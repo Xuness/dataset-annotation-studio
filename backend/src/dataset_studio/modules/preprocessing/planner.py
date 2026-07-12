@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+import json
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
+from PIL import Image, ImageOps
+
+from dataset_studio.core.files import file_sha256
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.preprocessing.models import OutputFormat, PreprocessRequest
 
@@ -23,16 +28,44 @@ class PlanItem:
 
 def build_plan(database_path: Path, root: Path, request: PreprocessRequest) -> list[PlanItem]:
     rows = _select_assets(database_path, request.asset_ids)
+    if request.asset_ids:
+        selected_ids = set(request.asset_ids)
+        found_ids = {str(row["id"]) for row in rows}
+        missing_count = len(selected_ids - found_ids)
+        if missing_count:
+            raise ValueError(f"选中的图片中有 {missing_count} 项已不存在，请重新选择。")
     plan: list[PlanItem] = []
     for row in rows:
-        width, height = int(row["width"]), int(row["height"])
-        target_width, target_height = _target_size(width, height, request)
         before_relative = str(row["relative_path"])
-        after_relative = _target_path(before_relative, request)
         source = root / before_relative
+        if not source.is_file():
+            raise ValueError(f"图片已不存在：{before_relative}")
+        stat_before = source.stat()
+        with Image.open(source) as opened:
+            width, height = ImageOps.exif_transpose(opened).size
+            frame_count = int(getattr(opened, "n_frames", 1))
+        before_hash = file_sha256(source)
+        stat_after = source.stat()
+        if (stat_before.st_size, stat_before.st_mtime_ns) != (
+            stat_after.st_size,
+            stat_after.st_mtime_ns,
+        ):
+            raise ValueError(f"图片正在被其他程序修改，请稍后重试：{before_relative}")
+        target_width, target_height = _target_size(width, height, request)
+        after_relative = _target_path(before_relative, request)
         target = root / after_relative
-        warning = None
-        if source.resolve() != target.resolve() and target.exists():
+        will_change = (
+            target_width != width
+            or target_height != height
+            or after_relative != before_relative
+            or request.convert is not None
+        )
+        warning = (
+            f"暂不支持安全处理多帧图片（{frame_count} 帧）：{before_relative}"
+            if frame_count > 1 and will_change
+            else None
+        )
+        if warning is None and source.resolve() != target.resolve() and target.exists():
             warning = f"目标文件已经存在：{after_relative}"
         plan.append(
             PlanItem(
@@ -43,32 +76,61 @@ def build_plan(database_path: Path, root: Path, request: PreprocessRequest) -> l
                 before_height=height,
                 after_width=target_width,
                 after_height=target_height,
-                before_hash=str(row["content_hash"]),
-                will_change=(
-                    target_width != width
-                    or target_height != height
-                    or after_relative != before_relative
-                    or request.convert is not None
-                ),
+                before_hash=before_hash,
+                will_change=will_change,
                 warning=warning,
             )
         )
-    return plan
+    collisions: dict[str, int] = {}
+    for item in plan:
+        collisions[item.after_relative_path.casefold()] = (
+            collisions.get(item.after_relative_path.casefold(), 0) + 1
+        )
+    result: list[PlanItem] = []
+    for item in plan:
+        warning = item.warning
+        if collisions[item.after_relative_path.casefold()] > 1 and warning is None:
+            warning = f"多个源文件会写入同一目标：{item.after_relative_path}"
+        result.append(replace(item, warning=warning))
+    return result
+
+
+def preview_token(request: PreprocessRequest, plan: list[PlanItem]) -> str:
+    payload = {
+        "request": request.model_dump(mode="json"),
+        "items": [asdict(item) for item in plan],
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _select_assets(database_path: Path, asset_ids: list[str]):
-    clauses = ["is_present = 1"]
-    parameters: list[object] = []
-    if asset_ids:
-        placeholders = ",".join("?" for _ in asset_ids)
-        clauses.append(f"id IN ({placeholders})")
-        parameters.extend(asset_ids)
     connection = connect(database_path)
     try:
-        return connection.execute(
-            f"SELECT * FROM assets WHERE {' AND '.join(clauses)} ORDER BY relative_path",
-            parameters,
-        ).fetchall()
+        if not asset_ids:
+            return connection.execute(
+                "SELECT * FROM assets WHERE is_present = 1 ORDER BY relative_path"
+            ).fetchall()
+        unique_ids = list(dict.fromkeys(asset_ids))
+        rows = []
+        for start in range(0, len(unique_ids), 500):
+            batch = unique_ids[start : start + 500]
+            placeholders = ",".join("?" for _ in batch)
+            rows.extend(
+                connection.execute(
+                    f"""
+                    SELECT * FROM assets
+                    WHERE is_present = 1 AND id IN ({placeholders})
+                    """,
+                    batch,
+                ).fetchall()
+            )
+        return sorted(rows, key=lambda row: str(row["relative_path"]).casefold())
     finally:
         connection.close()
 

@@ -1,6 +1,8 @@
 import { CircleStop, Clock3, RotateCcw } from "lucide-react";
 
 import type { JobSummary } from "../../../shared/api/types";
+import { Button } from "../../../shared/ui/Button";
+import { Spinner } from "../../../shared/ui/Spinner";
 
 const statusLabels: Record<JobSummary["status"], string> = {
   queued: "等待中",
@@ -15,10 +17,20 @@ const statusLabels: Record<JobSummary["status"], string> = {
 export function JobList({
   jobs,
   selectedId,
+  hasMore,
+  loading,
+  loadingMore,
+  error,
+  onLoadMore,
   onSelect,
 }: {
   jobs: JobSummary[];
   selectedId: string | null;
+  hasMore: boolean;
+  loading: boolean;
+  loadingMore: boolean;
+  error: string | null;
+  onLoadMore: () => void;
   onSelect: (id: string) => void;
 }) {
   return (
@@ -26,9 +38,19 @@ export function JobList({
       <header>
         <span className="eyebrow">Run history</span>
         <strong>任务记录</strong>
-        <small>{jobs.length} 个任务</small>
+        <small>已显示 {jobs.length} 个任务</small>
       </header>
       <div className="job-list-scroll">
+        {loading ? (
+          <div className="job-list-empty">
+            <Spinner label="读取任务记录" />
+          </div>
+        ) : null}
+        {error ? (
+          <div className="job-list-empty">
+            <p>{error}</p>
+          </div>
+        ) : null}
         {jobs.map((job) => {
           const finished = job.succeeded + job.failed + job.skipped + job.manually_accepted;
           const progress = job.total ? Math.round((finished / job.total) * 100) : 0;
@@ -63,11 +85,21 @@ export function JobList({
             </button>
           );
         })}
-        {!jobs.length ? (
+        {!loading && !error && !jobs.length ? (
           <div className="job-list-empty">
             <Clock3 size={22} />
             <p>还没有标注任务。</p>
           </div>
+        ) : null}
+        {hasMore && !error ? (
+          <Button
+            className="job-list-load-more"
+            icon={loadingMore ? <Spinner /> : <RotateCcw size={12} />}
+            disabled={loadingMore}
+            onClick={onLoadMore}
+          >
+            载入更早记录
+          </Button>
         ) : null}
       </div>
     </section>

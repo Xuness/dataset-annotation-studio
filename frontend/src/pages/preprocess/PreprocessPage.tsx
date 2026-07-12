@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { AlertCircle } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { useAssets } from "../../features/assets/hooks";
 import {
@@ -10,6 +11,7 @@ import { useRescanWorkspace, useWorkspace } from "../../features/workspaces/hook
 import type { PreprocessRequest } from "../../shared/api/types";
 import { useAppStore } from "../../shared/store/appStore";
 import { Spinner } from "../../shared/ui/Spinner";
+import { Button } from "../../shared/ui/Button";
 import { NavigationRail } from "../workspace/components/NavigationRail";
 import { WorkspaceTopbar } from "../workspace/components/WorkspaceTopbar";
 import "../workspace/workspace.css";
@@ -32,8 +34,9 @@ const initialForm: PreprocessFormState = {
 
 export function PreprocessPage() {
   const { projectId = "" } = useParams();
+  const navigate = useNavigate();
   const workspace = useWorkspace(projectId);
-  const assets = useAssets(projectId, { limit: 10_000 });
+  const assets = useAssets(projectId, { limit: 1 });
   const rescan = useRescanWorkspace(projectId);
   const operations = usePreprocessOperations(projectId);
   const actions = usePreprocessingActions(projectId);
@@ -41,6 +44,7 @@ export function PreprocessPage() {
   const setActiveProject = useAppStore((state) => state.setActiveProject);
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState<string | null>(null);
+  const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
 
   useEffect(() => setActiveProject(projectId), [projectId, setActiveProject]);
   const request = useMemo<PreprocessRequest>(
@@ -55,6 +59,20 @@ export function PreprocessPage() {
     }),
     [checkedAssetIds, form],
   );
+  const requestFingerprint = useMemo(() => JSON.stringify(request), [request]);
+  const validPreview = previewFingerprint === requestFingerprint ? actions.preview.data : undefined;
+  const filesChanging = actions.execute.isPending || actions.undo.isPending;
+  const workspaceBusy = filesChanging || rescan.isPending;
+
+  if (workspace.isError) {
+    return (
+      <div className="workspace-loading workspace-loading--error">
+        <AlertCircle size={28} />
+        <p>{workspace.error instanceof Error ? workspace.error.message : "工作区不可用。"}</p>
+        <Button onClick={() => navigate("/")}>返回项目首页</Button>
+      </div>
+    );
+  }
 
   if (!workspace.data) {
     return (
@@ -67,15 +85,17 @@ export function PreprocessPage() {
 
   async function preview() {
     setError(null);
+    setPreviewFingerprint(null);
     try {
       await actions.preview.mutateAsync(request);
+      setPreviewFingerprint(requestFingerprint);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法生成预览。 ");
+      setError(reason instanceof Error ? reason.message : "无法生成预览。");
     }
   }
 
   async function execute() {
-    const previewData = actions.preview.data;
+    const previewData = validPreview;
     if (!previewData || previewData.warning_count) return;
     if (
       !window.confirm(
@@ -85,10 +105,24 @@ export function PreprocessPage() {
       return;
     setError(null);
     try {
-      await actions.execute.mutateAsync(request);
+      await actions.execute.mutateAsync({
+        request,
+        previewToken: previewData.preview_token,
+      });
       actions.preview.reset();
+      setPreviewFingerprint(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "预处理失败。 ");
+      setError(reason instanceof Error ? reason.message : "预处理失败。");
+    }
+  }
+
+  async function undo(operationId: string) {
+    if (!window.confirm("撤销这次预处理并恢复原文件？撤销前会再次校验当前文件。")) return;
+    setError(null);
+    try {
+      await actions.undo.mutateAsync(operationId);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "撤销预处理失败。");
     }
   }
 
@@ -96,8 +130,10 @@ export function PreprocessPage() {
     <main className="workspace-page">
       <WorkspaceTopbar
         workspace={workspace.data}
-        rescanning={rescan.isPending}
-        onRescan={() => void rescan.mutateAsync()}
+        rescanning={workspaceBusy}
+        onRescan={() => {
+          if (!filesChanging) void rescan.mutateAsync();
+        }}
       />
       <div className="workspace-body preprocess-workspace-body">
         <NavigationRail projectId={projectId} active="preprocess" />
@@ -106,18 +142,18 @@ export function PreprocessPage() {
           onChange={(update) => setForm((current) => ({ ...current, ...update }))}
           assetCount={assets.data?.total ?? 0}
           checkedCount={checkedAssetIds.length}
-          preview={actions.preview.data}
-          previewPending={actions.preview.isPending}
-          executePending={actions.execute.isPending}
+          preview={validPreview}
+          previewPending={actions.preview.isPending || workspaceBusy}
+          executePending={workspaceBusy}
           error={error}
           onPreview={() => void preview()}
           onExecute={() => void execute()}
         />
-        <PreprocessPreviewPanel preview={actions.preview.data} />
+        <PreprocessPreviewPanel preview={validPreview} />
         <PreprocessHistoryPanel
           operations={operations.data ?? []}
-          undoPending={actions.undo.isPending}
-          onUndo={(id) => void actions.undo.mutateAsync(id)}
+          undoPending={workspaceBusy}
+          onUndo={(id) => void undo(id)}
         />
       </div>
       <footer className="workspace-statusbar">

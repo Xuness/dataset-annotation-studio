@@ -55,9 +55,12 @@ class PresetService:
         updated = updated.model_copy(
             update={"name": updated.name.strip(), "updated_at": utc_now_iso()}
         )
-        self._repository.update_system(
-            preset_id, updated.name, updated.system_prompt, updated.updated_at
-        )
+        try:
+            self._repository.update_system(
+                preset_id, updated.name, updated.system_prompt, updated.updated_at
+            )
+        except sqlite3.IntegrityError as error:
+            raise ValueError(f"预设名称已存在：{updated.name}") from error
         return updated
 
     def delete_system(self, preset_id: str) -> None:
@@ -97,12 +100,17 @@ class PresetService:
             now,
             now,
         )
+        secret_key = self._secret_key(profile_id)
+        if data.api_key:
+            self._secrets.set(secret_key, data.api_key)
         try:
             self._repository.insert_provider(values)
-        except sqlite3.IntegrityError as error:
-            raise ValueError(f"API 配置名称已存在：{data.name}") from error
-        if data.api_key:
-            self._secrets.set(self._secret_key(profile_id), data.api_key)
+        except BaseException as error:
+            if data.api_key:
+                self._secrets.delete(secret_key)
+            if isinstance(error, sqlite3.IntegrityError):
+                raise ValueError(f"API 配置名称已存在：{data.name}") from error
+            raise
         return self.get_provider(profile_id)
 
     def update_provider(self, profile_id: str, data: ProviderProfileUpdate) -> ProviderProfile:
@@ -110,32 +118,39 @@ class PresetService:
         values = data.model_dump(exclude_none=True, exclude={"api_key"})
         updated = current.model_copy(update=values)
         updated_at = utc_now_iso()
-        self._repository.update_provider(
-            profile_id,
-            (
-                updated.name.strip(),
-                updated.provider_type.value,
-                updated.base_url.rstrip("/"),
-                updated.model.strip(),
-                updated.temperature,
-                updated.max_output_tokens,
-                updated.concurrency,
-                updated.timeout_seconds,
-                updated.request_options.model_dump_json(exclude_none=True),
-                updated_at,
-            ),
-        )
+        secret_key = self._secret_key(profile_id)
+        old_api_key = self._secrets.get(secret_key) if data.api_key is not None else None
         if data.api_key is not None:
             if data.api_key:
-                self._secrets.set(self._secret_key(profile_id), data.api_key)
+                self._secrets.set(secret_key, data.api_key)
             else:
-                self._secrets.delete(self._secret_key(profile_id))
+                self._secrets.delete(secret_key)
+        try:
+            self._repository.update_provider(
+                profile_id,
+                self._provider_values(updated, updated_at),
+            )
+        except BaseException as error:
+            if data.api_key is not None:
+                self._restore_secret(secret_key, old_api_key)
+            if isinstance(error, sqlite3.IntegrityError):
+                raise ValueError(f"API 配置名称已存在：{updated.name}") from error
+            raise
         return self.get_provider(profile_id)
 
     def delete_provider(self, profile_id: str) -> None:
-        if not self._repository.delete_provider(profile_id):
+        self.get_provider(profile_id)
+        secret_key = self._secret_key(profile_id)
+        old_api_key = self._secrets.get(secret_key)
+        self._secrets.delete(secret_key)
+        try:
+            deleted = self._repository.delete_provider(profile_id)
+        except BaseException:
+            self._restore_secret(secret_key, old_api_key)
+            raise
+        if not deleted:
+            self._restore_secret(secret_key, old_api_key)
             raise PresetNotFoundError(f"找不到 API 配置：{profile_id}")
-        self._secrets.delete(self._secret_key(profile_id))
 
     def _provider_from_row(self, row) -> ProviderProfile:
         values = dict(row)
@@ -150,3 +165,24 @@ class PresetService:
     @staticmethod
     def _secret_key(profile_id: str) -> str:
         return f"provider:{profile_id}"
+
+    @staticmethod
+    def _provider_values(profile: ProviderProfile, updated_at: str) -> tuple[object, ...]:
+        return (
+            profile.name.strip(),
+            profile.provider_type.value,
+            profile.base_url.rstrip("/"),
+            profile.model.strip(),
+            profile.temperature,
+            profile.max_output_tokens,
+            profile.concurrency,
+            profile.timeout_seconds,
+            profile.request_options.model_dump_json(exclude_none=True),
+            updated_at,
+        )
+
+    def _restore_secret(self, key: str, value: str | None) -> None:
+        if value:
+            self._secrets.set(key, value)
+        else:
+            self._secrets.delete(key)

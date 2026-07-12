@@ -53,7 +53,7 @@ export function NewJobPanel({
       });
       onCreated(job);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法创建任务。 ");
+      setError(reason instanceof Error ? reason.message : "无法创建任务。");
     }
   }
 

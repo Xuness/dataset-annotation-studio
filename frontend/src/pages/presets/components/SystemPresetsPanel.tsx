@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FileText, Save, Trash2 } from "lucide-react";
 
 import { useSystemPresetMutations, useSystemPresets } from "../../../features/presets/hooks";
+import { useUnsavedChangesGuard, useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { usePresetEditorSelection } from "../hooks/usePresetEditorSelection";
@@ -11,6 +12,7 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
   const mutations = useSystemPresetMutations();
   const selection = usePresetEditorSelection(presets.data, createSignal);
   const selected = selection.selected;
+  const { confirmDiscard } = useUnsavedChangesGuard();
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,20 +36,28 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
         selection.select(created.id);
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法保存预设。 ");
+      setError(reason instanceof Error ? reason.message : "无法保存预设。");
     }
   }
 
   async function remove() {
     if (!selected || !window.confirm(`删除全局预设“${selected.name}”？`)) return;
-    await mutations.remove.mutateAsync(selected.id);
-    selection.clear();
+    setError(null);
+    try {
+      await mutations.remove.mutateAsync(selected.id);
+      selection.clear();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法删除预设。");
+    }
   }
 
-  const dirty = Boolean(
-    name.trim() && prompt && (name !== selected?.name || prompt !== selected?.system_prompt),
-  );
-  const pending = mutations.create.isPending || mutations.update.isPending;
+  const dirty = selected
+    ? name !== selected.name || prompt !== selected.system_prompt
+    : name !== "" || prompt !== "";
+  const canSave = Boolean(name.trim() && prompt.trim());
+  useUnsavedScope("system-preset", dirty);
+  const pending =
+    mutations.create.isPending || mutations.update.isPending || mutations.remove.isPending;
 
   return (
     <section className="preset-workarea">
@@ -63,7 +73,10 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
               className={
                 !selection.isCreating && selection.selectedId === preset.id ? "is-active" : ""
               }
-              onClick={() => selection.select(preset.id)}
+              onClick={() => {
+                if (selection.selectedId === preset.id && !selection.isCreating) return;
+                if (confirmDiscard()) selection.select(preset.id);
+              }}
             >
               <FileText size={15} />
               <span>
@@ -85,7 +98,7 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
             <Button
               tone="danger"
               icon={<Trash2 size={14} />}
-              disabled={!selected || mutations.remove.isPending}
+              disabled={!selected || pending}
               onClick={() => void remove()}
             >
               删除
@@ -93,7 +106,7 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
             <Button
               tone="primary"
               icon={pending ? <Spinner /> : <Save size={14} />}
-              disabled={!dirty || pending}
+              disabled={!dirty || !canSave || pending}
               onClick={() => void save()}
             >
               保存

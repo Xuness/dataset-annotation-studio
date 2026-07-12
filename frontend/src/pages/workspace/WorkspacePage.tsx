@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useAssets } from "../../features/assets/hooks";
+import { useInfiniteAssets } from "../../features/assets/hooks";
 import {
   useRescanWorkspace,
   useUpdateWorkspace,
@@ -52,11 +52,17 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const mediaColumnRef = useRef<HTMLDivElement>(null);
   const { layout, setLayout } = useWorkspaceLayout(projectId);
 
-  const assetQuery = useMemo(
-    () => ({ search, status: statusFilter, limit: 10_000 }),
-    [search, statusFilter],
+  const assetQuery = useMemo(() => ({ search, status: statusFilter }), [search, statusFilter]);
+  const assets = useInfiniteAssets(projectId, assetQuery);
+  const assetItems = useMemo(
+    () => assets.data?.pages.flatMap((page) => page.items) ?? [],
+    [assets.data?.pages],
   );
-  const assets = useAssets(projectId, assetQuery);
+  const assetResult = assets.data?.pages[0];
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = assets;
+  const loadMoreAssets = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   useEffect(() => {
     setActiveProject(projectId);
@@ -80,7 +86,8 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   }, [setLayout, workspace.data]);
 
   useEffect(() => {
-    const items = assets.data?.items;
+    const items = assetItems;
+    if (editorDirty) return;
     if (!items?.length) {
       if (selectedAssetId) selectAsset(null);
       return;
@@ -88,9 +95,9 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     if (!selectedAssetId || !items.some((asset) => asset.id === selectedAssetId)) {
       selectAsset(items[0].id);
     }
-  }, [assets.data?.items, selectAsset, selectedAssetId]);
+  }, [assetItems, editorDirty, selectAsset, selectedAssetId]);
 
-  const selectedAsset = assets.data?.items.find((asset) => asset.id === selectedAssetId) ?? null;
+  const selectedAsset = assetItems.find((asset) => asset.id === selectedAssetId) ?? null;
 
   const requestSelectAsset = useCallback(
     (assetId: string) => {
@@ -141,13 +148,18 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         <AssetBrowser
           mode={mode}
           projectId={projectId}
-          assets={assets.data?.items ?? []}
-          total={assets.data?.total ?? workspace.data.asset_count}
+          assets={assetItems}
+          total={assetResult?.total ?? workspace.data.asset_count}
           selectedAssetId={selectedAssetId}
           checkedAssetIds={checkedAssetIds}
           search={search}
           statusFilter={statusFilter}
-          statusCounts={assets.data?.status_counts ?? {}}
+          statusCounts={assetResult?.status_counts ?? {}}
+          hasMore={Boolean(assets.hasNextPage)}
+          loading={assets.isLoading}
+          loadingMore={assets.isFetchingNextPage}
+          error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
+          onLoadMore={loadMoreAssets}
           recursive={workspace.data.settings.recursive_scan}
           onSearchChange={setSearch}
           onStatusChange={setStatusFilter}
@@ -213,6 +225,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
             }
           />
           <AnnotationEditor
+            key={selectedAssetId ?? "no-asset"}
             projectId={projectId}
             assetId={selectedAssetId}
             onDirtyChange={setEditorDirty}
@@ -254,7 +267,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
       </div>
       <footer className="workspace-statusbar">
         <span>
-          {mode === "review" ? "审核" : "素材"} · {assets.data?.total ?? 0} 张图片
+          {mode === "review" ? "审核" : "素材"} · {assetResult?.total ?? 0} 张图片
         </span>
         <span>已标注 {workspace.data.annotated_count}</span>
         <span>异常 {workspace.data.invalid_count}</span>

@@ -27,7 +27,13 @@ export function usePreprocessingActions(projectId: string) {
       mutationFn: (request: PreprocessRequest) => previewPreprocessing(projectId, request),
     }),
     execute: useMutation({
-      mutationFn: (request: PreprocessRequest) => executePreprocessing(projectId, request),
+      mutationFn: ({
+        request,
+        previewToken,
+      }: {
+        request: PreprocessRequest;
+        previewToken: string;
+      }) => executePreprocessing(projectId, request, previewToken),
       onSuccess: refresh,
     }),
     undo: useMutation({

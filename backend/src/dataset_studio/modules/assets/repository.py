@@ -34,8 +34,8 @@ class AssetRepository:
                         byte_size, modified_ns, width, height,
                         annotation_relative_path, annotation_status,
                         annotation_modified_ns, metadata_relative_path,
-                        is_present, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                        image_metadata_version, is_present, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         relative_path = excluded.relative_path,
                         filename = excluded.filename,
@@ -50,6 +50,7 @@ class AssetRepository:
                         annotation_status = excluded.annotation_status,
                         annotation_modified_ns = excluded.annotation_modified_ns,
                         metadata_relative_path = excluded.metadata_relative_path,
+                        image_metadata_version = excluded.image_metadata_version,
                         is_present = 1,
                         updated_at = excluded.updated_at
                     """,
@@ -68,6 +69,7 @@ class AssetRepository:
                         record.annotation_status,
                         record.annotation_modified_ns,
                         record.metadata_relative_path,
+                        record.image_metadata_version,
                         record.created_at,
                         record.updated_at,
                     ),
@@ -109,7 +111,8 @@ class AssetRepository:
             )
             rows = connection.execute(
                 f"""
-                SELECT id, relative_path, filename, suffix, byte_size, width, height,
+                SELECT id, relative_path, filename, suffix,
+                       content_hash AS content_version, byte_size, width, height,
                        annotation_relative_path, annotation_status, metadata_relative_path
                 FROM assets
                 WHERE {where}
@@ -158,14 +161,3 @@ class AssetRepository:
             return int(row["total"] or 0), int(row["annotated"] or 0), int(row["invalid"] or 0)
         finally:
             connection.close()
-
-    def update_annotation_status(self, asset_id: str, status: str, modified_ns: int | None) -> None:
-        with transaction(self._database_path) as connection:
-            connection.execute(
-                """
-                UPDATE assets
-                SET annotation_status = ?, annotation_modified_ns = ?, updated_at = datetime('now')
-                WHERE id = ?
-                """,
-                (status, modified_ns, asset_id),
-            )

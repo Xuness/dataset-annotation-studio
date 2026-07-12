@@ -12,6 +12,7 @@ from dataset_studio.modules.jobs.models import (
     ActiveJobsOverview,
     JobCreateRequest,
     JobDetail,
+    JobItemStatus,
     JobScope,
     JobSummary,
 )
@@ -32,7 +33,13 @@ class JobService:
         self._presets = presets
         self._annotations = annotations
 
-    def create(self, project_id: str, request: JobCreateRequest) -> JobDetail:
+    def create(
+        self,
+        project_id: str,
+        request: JobCreateRequest,
+        *,
+        include_items: bool = True,
+    ) -> JobDetail:
         paths, manifest = self._workspaces.get(project_id)
         system_preset = self._presets.get_system(request.system_preset_id)
         provider_profile = self._presets.get_provider(request.provider_profile_id)
@@ -61,42 +68,81 @@ class JobService:
             retry_limit=3,
             asset_ids=asset_ids,
         )
-        return self.get(project_id, job_id)
+        return self.get(project_id, job_id, include_items=include_items)
 
-    def list(self, project_id: str) -> list[JobSummary]:
+    def list(
+        self,
+        project_id: str,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+        active_only: bool = False,
+    ) -> list[JobSummary]:
         paths, _ = self._workspaces.get(project_id)
-        return JobQueryRepository(paths.database).list_jobs()
+        return JobQueryRepository(paths.database).list_jobs(
+            offset=offset,
+            limit=limit,
+            active_only=active_only,
+        )
 
-    def get(self, project_id: str, job_id: str) -> JobDetail:
+    def get(
+        self,
+        project_id: str,
+        job_id: str,
+        *,
+        include_items: bool = True,
+        failed_items_only: bool = False,
+        item_offset: int = 0,
+        item_limit: int | None = None,
+    ) -> JobDetail:
         paths, _ = self._workspaces.get(project_id)
-        job = JobQueryRepository(paths.database).get_job(job_id)
+        job = JobQueryRepository(paths.database).get_job(
+            job_id,
+            include_items=include_items,
+            failed_items_only=failed_items_only,
+            item_offset=item_offset,
+            item_limit=item_limit,
+        )
         if job is None:
             raise JobNotFoundError(f"找不到任务：{job_id}")
         return job
 
-    def stop(self, project_id: str, job_id: str) -> JobDetail:
+    def stop(self, project_id: str, job_id: str, *, include_items: bool = True) -> JobDetail:
         paths, _ = self._workspaces.get(project_id)
         repository = JobLifecycleRepository(paths.database)
         if not repository.request_stop(job_id):
             raise JobNotFoundError("任务不存在或已经结束。")
-        return self.get(project_id, job_id)
+        return self.get(project_id, job_id, include_items=include_items)
 
     def stop_all(self, project_id: str) -> int:
         paths, _ = self._workspaces.get(project_id)
         return JobLifecycleRepository(paths.database).request_stop_all()
 
+    def has_active(self, project_id: str) -> bool:
+        paths, _ = self._workspaces.get(project_id)
+        return JobLifecycleRepository(paths.database).active_count() > 0
+
     def active_overview(self) -> ActiveJobsOverview:
         count = 0
-        project_count = 0
+        projects = self.active_project_ids()
+        for project_id in projects:
+            paths, _ = self._workspaces.get(project_id)
+            count += JobLifecycleRepository(paths.database).active_count()
+        return ActiveJobsOverview(
+            count=count,
+            project_count=len(projects),
+            annotation_job_count=count,
+        )
+
+    def active_project_ids(self) -> set[str]:
+        projects: set[str] = set()
         for workspace in self._workspaces.list_recent():
             if not workspace.exists:
                 continue
             paths, _ = self._workspaces.get(workspace.project_id)
-            active_count = JobLifecycleRepository(paths.database).active_count()
-            if active_count:
-                project_count += 1
-                count += active_count
-        return ActiveJobsOverview(count=count, project_count=project_count)
+            if JobLifecycleRepository(paths.database).active_count():
+                projects.add(workspace.project_id)
+        return projects
 
     def stop_all_workspaces(self) -> int:
         stopped = 0
@@ -106,19 +152,36 @@ class JobService:
                 stopped += JobLifecycleRepository(paths.database).request_stop_all()
         return stopped
 
-    def resume(self, project_id: str, job_id: str) -> JobDetail:
+    def resume(self, project_id: str, job_id: str, *, include_items: bool = True) -> JobDetail:
         paths, _ = self._workspaces.get(project_id)
+        if JobQueryRepository(paths.database).get_job_row(job_id) is None:
+            raise JobNotFoundError(f"找不到任务：{job_id}")
         if not JobLifecycleRepository(paths.database).resume(job_id):
-            raise JobNotFoundError(f"找不到任务：{job_id}")
-        return self.get(project_id, job_id)
+            raise ValueError("只有已停止或意外中断的任务可以继续。")
+        return self.get(project_id, job_id, include_items=include_items)
 
-    def retry_failed(self, project_id: str, job_id: str) -> JobDetail:
+    def retry_failed(
+        self,
+        project_id: str,
+        job_id: str,
+        *,
+        include_items: bool = True,
+    ) -> JobDetail:
         paths, _ = self._workspaces.get(project_id)
-        if not JobLifecycleRepository(paths.database).resume(job_id, failed_only=True):
+        if JobQueryRepository(paths.database).get_job_row(job_id) is None:
             raise JobNotFoundError(f"找不到任务：{job_id}")
-        return self.get(project_id, job_id)
+        if not JobLifecycleRepository(paths.database).resume(job_id, failed_only=True):
+            raise ValueError("只有已经结束且仍含失败项的任务可以仅重试失败项。")
+        return self.get(project_id, job_id, include_items=include_items)
 
-    def manually_accept(self, project_id: str, job_id: str, item_id: str) -> JobDetail:
+    def manually_accept(
+        self,
+        project_id: str,
+        job_id: str,
+        item_id: str,
+        *,
+        include_items: bool = True,
+    ) -> JobDetail:
         paths, _ = self._workspaces.get(project_id)
         queries = JobQueryRepository(paths.database)
         execution = JobExecutionRepository(paths.database)
@@ -130,16 +193,14 @@ class JobService:
             raise ValueError("这个失败项没有可以人工采用的模型响应。")
         asset_id, content = response
         self._annotations.save_generated(project_id, asset_id, content, manually_accepted=True)
-        from dataset_studio.modules.jobs.models import JobItemStatus
-
         execution.finish_item(
             item_id,
             JobItemStatus.MANUALLY_ACCEPTED,
             validation_status="manually_accepted",
             manually_accepted=True,
         )
-        JobLifecycleRepository(paths.database).finalize_jobs()
-        return self.get(project_id, job_id)
+        JobLifecycleRepository(paths.database).finalize_job(job_id)
+        return self.get(project_id, job_id, include_items=include_items)
 
     @staticmethod
     def _select_assets(
@@ -149,22 +210,40 @@ class JobService:
         *,
         overwrite_existing: bool,
     ) -> list[str]:
-        clauses = ["is_present = 1"]
-        parameters: list[object] = []
-        if not overwrite_existing:
-            clauses.append("annotation_status = 'missing'")
         if scope == JobScope.SELECTED:
             if not selected_ids:
                 return []
-            placeholders = ",".join("?" for _ in selected_ids)
-            clauses.append(f"id IN ({placeholders})")
-            parameters.extend(selected_ids)
+            unique_ids = list(dict.fromkeys(selected_ids))
+        else:
+            unique_ids = []
         connection = connect(database_path)
         try:
-            rows = connection.execute(
-                f"SELECT id FROM assets WHERE {' AND '.join(clauses)} ORDER BY relative_path",
-                parameters,
-            ).fetchall()
+            clauses = ["is_present = 1"]
+            if not overwrite_existing:
+                clauses.append("annotation_status = 'missing'")
+            if not unique_ids:
+                rows = connection.execute(
+                    f"""
+                    SELECT id, relative_path FROM assets
+                    WHERE {" AND ".join(clauses)}
+                    ORDER BY relative_path
+                    """
+                ).fetchall()
+            else:
+                rows = []
+                for start in range(0, len(unique_ids), 500):
+                    batch = unique_ids[start : start + 500]
+                    placeholders = ",".join("?" for _ in batch)
+                    rows.extend(
+                        connection.execute(
+                            f"""
+                            SELECT id, relative_path FROM assets
+                            WHERE {" AND ".join(clauses)} AND id IN ({placeholders})
+                            """,
+                            batch,
+                        ).fetchall()
+                    )
+                rows.sort(key=lambda row: str(row["relative_path"]).casefold())
             return [str(row["id"]) for row in rows]
         finally:
             connection.close()

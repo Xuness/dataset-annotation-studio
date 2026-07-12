@@ -18,7 +18,7 @@ export function ImageStage({ projectId, asset }: ImageStageProps) {
   useEffect(() => {
     setZoom(1);
     setLoaded(false);
-  }, [asset?.id]);
+  }, [asset?.content_version, asset?.id]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -31,7 +31,7 @@ export function ImageStage({ projectId, asset }: ImageStageProps) {
     const observer = new ResizeObserver(measure);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [asset?.id]);
+  }, [asset?.content_version, asset?.id]);
 
   const displaySize = useMemo(() => {
     if (!asset || viewport.width === 0 || viewport.height === 0) return null;
@@ -93,7 +93,7 @@ export function ImageStage({ projectId, asset }: ImageStageProps) {
         <div className="image-stage__checker" />
         <div className="image-stage__scroll-content">
           <img
-            src={imageUrl(projectId, asset.id)}
+            src={imageUrl(projectId, asset.id, asset.content_version)}
             alt={asset.filename}
             style={displaySize ?? undefined}
             onLoad={() => setLoaded(true)}

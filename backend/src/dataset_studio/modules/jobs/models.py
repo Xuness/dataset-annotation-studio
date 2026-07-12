@@ -92,3 +92,5 @@ class JobDetail(JobSummary):
 class ActiveJobsOverview(BaseModel):
     count: int
     project_count: int
+    annotation_job_count: int = 0
+    preprocessing_count: int = 0

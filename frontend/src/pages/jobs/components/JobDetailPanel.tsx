@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Check, CircleStop, FileWarning, Play, RefreshCw } from "lucide-react";
 
 import { useJob, useJobActions } from "../../../features/jobs/hooks";
@@ -5,13 +6,36 @@ import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 
 export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId: string | null }) {
-  const job = useJob(projectId, jobId);
+  const [itemLimit, setItemLimit] = useState(200);
+  const job = useJob(projectId, jobId, itemLimit);
   const actions = useJobActions(projectId);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setItemLimit(200);
+    setActionError(null);
+  }, [jobId]);
+
+  async function runAction(action: () => Promise<unknown>) {
+    setActionError(null);
+    try {
+      await action();
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : "任务操作失败。");
+    }
+  }
 
   if (!jobId)
     return (
       <section className="job-detail-panel job-detail-panel--empty">
         <p>选择一项任务查看详情。</p>
+      </section>
+    );
+  if (job.isError && !job.data)
+    return (
+      <section className="job-detail-panel job-detail-panel--empty">
+        <FileWarning size={20} />
+        <p>{job.error instanceof Error ? job.error.message : "读取任务详情失败。"}</p>
       </section>
     );
   if (!job.data)
@@ -22,6 +46,7 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
     );
 
   const active = ["queued", "running", "stopping"].includes(job.data.status);
+  const stopping = job.data.status === "stopping";
   const resumable = ["stopped", "interrupted"].includes(job.data.status);
   const failedItems = job.data.items.filter((item) => item.status === "failed");
 
@@ -38,31 +63,34 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
             <Button
               tone="danger"
               icon={actions.stop.isPending ? <Spinner /> : <CircleStop size={14} />}
-              onClick={() => void actions.stop.mutateAsync(job.data.id)}
-              disabled={actions.stop.isPending}
+              onClick={() => void runAction(() => actions.stop.mutateAsync(job.data.id))}
+              disabled={stopping || actions.stop.isPending}
             >
-              停止任务
+              {stopping ? "正在停止" : "停止任务"}
             </Button>
           ) : null}
           {resumable ? (
             <Button
               tone="primary"
-              icon={<Play size={14} />}
-              onClick={() => void actions.resume.mutateAsync(job.data.id)}
+              icon={actions.resume.isPending ? <Spinner /> : <Play size={14} />}
+              onClick={() => void runAction(() => actions.resume.mutateAsync(job.data.id))}
+              disabled={actions.resume.isPending}
             >
               继续任务
             </Button>
           ) : null}
-          {job.data.failed ? (
+          {job.data.status === "completed_with_errors" && job.data.failed ? (
             <Button
-              icon={<RefreshCw size={14} />}
-              onClick={() => void actions.retry.mutateAsync(job.data.id)}
+              icon={actions.retry.isPending ? <Spinner /> : <RefreshCw size={14} />}
+              onClick={() => void runAction(() => actions.retry.mutateAsync(job.data.id))}
+              disabled={actions.retry.isPending}
             >
               仅重试失败项
             </Button>
           ) : null}
         </div>
       </header>
+      {actionError ? <p className="form-error">{actionError}</p> : null}
 
       <div className="job-summary-grid">
         <div>
@@ -85,11 +113,17 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
 
       <div className="failed-items-header">
         <span>失败与异常项</span>
-        <small>{failedItems.length} 项</small>
+        <small>
+          已显示 {failedItems.length} / {job.data.failed} 项
+        </small>
       </div>
       <div className="failed-items-list">
         {failedItems.map((item) => {
-          const response = [...item.attempts].reverse().find((attempt) => attempt.response_content);
+          const attempts = [...item.attempts].reverse();
+          const adoptableResponse = attempts.find(
+            (attempt) => attempt.status === "validation_failed" && attempt.response_content,
+          );
+          const diagnosticResponse = attempts.find((attempt) => attempt.response_content);
           return (
             <article key={item.id} className="failed-item">
               <header>
@@ -98,12 +132,16 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
                 <span>{item.attempt_count} 次尝试</span>
               </header>
               <p>{item.last_error ?? "未知错误"}</p>
-              {response?.response_content ? <pre>{response.response_content}</pre> : null}
-              {response?.response_content ? (
+              {diagnosticResponse?.response_content ? (
+                <pre>{diagnosticResponse.response_content}</pre>
+              ) : null}
+              {adoptableResponse?.response_content ? (
                 <Button
                   icon={<Check size={13} />}
                   onClick={() =>
-                    void actions.accept.mutateAsync({ jobId: job.data.id, itemId: item.id })
+                    void runAction(() =>
+                      actions.accept.mutateAsync({ jobId: job.data.id, itemId: item.id }),
+                    )
                   }
                   disabled={actions.accept.isPending}
                 >
@@ -118,6 +156,15 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
             <Check size={20} />
             <p>当前没有失败项。</p>
           </div>
+        ) : null}
+        {failedItems.length < job.data.failed ? (
+          <Button
+            icon={<RefreshCw size={13} />}
+            onClick={() => setItemLimit((current) => Math.min(current + 200, job.data.failed))}
+            disabled={job.isFetching}
+          >
+            载入更多失败项
+          </Button>
         ) : null}
       </div>
     </section>

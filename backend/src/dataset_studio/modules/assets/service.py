@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageOps
@@ -11,6 +13,7 @@ from dataset_studio.modules.assets.models import (
     MetadataDocument,
 )
 from dataset_studio.modules.assets.repository import AssetRepository
+from dataset_studio.modules.prompts.composer import escape_metadata_path_segment
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
@@ -25,7 +28,8 @@ def _collect_json_fields(value: object, prefix: str = "") -> list[str]:
     fields: list[str] = []
     if isinstance(value, dict):
         for key, child in value.items():
-            path = f"{prefix}.{key}" if prefix else str(key)
+            segment = escape_metadata_path_segment(key)
+            path = f"{prefix}.{segment}" if prefix else segment
             fields.append(path)
             fields.extend(_collect_json_fields(child, path))
     return fields
@@ -72,7 +76,8 @@ class AssetService:
         asset = self._asset_row(paths.database, asset_id)
         image_path = _ensure_inside(paths.root, paths.root / str(asset["relative_path"]))
         safe_size = min(max(size, 96), 1024)
-        thumbnail_path = paths.thumbnails / f"{asset_id}-{safe_size}.webp"
+        content_key = str(asset["content_hash"])[:24]
+        thumbnail_path = paths.thumbnails / f"{asset_id}-{content_key}-{safe_size}.webp"
         if (
             not thumbnail_path.is_file()
             or thumbnail_path.stat().st_mtime_ns < image_path.stat().st_mtime_ns
@@ -112,9 +117,19 @@ class AssetService:
     @staticmethod
     def _create_thumbnail(image_path: Path, thumbnail_path: Path, size: int) -> None:
         thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
-        with Image.open(image_path) as image:
-            image = ImageOps.exif_transpose(image)
-            image.thumbnail((size, size), Image.Resampling.LANCZOS)
-            if image.mode not in {"RGB", "RGBA"}:
-                image = image.convert("RGBA" if "transparency" in image.info else "RGB")
-            image.save(thumbnail_path, format="WEBP", quality=82, method=4)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{thumbnail_path.stem}.", suffix=".webp", dir=thumbnail_path.parent
+        )
+        os.close(descriptor)
+        temporary_path = Path(temporary_name)
+        try:
+            with Image.open(image_path) as image:
+                image = ImageOps.exif_transpose(image)
+                image.thumbnail((size, size), Image.Resampling.LANCZOS)
+                if image.mode not in {"RGB", "RGBA"}:
+                    image = image.convert("RGBA" if "transparency" in image.info else "RGB")
+                image.save(temporary_path, format="WEBP", quality=82, method=4)
+            os.replace(temporary_path, thumbnail_path)
+        except BaseException:
+            temporary_path.unlink(missing_ok=True)
+            raise

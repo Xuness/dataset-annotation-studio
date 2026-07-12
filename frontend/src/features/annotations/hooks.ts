@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { deleteAnnotation, getAnnotation, saveAnnotation } from "./api";
+import { deleteAnnotation, getAnnotation, getAnnotationHistory, saveAnnotation } from "./api";
 
 export function useAnnotation(projectId: string, assetId: string | null) {
   return useQuery({
@@ -10,10 +10,19 @@ export function useAnnotation(projectId: string, assetId: string | null) {
   });
 }
 
+export function useAnnotationHistory(projectId: string, assetId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["annotation-history", projectId, assetId],
+    queryFn: () => getAnnotationHistory(projectId, assetId!),
+    enabled: Boolean(projectId && assetId && enabled),
+  });
+}
+
 function useInvalidateAnnotation(projectId: string, assetId: string) {
   const queryClient = useQueryClient();
   return () => {
     void queryClient.invalidateQueries({ queryKey: ["annotation", projectId, assetId] });
+    void queryClient.invalidateQueries({ queryKey: ["annotation-history", projectId, assetId] });
     void queryClient.invalidateQueries({ queryKey: ["assets", projectId] });
     void queryClient.invalidateQueries({ queryKey: ["workspaces", projectId] });
     void queryClient.invalidateQueries({ queryKey: ["statistics", projectId] });

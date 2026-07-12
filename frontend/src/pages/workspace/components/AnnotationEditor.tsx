@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { xml } from "@codemirror/lang-xml";
-import { FileText, Save, Trash2, TriangleAlert } from "lucide-react";
+import { FileText, History, RotateCcw, Save, Trash2, TriangleAlert } from "lucide-react";
 
 import {
   useAnnotation,
+  useAnnotationHistory,
   useDeleteAnnotation,
   useSaveAnnotation,
 } from "../../../features/annotations/hooks";
+import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { StatusDot } from "../../../shared/ui/StatusDot";
@@ -20,6 +22,12 @@ interface AnnotationEditorProps {
 }
 
 const FONT_SIZE_STORAGE_KEY = "dataset-studio.annotation-font-size";
+const REVISION_SOURCE_LABELS: Record<string, string> = {
+  manual_edit: "手动保存",
+  model_response: "模型生成",
+  manual_accept: "人工采用",
+  deleted_snapshot: "删除前快照",
+};
 
 function readFontSize(): number {
   const stored = Number.parseInt(window.localStorage.getItem(FONT_SIZE_STORAGE_KEY) ?? "12", 10);
@@ -33,8 +41,14 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
   const [fontSize, setFontSize] = useState(readFontSize);
+  const [showHistory, setShowHistory] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const history = useAnnotationHistory(projectId, assetId, showHistory);
 
   const dirty = content !== savedContent;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  useUnsavedScope(`annotation:${projectId}`, dirty);
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
 
   useEffect(() => {
@@ -42,6 +56,7 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
   }, [fontSize]);
 
   useEffect(() => {
+    if (dirtyRef.current) return;
     if (annotation.data) {
       setContent(annotation.data.content);
       setSavedContent(annotation.data.content);
@@ -84,16 +99,32 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
 
   async function handleSaveClick() {
     if (!assetId) return;
-    const result = await save.mutateAsync(content);
-    setSavedContent(result.content);
+    setActionError(null);
+    try {
+      const result = await save.mutateAsync(content);
+      setContent(result.content);
+      setSavedContent(result.content);
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : "保存标注失败。");
+    }
   }
 
   async function handleDelete() {
     if (!assetId || !annotation.data?.exists) return;
     if (!window.confirm("删除当前图片旁的同名标注文件？内部历史仍会保留。")) return;
-    await remove.mutateAsync();
-    setContent("");
-    setSavedContent("");
+    setActionError(null);
+    try {
+      await remove.mutateAsync();
+      setContent("");
+      setSavedContent("");
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : "删除标注失败。");
+    }
+  }
+
+  function restoreRevision(revisionContent: string) {
+    setContent(revisionContent);
+    setShowHistory(false);
   }
 
   return (
@@ -106,6 +137,13 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
           {dirty ? <span className="unsaved-mark">尚未保存</span> : null}
         </div>
         <div className="annotation-editor__actions">
+          <Button
+            icon={<History size={14} />}
+            onClick={() => setShowHistory((current) => !current)}
+            disabled={!assetId}
+          >
+            历史
+          </Button>
           <Button
             tone="danger"
             icon={<Trash2 size={14} />}
@@ -129,7 +167,43 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
         className="annotation-editor__body"
         style={{ "--annotation-font-size": `${fontSize}px` } as CSSProperties}
       >
-        {assetId ? (
+        {assetId && annotation.isLoading ? (
+          <div className="annotation-editor__empty">
+            <Spinner label="读取标注" />
+          </div>
+        ) : assetId && annotation.isError && !annotation.data ? (
+          <div className="annotation-editor__empty validation-warning">
+            无法读取标注：
+            {annotation.error instanceof Error ? annotation.error.message : "未知错误"}
+          </div>
+        ) : assetId && showHistory ? (
+          <div className="annotation-editor__history">
+            {history.isLoading ? <Spinner label="读取历史" /> : null}
+            {history.isError ? (
+              <p className="validation-warning">
+                {history.error instanceof Error ? history.error.message : "读取历史失败。"}
+              </p>
+            ) : null}
+            {history.data?.map((revision) => (
+              <article key={revision.id}>
+                <header>
+                  <div>
+                    <strong>{REVISION_SOURCE_LABELS[revision.source] ?? revision.source}</strong>
+                    <small>{new Date(revision.created_at).toLocaleString()}</small>
+                  </div>
+                  <Button
+                    icon={<RotateCcw size={12} />}
+                    onClick={() => restoreRevision(revision.content)}
+                  >
+                    恢复到编辑器
+                  </Button>
+                </header>
+                <pre>{revision.content}</pre>
+              </article>
+            ))}
+            {!history.isLoading && !history.data?.length ? <p>当前还没有历史版本。</p> : null}
+          </div>
+        ) : assetId ? (
           <CodeMirror
             className="annotation-editor__codemirror"
             value={content}
@@ -151,9 +225,14 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
       </div>
 
       <footer className="annotation-editor__footer">
+        {actionError ? <span className="validation-warning">{actionError}</span> : null}
         <span>{content.length.toLocaleString()} 字符</span>
-        <span>{annotation.data?.validation?.tag_count ?? 0} 个标签</span>
-        {annotation.data?.validation?.issues.length ? (
+        {dirty ? (
+          <span>保存后重新校验标签</span>
+        ) : (
+          <span>{annotation.data?.validation?.tag_count ?? 0} 个标签</span>
+        )}
+        {!dirty && annotation.data?.validation?.issues.length ? (
           <span className="validation-warning">
             <TriangleAlert size={12} /> {annotation.data.validation.issues[0].message}
           </span>

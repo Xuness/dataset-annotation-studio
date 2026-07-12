@@ -1,6 +1,8 @@
 import { Bot, Images, ListChecks, SlidersHorizontal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { useUnsavedChangesGuard } from "../../../shared/desktop/useUnsavedChanges";
+
 const items = [
   { id: "assets", icon: Images, label: "素材" },
   { id: "preprocess", icon: SlidersHorizontal, label: "预处理" },
@@ -16,8 +18,11 @@ export function NavigationRail({
   active?: string;
 }) {
   const navigate = useNavigate();
+  const { confirmDiscard } = useUnsavedChangesGuard();
 
   function open(id: string) {
+    if (id === active) return;
+    if (!confirmDiscard()) return;
     if (id === "assets") navigate(`/workspace/${projectId}`);
     if (id === "review") navigate(`/workspace/${projectId}/review`);
     if (id === "jobs") navigate(`/workspace/${projectId}/jobs`);

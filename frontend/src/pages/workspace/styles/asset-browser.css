@@ -136,6 +136,13 @@
   padding: 6px 0 10px;
 }
 
+.asset-list__loading {
+  padding: 6px 10px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 9px;
+}
+
 .asset-list__virtual {
   position: relative;
   width: 100%;

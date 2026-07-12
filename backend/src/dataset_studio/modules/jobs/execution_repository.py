@@ -66,12 +66,23 @@ class JobExecutionRepository:
         now = utc_now_iso()
         with transaction(self._database_path) as connection:
             row = connection.execute(
-                "SELECT attempt_count FROM job_items WHERE id = ?", (item_id,)
+                """
+                SELECT ji.attempt_count,
+                       COALESCE(MAX(ja.attempt_number), 0) AS last_attempt_number
+                FROM job_items ji
+                LEFT JOIN job_attempts ja ON ja.job_item_id = ji.id
+                WHERE ji.id = ?
+                GROUP BY ji.id
+                """,
+                (item_id,),
             ).fetchone()
-            attempt_number = int(row["attempt_count"]) + 1
+            if row is None:
+                raise ValueError(f"找不到任务条目：{item_id}")
+            cycle_attempt_count = int(row["attempt_count"]) + 1
+            attempt_number = int(row["last_attempt_number"]) + 1
             connection.execute(
                 "UPDATE job_items SET attempt_count = ?, updated_at = ? WHERE id = ?",
-                (attempt_number, now, item_id),
+                (cycle_attempt_count, now, item_id),
             )
             connection.execute(
                 """

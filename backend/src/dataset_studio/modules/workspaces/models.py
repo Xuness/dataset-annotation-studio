@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class WorkspaceSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     recursive_scan: bool = True
     user_prompt: str = ""
     json_fields: list[str] = Field(default_factory=list)
-    validation_mode: str = "tag_balance"
+    validation_mode: Literal["tag_balance"] = "tag_balance"
 
 
 class WorkspaceManifest(BaseModel):
-    schema_version: int = 1
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
     project_id: str
     name: str
     created_at: str
@@ -32,14 +38,23 @@ class WorkspaceSummary(BaseModel):
 
 
 class WorkspaceOpenRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     path: str
 
 
 class WorkspaceSettingsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     recursive_scan: bool | None = None
     user_prompt: str | None = None
     json_fields: list[str] | None = None
-    validation_mode: str | None = None
+    validation_mode: Literal["tag_balance"] | None = None
+
+
+class ScanIssue(BaseModel):
+    path: str
+    message: str
 
 
 class ScanResult(BaseModel):
@@ -48,6 +63,8 @@ class ScanResult(BaseModel):
     added: int
     updated: int
     missing: int
+    failed: int = 0
+    issues: list[ScanIssue] = Field(default_factory=list)
     duration_ms: int
 
 

@@ -40,3 +40,11 @@ class AnnotationDocument(BaseModel):
 
 class AnnotationUpdate(BaseModel):
     content: str
+
+
+class AnnotationRevision(BaseModel):
+    id: str
+    source: str
+    validation_status: AnnotationStatus
+    created_at: str
+    content: str

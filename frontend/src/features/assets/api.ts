@@ -25,10 +25,19 @@ export function getPromptPreview(projectId: string, assetId: string): Promise<Pr
   return apiRequest(`/api/v1/workspaces/${projectId}/assets/${assetId}/prompt-preview`);
 }
 
-export function imageUrl(projectId: string, assetId: string): string {
-  return apiAssetUrl(`/api/v1/workspaces/${projectId}/assets/${assetId}/image`);
+export function imageUrl(projectId: string, assetId: string, contentVersion: string): string {
+  const version = encodeURIComponent(contentVersion);
+  return apiAssetUrl(`/api/v1/workspaces/${projectId}/assets/${assetId}/image?v=${version}`);
 }
 
-export function thumbnailUrl(projectId: string, assetId: string, size = 320): string {
-  return apiAssetUrl(`/api/v1/workspaces/${projectId}/assets/${assetId}/thumbnail?size=${size}`);
+export function thumbnailUrl(
+  projectId: string,
+  assetId: string,
+  contentVersion: string,
+  size = 320,
+): string {
+  const parameters = new URLSearchParams({ size: String(size), v: contentVersion });
+  return apiAssetUrl(
+    `/api/v1/workspaces/${projectId}/assets/${assetId}/thumbnail?${parameters}`,
+  );
 }

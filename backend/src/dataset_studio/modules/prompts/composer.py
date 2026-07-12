@@ -12,13 +12,45 @@ class PromptPreview(BaseModel):
     final_prompt: str
 
 
+def escape_metadata_path_segment(segment: object) -> str:
+    return str(segment).replace("\\", "\\\\").replace(".", "\\.")
+
+
+def _split_path(path: str) -> list[str]:
+    segments: list[str] = []
+    current: list[str] = []
+    escaped = False
+    for character in path:
+        if escaped:
+            current.append(character)
+            escaped = False
+        elif character == "\\":
+            escaped = True
+        elif character == ".":
+            segments.append("".join(current))
+            current = []
+        else:
+            current.append(character)
+    if escaped:
+        current.append("\\")
+    segments.append("".join(current))
+    return segments
+
+
 def _resolve_path(document: object, path: str) -> tuple[bool, object | None]:
-    current = document
-    for segment in path.split("."):
-        if not isinstance(current, dict) or segment not in current:
-            return False, None
-        current = current[segment]
-    return True, current
+    def resolve(segments: list[str]) -> tuple[bool, object | None]:
+        current = document
+        for segment in segments:
+            if not isinstance(current, dict) or segment not in current:
+                return False, None
+            current = current[segment]
+        return True, current
+
+    found, value = resolve(_split_path(path))
+    if found or "\\" not in path:
+        return found, value
+    # Manifests created before escaping support treated backslashes literally.
+    return resolve(path.split("."))
 
 
 def _format_value(value: object) -> str:

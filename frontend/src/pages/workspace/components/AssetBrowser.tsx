@@ -1,9 +1,10 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { CheckCircle2, CircleAlert, FileQuestion, Search } from "lucide-react";
 
 import { thumbnailUrl } from "../../../features/assets/api";
 import type { AnnotationStatus, AssetSummary } from "../../../shared/api/types";
+import { Spinner } from "../../../shared/ui/Spinner";
 import { StatusDot } from "../../../shared/ui/StatusDot";
 
 type StatusFilter = AnnotationStatus | null;
@@ -19,11 +20,16 @@ interface AssetBrowserProps {
   statusFilter: StatusFilter;
   statusCounts: Record<string, number>;
   recursive: boolean;
+  hasMore: boolean;
+  loading: boolean;
+  loadingMore: boolean;
+  error: string | null;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: StatusFilter) => void;
   onSelect: (assetId: string) => void;
   onToggleChecked: (assetId: string) => void;
   onRecursiveChange: (value: boolean) => void;
+  onLoadMore: () => void;
 }
 
 const assetFilters: Array<{ value: StatusFilter; label: string; icon: typeof CheckCircle2 }> = [
@@ -54,11 +60,16 @@ export function AssetBrowser({
   statusFilter,
   statusCounts,
   recursive,
+  hasMore,
+  loading,
+  loadingMore,
+  error,
   onSearchChange,
   onStatusChange,
   onSelect,
   onToggleChecked,
   onRecursiveChange,
+  onLoadMore,
 }: AssetBrowserProps) {
   const filters = mode === "review" ? reviewFilters : assetFilters;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -68,6 +79,14 @@ export function AssetBrowser({
     estimateSize: () => 70,
     overscan: 8,
   });
+  const virtualItems = virtualizer.getVirtualItems();
+
+  useEffect(() => {
+    const lastVisible = virtualItems.at(-1);
+    if (lastVisible && lastVisible.index >= assets.length - 12 && hasMore && !loadingMore) {
+      onLoadMore();
+    }
+  }, [assets.length, hasMore, loadingMore, onLoadMore, virtualItems]);
 
   return (
     <aside className="asset-browser">
@@ -112,9 +131,18 @@ export function AssetBrowser({
       </div>
 
       <div className="asset-list" ref={scrollRef}>
-        {assets.length ? (
+        {loading ? (
+          <div className="asset-list__empty">
+            <Spinner label="读取素材" />
+          </div>
+        ) : error ? (
+          <div className="asset-list__empty">
+            <CircleAlert size={22} />
+            <p>{error}</p>
+          </div>
+        ) : assets.length ? (
           <div className="asset-list__virtual" style={{ height: virtualizer.getTotalSize() }}>
-            {virtualizer.getVirtualItems().map((virtualRow) => {
+            {virtualItems.map((virtualRow) => {
               const asset = assets[virtualRow.index];
               return (
                 <button
@@ -142,7 +170,11 @@ export function AssetBrowser({
                   >
                     {checkedAssetIds.includes(asset.id) ? "✓" : ""}
                   </span>
-                  <img src={thumbnailUrl(projectId, asset.id, 160)} alt="" loading="lazy" />
+                  <img
+                    src={thumbnailUrl(projectId, asset.id, asset.content_version, 160)}
+                    alt=""
+                    loading="lazy"
+                  />
                   <span className="asset-row__copy">
                     <strong title={asset.filename}>{asset.filename}</strong>
                     <small>
@@ -162,6 +194,7 @@ export function AssetBrowser({
           </div>
         )}
       </div>
+      {loadingMore ? <div className="asset-list__loading">正在载入更多图片…</div> : null}
     </aside>
   );
 }

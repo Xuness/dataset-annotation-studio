@@ -115,13 +115,13 @@ export function PreprocessSettingsPanel({
             </select>
           </label>
           <label className="form-field">
-            <span>质量</span>
+            <span>质量（WebP / JPEG）</span>
             <input
               type="number"
               min="1"
               max="100"
               value={form.quality}
-              disabled={!form.convertEnabled}
+              disabled={!form.convertEnabled || form.format === "png"}
               onChange={(event) => onChange({ quality: Number(event.target.value) })}
             />
           </label>

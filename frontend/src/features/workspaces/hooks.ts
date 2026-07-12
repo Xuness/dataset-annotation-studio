@@ -40,10 +40,18 @@ export function useRescanWorkspace(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => rescanWorkspace(projectId),
-    onSuccess: () => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
       void queryClient.invalidateQueries({ queryKey: ["assets", projectId] });
+      if (result.failed) {
+        const examples = result.issues
+          .slice(0, 5)
+          .map((issue) => `${issue.path}：${issue.message}`)
+          .join("\n");
+        window.alert(`扫描跳过了 ${result.failed} 个无法读取的图片。\n${examples}`);
+      }
     },
+    onError: (error) => window.alert(error instanceof Error ? error.message : "重新扫描失败。"),
   });
 }
 

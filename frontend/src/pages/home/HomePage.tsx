@@ -23,6 +23,15 @@ export function HomePage() {
       const path = await pickWorkspaceFolder();
       if (!path) return;
       const result = await openMutation.mutateAsync(path);
+      if (result.scan.failed) {
+        const examples = result.scan.issues
+          .slice(0, 5)
+          .map((issue) => `${issue.path}：${issue.message}`)
+          .join("\n");
+        window.alert(
+          `工作区已打开，但跳过了 ${result.scan.failed} 个损坏或无法读取的图片。\n${examples}`,
+        );
+      }
       setActiveProject(result.workspace.project_id);
       navigate(`/workspace/${result.workspace.project_id}`);
     } catch (error) {

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, FileJson2 } from "lucide-react";
 
 import { useAssetMetadata } from "../../../features/assets/hooks";
@@ -15,16 +15,24 @@ interface MetadataSettingsPanelProps {
 export function MetadataSettingsPanel({ projectId, workspace, asset }: MetadataSettingsPanelProps) {
   const metadata = useAssetMetadata(projectId, asset?.id ?? null);
   const update = useUpdateWorkspace(projectId);
+  const [error, setError] = useState<string | null>(null);
   const selected = useMemo(
     () => new Set(workspace.settings.json_fields),
     [workspace.settings.json_fields],
   );
 
+  useEffect(() => setError(null), [asset?.id]);
+
   async function toggleField(field: string) {
     const next = new Set(selected);
     if (next.has(field)) next.delete(field);
     else next.add(field);
-    await update.mutateAsync({ json_fields: [...next] });
+    setError(null);
+    try {
+      await update.mutateAsync({ json_fields: [...next] });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "保存元数据字段失败。");
+    }
   }
 
   if (!asset)
@@ -38,6 +46,12 @@ export function MetadataSettingsPanel({ projectId, workspace, asset }: MetadataS
     return (
       <div className="inspector-empty">
         <Spinner />
+      </div>
+    );
+  if (metadata.isError && !metadata.data)
+    return (
+      <div className="inspector-empty inspector-empty--error">
+        <p>{metadata.error instanceof Error ? metadata.error.message : "读取 JSON 失败。"}</p>
       </div>
     );
   if (!metadata.data?.exists)
@@ -72,6 +86,7 @@ export function MetadataSettingsPanel({ projectId, workspace, asset }: MetadataS
             </button>
           ))}
         </div>
+        {error ? <p className="form-error">{error}</p> : null}
       </section>
       <section className="inspector-section inspector-section--grow">
         <span className="section-kicker">原始 JSON</span>

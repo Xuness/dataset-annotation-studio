@@ -3,6 +3,7 @@ import { Save } from "lucide-react";
 
 import { usePromptPreview } from "../../../features/assets/hooks";
 import { useUpdateWorkspace } from "../../../features/workspaces/hooks";
+import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import type { AssetSummary, WorkspaceSummary } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
@@ -15,14 +16,21 @@ interface PromptSettingsPanelProps {
 
 export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSettingsPanelProps) {
   const [prompt, setPrompt] = useState(workspace.settings.user_prompt);
+  const [error, setError] = useState<string | null>(null);
   const update = useUpdateWorkspace(projectId);
   const preview = usePromptPreview(projectId, asset?.id ?? null);
 
   useEffect(() => setPrompt(workspace.settings.user_prompt), [workspace.settings.user_prompt]);
   const dirty = prompt !== workspace.settings.user_prompt;
+  useUnsavedScope(`workspace-prompt:${projectId}`, dirty);
 
   async function savePrompt() {
-    await update.mutateAsync({ user_prompt: prompt });
+    setError(null);
+    try {
+      await update.mutateAsync({ user_prompt: prompt });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "保存项目 Prompt 失败。");
+    }
   }
 
   return (
@@ -46,12 +54,17 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
         >
           保存项目 Prompt
         </Button>
+        {error ? <p className="form-error">{error}</p> : null}
       </section>
       <section className="inspector-section inspector-section--grow">
         <span className="section-kicker">当前图片最终预览</span>
         {asset ? (
           <pre className="prompt-preview">
-            {preview.data?.final_prompt || "保存 Prompt 后，此处会显示拼接元数据的最终内容。"}
+            {preview.isError
+              ? preview.error instanceof Error
+                ? preview.error.message
+                : "读取最终 Prompt 失败。"
+              : preview.data?.final_prompt || "保存 Prompt 后，此处会显示拼接元数据的最终内容。"}
           </pre>
         ) : (
           <p className="quiet-copy">选择图片后预览最终发送内容。</p>

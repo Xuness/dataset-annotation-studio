@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Braces, ChartNoAxesColumn, MessageSquareText } from "lucide-react";
 
 import type { AssetSummary, WorkspaceSummary } from "../../../shared/api/types";
+import { useAppStore } from "../../../shared/store/appStore";
 import { MetadataSettingsPanel } from "./MetadataSettingsPanel";
 import { OverviewPanel } from "./OverviewPanel";
 import { PromptSettingsPanel } from "./PromptSettingsPanel";
@@ -22,6 +23,23 @@ const tabs: Array<{ id: InspectorTab; label: string; icon: typeof ChartNoAxesCol
 
 export function InspectorPanel({ projectId, workspace, asset }: InspectorPanelProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("overview");
+  const promptScope = `workspace-prompt:${projectId}`;
+  const promptDirty = useAppStore((state) => Boolean(state.dirtyScopes[promptScope]));
+  const setDirtyScope = useAppStore((state) => state.setDirtyScope);
+
+  function selectTab(tab: InspectorTab) {
+    if (tab === activeTab) return;
+    if (
+      activeTab === "prompt" &&
+      promptDirty &&
+      !window.confirm("项目 Prompt 尚未保存，仍要离开这个面板吗？")
+    ) {
+      return;
+    }
+    if (activeTab === "prompt") setDirtyScope(promptScope, false);
+    setActiveTab(tab);
+  }
+
   return (
     <aside className="inspector-panel">
       <div className="inspector-tabs">
@@ -29,7 +47,7 @@ export function InspectorPanel({ projectId, workspace, asset }: InspectorPanelPr
           <button
             key={id}
             className={activeTab === id ? "is-active" : ""}
-            onClick={() => setActiveTab(id)}
+            onClick={() => selectTab(id)}
           >
             <Icon size={14} /> {label}
           </button>

@@ -54,11 +54,15 @@ class JobLifecycleRepository:
     def resume(self, job_id: str, *, failed_only: bool = False) -> bool:
         now = utc_now_iso()
         with transaction(self._database_path) as connection:
-            job = connection.execute("SELECT id FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            job = connection.execute(
+                "SELECT id, status FROM jobs WHERE id = ?", (job_id,)
+            ).fetchone()
             if job is None:
                 return False
             if failed_only:
-                connection.execute(
+                if str(job["status"]) != JobStatus.COMPLETED_WITH_ERRORS.value:
+                    return False
+                cursor = connection.execute(
                     """
                     UPDATE job_items
                     SET status = 'pending', attempt_count = 0, last_error = NULL,
@@ -67,7 +71,14 @@ class JobLifecycleRepository:
                     """,
                     (now, job_id),
                 )
+                if cursor.rowcount == 0:
+                    return False
             else:
+                if str(job["status"]) not in {
+                    JobStatus.STOPPED.value,
+                    JobStatus.INTERRUPTED.value,
+                }:
+                    return False
                 connection.execute(
                     """
                     UPDATE job_items
@@ -142,6 +153,31 @@ class JobLifecycleRepository:
                     """,
                     (status, now, now, job["id"]),
                 )
+
+    def finalize_job(self, job_id: str) -> None:
+        """Recalculate a terminal job after a manual item transition."""
+
+        with transaction(self._database_path) as connection:
+            job = connection.execute(
+                "SELECT id, status, stop_requested FROM jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+            if job is None or bool(job["stop_requested"]):
+                return
+            counts = self._item_counts(connection, job_id)
+            if counts.get(JobItemStatus.RUNNING.value, 0) or counts.get(
+                JobItemStatus.PENDING.value, 0
+            ):
+                return
+            failed = counts.get(JobItemStatus.FAILED.value, 0)
+            status = JobStatus.COMPLETED_WITH_ERRORS.value if failed else JobStatus.COMPLETED.value
+            now = utc_now_iso()
+            connection.execute(
+                """
+                UPDATE jobs SET status = ?, updated_at = ?, completed_at = ? WHERE id = ?
+                """,
+                (status, now, now, job_id),
+            )
 
     @staticmethod
     def _item_counts(connection, job_id: str) -> dict[str, int]:

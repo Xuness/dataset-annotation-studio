@@ -34,7 +34,11 @@ export function PreprocessHistoryPanel({
                   ? "可撤销"
                   : operation.status === "undone"
                     ? "已撤销"
-                    : operation.status}
+                    : operation.status === "failed"
+                      ? "失败"
+                      : operation.status === "running"
+                        ? "进行中"
+                        : operation.status}
               </span>
             </header>
             <small>{new Date(operation.created_at).toLocaleString()}</small>
@@ -44,6 +48,9 @@ export function PreprocessHistoryPanel({
                 ? ` · ${operation.options.convert.format.toUpperCase()}`
                 : ""}
             </p>
+            {operation.error_message ? (
+              <p className="form-error">{operation.error_message}</p>
+            ) : null}
             {operation.id === latestCompleted?.id ? (
               <Button
                 icon={undoPending ? <Spinner /> : <RotateCcw size={13} />}

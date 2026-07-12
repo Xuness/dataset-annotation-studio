@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+def _require_non_blank(value: str | None) -> str | None:
+    if value is not None and not value.strip():
+        raise ValueError("内容不能只包含空白字符。")
+    return value
 
 
 class SystemPreset(BaseModel):
@@ -17,10 +23,16 @@ class SystemPresetCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     system_prompt: str = Field(min_length=1)
 
+    _validate_name = field_validator("name")(_require_non_blank)
+    _validate_prompt = field_validator("system_prompt")(_require_non_blank)
+
 
 class SystemPresetUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     system_prompt: str | None = Field(default=None, min_length=1)
+
+    _validate_name = field_validator("name")(_require_non_blank)
+    _validate_prompt = field_validator("system_prompt")(_require_non_blank)
 
 
 class ProviderType(StrEnum):
@@ -81,6 +93,8 @@ class ProviderProfileCreate(BaseModel):
     timeout_seconds: int = Field(default=180, ge=1, le=3600)
     request_options: ProviderRequestOptions = Field(default_factory=ProviderRequestOptions)
 
+    _validate_text = field_validator("name", "base_url", "model")(_require_non_blank)
+
 
 class ProviderProfileUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
@@ -93,6 +107,8 @@ class ProviderProfileUpdate(BaseModel):
     concurrency: int | None = Field(default=None, ge=1, le=64)
     timeout_seconds: int | None = Field(default=None, ge=1, le=3600)
     request_options: ProviderRequestOptions | None = None
+
+    _validate_text = field_validator("name", "base_url", "model")(_require_non_blank)
 
 
 class ProviderModelSearchRequest(BaseModel):

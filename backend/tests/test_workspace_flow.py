@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from dataset_studio.core.config import Settings
@@ -64,7 +65,166 @@ def test_annotation_save_delete_and_history(tmp_path: Path) -> None:
     assert deleted.exists is False
     assert not (project / "image.txt").exists()
     history = annotations.history(summary.project_id, asset.id)
-    assert [revision["source"] for revision in history] == [
+    assert [revision.source for revision in history] == [
         "deleted_snapshot",
         "manual_edit",
     ]
+
+
+def test_workspace_scan_skips_broken_images_and_reports_them(tmp_path: Path) -> None:
+    workspaces, assets, _ = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "valid.png")
+    (project / "broken.png").write_bytes(b"not an image")
+
+    summary, scan = workspaces.open(str(project))
+
+    assert summary.asset_count == 1
+    assert scan.scanned_files == 2
+    assert scan.indexed_assets == 1
+    assert scan.failed == 1
+    assert scan.issues[0].path == "broken.png"
+    assert [item.filename for item in assets.list_assets(summary.project_id).items] == ["valid.png"]
+
+
+def test_moved_asset_keeps_manually_accepted_annotation_status(tmp_path: Path) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "before.png")
+    summary, _ = workspaces.open(str(project))
+    asset = assets.list_assets(summary.project_id).items[0]
+    annotations.save_generated(
+        summary.project_id,
+        asset.id,
+        "<caption>accepted despite review</caption>",
+        manually_accepted=True,
+    )
+
+    (project / "before.png").rename(project / "after.png")
+    (project / "before.txt").rename(project / "after.txt")
+    workspaces.rescan(summary.project_id)
+
+    moved = assets.list_assets(summary.project_id).items[0]
+    assert moved.id == asset.id
+    assert moved.relative_path == "after.png"
+    assert moved.annotation_status.value == "manually_accepted"
+
+
+def test_annotation_save_failure_restores_exact_previous_file(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    summary, _ = workspaces.open(str(project))
+    asset = assets.list_assets(summary.project_id).items[0]
+    annotations.save_generated(
+        summary.project_id,
+        asset.id,
+        "<caption>previous</caption>",
+        manually_accepted=True,
+    )
+    annotation_path = project / "image.txt"
+    previous_bytes = annotation_path.read_bytes()
+    previous_modified_ns = annotation_path.stat().st_mtime_ns
+
+    def fail_revision(*_args, **_kwargs):
+        raise RuntimeError("simulated revision failure")
+
+    monkeypatch.setattr(annotations, "_insert_revision", fail_revision)
+    with pytest.raises(RuntimeError, match="simulated revision failure"):
+        annotations.save(summary.project_id, asset.id, "<caption>replacement</caption>")
+
+    assert annotation_path.read_bytes() == previous_bytes
+    assert annotation_path.stat().st_mtime_ns == previous_modified_ns
+    assert annotations.get(summary.project_id, asset.id).status.value == "manually_accepted"
+
+
+def test_annotation_delete_failure_restores_file(tmp_path: Path, monkeypatch) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    summary, _ = workspaces.open(str(project))
+    asset = assets.list_assets(summary.project_id).items[0]
+    annotations.save(summary.project_id, asset.id, "<caption>keep me</caption>")
+
+    def fail_status_update(*_args, **_kwargs):
+        raise RuntimeError("simulated status failure")
+
+    monkeypatch.setattr(annotations, "_update_annotation_status", fail_status_update)
+    with pytest.raises(RuntimeError, match="simulated status failure"):
+        annotations.delete(summary.project_id, asset.id)
+
+    assert (project / "image.txt").read_text(encoding="utf-8") == "<caption>keep me</caption>"
+
+
+def test_new_duplicate_does_not_steal_existing_asset_identity(tmp_path: Path) -> None:
+    workspaces, assets, _ = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "z.png")
+    summary, _ = workspaces.open(str(project))
+    original = assets.list_assets(summary.project_id).items[0]
+    (project / "a.png").write_bytes((project / "z.png").read_bytes())
+
+    workspaces.rescan(summary.project_id)
+
+    listed = assets.list_assets(summary.project_id).items
+    assert [item.relative_path for item in listed] == ["a.png", "z.png"]
+    assert len({item.id for item in listed}) == 2
+    assert next(item for item in listed if item.relative_path == "z.png").id == original.id
+
+
+def test_case_only_rename_preserves_asset_identity(tmp_path: Path) -> None:
+    workspaces, assets, _ = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "Before.png")
+    summary, _ = workspaces.open(str(project))
+    original = assets.list_assets(summary.project_id).items[0]
+    intermediate = project / "temporary-name.png"
+    (project / "Before.png").rename(intermediate)
+    intermediate.rename(project / "before.png")
+
+    workspaces.rescan(summary.project_id)
+
+    renamed = assets.list_assets(summary.project_id).items[0]
+    assert renamed.relative_path == "before.png"
+    assert renamed.id == original.id
+
+
+def test_case_distinct_files_remain_distinct_when_filesystem_supports_them(
+    tmp_path: Path,
+) -> None:
+    workspaces, assets, _ = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "Case.png")
+    summary, _ = workspaces.open(str(project))
+    _write_image(project / "case.png", (90, 130))
+    if len(list(project.glob("*.png"))) < 2:
+        pytest.skip("filesystem is case-insensitive")
+
+    workspaces.rescan(summary.project_id)
+
+    listed = assets.list_assets(summary.project_id).items
+    assert {item.relative_path for item in listed} == {"Case.png", "case.png"}
+    assert len({item.id for item in listed}) == 2
+
+
+def test_thumbnail_cache_key_changes_with_image_content(tmp_path: Path) -> None:
+    workspaces, assets, _ = _services(tmp_path)
+    project = tmp_path / "dataset"
+    image_path = project / "image.png"
+    _write_image(image_path)
+    summary, _ = workspaces.open(str(project))
+    asset = assets.list_assets(summary.project_id).items[0]
+    first_thumbnail = assets.thumbnail_path(summary.project_id, asset.id, 96)
+
+    Image.new("RGB", (80, 120), "black").save(image_path)
+    workspaces.rescan(summary.project_id)
+    changed_asset = assets.list_assets(summary.project_id).items[0]
+    second_thumbnail = assets.thumbnail_path(summary.project_id, asset.id, 96)
+
+    assert changed_asset.content_version != asset.content_version
+    assert first_thumbnail != second_thumbnail
+    assert first_thumbnail.is_file()
+    assert second_thumbnail.is_file()

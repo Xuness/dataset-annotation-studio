@@ -48,6 +48,58 @@
   overflow: hidden;
 }
 
+.annotation-editor__history {
+  display: grid;
+  height: 100%;
+  align-content: start;
+  gap: 8px;
+  padding: 10px;
+  overflow: auto;
+  background: #fdfbf7;
+}
+
+.annotation-editor__history > p {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.annotation-editor__history article {
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.annotation-editor__history article > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.annotation-editor__history article strong,
+.annotation-editor__history article small {
+  display: block;
+}
+
+.annotation-editor__history article small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.annotation-editor__history pre {
+  max-height: 92px;
+  margin: 8px 0 0;
+  padding: 7px;
+  overflow: auto;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  color: var(--ink-soft);
+  background: var(--paper);
+  font-size: 9px;
+}
+
 .annotation-editor__codemirror,
 .annotation-editor__body .cm-editor,
 .annotation-editor__body .cm-scroller {

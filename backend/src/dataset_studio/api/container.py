@@ -35,13 +35,14 @@ class AppContainer:
         workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
         annotations = AnnotationService(workspaces)
         presets = PresetService(PresetRepository(global_database), KeyringSecretStore())
+        jobs = JobService(workspaces, presets, annotations)
         return cls(
             settings=settings,
             workspaces=workspaces,
             assets=AssetService(workspaces),
             annotations=annotations,
             presets=presets,
-            jobs=JobService(workspaces, presets, annotations),
-            preprocessing=PreprocessService(workspaces),
+            jobs=jobs,
+            preprocessing=PreprocessService(workspaces, has_active_jobs=jobs.has_active),
             statistics=StatisticsService(workspaces),
         )

@@ -19,24 +19,59 @@ class JobQueryRepository:
     def __init__(self, database_path: Path) -> None:
         self._database_path = database_path
 
-    def list_jobs(self, limit: int = 100) -> list[JobSummary]:
+    def list_jobs(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+        active_only: bool = False,
+    ) -> list[JobSummary]:
         connection = connect(self._database_path)
         try:
+            where = "WHERE status IN ('queued', 'running', 'stopping')" if active_only else ""
             rows = connection.execute(
-                "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?", (limit,)
+                f"""
+                SELECT * FROM jobs
+                {where}
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (limit, offset),
             ).fetchall()
-            return [self._summary(connection, row) for row in rows]
+            counts_by_job = self._counts_for_jobs(connection, [str(row["id"]) for row in rows])
+            return [
+                self._summary(connection, row, counts=counts_by_job.get(str(row["id"]), {}))
+                for row in rows
+            ]
         finally:
             connection.close()
 
-    def get_job(self, job_id: str, *, include_items: bool = True) -> JobDetail | None:
+    def get_job(
+        self,
+        job_id: str,
+        *,
+        include_items: bool = True,
+        failed_items_only: bool = False,
+        item_offset: int = 0,
+        item_limit: int | None = None,
+    ) -> JobDetail | None:
         connection = connect(self._database_path)
         try:
             row = connection.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
             if row is None:
                 return None
             summary = self._summary(connection, row)
-            items = self._items(connection, job_id) if include_items else []
+            items = (
+                self._items(
+                    connection,
+                    job_id,
+                    failed_only=failed_items_only,
+                    offset=item_offset,
+                    limit=item_limit,
+                )
+                if include_items
+                else []
+            )
             return JobDetail(**summary.model_dump(), items=items)
         finally:
             connection.close()
@@ -49,8 +84,12 @@ class JobQueryRepository:
                 SELECT ji.asset_id, ja.response_content
                 FROM job_items ji
                 JOIN job_attempts ja ON ja.job_item_id = ji.id
-                WHERE ji.job_id = ? AND ji.id = ? AND ja.response_content IS NOT NULL
-                ORDER BY ja.attempt_number DESC
+                WHERE ji.job_id = ?
+                  AND ji.id = ?
+                  AND ji.status = 'failed'
+                  AND ja.status = 'validation_failed'
+                  AND ja.response_content IS NOT NULL
+                ORDER BY ja.started_at DESC, ja.rowid DESC
                 LIMIT 1
                 """,
                 (job_id, item_id),
@@ -70,48 +109,81 @@ class JobQueryRepository:
             connection.close()
 
     @staticmethod
-    def _items(connection, job_id: str) -> list[JobItemDetail]:
+    def _items(
+        connection,
+        job_id: str,
+        *,
+        failed_only: bool = False,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[JobItemDetail]:
+        status_clause = "AND ji.status = 'failed'" if failed_only else ""
+        limit_clause = "LIMIT ? OFFSET ?" if limit is not None else ""
+        parameters: list[object] = [job_id]
+        if limit is not None:
+            parameters.extend((limit, offset))
         item_rows = connection.execute(
-            """
+            f"""
             SELECT ji.*, a.relative_path
             FROM job_items ji
             JOIN assets a ON a.id = ji.asset_id
             WHERE ji.job_id = ?
+              {status_clause}
             ORDER BY a.relative_path COLLATE NOCASE
+            {limit_clause}
             """,
-            (job_id,),
+            parameters,
         ).fetchall()
-        items: list[JobItemDetail] = []
-        for item_row in item_rows:
+        if not item_rows:
+            return []
+        item_ids = [str(row["id"]) for row in item_rows]
+        attempts_by_item: dict[str, list[JobAttempt]] = {item_id: [] for item_id in item_ids}
+        for start in range(0, len(item_ids), 500):
+            batch = item_ids[start : start + 500]
+            placeholders = ",".join("?" for _ in batch)
             attempt_rows = connection.execute(
-                """
-                SELECT id, attempt_number, status, response_content, error_message,
+                f"""
+                SELECT id, job_item_id, attempt_number, status, response_content, error_message,
                        started_at, finished_at, input_tokens, output_tokens, finish_reason
                 FROM job_attempts
-                WHERE job_item_id = ?
-                ORDER BY attempt_number
+                WHERE job_item_id IN ({placeholders})
+                ORDER BY job_item_id, attempt_number, started_at
                 """,
-                (item_row["id"],),
+                batch,
             ).fetchall()
+            for attempt in attempt_rows:
+                attempts_by_item[str(attempt["job_item_id"])].append(
+                    JobAttempt.model_validate(dict(attempt))
+                )
+        items: list[JobItemDetail] = []
+        for item_row in item_rows:
             values = dict(item_row)
             values["manually_accepted"] = bool(item_row["manually_accepted"])
+            attempts = attempts_by_item[str(item_row["id"])]
+            values["attempt_count"] = len(attempts)
             items.append(
                 JobItemDetail(
                     **values,
-                    attempts=[JobAttempt.model_validate(dict(attempt)) for attempt in attempt_rows],
+                    attempts=attempts,
                 )
             )
         return items
 
     @staticmethod
-    def _summary(connection, row) -> JobSummary:
-        counts = {
-            str(count_row["status"]): int(count_row["count"])
-            for count_row in connection.execute(
-                "SELECT status, COUNT(*) AS count FROM job_items WHERE job_id = ? GROUP BY status",
-                (row["id"],),
-            )
-        }
+    def _summary(connection, row, *, counts: dict[str, int] | None = None) -> JobSummary:
+        if counts is None:
+            counts = {
+                str(count_row["status"]): int(count_row["count"])
+                for count_row in connection.execute(
+                    """
+                    SELECT status, COUNT(*) AS count
+                    FROM job_items
+                    WHERE job_id = ?
+                    GROUP BY status
+                    """,
+                    (row["id"],),
+                )
+            }
         provider = json.loads(str(row["provider_snapshot"]))
         system = json.loads(str(row["system_prompt_snapshot"]))
         return JobSummary(
@@ -136,3 +208,22 @@ class JobQueryRepository:
             updated_at=str(row["updated_at"]),
             completed_at=str(row["completed_at"]) if row["completed_at"] else None,
         )
+
+    @staticmethod
+    def _counts_for_jobs(connection, job_ids: list[str]) -> dict[str, dict[str, int]]:
+        if not job_ids:
+            return {}
+        placeholders = ",".join("?" for _ in job_ids)
+        rows = connection.execute(
+            f"""
+            SELECT job_id, status, COUNT(*) AS count
+            FROM job_items
+            WHERE job_id IN ({placeholders})
+            GROUP BY job_id, status
+            """,
+            job_ids,
+        ).fetchall()
+        counts: dict[str, dict[str, int]] = {job_id: {} for job_id in job_ids}
+        for row in rows:
+            counts[str(row["job_id"])][str(row["status"])] = int(row["count"])
+        return counts

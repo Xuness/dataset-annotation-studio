@@ -36,6 +36,7 @@ class AnnotationWorker:
         self._container = container
         self._provider_factory = provider_factory
         self._active: set[asyncio.Task[None]] = set()
+        self._active_profiles: dict[asyncio.Task[None], str] = {}
 
     async def run(self, stopped: asyncio.Event) -> None:
         self._recover_orphaned_jobs()
@@ -71,17 +72,30 @@ class AnnotationWorker:
             JobLifecycleRepository(paths.database).finalize_jobs()
             for job in repository.runnable_jobs():
                 profile = ProviderProfile.model_validate_json(str(job["provider_snapshot"]))
-                available = profile.concurrency - repository.running_count(str(job["id"]))
+                profile_running = sum(
+                    active_profile == profile.id
+                    for active_profile in self._active_profiles.values()
+                )
+                available = profile.concurrency - profile_running
                 for item in repository.claim_items(str(job["id"]), available):
                     task = asyncio.create_task(
-                        self._process_item(workspace.project_id, paths.root, paths.runs, job, item)
+                        self._process_item(
+                            workspace.project_id,
+                            paths.database,
+                            paths.root,
+                            paths.runs,
+                            job,
+                            item,
+                        )
                     )
                     self._active.add(task)
+                    self._active_profiles[task] = profile.id
 
     def _reap_finished_tasks(self) -> None:
         finished = {task for task in self._active if task.done()}
         self._active.difference_update(finished)
         for task in finished:
+            self._active_profiles.pop(task, None)
             try:
                 task.result()
             except asyncio.CancelledError:
@@ -92,13 +106,47 @@ class AnnotationWorker:
     async def _process_item(
         self,
         project_id: str,
+        database_path: Path,
         workspace_root: Path,
         runs_root: Path,
         job: dict[str, object],
         item: dict[str, object],
     ) -> None:
-        paths, _ = self._container.workspaces.get(project_id)
-        repository = JobExecutionRepository(paths.database)
+        repository = JobExecutionRepository(database_path)
+        item_id = str(item["id"])
+        try:
+            await self._process_item_inner(
+                project_id,
+                workspace_root,
+                runs_root,
+                job,
+                item,
+                repository,
+            )
+        except asyncio.CancelledError:
+            with suppress(Exception):
+                repository.finish_item(item_id, JobItemStatus.INTERRUPTED)
+            raise
+        except Exception as error:
+            message = str(error) or type(error).__name__
+            LOGGER.exception("Worker item %s failed before it could finish cleanly.", item_id)
+            with suppress(Exception):
+                repository.finish_item(
+                    item_id,
+                    JobItemStatus.FAILED,
+                    error=f"内部错误：{message}",
+                    validation_status="failed",
+                )
+
+    async def _process_item_inner(
+        self,
+        project_id: str,
+        workspace_root: Path,
+        runs_root: Path,
+        job: dict[str, object],
+        item: dict[str, object],
+        repository: JobExecutionRepository,
+    ) -> None:
         job_id = str(job["id"])
         item_id = str(item["id"])
         asset_id = str(item["asset_id"])
@@ -136,7 +184,7 @@ class AnnotationWorker:
         previous_attempts = int(item["attempt_count"])
         last_error = "请求未完成。"
 
-        for _ in range(previous_attempts, max_attempts):
+        for cycle_attempt in range(previous_attempts + 1, max_attempts + 1):
             if repository.is_stop_requested(job_id):
                 repository.finish_item(item_id, JobItemStatus.INTERRUPTED)
                 return
@@ -243,8 +291,13 @@ class AnnotationWorker:
                     error_message=last_error,
                 )
 
-            if attempt_number < max_attempts:
-                await asyncio.sleep(min(2 ** (attempt_number - 1), 8))
+            if cycle_attempt < max_attempts:
+                delay = min(2 ** (cycle_attempt - 1), 8)
+                for _ in range(delay * 2):
+                    if repository.is_stop_requested(job_id):
+                        repository.finish_item(item_id, JobItemStatus.INTERRUPTED)
+                        return
+                    await asyncio.sleep(0.5)
 
         repository.finish_item(
             item_id,

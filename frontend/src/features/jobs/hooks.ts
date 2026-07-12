@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   acceptJobItem,
@@ -16,16 +16,32 @@ const isActive = (status: string) => ["queued", "running", "stopping"].includes(
 export function useJobs(projectId: string) {
   return useQuery({
     queryKey: ["jobs", projectId],
-    queryFn: () => listJobs(projectId),
+    queryFn: () => listJobs(projectId, { limit: 500, activeOnly: true }),
+    enabled: Boolean(projectId),
     refetchInterval: (query) =>
       query.state.data?.some((job) => isActive(job.status)) ? 1000 : 5000,
   });
 }
 
-export function useJob(projectId: string, jobId: string | null) {
+export function useJobHistory(projectId: string, pageSize = 100) {
+  return useInfiniteQuery({
+    queryKey: ["jobs", projectId, "history", pageSize],
+    queryFn: ({ pageParam }) => listJobs(projectId, { offset: pageParam, limit: pageSize }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) =>
+      lastPage.length < pageSize ? undefined : pages.length * pageSize,
+    enabled: Boolean(projectId),
+    refetchInterval: (query) =>
+      query.state.data?.pages.some((page) => page.some((job) => isActive(job.status)))
+        ? 1000
+        : false,
+  });
+}
+
+export function useJob(projectId: string, jobId: string | null, itemLimit = 200) {
   return useQuery({
-    queryKey: ["jobs", projectId, jobId],
-    queryFn: () => getJob(projectId, jobId!),
+    queryKey: ["jobs", projectId, jobId, itemLimit],
+    queryFn: () => getJob(projectId, jobId!, itemLimit),
     enabled: Boolean(jobId),
     refetchInterval: (query) =>
       query.state.data && isActive(query.state.data.status) ? 1000 : false,

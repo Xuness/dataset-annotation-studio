@@ -146,6 +146,12 @@
   padding: 8px;
 }
 
+.job-list-load-more {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
 .job-card {
   display: block;
   width: 100%;

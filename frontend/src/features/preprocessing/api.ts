@@ -20,10 +20,11 @@ export function previewPreprocessing(
 export function executePreprocessing(
   projectId: string,
   request: PreprocessRequest,
+  previewToken: string,
 ): Promise<PreprocessOperation> {
   return apiRequest(`${path(projectId)}/execute`, {
     method: "POST",
-    body: JSON.stringify(request),
+    body: JSON.stringify({ request, preview_token: previewToken }),
   });
 }
 

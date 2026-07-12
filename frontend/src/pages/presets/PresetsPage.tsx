@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowLeft, Braces, Cable, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { useUnsavedChangesGuard } from "../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../shared/ui/Button";
 import { ProviderProfilesPanel } from "./components/ProviderProfilesPanel";
 import { SystemPresetsPanel } from "./components/SystemPresetsPanel";
@@ -11,13 +12,19 @@ type PresetTab = "system" | "providers";
 
 export function PresetsPage() {
   const navigate = useNavigate();
+  const { confirmDiscard } = useUnsavedChangesGuard();
   const [tab, setTab] = useState<PresetTab>("system");
   const [createSignal, setCreateSignal] = useState(0);
+
+  function changeTab(nextTab: PresetTab) {
+    if (nextTab === tab || confirmDiscard()) setTab(nextTab);
+  }
+
   return (
     <main className="presets-page">
       <header className="presets-topbar">
         <div>
-          <Button icon={<ArrowLeft size={15} />} onClick={() => navigate(-1)}>
+          <Button icon={<ArrowLeft size={15} />} onClick={() => confirmDiscard() && navigate(-1)}>
             返回
           </Button>
           <span>
@@ -28,7 +35,7 @@ export function PresetsPage() {
         <Button
           tone="primary"
           icon={<Plus size={15} />}
-          onClick={() => setCreateSignal((n) => n + 1)}
+          onClick={() => confirmDiscard() && setCreateSignal((n) => n + 1)}
         >
           新建{tab === "system" ? "预设" : "连接"}
         </Button>
@@ -36,7 +43,10 @@ export function PresetsPage() {
       <div className="presets-layout">
         <nav className="presets-navigation">
           <span className="eyebrow">Global library</span>
-          <button className={tab === "system" ? "is-active" : ""} onClick={() => setTab("system")}>
+          <button
+            className={tab === "system" ? "is-active" : ""}
+            onClick={() => changeTab("system")}
+          >
             <Braces size={16} />
             <span>
               <strong>System Prompt</strong>
@@ -45,7 +55,7 @@ export function PresetsPage() {
           </button>
           <button
             className={tab === "providers" ? "is-active" : ""}
-            onClick={() => setTab("providers")}
+            onClick={() => changeTab("providers")}
           >
             <Cable size={16} />
             <span>

@@ -184,6 +184,14 @@
   padding: 8px;
 }
 
+.preview-limit-note {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--warning);
+  background: var(--warning-soft);
+  font-size: 9px;
+}
+
 .preview-table > div:not(.preview-empty) {
   display: grid;
   min-width: 610px;

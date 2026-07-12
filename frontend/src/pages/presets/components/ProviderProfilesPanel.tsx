@@ -3,7 +3,8 @@ import { Cable, KeyRound, Save, Search, Trash2 } from "lucide-react";
 
 import type { ProviderProfileInput } from "../../../features/presets/api";
 import { useProviderProfileMutations, useProviderProfiles } from "../../../features/presets/hooks";
-import type { ProviderType } from "../../../shared/api/types";
+import type { ProviderProfile, ProviderType } from "../../../shared/api/types";
+import { useUnsavedChangesGuard, useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { ProviderModelPicker } from "./ProviderModelPicker";
@@ -36,17 +37,33 @@ const emptyForm: ProviderProfileForm = {
   },
 };
 
+function profileToForm(profile: ProviderProfile): ProviderProfileForm {
+  return {
+    name: profile.name,
+    provider_type: profile.provider_type,
+    base_url: profile.base_url,
+    model: profile.model,
+    api_key: "",
+    temperature: profile.temperature,
+    max_output_tokens: profile.max_output_tokens,
+    concurrency: profile.concurrency,
+    timeout_seconds: profile.timeout_seconds,
+    request_options: profile.request_options,
+  };
+}
+
 export function ProviderProfilesPanel({ createSignal }: { createSignal: number }) {
   const profiles = useProviderProfiles();
   const mutations = useProviderProfileMutations();
   const selection = usePresetEditorSelection(profiles.data, createSignal);
   const selected = selection.selected;
+  const { confirmDiscard } = useUnsavedChangesGuard();
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
 
   useEffect(() => {
-    setForm(selected ? { ...selected, api_key: "" } : emptyForm);
+    setForm(selected ? profileToForm(selected) : emptyForm);
     setError(null);
     setShowModelPicker(false);
   }, [selected]);
@@ -71,18 +88,39 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
       }
       setField("api_key", "");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法保存 API 配置。 ");
+      setError(reason instanceof Error ? reason.message : "无法保存 API 配置。");
     }
   }
 
   async function remove() {
     if (!selected || !window.confirm(`删除 API 配置“${selected.name}”？`)) return;
-    await mutations.remove.mutateAsync(selected.id);
-    selection.clear();
+    setError(null);
+    try {
+      await mutations.remove.mutateAsync(selected.id);
+      selection.clear();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法删除 API 配置。");
+    }
   }
 
-  const pending = mutations.create.isPending || mutations.update.isPending;
+  async function clearApiKey() {
+    if (!selected?.has_api_key || !window.confirm("清除这个 API 配置中已保存的 API Key？")) {
+      return;
+    }
+    setError(null);
+    try {
+      await mutations.update.mutateAsync({ id: selected.id, input: { api_key: "" } });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法清除 API Key。");
+    }
+  }
+
+  const pending =
+    mutations.create.isPending || mutations.update.isPending || mutations.remove.isPending;
   const canSave = Boolean(form.name.trim() && form.base_url.trim() && form.model.trim());
+  const baseline = selected ? profileToForm(selected) : emptyForm;
+  const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
+  useUnsavedScope("provider-profile", dirty);
 
   return (
     <section className="preset-workarea">
@@ -98,7 +136,10 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               className={
                 !selection.isCreating && selection.selectedId === profile.id ? "is-active" : ""
               }
-              onClick={() => selection.select(profile.id)}
+              onClick={() => {
+                if (selection.selectedId === profile.id && !selection.isCreating) return;
+                if (confirmDiscard()) selection.select(profile.id);
+              }}
             >
               <Cable size={15} />
               <span>
@@ -121,7 +162,7 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
             <Button
               tone="danger"
               icon={<Trash2 size={14} />}
-              disabled={!selected || mutations.remove.isPending}
+              disabled={!selected || pending}
               onClick={() => void remove()}
             >
               删除
@@ -129,7 +170,7 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
             <Button
               tone="primary"
               icon={pending ? <Spinner /> : <Save size={14} />}
-              disabled={!canSave || pending}
+              disabled={!canSave || !dirty || pending}
               onClick={() => void save()}
             >
               保存
@@ -196,7 +237,7 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               onClose={() => setShowModelPicker(false)}
             />
           ) : null}
-          <label className="form-field form-field--wide">
+          <div className="form-field form-field--wide">
             <span>API Key {selected?.has_api_key ? "· 已安全保存，留空保持不变" : ""}</span>
             <input
               type="password"
@@ -204,7 +245,17 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               onChange={(event) => setField("api_key", event.target.value)}
               placeholder={selected?.has_api_key ? "••••••••••••" : "输入 API Key"}
             />
-          </label>
+            {selected?.has_api_key ? (
+              <Button
+                type="button"
+                tone="danger"
+                disabled={pending}
+                onClick={() => void clearApiKey()}
+              >
+                清除已保存的 Key
+              </Button>
+            ) : null}
+          </div>
           <label className="form-field">
             <span>温度</span>
             <input

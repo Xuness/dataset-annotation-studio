@@ -134,8 +134,16 @@ CREATE INDEX IF NOT EXISTS idx_preprocess_items_operation
 ON preprocess_items(operation_id);
 """
 
-WORKSPACE_SCHEMA_VERSION = 1
-WORKSPACE_MIGRATIONS = (Migration(1, "initial_workspace_schema", WORKSPACE_SCHEMA),)
+IMAGE_METADATA_VERSION_MIGRATION = """
+ALTER TABLE assets
+ADD COLUMN image_metadata_version INTEGER NOT NULL DEFAULT 1;
+"""
+
+WORKSPACE_SCHEMA_VERSION = 2
+WORKSPACE_MIGRATIONS = (
+    Migration(1, "initial_workspace_schema", WORKSPACE_SCHEMA),
+    Migration(2, "image_metadata_version", IMAGE_METADATA_VERSION_MIGRATION),
+)
 
 
 def initialize_workspace_database(database_path: Path) -> None:

@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends
 
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
-from dataset_studio.modules.annotations.models import AnnotationDocument, AnnotationUpdate
+from dataset_studio.modules.annotations.models import (
+    AnnotationDocument,
+    AnnotationRevision,
+    AnnotationUpdate,
+)
 
 router = APIRouter(
     prefix="/workspaces/{project_id}/assets/{asset_id}/annotation",
@@ -28,6 +32,6 @@ def delete_annotation(project_id: str, asset_id: str, container: Container):
     return container.annotations.delete(project_id, asset_id)
 
 
-@router.get("/history")
+@router.get("/history", response_model=list[AnnotationRevision])
 def annotation_history(project_id: str, asset_id: str, container: Container):
     return container.annotations.history(project_id, asset_id)

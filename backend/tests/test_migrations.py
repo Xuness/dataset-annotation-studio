@@ -4,7 +4,10 @@ import pytest
 
 from dataset_studio.core.migrations import migrate_database
 from dataset_studio.core.sqlite import connect
-from dataset_studio.modules.workspaces.schema import initialize_workspace_database
+from dataset_studio.modules.workspaces.schema import (
+    WORKSPACE_MIGRATIONS,
+    initialize_workspace_database,
+)
 from dataset_studio.platform.global_store import GLOBAL_MIGRATIONS, initialize_global_database
 
 
@@ -84,4 +87,57 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     finally:
         connection.close()
     assert row["request_options_json"] == "{}"
+    assert versions == [1, 2]
+
+
+def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: Path) -> None:
+    database = tmp_path / "workspace.sqlite3"
+    migrate_database(database, (WORKSPACE_MIGRATIONS[0],))
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            INSERT INTO assets (
+                id, relative_path, filename, stem, suffix, content_hash,
+                byte_size, modified_ns, width, height, annotation_relative_path,
+                annotation_status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "asset",
+                "image.png",
+                "image.png",
+                "image",
+                ".png",
+                "hash",
+                1,
+                1,
+                120,
+                60,
+                "image.txt",
+                "missing",
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:00Z",
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    initialize_workspace_database(database)
+
+    connection = connect(database)
+    try:
+        row = connection.execute(
+            "SELECT image_metadata_version FROM assets WHERE id = 'asset'"
+        ).fetchone()
+        versions = [
+            entry["version"]
+            for entry in connection.execute(
+                "SELECT version FROM schema_migrations ORDER BY version"
+            ).fetchall()
+        ]
+    finally:
+        connection.close()
+    assert row["image_metadata_version"] == 1
     assert versions == [1, 2]

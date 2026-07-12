@@ -27,6 +27,8 @@ export interface ScanResult {
   added: number;
   updated: number;
   missing: number;
+  failed: number;
+  issues: Array<{ path: string; message: string }>;
   duration_ms: number;
 }
 
@@ -40,6 +42,7 @@ export interface AssetSummary {
   relative_path: string;
   filename: string;
   suffix: string;
+  content_version: string;
   byte_size: number;
   width: number;
   height: number;
@@ -78,6 +81,14 @@ export interface AnnotationDocument {
   status: AnnotationStatus;
   validation: ValidationResult | null;
   modified_at: string | null;
+}
+
+export interface AnnotationRevision {
+  id: string;
+  source: string;
+  validation_status: AnnotationStatus;
+  created_at: string;
+  content: string;
 }
 
 export interface MetadataDocument {
@@ -249,9 +260,12 @@ export interface PreprocessPreviewItem {
 
 export interface PreprocessPreview {
   items: PreprocessPreviewItem[];
+  total_items: number;
+  truncated: boolean;
   changed_count: number;
   unchanged_count: number;
   warning_count: number;
+  preview_token: string;
 }
 
 export interface PreprocessOperation {

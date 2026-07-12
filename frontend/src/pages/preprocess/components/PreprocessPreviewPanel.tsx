@@ -20,6 +20,11 @@ export function PreprocessPreviewPanel({ preview }: { preview: PreprocessPreview
         ) : null}
       </header>
       <div className="preview-table">
+        {preview?.truncated ? (
+          <p className="preview-limit-note">
+            当前展示 {preview.items.length} / {preview.total_items} 项；执行校验仍覆盖全部图片。
+          </p>
+        ) : null}
         {preview?.items.map((item) => (
           <div
             key={item.asset_id}

@@ -25,6 +25,7 @@ class AssetRecord:
     annotation_status: str
     annotation_modified_ns: int | None
     metadata_relative_path: str | None
+    image_metadata_version: int
     created_at: str
     updated_at: str
 
@@ -34,6 +35,7 @@ class AssetSummary(BaseModel):
     relative_path: str
     filename: str
     suffix: str
+    content_version: str
     byte_size: int
     width: int
     height: int

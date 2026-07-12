@@ -1,22 +1,18 @@
 from __future__ import annotations
 
-import hashlib
 import os
 import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageOps
 
+from dataset_studio.core.files import file_sha256
 from dataset_studio.modules.preprocessing.models import ConvertOptions, OutputFormat
 from dataset_studio.modules.preprocessing.planner import PlanItem
 
 
 def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return file_sha256(path)
 
 
 def render_image(
@@ -53,9 +49,17 @@ def _encoding_options(
     suffix: str,
     convert: ConvertOptions | None,
 ) -> tuple[Image.Image, dict[str, object]]:
-    output_format = convert.format if convert else _format_from_suffix(suffix)
+    if convert is None:
+        normalized_suffix = suffix.lower()
+        if normalized_suffix in {".bmp"}:
+            return _rgb_or_rgba(image), {"format": "BMP"}
+        if normalized_suffix in {".tif", ".tiff"}:
+            return image, {"format": "TIFF", "compression": "tiff_lzw"}
+        output_format = _format_from_suffix(normalized_suffix)
+    else:
+        output_format = convert.format
     if output_format == OutputFormat.WEBP:
-        return image, {
+        return _rgb_or_rgba(image), {
             "format": "WEBP",
             "quality": convert.quality if convert else 90,
             "method": convert.effort if convert else 4,
@@ -66,6 +70,8 @@ def _encoding_options(
             "quality": convert.quality if convert else 95,
             "optimize": True,
         }
+    if image.mode not in {"1", "L", "LA", "P", "RGB", "RGBA", "I", "I;16"}:
+        image = _rgb_or_rgba(image)
     return image, {"format": "PNG", "compress_level": 6}
 
 
@@ -74,7 +80,9 @@ def _format_from_suffix(suffix: str) -> OutputFormat:
         return OutputFormat.WEBP
     if suffix.lower() in {".jpg", ".jpeg"}:
         return OutputFormat.JPEG
-    return OutputFormat.PNG
+    if suffix.lower() == ".png":
+        return OutputFormat.PNG
+    raise ValueError(f"无法在不转换格式的情况下写入图片：{suffix}")
 
 
 def _flatten_for_jpeg(image: Image.Image) -> Image.Image:
@@ -84,3 +92,9 @@ def _flatten_for_jpeg(image: Image.Image) -> Image.Image:
     background = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
     background.alpha_composite(rgba)
     return background.convert("RGB")
+
+
+def _rgb_or_rgba(image: Image.Image) -> Image.Image:
+    if image.mode in {"RGB", "RGBA"}:
+        return image
+    return image.convert("RGBA" if "transparency" in image.info else "RGB")
