@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import { Cable, KeyRound, Save, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Cable, KeyRound, Save, Search, Trash2 } from "lucide-react";
 
+import type { ProviderProfileInput } from "../../../features/presets/api";
 import { useProviderProfileMutations, useProviderProfiles } from "../../../features/presets/hooks";
 import type { ProviderType } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
+import { ProviderModelPicker } from "./ProviderModelPicker";
+import { ProviderRequestOptionsFields } from "./ProviderRequestOptionsFields";
+import { usePresetEditorSelection } from "../hooks/usePresetEditorSelection";
 
 const defaultUrls: Record<ProviderType, string> = {
   openrouter: "https://openrouter.ai/api/v1",
@@ -12,7 +16,9 @@ const defaultUrls: Record<ProviderType, string> = {
   gemini: "https://generativelanguage.googleapis.com/v1beta",
 };
 
-const emptyForm = {
+type ProviderProfileForm = ProviderProfileInput & { api_key: string };
+
+const emptyForm: ProviderProfileForm = {
   name: "",
   provider_type: "openrouter" as ProviderType,
   base_url: defaultUrls.openrouter,
@@ -22,35 +28,28 @@ const emptyForm = {
   max_output_tokens: 4096,
   concurrency: 4,
   timeout_seconds: 180,
+  request_options: {
+    top_p: null,
+    seed: null,
+    service_tier: null,
+    reasoning_effort: null,
+  },
 };
 
 export function ProviderProfilesPanel({ createSignal }: { createSignal: number }) {
   const profiles = useProviderProfiles();
   const mutations = useProviderProfileMutations();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = useMemo(
-    () => profiles.data?.find((profile) => profile.id === selectedId) ?? null,
-    [profiles.data, selectedId],
-  );
+  const selection = usePresetEditorSelection(profiles.data, createSignal);
+  const selected = selection.selected;
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedId && profiles.data?.length) setSelectedId(profiles.data[0].id);
-  }, [profiles.data, selectedId]);
+  const [showModelPicker, setShowModelPicker] = useState(false);
 
   useEffect(() => {
     setForm(selected ? { ...selected, api_key: "" } : emptyForm);
     setError(null);
+    setShowModelPicker(false);
   }, [selected]);
-
-  useEffect(() => {
-    if (createSignal > 0) {
-      setSelectedId(null);
-      setForm(emptyForm);
-      setError(null);
-    }
-  }, [createSignal]);
 
   function setField<K extends keyof typeof form>(field: K, value: (typeof form)[K]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -68,7 +67,7 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
         await mutations.update.mutateAsync({ id: selected.id, input });
       } else {
         const created = await mutations.create.mutateAsync(input);
-        setSelectedId(created.id);
+        selection.select(created.id);
       }
       setField("api_key", "");
     } catch (reason) {
@@ -79,7 +78,7 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
   async function remove() {
     if (!selected || !window.confirm(`删除 API 配置“${selected.name}”？`)) return;
     await mutations.remove.mutateAsync(selected.id);
-    setSelectedId(null);
+    selection.clear();
   }
 
   const pending = mutations.create.isPending || mutations.update.isPending;
@@ -96,8 +95,10 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
           {profiles.data?.map((profile) => (
             <button
               key={profile.id}
-              className={selectedId === profile.id ? "is-active" : ""}
-              onClick={() => setSelectedId(profile.id)}
+              className={
+                !selection.isCreating && selection.selectedId === profile.id ? "is-active" : ""
+              }
+              onClick={() => selection.select(profile.id)}
             >
               <Cable size={15} />
               <span>
@@ -162,14 +163,39 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               onChange={(event) => setField("base_url", event.target.value)}
             />
           </label>
-          <label className="form-field form-field--wide">
+          <div className="form-field form-field--wide">
             <span>默认模型</span>
-            <input
-              value={form.model}
-              onChange={(event) => setField("model", event.target.value)}
-              placeholder="模型 ID"
+            <div className="model-input-row">
+              <input
+                value={form.model}
+                onChange={(event) => setField("model", event.target.value)}
+                placeholder="模型 ID"
+              />
+              {form.provider_type === "openrouter" ? (
+                <Button
+                  type="button"
+                  icon={<Search size={13} />}
+                  onClick={() => setShowModelPicker((current) => !current)}
+                >
+                  搜索模型
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          {showModelPicker && form.provider_type === "openrouter" ? (
+            <ProviderModelPicker
+              providerType={form.provider_type}
+              baseUrl={form.base_url}
+              profileId={selected?.id}
+              apiKey={form.api_key}
+              selectedModel={form.model}
+              onSelect={(model) => {
+                setField("model", model.id);
+                setShowModelPicker(false);
+              }}
+              onClose={() => setShowModelPicker(false)}
             />
-          </label>
+          ) : null}
           <label className="form-field form-field--wide">
             <span>API Key {selected?.has_api_key ? "· 已安全保存，留空保持不变" : ""}</span>
             <input
@@ -218,6 +244,11 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               onChange={(event) => setField("timeout_seconds", Number(event.target.value))}
             />
           </label>
+          <ProviderRequestOptionsFields
+            providerType={form.provider_type}
+            value={form.request_options}
+            onChange={(request_options) => setField("request_options", request_options)}
+          />
         </div>
         {error ? <p className="form-error">{error}</p> : null}
       </div>

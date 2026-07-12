@@ -19,6 +19,7 @@ from dataset_studio.api.routes import (
 )
 from dataset_studio.core.config import Settings, settings
 from dataset_studio.core.errors import StudioError
+from dataset_studio.modules.providers.models import ProviderRequestError
 
 
 def create_app(app_settings: Settings = settings) -> FastAPI:
@@ -52,6 +53,10 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     @app.exception_handler(ValueError)
     async def value_error_handler(_request: Request, error: ValueError):
         return JSONResponse(status_code=400, content={"detail": str(error)})
+
+    @app.exception_handler(ProviderRequestError)
+    async def provider_request_error_handler(_request: Request, error: ProviderRequestError):
+        return JSONResponse(status_code=502, content={"detail": str(error)})
 
     @app.get("/health", tags=["system"])
     def health():

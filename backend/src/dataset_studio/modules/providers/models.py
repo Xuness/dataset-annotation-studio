@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from pydantic import BaseModel, Field
+
 
 @dataclass(frozen=True, slots=True)
 class MultimodalRequest:
@@ -22,6 +24,19 @@ class ProviderResponse:
     finish_reason: str | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+
+
+class ProviderModelSummary(BaseModel):
+    id: str
+    name: str
+    description: str = ""
+    context_length: int | None = None
+    max_output_tokens: int | None = None
+    input_modalities: list[str] = Field(default_factory=list)
+    supported_parameters: list[str] = Field(default_factory=list)
+    reasoning_efforts: list[str] = Field(default_factory=list)
+    prompt_price: str | None = None
+    completion_price: str | None = None
 
 
 class ProviderRequestError(Exception):

@@ -24,6 +24,38 @@ def _extract_content(value: object) -> str:
     return ""
 
 
+def _build_payload(profile: ProviderProfile, request: MultimodalRequest) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "model": request.model,
+        "messages": [
+            {"role": "system", "content": request.system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": request.user_prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": image_data_url(request.image_path)},
+                    },
+                ],
+            },
+        ],
+        "temperature": request.temperature,
+        "max_tokens": request.max_output_tokens,
+    }
+    options = profile.request_options
+    if options.top_p is not None:
+        payload["top_p"] = options.top_p
+    if options.seed is not None:
+        payload["seed"] = options.seed
+    if profile.provider_type == ProviderType.OPENROUTER:
+        if options.service_tier is not None:
+            payload["service_tier"] = options.service_tier.value
+        if options.reasoning_effort is not None:
+            payload["reasoning"] = {"effort": options.reasoning_effort.value}
+    return payload
+
+
 class OpenAICompatibleProvider:
     async def complete(
         self,
@@ -43,24 +75,7 @@ class OpenAICompatibleProvider:
                     "X-Title": "Dataset Annotation Studio",
                 }
             )
-        payload = {
-            "model": request.model,
-            "messages": [
-                {"role": "system", "content": request.system_prompt},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": request.user_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": image_data_url(request.image_path)},
-                        },
-                    ],
-                },
-            ],
-            "temperature": request.temperature,
-            "max_tokens": request.max_output_tokens,
-        }
+        payload = _build_payload(profile, request)
 
         try:
             async with httpx.AsyncClient(timeout=request.timeout_seconds) as client:

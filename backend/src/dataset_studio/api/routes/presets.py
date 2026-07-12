@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Response, status
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
 from dataset_studio.modules.presets.models import (
+    ProviderModelSearchRequest,
     ProviderProfile,
     ProviderProfileCreate,
     ProviderProfileUpdate,
@@ -12,6 +13,8 @@ from dataset_studio.modules.presets.models import (
     SystemPresetCreate,
     SystemPresetUpdate,
 )
+from dataset_studio.modules.providers.catalog import search_provider_models
+from dataset_studio.modules.providers.models import ProviderModelSummary
 
 router = APIRouter(prefix="/presets", tags=["presets"])
 Container = Annotated[AppContainer, Depends(get_container)]
@@ -57,3 +60,34 @@ def update_provider_profile(profile_id: str, data: ProviderProfileUpdate, contai
 def delete_provider_profile(profile_id: str, container: Container):
     container.presets.delete_provider(profile_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/provider-models/search", response_model=list[ProviderModelSummary])
+async def search_models(data: ProviderModelSearchRequest, container: Container):
+    provider_type = data.provider_type
+    base_url = data.base_url
+    api_key = data.api_key
+
+    if data.profile_id:
+        profile = container.presets.get_provider(data.profile_id)
+        provider_type = provider_type or profile.provider_type
+        base_url = base_url or profile.base_url
+        if (
+            not api_key
+            and provider_type == profile.provider_type
+            and base_url.rstrip("/") == profile.base_url.rstrip("/")
+        ):
+            try:
+                api_key = container.presets.get_api_key(profile.id)
+            except ValueError:
+                api_key = None
+
+    if provider_type is None or not base_url:
+        raise ValueError("无法确定模型目录对应的供应商与 API 地址。")
+    return await search_provider_models(
+        provider_type,
+        base_url,
+        api_key,
+        data.query,
+        data.limit,
+    )

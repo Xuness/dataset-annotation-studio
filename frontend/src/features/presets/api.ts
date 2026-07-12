@@ -1,5 +1,11 @@
 import { apiRequest } from "../../shared/api/client";
-import type { ProviderProfile, ProviderType, SystemPreset } from "../../shared/api/types";
+import type {
+  ProviderModelSummary,
+  ProviderProfile,
+  ProviderRequestOptions,
+  ProviderType,
+  SystemPreset,
+} from "../../shared/api/types";
 
 export interface SystemPresetInput {
   name: string;
@@ -16,6 +22,16 @@ export interface ProviderProfileInput {
   max_output_tokens: number;
   concurrency: number;
   timeout_seconds: number;
+  request_options: ProviderRequestOptions;
+}
+
+export interface ProviderModelSearchInput {
+  profile_id?: string;
+  provider_type: ProviderType;
+  base_url: string;
+  api_key?: string;
+  query: string;
+  limit?: number;
 }
 
 export function listSystemPresets(): Promise<SystemPreset[]> {
@@ -66,4 +82,13 @@ export function updateProviderProfile(
 
 export function deleteProviderProfile(id: string): Promise<void> {
   return apiRequest(`/api/v1/presets/providers/${id}`, { method: "DELETE" });
+}
+
+export function searchProviderModels(
+  input: ProviderModelSearchInput,
+): Promise<ProviderModelSummary[]> {
+  return apiRequest("/api/v1/presets/provider-models/search", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }

@@ -1,40 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { FileText, Save, Trash2 } from "lucide-react";
 
 import { useSystemPresetMutations, useSystemPresets } from "../../../features/presets/hooks";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
+import { usePresetEditorSelection } from "../hooks/usePresetEditorSelection";
 
 export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
   const presets = useSystemPresets();
   const mutations = useSystemPresetMutations();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = useMemo(
-    () => presets.data?.find((preset) => preset.id === selectedId) ?? null,
-    [presets.data, selectedId],
-  );
+  const selection = usePresetEditorSelection(presets.data, createSignal);
+  const selected = selection.selected;
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedId && presets.data?.length) setSelectedId(presets.data[0].id);
-  }, [presets.data, selectedId]);
 
   useEffect(() => {
     setName(selected?.name ?? "");
     setPrompt(selected?.system_prompt ?? "");
     setError(null);
   }, [selected]);
-
-  useEffect(() => {
-    if (createSignal > 0) {
-      setSelectedId(null);
-      setName("");
-      setPrompt("");
-      setError(null);
-    }
-  }, [createSignal]);
 
   async function save() {
     setError(null);
@@ -46,7 +31,7 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
         });
       } else {
         const created = await mutations.create.mutateAsync({ name, system_prompt: prompt });
-        setSelectedId(created.id);
+        selection.select(created.id);
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法保存预设。 ");
@@ -56,7 +41,7 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
   async function remove() {
     if (!selected || !window.confirm(`删除全局预设“${selected.name}”？`)) return;
     await mutations.remove.mutateAsync(selected.id);
-    setSelectedId(null);
+    selection.clear();
   }
 
   const dirty = Boolean(
@@ -75,8 +60,10 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
           {presets.data?.map((preset) => (
             <button
               key={preset.id}
-              className={selectedId === preset.id ? "is-active" : ""}
-              onClick={() => setSelectedId(preset.id)}
+              className={
+                !selection.isCreating && selection.selectedId === preset.id ? "is-active" : ""
+              }
+              onClick={() => selection.select(preset.id)}
             >
               <FileText size={15} />
               <span>

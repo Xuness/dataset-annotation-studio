@@ -36,8 +36,16 @@ CREATE TABLE IF NOT EXISTS provider_profiles (
 );
 """
 
-GLOBAL_SCHEMA_VERSION = 1
-GLOBAL_MIGRATIONS = (Migration(1, "initial_global_schema", GLOBAL_SCHEMA),)
+PROVIDER_REQUEST_OPTIONS_MIGRATION = """
+ALTER TABLE provider_profiles
+ADD COLUMN request_options_json TEXT NOT NULL DEFAULT '{}';
+"""
+
+GLOBAL_SCHEMA_VERSION = 2
+GLOBAL_MIGRATIONS = (
+    Migration(1, "initial_global_schema", GLOBAL_SCHEMA),
+    Migration(2, "provider_request_options", PROVIDER_REQUEST_OPTIONS_MIGRATION),
+)
 
 
 def initialize_global_database(database_path: Path) -> None:

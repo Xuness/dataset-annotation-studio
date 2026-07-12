@@ -11,6 +11,22 @@ from dataset_studio.modules.providers.models import (
 )
 
 
+def _build_generation_config(
+    profile: ProviderProfile,
+    request: MultimodalRequest,
+) -> dict[str, object]:
+    config: dict[str, object] = {
+        "temperature": request.temperature,
+        "maxOutputTokens": request.max_output_tokens,
+    }
+    options = profile.request_options
+    if options.top_p is not None:
+        config["topP"] = options.top_p
+    if options.seed is not None:
+        config["seed"] = options.seed
+    return config
+
+
 class GeminiProvider:
     async def complete(
         self,
@@ -36,10 +52,7 @@ class GeminiProvider:
                     ],
                 }
             ],
-            "generationConfig": {
-                "temperature": request.temperature,
-                "maxOutputTokens": request.max_output_tokens,
-            },
+            "generationConfig": _build_generation_config(profile, request),
         }
         try:
             async with httpx.AsyncClient(timeout=request.timeout_seconds) as client:

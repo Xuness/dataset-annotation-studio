@@ -7,9 +7,11 @@ import {
   deleteSystemPreset,
   listProviderProfiles,
   listSystemPresets,
+  searchProviderModels,
   updateProviderProfile,
   updateSystemPreset,
   type ProviderProfileInput,
+  type ProviderModelSearchInput,
   type SystemPresetInput,
 } from "./api";
 
@@ -24,6 +26,23 @@ export function useSystemPresets() {
 
 export function useProviderProfiles() {
   return useQuery({ queryKey: presetKeys.providers, queryFn: listProviderProfiles });
+}
+
+export function useProviderModelSearch(input: ProviderModelSearchInput, enabled: boolean) {
+  return useQuery({
+    queryKey: [
+      "presets",
+      "provider-models",
+      input.profile_id ?? "new",
+      input.provider_type,
+      input.base_url,
+      input.query,
+      Boolean(input.api_key),
+    ],
+    queryFn: () => searchProviderModels(input),
+    enabled,
+    staleTime: 60_000,
+  });
 }
 
 export function useSystemPresetMutations() {

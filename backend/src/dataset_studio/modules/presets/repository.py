@@ -53,8 +53,9 @@ class PresetRepository:
                 """
                 INSERT INTO provider_profiles (
                     id, name, provider_type, base_url, model, temperature,
-                    max_output_tokens, concurrency, timeout_seconds, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    max_output_tokens, concurrency, timeout_seconds, request_options_json,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
             )
@@ -65,7 +66,8 @@ class PresetRepository:
                 """
                 UPDATE provider_profiles
                 SET name = ?, provider_type = ?, base_url = ?, model = ?, temperature = ?,
-                    max_output_tokens = ?, concurrency = ?, timeout_seconds = ?, updated_at = ?
+                    max_output_tokens = ?, concurrency = ?, timeout_seconds = ?,
+                    request_options_json = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (*values, profile_id),

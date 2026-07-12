@@ -116,6 +116,15 @@ export interface SystemPreset {
 }
 
 export type ProviderType = "openrouter" | "openai_compatible" | "gemini";
+export type ServiceTier = "flex" | "priority";
+export type ReasoningEffort = "max" | "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
+
+export interface ProviderRequestOptions {
+  top_p: number | null;
+  seed: number | null;
+  service_tier: ServiceTier | null;
+  reasoning_effort: ReasoningEffort | null;
+}
 
 export interface ProviderProfile {
   id: string;
@@ -127,9 +136,23 @@ export interface ProviderProfile {
   max_output_tokens: number;
   concurrency: number;
   timeout_seconds: number;
+  request_options: ProviderRequestOptions;
   has_api_key: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProviderModelSummary {
+  id: string;
+  name: string;
+  description: string;
+  context_length: number | null;
+  max_output_tokens: number | null;
+  input_modalities: string[];
+  supported_parameters: string[];
+  reasoning_efforts: string[];
+  prompt_price: string | null;
+  completion_price: string | null;
 }
 
 export type JobStatus =

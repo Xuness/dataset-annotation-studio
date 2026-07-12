@@ -9,6 +9,7 @@ from dataset_studio.modules.presets.models import (
     ProviderProfile,
     ProviderProfileCreate,
     ProviderProfileUpdate,
+    ProviderRequestOptions,
     SystemPreset,
     SystemPresetCreate,
     SystemPresetUpdate,
@@ -92,6 +93,7 @@ class PresetService:
             data.max_output_tokens,
             data.concurrency,
             data.timeout_seconds,
+            data.request_options.model_dump_json(exclude_none=True),
             now,
             now,
         )
@@ -119,6 +121,7 @@ class PresetService:
                 updated.max_output_tokens,
                 updated.concurrency,
                 updated.timeout_seconds,
+                updated.request_options.model_dump_json(exclude_none=True),
                 updated_at,
             ),
         )
@@ -136,6 +139,11 @@ class PresetService:
 
     def _provider_from_row(self, row) -> ProviderProfile:
         values = dict(row)
+        options_json = str(values.pop("request_options_json", "{}"))
+        try:
+            values["request_options"] = ProviderRequestOptions.model_validate_json(options_json)
+        except ValueError:
+            values["request_options"] = ProviderRequestOptions()
         values["has_api_key"] = bool(self._secrets.get(self._secret_key(str(row["id"]))))
         return ProviderProfile.model_validate(values)
 
