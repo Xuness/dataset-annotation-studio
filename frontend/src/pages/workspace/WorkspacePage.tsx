@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -17,10 +17,22 @@ import { AssetBrowser } from "./components/AssetBrowser";
 import { ImageStage } from "./components/ImageStage";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { NavigationRail } from "./components/NavigationRail";
+import { PaneResizeHandle } from "./components/PaneResizeHandle";
 import { WorkspaceTopbar } from "./components/WorkspaceTopbar";
+import {
+  clamp,
+  DEFAULT_WORKSPACE_LAYOUT,
+  fitWorkspaceLayoutToWidth,
+  useWorkspaceLayout,
+  WORKSPACE_LAYOUT_LIMITS,
+} from "./hooks/useWorkspaceLayout";
 import "./workspace.css";
 
-export function WorkspacePage() {
+interface WorkspacePageProps {
+  mode?: "assets" | "review";
+}
+
+export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const { projectId = "" } = useParams();
   const navigate = useNavigate();
   const workspace = useWorkspace(projectId);
@@ -32,8 +44,13 @@ export function WorkspacePage() {
   const toggleCheckedAsset = useAppStore((state) => state.toggleCheckedAsset);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<AnnotationStatus | null>(null);
+  const [statusFilter, setStatusFilter] = useState<AnnotationStatus | null>(
+    mode === "review" ? "invalid" : null,
+  );
   const [editorDirty, setEditorDirty] = useState(false);
+  const workspaceBodyRef = useRef<HTMLDivElement>(null);
+  const mediaColumnRef = useRef<HTMLDivElement>(null);
+  const { layout, setLayout } = useWorkspaceLayout(projectId);
 
   const assetQuery = useMemo(
     () => ({ search, status: statusFilter, limit: 10_000 }),
@@ -44,6 +61,23 @@ export function WorkspacePage() {
   useEffect(() => {
     setActiveProject(projectId);
   }, [projectId, setActiveProject]);
+
+  useEffect(() => {
+    setStatusFilter(mode === "review" ? "invalid" : null);
+  }, [mode]);
+
+  useEffect(() => {
+    const body = workspaceBodyRef.current;
+    if (!body) return;
+
+    const fitLayout = () => {
+      setLayout((current) => fitWorkspaceLayoutToWidth(current, body.clientWidth));
+    };
+    fitLayout();
+    const observer = new ResizeObserver(fitLayout);
+    observer.observe(body);
+    return () => observer.disconnect();
+  }, [setLayout, workspace.data]);
 
   useEffect(() => {
     const items = assets.data?.items;
@@ -65,6 +99,12 @@ export function WorkspacePage() {
     },
     [editorDirty, selectAsset],
   );
+
+  const layoutStyle = {
+    "--asset-pane-width": `${layout.assetPaneWidth}px`,
+    "--inspector-pane-width": `${layout.inspectorPaneWidth}px`,
+    "--image-pane-ratio": `${layout.imagePaneRatio}%`,
+  } as CSSProperties;
 
   if (workspace.isLoading) {
     return (
@@ -92,9 +132,14 @@ export function WorkspacePage() {
         rescanning={rescan.isPending}
         onRescan={() => void rescan.mutateAsync()}
       />
-      <div className="workspace-body">
-        <NavigationRail projectId={projectId} />
+      <div
+        ref={workspaceBodyRef}
+        className="workspace-body workspace-body--assets"
+        style={layoutStyle}
+      >
+        <NavigationRail projectId={projectId} active={mode} />
         <AssetBrowser
+          mode={mode}
           projectId={projectId}
           assets={assets.data?.items ?? []}
           total={assets.data?.total ?? workspace.data.asset_count}
@@ -112,18 +157,105 @@ export function WorkspacePage() {
             void updateWorkspace.mutateAsync({ recursive_scan })
           }
         />
-        <div className="media-column">
+        <PaneResizeHandle
+          orientation="vertical"
+          label="调整素材列表宽度"
+          onResize={(delta) =>
+            setLayout((current) => {
+              const bodyWidth = workspaceBodyRef.current?.clientWidth ?? window.innerWidth;
+              const available =
+                bodyWidth -
+                WORKSPACE_LAYOUT_LIMITS.navigationWidth -
+                WORKSPACE_LAYOUT_LIMITS.resizeHandlesWidth -
+                WORKSPACE_LAYOUT_LIMITS.mediaPaneMin -
+                current.inspectorPaneWidth;
+              return {
+                ...current,
+                assetPaneWidth: clamp(
+                  current.assetPaneWidth + delta,
+                  WORKSPACE_LAYOUT_LIMITS.assetPaneMin,
+                  Math.max(
+                    WORKSPACE_LAYOUT_LIMITS.assetPaneMin,
+                    Math.min(WORKSPACE_LAYOUT_LIMITS.assetPaneMax, available),
+                  ),
+                ),
+              };
+            })
+          }
+          onReset={() =>
+            setLayout((current) => ({
+              ...current,
+              assetPaneWidth: DEFAULT_WORKSPACE_LAYOUT.assetPaneWidth,
+            }))
+          }
+        />
+        <div className="media-column" ref={mediaColumnRef}>
           <ImageStage projectId={projectId} asset={selectedAsset} />
+          <PaneResizeHandle
+            orientation="horizontal"
+            label="调整图片与标注区域高度"
+            onResize={(delta) => {
+              const height = mediaColumnRef.current?.clientHeight ?? 1;
+              setLayout((current) => ({
+                ...current,
+                imagePaneRatio: clamp(
+                  current.imagePaneRatio + (delta / height) * 100,
+                  WORKSPACE_LAYOUT_LIMITS.imagePaneMin,
+                  WORKSPACE_LAYOUT_LIMITS.imagePaneMax,
+                ),
+              }));
+            }}
+            onReset={() =>
+              setLayout((current) => ({
+                ...current,
+                imagePaneRatio: DEFAULT_WORKSPACE_LAYOUT.imagePaneRatio,
+              }))
+            }
+          />
           <AnnotationEditor
             projectId={projectId}
             assetId={selectedAssetId}
             onDirtyChange={setEditorDirty}
           />
         </div>
+        <PaneResizeHandle
+          orientation="vertical"
+          label="调整右侧面板宽度"
+          onResize={(delta) =>
+            setLayout((current) => {
+              const bodyWidth = workspaceBodyRef.current?.clientWidth ?? window.innerWidth;
+              const available =
+                bodyWidth -
+                WORKSPACE_LAYOUT_LIMITS.navigationWidth -
+                WORKSPACE_LAYOUT_LIMITS.resizeHandlesWidth -
+                WORKSPACE_LAYOUT_LIMITS.mediaPaneMin -
+                current.assetPaneWidth;
+              return {
+                ...current,
+                inspectorPaneWidth: clamp(
+                  current.inspectorPaneWidth - delta,
+                  WORKSPACE_LAYOUT_LIMITS.inspectorPaneMin,
+                  Math.max(
+                    WORKSPACE_LAYOUT_LIMITS.inspectorPaneMin,
+                    Math.min(WORKSPACE_LAYOUT_LIMITS.inspectorPaneMax, available),
+                  ),
+                ),
+              };
+            })
+          }
+          onReset={() =>
+            setLayout((current) => ({
+              ...current,
+              inspectorPaneWidth: DEFAULT_WORKSPACE_LAYOUT.inspectorPaneWidth,
+            }))
+          }
+        />
         <InspectorPanel projectId={projectId} workspace={workspace.data} asset={selectedAsset} />
       </div>
       <footer className="workspace-statusbar">
-        <span>{assets.data?.total ?? 0} 张图片</span>
+        <span>
+          {mode === "review" ? "审核" : "素材"} · {assets.data?.total ?? 0} 张图片
+        </span>
         <span>已标注 {workspace.data.annotated_count}</span>
         <span>异常 {workspace.data.invalid_count}</span>
         <span className="workspace-statusbar__path">UTF-8 · 同名 .txt · 标签闭合轻量校验</span>

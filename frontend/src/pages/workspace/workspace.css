@@ -105,6 +105,13 @@
   background: var(--line);
 }
 
+.workspace-body--assets {
+  grid-template-columns:
+    52px var(--asset-pane-width) 5px minmax(340px, 1fr) 5px
+    var(--inspector-pane-width);
+  gap: 0;
+}
+
 .navigation-rail {
   display: flex;
   min-height: 0;
@@ -144,9 +151,93 @@
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: minmax(260px, 1fr) minmax(190px, 34%);
-  gap: 1px;
+  grid-template-rows:
+    minmax(180px, var(--image-pane-ratio)) 5px
+    minmax(140px, 1fr);
+  gap: 0;
   background: var(--line);
+}
+
+.pane-resize-handle {
+  position: relative;
+  z-index: 4;
+  min-width: 0;
+  min-height: 0;
+  background: var(--line);
+  touch-action: none;
+}
+
+.pane-resize-handle::after {
+  position: absolute;
+  border-radius: 999px;
+  background: transparent;
+  content: "";
+  transition: background var(--transition);
+}
+
+.pane-resize-handle:hover::after,
+.pane-resize-handle:focus-visible::after,
+.pane-resize-handle:active::after {
+  background: color-mix(in srgb, var(--accent) 72%, transparent);
+}
+
+.pane-resize-handle--vertical {
+  cursor: col-resize;
+}
+
+.pane-resize-handle--vertical::after {
+  top: 11px;
+  bottom: 11px;
+  left: 2px;
+  width: 2px;
+}
+
+.pane-resize-handle--horizontal {
+  cursor: row-resize;
+}
+
+.pane-resize-handle--horizontal::after {
+  right: 11px;
+  bottom: 2px;
+  left: 11px;
+  height: 2px;
+}
+
+.interface-scale-control {
+  display: inline-flex;
+  height: 29px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+
+.interface-scale-control button {
+  display: grid;
+  width: 27px;
+  height: 100%;
+  place-items: center;
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+}
+
+.interface-scale-control button:hover:not(:disabled) {
+  background: var(--surface-soft);
+}
+
+.interface-scale-control button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.interface-scale-control > span {
+  width: 38px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
 }
 
 .workspace-statusbar {
@@ -182,6 +273,12 @@
 @media (max-width: 1220px) {
   .workspace-body {
     grid-template-columns: 50px 248px minmax(360px, 1fr) 280px;
+  }
+
+  .workspace-body--assets {
+    grid-template-columns:
+      50px var(--asset-pane-width) 5px minmax(340px, 1fr) 5px
+      var(--inspector-pane-width);
   }
 
   .quiet-stat {

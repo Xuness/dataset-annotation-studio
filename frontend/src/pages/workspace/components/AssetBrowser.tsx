@@ -9,6 +9,7 @@ import { StatusDot } from "../../../shared/ui/StatusDot";
 type StatusFilter = AnnotationStatus | null;
 
 interface AssetBrowserProps {
+  mode?: "assets" | "review";
   projectId: string;
   assets: AssetSummary[];
   total: number;
@@ -25,10 +26,16 @@ interface AssetBrowserProps {
   onRecursiveChange: (value: boolean) => void;
 }
 
-const filters: Array<{ value: StatusFilter; label: string; icon: typeof CheckCircle2 }> = [
+const assetFilters: Array<{ value: StatusFilter; label: string; icon: typeof CheckCircle2 }> = [
   { value: null, label: "全部", icon: CheckCircle2 },
   { value: "missing", label: "未标注", icon: FileQuestion },
   { value: "invalid", label: "异常", icon: CircleAlert },
+];
+
+const reviewFilters: Array<{ value: StatusFilter; label: string; icon: typeof CheckCircle2 }> = [
+  { value: "invalid", label: "标签异常", icon: CircleAlert },
+  { value: "empty", label: "空文件", icon: FileQuestion },
+  { value: "unchecked", label: "未校验", icon: FileQuestion },
 ];
 
 function formatBytes(bytes: number): string {
@@ -37,6 +44,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function AssetBrowser({
+  mode = "assets",
   projectId,
   assets,
   total,
@@ -52,6 +60,7 @@ export function AssetBrowser({
   onToggleChecked,
   onRecursiveChange,
 }: AssetBrowserProps) {
+  const filters = mode === "review" ? reviewFilters : assetFilters;
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: assets.length,
@@ -64,7 +73,7 @@ export function AssetBrowser({
     <aside className="asset-browser">
       <div className="asset-browser__header">
         <div>
-          <span className="eyebrow">Dataset</span>
+          <span className="eyebrow">{mode === "review" ? "Review Queue" : "Dataset"}</span>
           <strong>{total} 张图片</strong>
         </div>
         <label className="switch-label" title="扫描所有子文件夹">
@@ -148,8 +157,8 @@ export function AssetBrowser({
           </div>
         ) : (
           <div className="asset-list__empty">
-            <FileQuestion size={22} />
-            <p>没有符合当前条件的图片。</p>
+            {mode === "review" ? <CheckCircle2 size={22} /> : <FileQuestion size={22} />}
+            <p>{mode === "review" ? "当前分类没有待审核内容。" : "没有符合当前条件的图片。"}</p>
           </div>
         )}
       </div>

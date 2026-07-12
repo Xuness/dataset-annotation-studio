@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { xml } from "@codemirror/lang-xml";
 import { FileText, Save, Trash2, TriangleAlert } from "lucide-react";
@@ -18,15 +19,27 @@ interface AnnotationEditorProps {
   onDirtyChange: (dirty: boolean) => void;
 }
 
+const FONT_SIZE_STORAGE_KEY = "dataset-studio.annotation-font-size";
+
+function readFontSize(): number {
+  const stored = Number.parseInt(window.localStorage.getItem(FONT_SIZE_STORAGE_KEY) ?? "12", 10);
+  return Number.isFinite(stored) ? Math.min(22, Math.max(10, stored)) : 12;
+}
+
 export function AnnotationEditor({ projectId, assetId, onDirtyChange }: AnnotationEditorProps) {
   const annotation = useAnnotation(projectId, assetId);
   const save = useSaveAnnotation(projectId, assetId ?? "");
   const remove = useDeleteAnnotation(projectId, assetId ?? "");
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
+  const [fontSize, setFontSize] = useState(readFontSize);
 
   const dirty = content !== savedContent;
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
+
+  useEffect(() => {
+    window.localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(fontSize));
+  }, [fontSize]);
 
   useEffect(() => {
     if (annotation.data) {
@@ -49,7 +62,25 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
     return () => window.removeEventListener("keydown", handleSave);
   });
 
-  const extensions = useMemo(() => [xml()], []);
+  const extensions = useMemo(
+    () => [
+      xml(),
+      EditorView.lineWrapping,
+      EditorView.domEventHandlers({
+        wheel(event, view) {
+          if (!event.ctrlKey || event.deltaY === 0) return false;
+
+          event.preventDefault();
+          setFontSize((current) =>
+            Math.min(22, Math.max(10, current + (event.deltaY < 0 ? 1 : -1))),
+          );
+          view.requestMeasure();
+          return true;
+        },
+      }),
+    ],
+    [],
+  );
 
   async function handleSaveClick() {
     if (!assetId) return;
@@ -94,11 +125,16 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
         </div>
       </header>
 
-      <div className="annotation-editor__body">
+      <div
+        className="annotation-editor__body"
+        style={{ "--annotation-font-size": `${fontSize}px` } as CSSProperties}
+      >
         {assetId ? (
           <CodeMirror
+            className="annotation-editor__codemirror"
             value={content}
             height="100%"
+            maxHeight="100%"
             extensions={extensions}
             onChange={setContent}
             placeholder="当前图片还没有标注。你可以在这里手动填写，或稍后创建批量标注任务。"
@@ -122,7 +158,9 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
             <TriangleAlert size={12} /> {annotation.data.validation.issues[0].message}
           </span>
         ) : null}
-        <span className="annotation-editor__shortcut">Ctrl+S 保存</span>
+        <span className="annotation-editor__shortcut">
+          {fontSize}px · Ctrl+滚轮调整字号 · Ctrl+S 保存
+        </span>
       </footer>
     </section>
   );

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import type { WorkspaceSummary } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
+import { InterfaceScaleControl } from "../../../shared/ui/InterfaceScaleControl";
 import { Spinner } from "../../../shared/ui/Spinner";
 
 interface WorkspaceTopbarProps {
@@ -31,6 +32,7 @@ export function WorkspaceTopbar({ workspace, rescanning, onRescan }: WorkspaceTo
         <span className="quiet-stat">
           <SquareActivity size={14} /> 当前没有运行中的任务
         </span>
+        <InterfaceScaleControl />
         <Button
           icon={rescanning ? <Spinner /> : <RefreshCw size={15} />}
           onClick={onRescan}

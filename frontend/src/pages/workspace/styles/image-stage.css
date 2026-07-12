@@ -76,16 +76,15 @@
 
 .image-stage__canvas {
   position: relative;
-  display: grid;
   min-height: 0;
   overflow: auto;
-  place-items: center;
-  padding: 24px;
+  overscroll-behavior: contain;
 }
 
 .image-stage__checker {
   position: absolute;
   inset: 0;
+  pointer-events: none;
   background-image:
     linear-gradient(45deg, rgb(124 109 95 / 5%) 25%, transparent 25%),
     linear-gradient(-45deg, rgb(124 109 95 / 5%) 25%, transparent 25%),
@@ -99,20 +98,29 @@
   background-size: 12px 12px;
 }
 
-.image-stage__canvas img {
+.image-stage__scroll-content {
+  position: relative;
   z-index: 1;
+  display: grid;
+  width: max-content;
+  min-width: 100%;
+  height: max-content;
+  min-height: 100%;
+  place-items: center;
+  padding: 18px;
+}
+
+.image-stage__canvas img {
   display: block;
-  max-width: min(100%, 1000px);
-  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 0 0 auto;
   border: 1px solid rgb(77 61 49 / 10%);
   border-radius: 2px;
   object-fit: contain;
   box-shadow: 0 11px 34px rgb(58 45 35 / 15%);
   opacity: 0;
-  transform-origin: center;
-  transition:
-    opacity 220ms ease,
-    transform 160ms ease;
+  transition: opacity 220ms ease;
 }
 
 .image-stage__canvas.is-loaded img {

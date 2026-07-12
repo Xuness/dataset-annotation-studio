@@ -48,16 +48,27 @@
   overflow: hidden;
 }
 
-.annotation-editor__body .cm-theme,
+.annotation-editor__codemirror,
 .annotation-editor__body .cm-editor,
 .annotation-editor__body .cm-scroller {
   height: 100%;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.annotation-editor__codemirror {
+  overflow: hidden;
 }
 
 .annotation-editor__body .cm-editor {
   color: var(--ink);
   background: #fdfbf7;
-  font-size: 11px;
+  font-size: var(--annotation-font-size, 12px);
+}
+
+.annotation-editor__body .cm-scroller {
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .annotation-editor__body .cm-gutters {
@@ -75,6 +86,7 @@
   padding: 6px 0;
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 
 .annotation-editor__empty {

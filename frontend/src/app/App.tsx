@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { useCloseGuard } from "../shared/desktop/useCloseGuard";
+import { useApplyInterfaceScale } from "../shared/desktop/useInterfaceScale";
 import { Spinner } from "../shared/ui/Spinner";
 
 const HomePage = lazy(() =>
@@ -28,6 +29,7 @@ const PresetsPage = lazy(() =>
 
 export function App() {
   useCloseGuard();
+  useApplyInterfaceScale();
   return (
     <Suspense
       fallback={
@@ -40,6 +42,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/workspace/:projectId" element={<WorkspacePage />} />
+        <Route path="/workspace/:projectId/review" element={<WorkspacePage mode="review" />} />
         <Route path="/workspace/:projectId/jobs" element={<JobsPage />} />
         <Route path="/workspace/:projectId/preprocess" element={<PreprocessPage />} />
         <Route path="/presets" element={<PresetsPage />} />

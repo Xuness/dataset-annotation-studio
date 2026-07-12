@@ -18,7 +18,8 @@ export function NavigationRail({
   const navigate = useNavigate();
 
   function open(id: string) {
-    if (id === "assets" || id === "review") navigate(`/workspace/${projectId}`);
+    if (id === "assets") navigate(`/workspace/${projectId}`);
+    if (id === "review") navigate(`/workspace/${projectId}/review`);
     if (id === "jobs") navigate(`/workspace/${projectId}/jobs`);
     if (id === "preprocess") navigate(`/workspace/${projectId}/preprocess`);
   }
