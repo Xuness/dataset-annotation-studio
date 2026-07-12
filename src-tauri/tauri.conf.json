@@ -1,0 +1,44 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Dataset Studio",
+  "version": "0.1.0",
+  "identifier": "studio.dataset.annotation",
+  "build": {
+    "beforeDevCommand": "pnpm dev:services",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "pnpm build:frontend",
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Dataset Studio",
+        "width": 1480,
+        "height": 920,
+        "minWidth": 1024,
+        "minHeight": 680,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "backgroundColor": "#f5f1ea"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:8765; img-src 'self' asset: http://asset.localhost http://127.0.0.1:8765 data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Productivity",
+    "shortDescription": "Image dataset annotation workspace",
+    "longDescription": "A local-first desktop workspace for image dataset preparation and multimodal annotation."
+  }
+}

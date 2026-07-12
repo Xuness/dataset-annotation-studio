@@ -1,0 +1,72 @@
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from dataset_studio import __version__
+from dataset_studio.api.container import AppContainer
+from dataset_studio.api.routes import (
+    annotations,
+    assets,
+    jobs,
+    preprocessing,
+    presets,
+    statistics,
+    workspaces,
+)
+from dataset_studio.core.config import Settings, settings
+from dataset_studio.core.errors import StudioError
+
+
+def create_app(app_settings: Settings = settings) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        app.state.container = AppContainer.create(app_settings)
+        yield
+
+    app = FastAPI(
+        title="Dataset Annotation Studio API",
+        version=__version__,
+        lifespan=lifespan,
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "tauri://localhost",
+            "http://tauri.localhost",
+        ],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.exception_handler(StudioError)
+    async def studio_error_handler(_request: Request, error: StudioError):
+        return JSONResponse(status_code=404, content={"detail": str(error)})
+
+    @app.exception_handler(ValueError)
+    async def value_error_handler(_request: Request, error: ValueError):
+        return JSONResponse(status_code=400, content={"detail": str(error)})
+
+    @app.get("/health", tags=["system"])
+    def health():
+        return {"status": "ok", "version": __version__}
+
+    api_prefix = "/api/v1"
+    app.include_router(workspaces.router, prefix=api_prefix)
+    app.include_router(assets.router, prefix=api_prefix)
+    app.include_router(annotations.router, prefix=api_prefix)
+    app.include_router(presets.router, prefix=api_prefix)
+    app.include_router(jobs.router, prefix=api_prefix)
+    app.include_router(jobs.global_router, prefix=api_prefix)
+    app.include_router(preprocessing.router, prefix=api_prefix)
+    app.include_router(statistics.router, prefix=api_prefix)
+    return app
+
+
+app = create_app()

@@ -1,0 +1,218 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 960px;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  color: inherit;
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, white);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: var(--ink);
+  background: var(--accent-soft);
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 42%, transparent);
+  background-clip: padding-box;
+}
+
+.button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    border-color var(--transition),
+    background var(--transition),
+    transform var(--transition);
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: white;
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.button--primary {
+  color: #fffaf7;
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.button--primary:hover:not(:disabled) {
+  border-color: var(--accent-deep);
+  background: var(--accent-deep);
+}
+
+.button--danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--line));
+  background: var(--danger-soft);
+}
+
+.button__icon {
+  display: inline-flex;
+}
+
+.icon-button {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  border-color: var(--line);
+  background: var(--surface-raised);
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.inline-error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.spinner {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+}
+
+.spinner > span {
+  width: 100%;
+  height: 100%;
+  border: 2px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.status-dot > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.status-dot--valid > span,
+.status-dot--manually_accepted > span {
+  background: var(--sage);
+}
+
+.status-dot--invalid > span,
+.status-dot--empty > span {
+  background: var(--danger);
+}
+
+.placeholder-page {
+  display: grid;
+  height: 100%;
+  align-content: start;
+  gap: 60px;
+  padding: 26px;
+  background: var(--paper);
+}
+
+.placeholder-page > div {
+  max-width: 640px;
+  margin: 10vh auto;
+}
+
+.placeholder-page h1 {
+  margin: 12px 0;
+  font-family: "Songti SC", "Noto Serif SC", Georgia, serif;
+  font-size: 34px;
+  font-weight: 500;
+}
+
+.placeholder-page p {
+  color: var(--muted);
+}

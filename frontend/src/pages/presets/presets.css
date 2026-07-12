@@ -1,0 +1,287 @@
+.presets-page {
+  display: grid;
+  height: 100%;
+  grid-template-rows: 58px minmax(0, 1fr);
+  background: var(--paper);
+}
+
+.presets-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.presets-topbar > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.presets-topbar > div > span strong,
+.presets-topbar > div > span small {
+  display: block;
+}
+
+.presets-topbar > div > span strong {
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 14px;
+}
+
+.presets-topbar > div > span small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.presets-layout {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: 230px minmax(0, 1fr);
+}
+
+.presets-navigation {
+  padding: 24px 14px;
+  border-right: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+}
+
+.presets-navigation > .eyebrow {
+  display: block;
+  margin: 0 8px 13px;
+}
+
+.presets-navigation > button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 25px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.presets-navigation > button:hover,
+.presets-navigation > button.is-active {
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+.presets-navigation > button strong,
+.presets-navigation > button small {
+  display: block;
+}
+
+.presets-navigation > button strong {
+  font-size: 11px;
+}
+
+.presets-navigation > button small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.presets-navigation > p {
+  margin: 32px 9px 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.7;
+}
+
+.preset-workarea {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: 270px minmax(0, 1fr);
+  background: var(--line);
+  gap: 1px;
+}
+
+.preset-list {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--surface);
+}
+
+.preset-list > header {
+  padding: 20px 16px 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.preset-list > header strong {
+  display: block;
+  margin-top: 5px;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.preset-list > div {
+  overflow: auto;
+  padding: 8px;
+}
+
+.preset-list > div > button {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  padding: 10px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.preset-list > div > button:hover {
+  background: var(--surface-soft);
+}
+
+.preset-list > div > button.is-active {
+  color: var(--accent-deep);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+  background: var(--accent-soft);
+}
+
+.preset-list button strong,
+.preset-list button small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-list button strong {
+  font-size: 10px;
+}
+
+.preset-list button small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.preset-list > div > p {
+  padding: 30px 12px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+.preset-editor {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(220px, 1fr) auto;
+  gap: 16px;
+  padding: 28px 34px;
+  overflow: auto;
+  background: var(--paper);
+}
+
+.preset-editor--provider {
+  display: block;
+}
+
+.preset-editor > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--line);
+}
+
+.preset-editor > header h1 {
+  margin: 6px 0 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.preset-editor > header > div:last-child {
+  display: flex;
+  gap: 7px;
+}
+
+.form-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.form-field > span {
+  color: var(--ink-soft);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--surface-raised);
+}
+
+.form-field input,
+.form-field select {
+  height: 36px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+.form-field textarea {
+  height: 100%;
+  min-height: 240px;
+  padding: 13px;
+  resize: none;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--line));
+}
+
+.form-field--grow {
+  min-height: 0;
+}
+
+.form-grid {
+  display: grid;
+  max-width: 780px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding-top: 24px;
+}
+
+.form-field--wide {
+  grid-column: 1 / -1;
+}
+
+.form-error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 9px;
+}

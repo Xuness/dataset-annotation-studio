@@ -1,0 +1,231 @@
+.home-page {
+  height: 100%;
+  overflow: auto;
+  background:
+    linear-gradient(90deg, transparent 49.94%, rgb(89 74 61 / 3%) 50%, transparent 50.06%),
+    var(--paper);
+}
+
+.home-topbar {
+  display: flex;
+  height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 34px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brand-lockup strong,
+.brand-lockup small {
+  display: block;
+}
+
+.brand-lockup strong {
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.brand-lockup small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.brand-mark {
+  position: relative;
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border: 1px solid var(--accent);
+  border-radius: 50% 50% 47% 53%;
+  transform: rotate(-7deg);
+}
+
+.brand-mark::before,
+.brand-mark::after,
+.brand-mark > span {
+  position: absolute;
+  content: "";
+  border-radius: 50%;
+}
+
+.brand-mark::before {
+  width: 15px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.brand-mark::after {
+  width: 3px;
+  height: 3px;
+  margin-left: 13px;
+  background: var(--accent);
+}
+
+.brand-mark > span {
+  width: 3px;
+  height: 3px;
+  margin-left: -13px;
+  background: var(--accent);
+}
+
+.home-hero {
+  display: grid;
+  max-width: 1160px;
+  min-height: 420px;
+  grid-template-columns: minmax(420px, 0.95fr) minmax(400px, 1.05fr);
+  align-items: center;
+  gap: 70px;
+  margin: 0 auto;
+  padding: 54px 48px 36px;
+}
+
+.home-hero h1 {
+  margin: 15px 0 19px;
+  font-family: "Songti SC", "Noto Serif SC", Georgia, serif;
+  font-size: clamp(36px, 4.1vw, 56px);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.34;
+}
+
+.home-hero__description {
+  max-width: 510px;
+  margin: 0 0 26px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.recent-section {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 10px 48px 70px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.section-heading h2 {
+  margin: 5px 0 0;
+  font-family: "Songti SC", "Noto Serif SC", Georgia, serif;
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.recent-card {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 42px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  text-align: left;
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    transform var(--transition);
+}
+
+.recent-card:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+  transform: translateY(-1px);
+}
+
+.recent-card--missing {
+  opacity: 0.68;
+}
+
+.recent-card__icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+.recent-card__body {
+  min-width: 0;
+}
+
+.recent-card__body strong,
+.recent-card__body small,
+.recent-card__body > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-card__body strong {
+  font-size: 13px;
+}
+
+.recent-card__body small {
+  margin: 4px 0 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.recent-card__body > span {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.recent-card__arrow {
+  color: var(--faint);
+}
+
+.recent-placeholder {
+  display: grid;
+  min-height: 100px;
+  place-items: center;
+  padding: 20px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  text-align: center;
+  font-size: 12px;
+}
+
+.recent-placeholder--error {
+  gap: 10px;
+  color: var(--danger);
+}
+
+@media (max-width: 1050px) {
+  .home-hero {
+    grid-template-columns: 1fr 0.85fr;
+    gap: 36px;
+  }
+
+  .recent-grid {
+    grid-template-columns: 1fr;
+  }
+}

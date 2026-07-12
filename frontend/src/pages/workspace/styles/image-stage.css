@@ -1,0 +1,120 @@
+.image-stage {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 38px minmax(0, 1fr);
+  background: #e8e2d9;
+}
+
+.image-stage--empty {
+  place-content: center;
+  justify-items: center;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.image-stage__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 0 13px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.image-stage__header > div:first-child {
+  min-width: 0;
+}
+
+.image-stage__header strong,
+.image-stage__header span {
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-stage__header strong {
+  max-width: 42vw;
+  font-size: 10px;
+}
+
+.image-stage__header > div:first-child span {
+  margin-left: 9px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.zoom-controls button {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+}
+
+.zoom-controls button:hover {
+  background: var(--surface-soft);
+}
+
+.zoom-controls > span {
+  width: 42px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 8px;
+}
+
+.image-stage__canvas {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  overflow: auto;
+  place-items: center;
+  padding: 24px;
+}
+
+.image-stage__checker {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(45deg, rgb(124 109 95 / 5%) 25%, transparent 25%),
+    linear-gradient(-45deg, rgb(124 109 95 / 5%) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgb(124 109 95 / 5%) 75%),
+    linear-gradient(-45deg, transparent 75%, rgb(124 109 95 / 5%) 75%);
+  background-position:
+    0 0,
+    0 6px,
+    6px -6px,
+    -6px 0;
+  background-size: 12px 12px;
+}
+
+.image-stage__canvas img {
+  z-index: 1;
+  display: block;
+  max-width: min(100%, 1000px);
+  max-height: 100%;
+  border: 1px solid rgb(77 61 49 / 10%);
+  border-radius: 2px;
+  object-fit: contain;
+  box-shadow: 0 11px 34px rgb(58 45 35 / 15%);
+  opacity: 0;
+  transform-origin: center;
+  transition:
+    opacity 220ms ease,
+    transform 160ms ease;
+}
+
+.image-stage__canvas.is-loaded img {
+  opacity: 1;
+}

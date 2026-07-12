@@ -1,0 +1,50 @@
+[project]
+name = "dataset-annotation-studio-backend"
+version = "0.1.0"
+description = "Local backend and durable worker for Dataset Annotation Studio"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.116,<1",
+    "httpx>=0.28,<1",
+    "keyring>=25.6,<26",
+    "pillow>=11.3,<13",
+    "pydantic>=2.11,<3",
+    "uvicorn[standard]>=0.35,<1",
+]
+
+[project.scripts]
+dataset-studio-api = "dataset_studio.entrypoints.api:main"
+dataset-studio-worker = "dataset_studio.entrypoints.worker:main"
+dataset-studio-service = "dataset_studio.entrypoints.service:main"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.15,<7",
+    "pytest>=8.4,<9",
+    "pytest-asyncio>=1.1,<2",
+    "ruff>=0.12,<1",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dataset_studio"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF001"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

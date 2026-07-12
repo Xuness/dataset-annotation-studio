@@ -1,0 +1,282 @@
+.inspector-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 39px minmax(0, 1fr);
+  background: var(--surface);
+}
+
+.inspector-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 5px 7px;
+  border-bottom: 1px solid var(--line);
+}
+
+.inspector-tabs button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 9px;
+}
+
+.inspector-tabs button:hover {
+  background: var(--surface-soft);
+}
+
+.inspector-tabs button.is-active {
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+.inspector-panel__content {
+  min-height: 0;
+  overflow: auto;
+}
+
+.inspector-section {
+  padding: 14px 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.inspector-section--grow {
+  min-height: 180px;
+}
+
+.section-kicker {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.section-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dataset-progress {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.progress-ring {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) var(--progress), var(--surface-soft) 0);
+}
+
+.progress-ring::before {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface);
+  content: "";
+}
+
+.progress-ring span {
+  z-index: 1;
+  font-family: Georgia, serif;
+  font-size: 11px;
+}
+
+.dataset-progress > div:last-child strong,
+.dataset-progress > div:last-child span,
+.dataset-progress > div:last-child small {
+  display: block;
+}
+
+.dataset-progress > div:last-child strong {
+  margin-bottom: 3px;
+  font-size: 13px;
+}
+
+.dataset-progress > div:last-child span,
+.dataset-progress > div:last-child small {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.6;
+}
+
+.dataset-progress > div:last-child small {
+  color: var(--danger);
+}
+
+.progress-track {
+  height: 3px;
+  margin-top: 13px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.detail-list {
+  margin: 0;
+}
+
+.detail-list div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  font-size: 9px;
+}
+
+.detail-list div:last-child {
+  border: 0;
+}
+
+.detail-list dt {
+  color: var(--muted);
+}
+
+.detail-list dd {
+  margin: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspector-section--path p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink-soft);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8px;
+  line-height: 1.6;
+}
+
+.quiet-copy {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.prompt-textarea {
+  width: 100%;
+  min-height: 150px;
+  margin-bottom: 9px;
+  padding: 9px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--surface-raised);
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.prompt-textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
+}
+
+.inspector-section .button {
+  min-height: 29px;
+  font-size: 9px;
+}
+
+.prompt-preview,
+.json-preview {
+  max-height: 310px;
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: #f8f4ed;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.metadata-fields {
+  display: flex;
+  max-height: 230px;
+  flex-direction: column;
+  gap: 3px;
+  overflow: auto;
+}
+
+.metadata-fields button {
+  display: grid;
+  min-height: 27px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 5px;
+  color: var(--ink-soft);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8px;
+}
+
+.metadata-fields button:hover,
+.metadata-fields button.is-selected {
+  background: var(--surface-soft);
+}
+
+.metadata-fields button.is-selected {
+  color: var(--accent-deep);
+}
+
+.metadata-fields button > span {
+  display: grid;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+}
+
+.metadata-fields button.is-selected > span {
+  color: white;
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.inspector-empty {
+  display: grid;
+  min-height: 240px;
+  place-content: center;
+  justify-items: center;
+  padding: 30px;
+  color: var(--faint);
+  text-align: center;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.inspector-empty--error {
+  color: var(--danger);
+}

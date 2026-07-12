@@ -1,0 +1,58 @@
+import { apiRequest } from "../../shared/api/client";
+import type { JobDetail, JobSummary } from "../../shared/api/types";
+
+export interface CreateJobInput {
+  system_preset_id: string;
+  provider_profile_id: string;
+  scope: "all" | "selected";
+  asset_ids: string[];
+  overwrite_existing?: boolean;
+}
+
+const jobsPath = (projectId: string) => `/api/v1/workspaces/${projectId}/jobs`;
+
+export function listJobs(projectId: string): Promise<JobSummary[]> {
+  return apiRequest(jobsPath(projectId));
+}
+
+export function getJob(projectId: string, jobId: string): Promise<JobDetail> {
+  return apiRequest(`${jobsPath(projectId)}/${jobId}`);
+}
+
+export function createJob(projectId: string, input: CreateJobInput): Promise<JobDetail> {
+  return apiRequest(jobsPath(projectId), { method: "POST", body: JSON.stringify(input) });
+}
+
+export function stopJob(projectId: string, jobId: string): Promise<JobDetail> {
+  return apiRequest(`${jobsPath(projectId)}/${jobId}/stop`, { method: "POST" });
+}
+
+export function stopAllJobs(projectId: string): Promise<{ stopped: number }> {
+  return apiRequest(`${jobsPath(projectId)}/stop-all`, { method: "POST" });
+}
+
+export function getActiveJobs(): Promise<{ count: number; project_count: number }> {
+  return apiRequest("/api/v1/jobs/active");
+}
+
+export function stopAllWorkspaceJobs(): Promise<{ stopped: number }> {
+  return apiRequest("/api/v1/jobs/stop-all", { method: "POST" });
+}
+
+export function resumeJob(projectId: string, jobId: string): Promise<JobDetail> {
+  return apiRequest(`${jobsPath(projectId)}/${jobId}/resume`, { method: "POST" });
+}
+
+export function retryFailed(projectId: string, jobId: string): Promise<JobDetail> {
+  return apiRequest(`${jobsPath(projectId)}/${jobId}/retry-failed`, { method: "POST" });
+}
+
+export function acceptJobItem(
+  projectId: string,
+  jobId: string,
+  itemId: string,
+): Promise<JobDetail> {
+  return apiRequest(`${jobsPath(projectId)}/${jobId}/items/${itemId}/accept`, {
+    method: "POST",
+  });
+}

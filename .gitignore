@@ -1,0 +1,36 @@
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# JavaScript
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+pnpm-debug.log*
+
+# Python
+backend/.venv/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/.mypy_cache/
+backend/**/__pycache__/
+backend/**/*.py[cod]
+backend/build/
+backend/dist/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/*.exe
+src-tauri/binaries/dataset-studio-service-*
+
+# Local configuration
+.env
+.env.*
+!.env.example
+.codex-*.log

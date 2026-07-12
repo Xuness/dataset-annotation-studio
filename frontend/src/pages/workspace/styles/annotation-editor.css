@@ -1,0 +1,110 @@
+.annotation-editor {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 38px minmax(0, 1fr) 24px;
+  background: var(--surface);
+}
+
+.annotation-editor__header,
+.annotation-editor__footer {
+  display: flex;
+  align-items: center;
+}
+
+.annotation-editor__header {
+  justify-content: space-between;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.annotation-editor__title,
+.annotation-editor__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.annotation-editor__title strong {
+  font-size: 10px;
+}
+
+.annotation-editor__actions .button {
+  min-height: 28px;
+  padding: 0 9px;
+  font-size: 9px;
+}
+
+.unsaved-mark {
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: var(--warning);
+  background: var(--warning-soft);
+  font-size: 8px;
+}
+
+.annotation-editor__body {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.annotation-editor__body .cm-theme,
+.annotation-editor__body .cm-editor,
+.annotation-editor__body .cm-scroller {
+  height: 100%;
+}
+
+.annotation-editor__body .cm-editor {
+  color: var(--ink);
+  background: #fdfbf7;
+  font-size: 11px;
+}
+
+.annotation-editor__body .cm-gutters {
+  color: var(--faint);
+  border-right: 1px solid var(--line);
+  background: #f4f0e9;
+}
+
+.annotation-editor__body .cm-activeLine,
+.annotation-editor__body .cm-activeLineGutter {
+  background: rgb(188 146 130 / 8%);
+}
+
+.annotation-editor__body .cm-content {
+  padding: 6px 0;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  line-height: 1.65;
+}
+
+.annotation-editor__empty {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.annotation-editor__footer {
+  gap: 12px;
+  padding: 0 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 8px;
+}
+
+.validation-warning {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--danger);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-editor__shortcut {
+  margin-left: auto;
+}

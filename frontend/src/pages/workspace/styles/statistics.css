@@ -1,0 +1,32 @@
+.tag-frequency {
+  display: grid;
+  gap: 8px;
+}
+
+.tag-frequency__row > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+  color: var(--ink-soft);
+  font-size: 8px;
+}
+
+.tag-frequency__row code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-frequency__row i {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--sage);
+}
+
+.tag-frequency > small {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.5;
+}

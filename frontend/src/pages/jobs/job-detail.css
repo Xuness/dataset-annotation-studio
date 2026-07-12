@@ -1,0 +1,148 @@
+.job-detail-panel {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  padding: 19px 20px 0;
+}
+
+.job-detail-panel--empty {
+  place-items: center;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.job-detail-panel > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.job-detail-panel > header h2 {
+  margin: 5px 0 3px;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.job-detail-panel > header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.job-detail-panel > header > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.job-detail-panel .button {
+  min-height: 29px;
+  padding: 0 9px;
+  font-size: 8px;
+}
+
+.job-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  padding: 14px 0;
+}
+
+.job-summary-grid > div {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.job-summary-grid strong,
+.job-summary-grid span {
+  display: block;
+}
+
+.job-summary-grid strong {
+  font-family: Georgia, serif;
+  font-size: 18px;
+}
+
+.job-summary-grid span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.job-summary-grid .is-alert strong {
+  color: var(--danger);
+}
+
+.failed-items-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0 9px;
+  color: var(--ink-soft);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.failed-items-header small {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.failed-items-list {
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 15px;
+}
+
+.failed-item {
+  margin-bottom: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger-soft) 42%, var(--surface));
+}
+
+.failed-item > header {
+  display: grid;
+  grid-template-columns: 17px minmax(0, 1fr) auto;
+  align-items: center;
+  color: var(--danger);
+}
+
+.failed-item > header strong {
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+}
+
+.failed-item > header span {
+  color: var(--muted);
+  font-size: 7px;
+}
+
+.failed-item > p {
+  margin: 8px 0;
+  color: var(--danger);
+  font-size: 8px;
+}
+
+.failed-item pre {
+  max-height: 120px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 7px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}

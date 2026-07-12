@@ -1,0 +1,29 @@
+{
+  "name": "dataset-annotation-studio",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "dev": "tauri dev",
+    "dev:frontend": "pnpm --dir frontend dev",
+    "dev:api": "uv run --project backend dataset-studio-api",
+    "dev:worker": "uv run --project backend dataset-studio-worker",
+    "dev:services": "concurrently --kill-others --names frontend,api,worker \"pnpm dev:frontend\" \"pnpm dev:api\" \"pnpm dev:worker\"",
+    "build:frontend": "pnpm --dir frontend build",
+    "build:sidecar": "pwsh -NoProfile -File scripts/build-sidecar.ps1",
+    "build": "pnpm build:sidecar && tauri build --config src-tauri/tauri.release.conf.json",
+    "clean": "pwsh -NoProfile -File scripts/clean-generated.ps1",
+    "check": "pnpm --dir frontend check && uv run --project backend ruff check backend/src backend/tests && uv run --project backend pytest && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo check --manifest-path src-tauri/Cargo.toml",
+    "format": "pnpm --dir frontend format && uv run --project backend ruff format backend/src backend/tests"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.8.5",
+    "concurrently": "^9.2.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@tauri-apps/cli",
+      "esbuild"
+    ]
+  }
+}
