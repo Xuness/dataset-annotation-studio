@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import uuid
 
-from dataset_studio.core.errors import JobNotFoundError
+from dataset_studio.core.errors import JobNotFoundError, PresetNotFoundError
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
@@ -41,7 +41,15 @@ class JobService:
         include_items: bool = True,
     ) -> JobDetail:
         paths, manifest = self._workspaces.get(project_id)
-        system_preset = self._presets.get_system(request.system_preset_id)
+        system_preset_id = manifest.settings.system_preset_id
+        if not system_preset_id:
+            raise ValueError("请先在素材页的提示词面板选择并保存 System Prompt 预设。")
+        try:
+            system_preset = self._presets.get_system(system_preset_id)
+        except PresetNotFoundError as error:
+            raise ValueError(
+                "项目关联的 System Prompt 预设已不存在，请在素材页重新选择并保存。"
+            ) from error
         provider_profile = self._presets.get_provider(request.provider_profile_id)
         self._presets.get_api_key(provider_profile.id)
         asset_ids = self._select_assets(

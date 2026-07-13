@@ -47,7 +47,10 @@ export function useProviderModelSearch(input: ProviderModelSearchInput, enabled:
 
 export function useSystemPresetMutations() {
   const queryClient = useQueryClient();
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: presetKeys.system });
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: presetKeys.system });
+    void queryClient.invalidateQueries({ queryKey: ["prompt-preview"] });
+  };
   return {
     create: useMutation({ mutationFn: createSystemPreset, onSuccess: invalidate }),
     update: useMutation({

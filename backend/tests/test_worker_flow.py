@@ -77,12 +77,16 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
     Image.new("RGB", (48, 48), "white").save(project / "sample.png")
     (project / "sample.json").write_text('{"artist":"Mori","unused":1}', encoding="utf-8")
     workspace, _ = workspaces.open(str(project))
-    workspaces.update_settings(
-        workspace.project_id,
-        WorkspaceSettingsUpdate(user_prompt="Describe the image.", json_fields=["artist"]),
-    )
     system = presets.create_system(
         SystemPresetCreate(name="Balanced XML", system_prompt="Return one XML element.")
+    )
+    workspaces.update_settings(
+        workspace.project_id,
+        WorkspaceSettingsUpdate(
+            system_preset_id=system.id,
+            user_prompt="Describe the image.",
+            json_fields=["artist"],
+        ),
     )
     profile = presets.create_provider(
         ProviderProfileCreate(
@@ -97,7 +101,6 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
     created = jobs.create(
         workspace.project_id,
         JobCreateRequest(
-            system_preset_id=system.id,
             provider_profile_id=profile.id,
             scope=JobScope.ALL,
         ),
@@ -141,6 +144,10 @@ async def test_worker_marks_item_failed_when_image_disappears(tmp_path: Path) ->
     system = presets.create_system(
         SystemPresetCreate(name="XML", system_prompt="Return one XML element.")
     )
+    workspaces.update_settings(
+        workspace.project_id,
+        WorkspaceSettingsUpdate(system_preset_id=system.id),
+    )
     profile = presets.create_provider(
         ProviderProfileCreate(
             name="Fake provider",
@@ -154,7 +161,6 @@ async def test_worker_marks_item_failed_when_image_disappears(tmp_path: Path) ->
     created = jobs.create(
         workspace.project_id,
         JobCreateRequest(
-            system_preset_id=system.id,
             provider_profile_id=profile.id,
             scope=JobScope.ALL,
         ),

@@ -25,16 +25,9 @@ export function NewJobPanel({
   const systemPresets = useSystemPresets();
   const providerProfiles = useProviderProfiles();
   const actions = useJobActions(projectId);
-  const [systemPresetId, setSystemPresetId] = useState("");
   const [providerProfileId, setProviderProfileId] = useState("");
   const [scope, setScope] = useState<"all" | "selected">("all");
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!systemPresetId && systemPresets.data?.length) {
-      setSystemPresetId(systemPresets.data[0].id);
-    }
-  }, [systemPresetId, systemPresets.data]);
 
   useEffect(() => {
     if (!providerProfileId && providerProfiles.data?.length) {
@@ -46,7 +39,6 @@ export function NewJobPanel({
     setError(null);
     try {
       const job = await actions.create.mutateAsync({
-        system_preset_id: systemPresetId,
         provider_profile_id: providerProfileId,
         scope,
         asset_ids: scope === "selected" ? checkedAssetIds : [],
@@ -57,8 +49,18 @@ export function NewJobPanel({
     }
   }
 
+  const configuredSystemPreset = systemPresets.data?.find(
+    (preset) => preset.id === workspace.settings.system_preset_id,
+  );
+  const promptConfigurationIssue = !workspace.settings.system_preset_id
+    ? "尚未在素材页选择 System Prompt 预设"
+    : systemPresets.isError
+      ? "无法读取项目关联的 System Prompt 预设"
+      : systemPresets.isSuccess && !configuredSystemPreset
+        ? "项目关联的 System Prompt 预设已不存在"
+        : null;
   const ready = Boolean(
-    systemPresetId && providerProfileId && (scope === "all" || checkedAssetIds.length > 0),
+    configuredSystemPreset && providerProfileId && (scope === "all" || checkedAssetIds.length > 0),
   );
 
   return (
@@ -73,17 +75,20 @@ export function NewJobPanel({
         </div>
       </header>
 
-      <label className="form-field">
-        <span>System Prompt 预设</span>
-        <select value={systemPresetId} onChange={(event) => setSystemPresetId(event.target.value)}>
-          {!systemPresets.data?.length ? <option value="">尚未创建预设</option> : null}
-          {systemPresets.data?.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {preset.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className={`job-prompt-source ${promptConfigurationIssue ? "has-error" : ""}`}>
+        <span>项目提示词</span>
+        <strong>
+          {systemPresets.isLoading
+            ? "正在读取项目配置…"
+            : (configuredSystemPreset?.name ?? promptConfigurationIssue)}
+        </strong>
+        <small>System Prompt 与 User Prompt 均沿用素材页最后保存的配置。</small>
+        {promptConfigurationIssue ? (
+          <button onClick={() => navigate(`/workspace/${projectId}?panel=prompt`)}>
+            回到素材页配置
+          </button>
+        ) : null}
+      </div>
 
       <label className="form-field">
         <span>API 配置</span>

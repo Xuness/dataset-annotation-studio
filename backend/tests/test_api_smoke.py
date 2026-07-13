@@ -24,6 +24,34 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
         listed = client.get(f"/api/v1/workspaces/{project_id}/assets")
         assert listed.status_code == 200
         assert listed.json()["items"][0]["relative_path"] == "sample.webp"
+        asset_id = listed.json()["items"][0]["id"]
+
+        unconfigured_preview = client.get(
+            f"/api/v1/workspaces/{project_id}/assets/{asset_id}/prompt-preview"
+        )
+        assert unconfigured_preview.status_code == 200
+        assert unconfigured_preview.json()["configuration_issue"]
+
+        preset = client.post(
+            "/api/v1/presets/system",
+            json={"name": "XML caption", "system_prompt": "Return balanced XML."},
+        )
+        assert preset.status_code == 201
+        configured = client.patch(
+            f"/api/v1/workspaces/{project_id}",
+            json={
+                "system_preset_id": preset.json()["id"],
+                "user_prompt": "Describe this image.",
+            },
+        )
+        assert configured.status_code == 200
+
+        preview = client.get(f"/api/v1/workspaces/{project_id}/assets/{asset_id}/prompt-preview")
+        assert preview.status_code == 200
+        assert preview.json()["system_preset_name"] == "XML caption"
+        assert preview.json()["system_prompt"] == "Return balanced XML."
+        assert preview.json()["final_user_prompt"] == "Describe this image."
+        assert preview.json()["configuration_issue"] is None
 
         matching_ids = client.get(
             f"/api/v1/workspaces/{project_id}/assets/ids",

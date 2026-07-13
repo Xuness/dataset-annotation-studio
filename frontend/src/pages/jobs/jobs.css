@@ -43,6 +43,57 @@
   margin-bottom: 14px;
 }
 
+.job-prompt-source {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 14px;
+  padding: 10px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface-raised));
+}
+
+.job-prompt-source > span {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.job-prompt-source > strong {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-prompt-source > small {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.job-prompt-source.has-error {
+  border-color: color-mix(in srgb, var(--warning) 38%, var(--line));
+  background: var(--warning-soft);
+}
+
+.job-prompt-source.has-error > strong {
+  color: var(--warning);
+  white-space: normal;
+}
+
+.job-prompt-source > button {
+  justify-self: start;
+  padding: 0;
+  color: var(--accent-deep);
+  background: transparent;
+  cursor: pointer;
+  font-size: 8px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .job-scope {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

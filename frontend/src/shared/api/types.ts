@@ -3,6 +3,7 @@ export type AnnotationStatus =
 
 export interface WorkspaceSettings {
   recursive_scan: boolean;
+  system_preset_id: string | null;
   user_prompt: string;
   json_fields: string[];
   validation_mode: string;
@@ -105,9 +106,13 @@ export interface MetadataDocument {
 }
 
 export interface PromptPreview {
+  system_preset_id: string | null;
+  system_preset_name: string | null;
+  system_prompt: string;
   user_prompt: string;
   metadata_lines: string[];
-  final_prompt: string;
+  final_user_prompt: string;
+  configuration_issue: string | null;
 }
 
 export interface FrequencyBucket {

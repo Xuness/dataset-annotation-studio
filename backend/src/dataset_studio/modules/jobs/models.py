@@ -31,7 +31,6 @@ class JobScope(StrEnum):
 
 
 class JobCreateRequest(BaseModel):
-    system_preset_id: str
     provider_profile_id: str
     scope: JobScope = JobScope.ALL
     asset_ids: list[str] = Field(default_factory=list)

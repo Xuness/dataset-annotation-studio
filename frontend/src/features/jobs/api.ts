@@ -2,7 +2,6 @@ import { apiRequest } from "../../shared/api/client";
 import type { JobDetail, JobSummary } from "../../shared/api/types";
 
 export interface CreateJobInput {
-  system_preset_id: string;
   provider_profile_id: string;
   scope: "all" | "selected";
   asset_ids: string[];

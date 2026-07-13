@@ -182,7 +182,6 @@
 .prompt-textarea {
   width: 100%;
   min-height: 150px;
-  margin-bottom: 9px;
   padding: 9px;
   resize: vertical;
   border: 1px solid var(--line);
@@ -195,6 +194,99 @@
 
 .prompt-textarea:focus {
   border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
+}
+
+.prompt-preset-field {
+  margin-bottom: 12px;
+}
+
+.prompt-user-field > span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ink-soft);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.prompt-config-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.prompt-config-warning {
+  margin: 0 0 10px;
+  padding: 8px 9px;
+  border-radius: var(--radius-sm);
+  color: var(--warning);
+  background: var(--warning-soft);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.prompt-request-badge {
+  margin-bottom: 10px;
+  color: var(--faint);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+}
+
+.prompt-request-preview {
+  display: grid;
+  gap: 9px;
+}
+
+.prompt-message-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #f8f4ed;
+}
+
+.prompt-message-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+}
+
+.prompt-message-card > header span {
+  color: var(--accent-deep);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.prompt-message-card > header small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prompt-message-card > pre {
+  max-height: 235px;
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
+  color: var(--ink-soft);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.prompt-image-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.55;
 }
 
 .inspector-section .button {

@@ -21,6 +21,7 @@ from dataset_studio.modules.presets.models import (
 )
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.service import PresetService
+from dataset_studio.modules.workspaces.models import WorkspaceSettingsUpdate
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
 from dataset_studio.platform.global_store import initialize_global_database
@@ -56,6 +57,10 @@ def _single_item_job(tmp_path: Path):
     system = presets.create_system(
         SystemPresetCreate(name="XML", system_prompt="Return balanced tags.")
     )
+    workspaces.update_settings(
+        workspace.project_id,
+        WorkspaceSettingsUpdate(system_preset_id=system.id),
+    )
     provider = presets.create_provider(
         ProviderProfileCreate(
             name="Provider",
@@ -68,7 +73,6 @@ def _single_item_job(tmp_path: Path):
     job = jobs.create(
         workspace.project_id,
         JobCreateRequest(
-            system_preset_id=system.id,
             provider_profile_id=provider.id,
             scope=JobScope.ALL,
         ),
@@ -121,6 +125,10 @@ def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -
     system = presets.create_system(
         SystemPresetCreate(name="XML caption", system_prompt="Return balanced tags.")
     )
+    workspaces.update_settings(
+        workspace.project_id,
+        WorkspaceSettingsUpdate(system_preset_id=system.id),
+    )
     provider = presets.create_provider(
         ProviderProfileCreate(
             name="OpenRouter",
@@ -134,7 +142,6 @@ def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -
     job = jobs.create(
         workspace.project_id,
         JobCreateRequest(
-            system_preset_id=system.id,
             provider_profile_id=provider.id,
             scope=JobScope.ALL,
         ),
@@ -148,6 +155,37 @@ def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -
     assert jobs.active_overview().count == 1
     assert jobs.active_overview().project_count == 1
     assert jobs.stop_all_workspaces() == 1
+
+
+def test_job_creation_requires_project_system_preset(tmp_path: Path) -> None:
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+    settings.ensure_directories()
+    global_database = settings.app_data_dir / "global.sqlite3"
+    initialize_global_database(global_database)
+    workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
+    annotations = AnnotationService(workspaces)
+    presets = PresetService(PresetRepository(global_database), MemorySecrets())
+    jobs = JobService(workspaces, presets, annotations)
+
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (32, 32), "white").save(project / "sample.png")
+    workspace, _ = workspaces.open(str(project))
+    provider = presets.create_provider(
+        ProviderProfileCreate(
+            name="Provider",
+            provider_type=ProviderType.OPENAI_COMPATIBLE,
+            base_url="https://example.invalid/v1",
+            model="example/model",
+            api_key="secret",
+        )
+    )
+
+    with pytest.raises(ValueError, match="素材页"):
+        jobs.create(
+            workspace.project_id,
+            JobCreateRequest(provider_profile_id=provider.id, scope=JobScope.ALL),
+        )
 
 
 def test_manual_accept_rejects_provider_error_response(tmp_path: Path) -> None:

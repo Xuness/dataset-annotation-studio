@@ -43,6 +43,8 @@ export function useRescanWorkspace(projectId: string) {
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
       void queryClient.invalidateQueries({ queryKey: ["assets", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["metadata", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["prompt-preview", projectId] });
       if (result.failed) {
         const examples = result.issues
           .slice(0, 5)
@@ -63,6 +65,7 @@ export function useUpdateWorkspace(projectId: string) {
     onSuccess: (workspace) => {
       queryClient.setQueryData(workspaceKeys.detail(projectId), workspace);
       void queryClient.invalidateQueries({ queryKey: ["assets", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["prompt-preview", projectId] });
     },
   });
 }

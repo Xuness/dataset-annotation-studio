@@ -34,6 +34,8 @@ def get_workspace(project_id: str, container: Container):
 
 @router.patch("/{project_id}", response_model=WorkspaceSummary)
 def update_workspace(project_id: str, update: WorkspaceSettingsUpdate, container: Container):
+    if update.system_preset_id is not None:
+        container.presets.get_system(update.system_preset_id)
     if update.recursive_scan is None:
         return container.workspaces.update_settings(project_id, update)
     with container.preprocessing.guard_workspace(project_id, "settings-scan"):

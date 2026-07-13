@@ -5,12 +5,13 @@ from fastapi.responses import FileResponse
 
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
+from dataset_studio.core.errors import PresetNotFoundError
 from dataset_studio.modules.assets.models import (
     AssetIdListResponse,
     AssetListResponse,
     MetadataDocument,
 )
-from dataset_studio.modules.prompts.composer import PromptPreview, preview_user_prompt
+from dataset_studio.modules.prompts.composer import RequestPromptPreview, preview_request_prompt
 
 router = APIRouter(prefix="/workspaces/{project_id}/assets", tags=["assets"])
 Container = Annotated[AppContainer, Depends(get_container)]
@@ -70,12 +71,26 @@ def get_metadata(project_id: str, asset_id: str, container: Container):
     return container.assets.metadata(project_id, asset_id)
 
 
-@router.get("/{asset_id}/prompt-preview", response_model=PromptPreview)
+@router.get("/{asset_id}/prompt-preview", response_model=RequestPromptPreview)
 def get_prompt_preview(project_id: str, asset_id: str, container: Container):
     workspace = container.workspaces.get_summary(project_id)
     metadata = container.assets.metadata(project_id, asset_id)
-    return preview_user_prompt(
-        workspace.settings.user_prompt,
-        metadata.value if metadata.exists and not metadata.error else None,
-        workspace.settings.json_fields,
+    preset_id = workspace.settings.system_preset_id
+    preset = None
+    configuration_issue = None
+    if preset_id:
+        try:
+            preset = container.presets.get_system(preset_id)
+        except PresetNotFoundError:
+            configuration_issue = "项目关联的 System Prompt 预设已不存在，请重新选择并保存。"
+    else:
+        configuration_issue = "项目尚未选择 System Prompt 预设。"
+    return preview_request_prompt(
+        system_preset_id=preset_id,
+        system_preset_name=preset.name if preset else None,
+        system_prompt=preset.system_prompt if preset else "",
+        user_prompt=workspace.settings.user_prompt,
+        metadata=metadata.value if metadata.exists and not metadata.error else None,
+        selected_fields=workspace.settings.json_fields,
+        configuration_issue=configuration_issue,
     )

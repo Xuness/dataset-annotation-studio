@@ -12,6 +12,18 @@ class PromptPreview(BaseModel):
     final_prompt: str
 
 
+class RequestPromptPreview(BaseModel):
+    """The two text messages sent with an image in a multimodal request."""
+
+    system_preset_id: str | None
+    system_preset_name: str | None
+    system_prompt: str
+    user_prompt: str
+    metadata_lines: list[str]
+    final_user_prompt: str
+    configuration_issue: str | None = None
+
+
 def escape_metadata_path_segment(segment: object) -> str:
     return str(segment).replace("\\", "\\\\").replace(".", "\\.")
 
@@ -97,4 +109,26 @@ def preview_user_prompt(
         user_prompt=body,
         metadata_lines=metadata_text.splitlines() if metadata_text else [],
         final_prompt=final_prompt,
+    )
+
+
+def preview_request_prompt(
+    *,
+    system_preset_id: str | None,
+    system_preset_name: str | None,
+    system_prompt: str,
+    user_prompt: str,
+    metadata: object | None,
+    selected_fields: Iterable[str],
+    configuration_issue: str | None = None,
+) -> RequestPromptPreview:
+    user_preview = preview_user_prompt(user_prompt, metadata, selected_fields)
+    return RequestPromptPreview(
+        system_preset_id=system_preset_id,
+        system_preset_name=system_preset_name,
+        system_prompt=system_prompt,
+        user_prompt=user_preview.user_prompt,
+        metadata_lines=user_preview.metadata_lines,
+        final_user_prompt=user_preview.final_prompt,
+        configuration_issue=configuration_issue,
     )

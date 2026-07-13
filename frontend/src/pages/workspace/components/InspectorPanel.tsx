@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Braces, ChartNoAxesColumn, MessageSquareText } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 
 import type { AssetSummary, WorkspaceSummary } from "../../../shared/api/types";
 import { useAppStore } from "../../../shared/store/appStore";
@@ -22,7 +23,10 @@ const tabs: Array<{ id: InspectorTab; label: string; icon: typeof ChartNoAxesCol
 ];
 
 export function InspectorPanel({ projectId, workspace, asset }: InspectorPanelProps) {
-  const [activeTab, setActiveTab] = useState<InspectorTab>("overview");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<InspectorTab>(() =>
+    searchParams.get("panel") === "prompt" ? "prompt" : "overview",
+  );
   const promptScope = `workspace-prompt:${projectId}`;
   const promptDirty = useAppStore((state) => Boolean(state.dirtyScopes[promptScope]));
   const setDirtyScope = useAppStore((state) => state.setDirtyScope);
@@ -32,7 +36,7 @@ export function InspectorPanel({ projectId, workspace, asset }: InspectorPanelPr
     if (
       activeTab === "prompt" &&
       promptDirty &&
-      !window.confirm("项目 Prompt 尚未保存，仍要离开这个面板吗？")
+      !window.confirm("项目提示词配置尚未保存，仍要离开这个面板吗？")
     ) {
       return;
     }

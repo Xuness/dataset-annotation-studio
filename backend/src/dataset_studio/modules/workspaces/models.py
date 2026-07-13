@@ -9,6 +9,7 @@ class WorkspaceSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     recursive_scan: bool = True
+    system_preset_id: str | None = None
     user_prompt: str = ""
     json_fields: list[str] = Field(default_factory=list)
     validation_mode: Literal["tag_balance"] = "tag_balance"
@@ -47,6 +48,7 @@ class WorkspaceSettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     recursive_scan: bool | None = None
+    system_preset_id: str | None = None
     user_prompt: str | None = None
     json_fields: list[str] | None = None
     validation_mode: Literal["tag_balance"] | None = None
