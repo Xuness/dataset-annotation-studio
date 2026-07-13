@@ -1,23 +1,28 @@
 import type { AnnotationStatus } from "../api/types";
 
-const LABELS: Record<AnnotationStatus, string> = {
+type DisplayStatus = AnnotationStatus | "failed";
+
+const LABELS: Record<DisplayStatus, string> = {
   missing: "未标注",
   valid: "结构闭合",
   invalid: "结构异常",
   empty: "空标注",
   unchecked: "未校验",
   manually_accepted: "人工确认",
+  failed: "生成失败",
 };
 
 export function StatusDot({
   status,
   showLabel = false,
+  title,
 }: {
-  status: AnnotationStatus;
+  status: DisplayStatus;
   showLabel?: boolean;
+  title?: string;
 }) {
   return (
-    <span className={`status-dot status-dot--${status}`} title={LABELS[status]}>
+    <span className={`status-dot status-dot--${status}`} title={title ?? LABELS[status]}>
       <span aria-hidden="true" />
       {showLabel ? LABELS[status] : null}
     </span>

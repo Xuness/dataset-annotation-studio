@@ -137,7 +137,12 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
                 "SELECT version FROM schema_migrations ORDER BY version"
             ).fetchall()
         ]
+        indexes = {
+            entry["name"]
+            for entry in connection.execute("PRAGMA index_list('job_items')").fetchall()
+        }
     finally:
         connection.close()
     assert row["image_metadata_version"] == 1
-    assert versions == [1, 2]
+    assert versions == [1, 2, 3]
+    assert "idx_job_items_asset_updated" in indexes

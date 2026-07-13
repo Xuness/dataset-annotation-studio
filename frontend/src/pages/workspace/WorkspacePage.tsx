@@ -8,7 +8,7 @@ import {
   useUpdateWorkspace,
   useWorkspace,
 } from "../../features/workspaces/hooks";
-import type { AnnotationStatus } from "../../shared/api/types";
+import type { AssetFilterStatus } from "../../shared/api/types";
 import { useAppStore } from "../../shared/store/appStore";
 import { Button } from "../../shared/ui/Button";
 import { Spinner } from "../../shared/ui/Spinner";
@@ -44,8 +44,8 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const setAssetsChecked = useAppStore((state) => state.setAssetsChecked);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<AnnotationStatus | null>(
-    mode === "review" ? "invalid" : null,
+  const [statusFilter, setStatusFilter] = useState<AssetFilterStatus | null>(
+    mode === "review" ? "needs_review" : null,
   );
   const [editorDirty, setEditorDirty] = useState(false);
   const workspaceBodyRef = useRef<HTMLDivElement>(null);
@@ -85,7 +85,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   }, [projectId, setActiveProject]);
 
   useEffect(() => {
-    setStatusFilter(mode === "review" ? "invalid" : null);
+    setStatusFilter(mode === "review" ? "needs_review" : null);
   }, [mode]);
 
   useEffect(() => {

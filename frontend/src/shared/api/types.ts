@@ -1,6 +1,8 @@
 export type AnnotationStatus =
   "missing" | "valid" | "invalid" | "empty" | "unchecked" | "manually_accepted";
 
+export type AssetFilterStatus = AnnotationStatus | "failed" | "needs_review";
+
 export interface WorkspaceSettings {
   recursive_scan: boolean;
   system_preset_id: string | null;
@@ -50,6 +52,8 @@ export interface AssetSummary {
   annotation_relative_path: string;
   annotation_status: AnnotationStatus;
   metadata_relative_path: string | null;
+  generation_status: "failed" | null;
+  generation_error: string | null;
 }
 
 export interface AssetListResponse {

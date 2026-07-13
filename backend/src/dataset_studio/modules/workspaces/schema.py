@@ -139,10 +139,16 @@ ALTER TABLE assets
 ADD COLUMN image_metadata_version INTEGER NOT NULL DEFAULT 1;
 """
 
-WORKSPACE_SCHEMA_VERSION = 2
+JOB_ITEM_ASSET_UPDATED_INDEX_MIGRATION = """
+CREATE INDEX IF NOT EXISTS idx_job_items_asset_updated
+ON job_items(asset_id, updated_at DESC);
+"""
+
+WORKSPACE_SCHEMA_VERSION = 3
 WORKSPACE_MIGRATIONS = (
     Migration(1, "initial_workspace_schema", WORKSPACE_SCHEMA),
     Migration(2, "image_metadata_version", IMAGE_METADATA_VERSION_MIGRATION),
+    Migration(3, "job_item_asset_updated_index", JOB_ITEM_ASSET_UPDATED_INDEX_MIGRATION),
 )
 
 

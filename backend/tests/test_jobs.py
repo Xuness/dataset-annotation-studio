@@ -5,6 +5,7 @@ from PIL import Image
 
 from dataset_studio.core.config import Settings
 from dataset_studio.modules.annotations.service import AnnotationService
+from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
 from dataset_studio.modules.jobs.models import (
@@ -248,3 +249,41 @@ def test_failed_only_retry_keeps_attempt_numbers_unique(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="已经结束"):
         jobs.retry_failed(project_id, job.id)
+
+
+def test_failed_job_item_appears_in_review_until_retry(tmp_path: Path) -> None:
+    jobs, project_id, job, database, _ = _single_item_job(tmp_path)
+    item = job.items[0]
+    _fail_item(
+        database,
+        item.id,
+        attempt_status="request_failed",
+        response_content='{"error":"upstream unavailable"}',
+    )
+
+    repository = AssetRepository(database)
+    failed_items, failed_total, status_counts = repository.list_assets(annotation_status="failed")
+    review_items, review_total, _ = repository.list_assets(annotation_status="needs_review")
+
+    assert failed_total == 1
+    assert [asset.id for asset in failed_items] == [item.asset_id]
+    assert failed_items[0].annotation_status.value == "missing"
+    assert failed_items[0].generation_status == "failed"
+    assert failed_items[0].generation_error == "simulated failure"
+    assert review_total == 1
+    assert [asset.id for asset in review_items] == [item.asset_id]
+    assert repository.list_asset_ids(annotation_status="needs_review") == [item.asset_id]
+    assert status_counts["failed"] == 1
+    assert status_counts["needs_review"] == 1
+    assert repository.count_summary() == (1, 0, 1)
+
+    jobs.retry_failed(project_id, job.id)
+
+    _, failed_total_after_retry, status_counts_after_retry = repository.list_assets(
+        annotation_status="failed"
+    )
+    assert failed_total_after_retry == 0
+    assert status_counts_after_retry["failed"] == 0
+    assert status_counts_after_retry["needs_review"] == 0
+    assert repository.list_asset_ids(annotation_status="needs_review") == []
+    assert repository.count_summary() == (1, 0, 0)

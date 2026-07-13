@@ -6,6 +6,35 @@ from pathlib import Path
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.modules.assets.models import AssetRecord, AssetSummary
 
+LATEST_JOB_STATUS_SQL = """
+(
+    SELECT job_items.status
+    FROM job_items
+    WHERE job_items.asset_id = assets.id
+    ORDER BY job_items.updated_at DESC, job_items.created_at DESC, job_items.id DESC
+    LIMIT 1
+)
+"""
+
+LATEST_JOB_ERROR_SQL = """
+(
+    SELECT job_items.last_error
+    FROM job_items
+    WHERE job_items.asset_id = assets.id
+    ORDER BY job_items.updated_at DESC, job_items.created_at DESC, job_items.id DESC
+    LIMIT 1
+)
+"""
+
+UNRESOLVED_GENERATION_FAILURE_SQL = f"""
+(
+    assets.annotation_status = 'missing'
+    AND {LATEST_JOB_STATUS_SQL} = 'failed'
+)
+"""
+
+REVIEW_ANNOTATION_STATUSES = ("invalid", "empty", "unchecked")
+
 
 class AssetRepository:
     def __init__(self, database_path: Path) -> None:
@@ -103,7 +132,16 @@ class AssetRepository:
                 f"""
                 SELECT id, relative_path, filename, suffix,
                        content_hash AS content_version, byte_size, width, height,
-                       annotation_relative_path, annotation_status, metadata_relative_path
+                       annotation_relative_path, annotation_status, metadata_relative_path,
+                       CASE
+                           WHEN {UNRESOLVED_GENERATION_FAILURE_SQL} THEN 'failed'
+                           ELSE NULL
+                       END AS generation_status,
+                       CASE
+                           WHEN {UNRESOLVED_GENERATION_FAILURE_SQL}
+                           THEN {LATEST_JOB_ERROR_SQL}
+                           ELSE NULL
+                       END AS generation_error
                 FROM assets
                 WHERE {where}
                 ORDER BY relative_path COLLATE NOCASE
@@ -120,6 +158,19 @@ class AssetRepository:
                 """
             ).fetchall()
             status_counts = {str(row["annotation_status"]): int(row["count"]) for row in count_rows}
+            failed_count = int(
+                connection.execute(
+                    f"""
+                    SELECT COUNT(*)
+                    FROM assets
+                    WHERE is_present = 1 AND {UNRESOLVED_GENERATION_FAILURE_SQL}
+                    """
+                ).fetchone()[0]
+            )
+            status_counts["failed"] = failed_count
+            status_counts["needs_review"] = failed_count + sum(
+                status_counts.get(status, 0) for status in REVIEW_ANNOTATION_STATUSES
+            )
             return ([AssetSummary.model_validate(dict(row)) for row in rows], total, status_counts)
         finally:
             connection.close()
@@ -154,7 +205,14 @@ class AssetRepository:
             clauses.append("relative_path LIKE ? ESCAPE '\\'")
             escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             parameters.append(f"%{escaped}%")
-        if annotation_status:
+        if annotation_status == "failed":
+            clauses.append(UNRESOLVED_GENERATION_FAILURE_SQL)
+        elif annotation_status == "needs_review":
+            review_statuses = ", ".join(f"'{status}'" for status in REVIEW_ANNOTATION_STATUSES)
+            clauses.append(
+                f"(annotation_status IN ({review_statuses}) OR {UNRESOLVED_GENERATION_FAILURE_SQL})"
+            )
+        elif annotation_status:
             clauses.append("annotation_status = ?")
             parameters.append(annotation_status)
         return " AND ".join(clauses), parameters
@@ -172,12 +230,16 @@ class AssetRepository:
         connection = connect(self._database_path)
         try:
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     COUNT(*) AS total,
                     SUM(CASE WHEN annotation_status != 'missing' THEN 1 ELSE 0 END) AS annotated,
                     SUM(
-                        CASE WHEN annotation_status IN ('invalid', 'empty') THEN 1 ELSE 0 END
+                        CASE
+                            WHEN annotation_status IN ('invalid', 'empty')
+                                 OR {UNRESOLVED_GENERATION_FAILURE_SQL}
+                            THEN 1 ELSE 0
+                        END
                     ) AS invalid
                 FROM assets
                 WHERE is_present = 1

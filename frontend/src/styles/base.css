@@ -188,7 +188,8 @@ select:focus-visible {
 }
 
 .status-dot--invalid > span,
-.status-dot--empty > span {
+.status-dot--empty > span,
+.status-dot--failed > span {
   background: var(--danger);
 }
 

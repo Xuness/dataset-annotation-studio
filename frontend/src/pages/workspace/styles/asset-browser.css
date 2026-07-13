@@ -103,6 +103,7 @@
 
 .asset-filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 5px;
   padding: 8px 0;
   border-bottom: 1px solid var(--line);

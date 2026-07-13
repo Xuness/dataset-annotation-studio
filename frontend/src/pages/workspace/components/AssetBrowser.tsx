@@ -3,11 +3,11 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { CheckCircle2, CircleAlert, FileQuestion, Search } from "lucide-react";
 
 import { thumbnailUrl } from "../../../features/assets/api";
-import type { AnnotationStatus, AssetSummary } from "../../../shared/api/types";
+import type { AssetFilterStatus, AssetSummary } from "../../../shared/api/types";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { StatusDot } from "../../../shared/ui/StatusDot";
 
-type StatusFilter = AnnotationStatus | null;
+type StatusFilter = AssetFilterStatus | null;
 
 interface AssetBrowserProps {
   mode?: "assets" | "review";
@@ -42,6 +42,8 @@ const assetFilters: Array<{ value: StatusFilter; label: string; icon: typeof Che
 ];
 
 const reviewFilters: Array<{ value: StatusFilter; label: string; icon: typeof CheckCircle2 }> = [
+  { value: "needs_review", label: "全部异常", icon: CircleAlert },
+  { value: "failed", label: "生成失败", icon: CircleAlert },
   { value: "invalid", label: "标签异常", icon: CircleAlert },
   { value: "empty", label: "空文件", icon: FileQuestion },
   { value: "unchecked", label: "未校验", icon: FileQuestion },
@@ -242,7 +244,15 @@ export function AssetBrowser({
                     </small>
                     <span title={asset.relative_path}>{asset.relative_path}</span>
                   </span>
-                  <StatusDot status={asset.annotation_status} />
+                  <StatusDot
+                    status={asset.generation_status ?? asset.annotation_status}
+                    showLabel={asset.generation_status === "failed"}
+                    title={
+                      asset.generation_status === "failed"
+                        ? `生成失败${asset.generation_error ? `：${asset.generation_error}` : ""}`
+                        : undefined
+                    }
+                  />
                 </button>
               );
             })}

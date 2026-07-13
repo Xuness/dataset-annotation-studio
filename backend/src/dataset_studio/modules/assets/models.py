@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -42,6 +43,8 @@ class AssetSummary(BaseModel):
     annotation_relative_path: str
     annotation_status: AnnotationStatus
     metadata_relative_path: str | None = None
+    generation_status: Literal["failed"] | None = None
+    generation_error: str | None = None
 
 
 class AssetListResponse(BaseModel):
