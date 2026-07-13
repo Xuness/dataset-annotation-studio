@@ -34,6 +34,7 @@ const emptyForm: ProviderProfileForm = {
     seed: null,
     service_tier: null,
     reasoning_effort: null,
+    prompt_cache_strategy: null,
   },
 };
 

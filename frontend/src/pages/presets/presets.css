@@ -250,6 +250,12 @@
   font-size: 8px;
 }
 
+.provider-option-note {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.6;
+}
+
 .model-picker {
   overflow: hidden;
   border: 1px solid var(--line);

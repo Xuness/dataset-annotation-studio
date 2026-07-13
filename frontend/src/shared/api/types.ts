@@ -139,12 +139,14 @@ export interface SystemPreset {
 export type ProviderType = "openrouter" | "openai_compatible" | "gemini";
 export type ServiceTier = "flex" | "priority";
 export type ReasoningEffort = "max" | "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
+export type PromptCacheStrategy = "explicit_system";
 
 export interface ProviderRequestOptions {
   top_p: number | null;
   seed: number | null;
   service_tier: ServiceTier | null;
   reasoning_effort: ReasoningEffort | null;
+  prompt_cache_strategy: PromptCacheStrategy | null;
 }
 
 export interface ProviderProfile {

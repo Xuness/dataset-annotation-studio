@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from dataset_studio.modules.presets.models import (
+    PromptCacheStrategy,
     ProviderProfileCreate,
     ProviderProfileUpdate,
     ProviderRequestOptions,
@@ -109,12 +110,20 @@ def test_provider_update_accepts_full_form_with_request_options(tmp_path: Path) 
             max_output_tokens=profile.max_output_tokens,
             concurrency=12,
             timeout_seconds=profile.timeout_seconds,
-            request_options=ProviderRequestOptions(top_p=0.9, seed=42),
+            request_options=ProviderRequestOptions(
+                top_p=0.9,
+                seed=42,
+                prompt_cache_strategy=PromptCacheStrategy.EXPLICIT_SYSTEM,
+            ),
         ),
     )
 
     assert updated.concurrency == 12
-    assert updated.request_options == ProviderRequestOptions(top_p=0.9, seed=42)
+    assert updated.request_options == ProviderRequestOptions(
+        top_p=0.9,
+        seed=42,
+        prompt_cache_strategy=PromptCacheStrategy.EXPLICIT_SYSTEM,
+    )
     assert service.get_api_key(profile.id) == "secret"
 
 

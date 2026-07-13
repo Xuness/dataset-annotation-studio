@@ -90,6 +90,25 @@ export function ProviderRequestOptionsFields({
               <option value="none">None · 关闭推理</option>
             </select>
           </label>
+          <label className="form-field form-field--wide">
+            <span>提示词缓存</span>
+            <select
+              value={value.prompt_cache_strategy ?? ""}
+              onChange={(event) =>
+                setOption(
+                  "prompt_cache_strategy",
+                  (event.target.value || null) as ProviderRequestOptions["prompt_cache_strategy"],
+                )
+              }
+            >
+              <option value="">关闭 · 不添加显式缓存断点</option>
+              <option value="explicit_system">System Prompt · cache_control 断点</option>
+            </select>
+            <small className="provider-option-note">
+              将稳定的 System Prompt 标记为可缓存前缀；适用于 OpenRouter 支持显式断点的模型，
+              是否命中仍取决于模型支持、最低 Token 数与缓存有效期。
+            </small>
+          </label>
         </>
       ) : null}
     </>

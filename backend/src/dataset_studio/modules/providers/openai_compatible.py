@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import httpx
 
-from dataset_studio.modules.presets.models import ProviderProfile, ProviderType
+from dataset_studio.modules.presets.models import (
+    PromptCacheStrategy,
+    ProviderProfile,
+    ProviderType,
+)
 from dataset_studio.modules.providers.media import image_data_url
 from dataset_studio.modules.providers.models import (
     MultimodalRequest,
@@ -77,10 +81,24 @@ def _parse_response(raw: object, response_text: str) -> ProviderResponse:
 
 
 def _build_payload(profile: ProviderProfile, request: MultimodalRequest) -> dict[str, object]:
+    system_content: object = request.system_prompt
+    options = profile.request_options
+    if (
+        profile.provider_type == ProviderType.OPENROUTER
+        and options.prompt_cache_strategy == PromptCacheStrategy.EXPLICIT_SYSTEM
+    ):
+        system_content = [
+            {
+                "type": "text",
+                "text": request.system_prompt,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+
     payload: dict[str, object] = {
         "model": request.model,
         "messages": [
-            {"role": "system", "content": request.system_prompt},
+            {"role": "system", "content": system_content},
             {
                 "role": "user",
                 "content": [
@@ -95,7 +113,6 @@ def _build_payload(profile: ProviderProfile, request: MultimodalRequest) -> dict
         "temperature": request.temperature,
         "max_tokens": request.max_output_tokens,
     }
-    options = profile.request_options
     if options.top_p is not None:
         payload["top_p"] = options.top_p
     if options.seed is not None:

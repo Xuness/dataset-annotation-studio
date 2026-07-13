@@ -56,6 +56,12 @@ class ReasoningEffort(StrEnum):
     NONE = "none"
 
 
+class PromptCacheStrategy(StrEnum):
+    """Provider-neutral placement strategy for an explicit prompt cache breakpoint."""
+
+    EXPLICIT_SYSTEM = "explicit_system"
+
+
 class ProviderRequestOptions(BaseModel):
     """Optional generation controls snapshotted with an API profile."""
 
@@ -63,6 +69,7 @@ class ProviderRequestOptions(BaseModel):
     seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
     service_tier: ServiceTier | None = None
     reasoning_effort: ReasoningEffort | None = None
+    prompt_cache_strategy: PromptCacheStrategy | None = None
 
 
 class ProviderProfile(BaseModel):
