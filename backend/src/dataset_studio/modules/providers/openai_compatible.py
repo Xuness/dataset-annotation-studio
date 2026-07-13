@@ -24,6 +24,58 @@ def _extract_content(value: object) -> str:
     return ""
 
 
+def _status_code(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int) and 100 <= value <= 599:
+        return value
+    if isinstance(value, str) and value.isdigit():
+        parsed = int(value)
+        if 100 <= parsed <= 599:
+            return parsed
+    return None
+
+
+def _raise_api_error(raw: dict[str, object], response_text: str) -> None:
+    error = raw.get("error")
+    if error is None:
+        return
+
+    status_code = None
+    if isinstance(error, dict):
+        message_value = error.get("message") or error.get("detail")
+        status_code = _status_code(
+            error.get("status_code") or error.get("status") or error.get("code")
+        )
+    else:
+        message_value = error
+    message = str(message_value).strip() if message_value is not None else "未知 API 错误"
+    raise ProviderRequestError(
+        f"API 返回错误：{message}",
+        status_code=status_code,
+        response_text=response_text,
+    )
+
+
+def _parse_response(raw: object, response_text: str) -> ProviderResponse:
+    if not isinstance(raw, dict):
+        raise ProviderRequestError("API 响应结构无法识别。", response_text=response_text)
+    _raise_api_error(raw, response_text)
+    try:
+        choice = raw["choices"][0]
+        content = _extract_content(choice["message"].get("content"))
+        usage = raw.get("usage") or {}
+        return ProviderResponse(
+            content=content,
+            raw_payload=raw,
+            finish_reason=choice.get("finish_reason"),
+            input_tokens=usage.get("prompt_tokens"),
+            output_tokens=usage.get("completion_tokens"),
+        )
+    except (AttributeError, KeyError, IndexError, TypeError, ValueError) as error:
+        raise ProviderRequestError("API 响应结构无法识别。", response_text=response_text) from error
+
+
 def _build_payload(profile: ProviderProfile, request: MultimodalRequest) -> dict[str, object]:
     payload: dict[str, object] = {
         "model": request.model,
@@ -91,17 +143,8 @@ class OpenAICompatibleProvider:
             )
         try:
             raw = response.json()
-            choice = raw["choices"][0]
-            content = _extract_content(choice["message"].get("content"))
-            usage = raw.get("usage") or {}
-            return ProviderResponse(
-                content=content,
-                raw_payload=raw,
-                finish_reason=choice.get("finish_reason"),
-                input_tokens=usage.get("prompt_tokens"),
-                output_tokens=usage.get("completion_tokens"),
-            )
-        except (KeyError, IndexError, TypeError, ValueError) as error:
+        except ValueError as error:
             raise ProviderRequestError(
                 "API 响应结构无法识别。", response_text=response.text
             ) from error
+        return _parse_response(raw, response.text)

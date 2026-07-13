@@ -4,8 +4,21 @@ import base64
 import mimetypes
 from pathlib import Path
 
+_IMAGE_MIME_TYPES = {
+    ".bmp": "image/bmp",
+    ".jpeg": "image/jpeg",
+    ".jpg": "image/jpeg",
+    ".png": "image/png",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+    ".webp": "image/webp",
+}
+
 
 def image_mime_type(path: Path) -> str:
+    known_type = _IMAGE_MIME_TYPES.get(path.suffix.lower())
+    if known_type is not None:
+        return known_type
     mime_type, _ = mimetypes.guess_type(path.name)
     return mime_type or "application/octet-stream"
 
