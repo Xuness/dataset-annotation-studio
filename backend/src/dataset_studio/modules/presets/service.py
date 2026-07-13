@@ -116,7 +116,7 @@ class PresetService:
     def update_provider(self, profile_id: str, data: ProviderProfileUpdate) -> ProviderProfile:
         current = self.get_provider(profile_id)
         values = data.model_dump(exclude_none=True, exclude={"api_key"})
-        updated = current.model_copy(update=values)
+        updated = ProviderProfile.model_validate({**current.model_dump(), **values})
         updated_at = utc_now_iso()
         secret_key = self._secret_key(profile_id)
         old_api_key = self._secrets.get(secret_key) if data.api_key is not None else None

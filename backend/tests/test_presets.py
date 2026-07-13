@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from dataset_studio.modules.presets.models import (
     ProviderProfileCreate,
     ProviderProfileUpdate,
+    ProviderRequestOptions,
     ProviderType,
     SystemPresetCreate,
 )
@@ -91,6 +92,30 @@ def test_empty_api_key_explicitly_clears_saved_secret(tmp_path: Path) -> None:
     assert updated.has_api_key is False
     with pytest.raises(ValueError, match="尚未保存 API Key"):
         service.get_api_key(profile.id)
+
+
+def test_provider_update_accepts_full_form_with_request_options(tmp_path: Path) -> None:
+    service, _, _ = _service(tmp_path)
+    profile = service.create_provider(_provider("Profile", "secret"))
+
+    updated = service.update_provider(
+        profile.id,
+        ProviderProfileUpdate(
+            name=profile.name,
+            provider_type=profile.provider_type,
+            base_url=profile.base_url,
+            model=profile.model,
+            temperature=profile.temperature,
+            max_output_tokens=profile.max_output_tokens,
+            concurrency=12,
+            timeout_seconds=profile.timeout_seconds,
+            request_options=ProviderRequestOptions(top_p=0.9, seed=42),
+        ),
+    )
+
+    assert updated.concurrency == 12
+    assert updated.request_options == ProviderRequestOptions(top_p=0.9, seed=42)
+    assert service.get_api_key(profile.id) == "secret"
 
 
 def test_presets_reject_whitespace_only_required_text() -> None:
