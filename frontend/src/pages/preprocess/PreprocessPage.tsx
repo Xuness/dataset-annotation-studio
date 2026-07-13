@@ -30,6 +30,10 @@ const initialForm: PreprocessFormState = {
   format: "webp",
   quality: 90,
   effort: 4,
+  renameEnabled: false,
+  renameTemplate: "image_{index}",
+  renameStartIndex: 1,
+  renamePadding: 6,
 };
 
 export function PreprocessPage() {
@@ -55,6 +59,13 @@ export function PreprocessPage() {
         : null,
       convert: form.convertEnabled
         ? { format: form.format, quality: form.quality, effort: form.effort }
+        : null,
+      rename: form.renameEnabled
+        ? {
+            template: form.renameTemplate,
+            start_index: form.renameStartIndex,
+            padding: form.renamePadding,
+          }
         : null,
     }),
     [checkedAssetIds, form],
@@ -99,7 +110,7 @@ export function PreprocessPage() {
     if (!previewData || previewData.warning_count) return;
     if (
       !window.confirm(
-        `对 ${previewData.changed_count} 张图片执行预处理？原文件会保存在当前项目的恢复区。`,
+        `对 ${previewData.changed_count} 张图片执行预处理？原文件会保存在当前项目的恢复区。${request.rename ? "同名 .txt / .json 也会一起重命名。" : ""}`,
       )
     )
       return;

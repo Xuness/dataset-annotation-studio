@@ -118,6 +118,11 @@
   gap: 8px;
 }
 
+.preprocess-rename-fields {
+  grid-template-columns: 1fr 1fr;
+  margin: 9px 0;
+}
+
 .effort-slider {
   display: block;
   margin-top: 10px;

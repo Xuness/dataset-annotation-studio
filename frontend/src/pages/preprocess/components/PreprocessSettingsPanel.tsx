@@ -31,7 +31,14 @@ export function PreprocessSettingsPanel({
   onExecute,
 }: Props) {
   const validScope = form.scope === "all" || checkedCount > 0;
-  const validRequest = (form.resizeEnabled || form.convertEnabled) && validScope;
+  const validRename =
+    !form.renameEnabled ||
+    (Boolean(form.renameTemplate.trim()) &&
+      form.renameStartIndex >= 0 &&
+      form.renamePadding >= 1 &&
+      form.renamePadding <= 12);
+  const validRequest =
+    (form.resizeEnabled || form.convertEnabled || form.renameEnabled) && validScope && validRename;
   return (
     <aside className="preprocess-settings">
       <header>
@@ -139,6 +146,55 @@ export function PreprocessSettingsPanel({
             onChange={(event) => onChange({ effort: Number(event.target.value) })}
           />
         </label>
+      </section>
+      <section className="preprocess-option">
+        <label className="option-toggle">
+          <input
+            type="checkbox"
+            checked={form.renameEnabled}
+            onChange={(event) => onChange({ renameEnabled: event.target.checked })}
+          />
+          <span />
+          批量重命名
+        </label>
+        <label className="form-field">
+          <span>文件名模板（不含扩展名）</span>
+          <input
+            value={form.renameTemplate}
+            maxLength={200}
+            disabled={!form.renameEnabled}
+            placeholder="image_{index}"
+            onChange={(event) => onChange({ renameTemplate: event.target.value })}
+          />
+        </label>
+        <div className="preprocess-inline-fields preprocess-rename-fields">
+          <label className="form-field">
+            <span>起始序号</span>
+            <input
+              type="number"
+              min="0"
+              max="9999999999"
+              value={form.renameStartIndex}
+              disabled={!form.renameEnabled}
+              onChange={(event) => onChange({ renameStartIndex: Number(event.target.value) })}
+            />
+          </label>
+          <label className="form-field">
+            <span>补零位数</span>
+            <input
+              type="number"
+              min="1"
+              max="12"
+              value={form.renamePadding}
+              disabled={!form.renameEnabled}
+              onChange={(event) => onChange({ renamePadding: Number(event.target.value) })}
+            />
+          </label>
+        </div>
+        <small>
+          支持 {"{name}"}（原文件名）和 {"{index}"}（序号）；保留原目录和最终扩展名，并同步同名 .txt
+          / .json。
+        </small>
       </section>
       {error ? <p className="form-error">{error}</p> : null}
       <div className="preprocess-actions">

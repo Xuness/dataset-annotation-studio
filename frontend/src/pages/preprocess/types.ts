@@ -7,4 +7,8 @@ export interface PreprocessFormState {
   format: "webp" | "jpeg" | "png";
   quality: number;
   effort: number;
+  renameEnabled: boolean;
+  renameTemplate: string;
+  renameStartIndex: number;
+  renamePadding: number;
 }

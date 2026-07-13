@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
@@ -10,6 +11,18 @@ from PIL import Image, ImageOps
 from dataset_studio.core.files import file_sha256
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.preprocessing.models import OutputFormat, PreprocessRequest
+
+_RENAME_FIELD_PATTERN = re.compile(r"\{(name|index)\}")
+_WINDOWS_RESERVED_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    *(f"COM{index}" for index in range(1, 10)),
+    *(f"LPT{index}" for index in range(1, 10)),
+}
+_INVALID_FILENAME_CHARACTERS = frozenset('<>:"/\\|?*')
+_SIDECAR_SUFFIXES = (".txt", ".json")
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +48,7 @@ def build_plan(database_path: Path, root: Path, request: PreprocessRequest) -> l
         if missing_count:
             raise ValueError(f"选中的图片中有 {missing_count} 项已不存在，请重新选择。")
     plan: list[PlanItem] = []
-    for row in rows:
+    for position, row in enumerate(rows):
         before_relative = str(row["relative_path"])
         source = root / before_relative
         if not source.is_file():
@@ -52,21 +65,30 @@ def build_plan(database_path: Path, root: Path, request: PreprocessRequest) -> l
         ):
             raise ValueError(f"图片正在被其他程序修改，请稍后重试：{before_relative}")
         target_width, target_height = _target_size(width, height, request)
-        after_relative = _target_path(before_relative, request)
+        after_relative = _target_path(before_relative, request, position)
         target = root / after_relative
-        will_change = (
-            target_width != width
-            or target_height != height
-            or after_relative != before_relative
-            or request.convert is not None
+        requires_render = (
+            target_width != width or target_height != height or request.convert is not None
         )
+        will_change = requires_render or after_relative != before_relative
         warning = (
             f"暂不支持安全处理多帧图片（{frame_count} 帧）：{before_relative}"
-            if frame_count > 1 and will_change
+            if frame_count > 1 and requires_render
             else None
         )
         if warning is None and source.resolve() != target.resolve() and target.exists():
             warning = f"目标文件已经存在：{after_relative}"
+        if warning is None and request.rename is not None:
+            for suffix in _SIDECAR_SUFFIXES:
+                source_sidecar = source.with_suffix(suffix)
+                target_sidecar = target.with_suffix(suffix)
+                if (
+                    source_sidecar.as_posix() != target_sidecar.as_posix()
+                    and target_sidecar.exists()
+                    and not _same_file(source_sidecar, target_sidecar)
+                ):
+                    warning = f"目标同名伴随文件已经存在：{target_sidecar.relative_to(root)}"
+                    break
         plan.append(
             PlanItem(
                 asset_id=str(row["id"]),
@@ -82,15 +104,30 @@ def build_plan(database_path: Path, root: Path, request: PreprocessRequest) -> l
             )
         )
     collisions: dict[str, int] = {}
+    companion_collisions: dict[str, int] = {}
+    changed_companion_keys: set[str] = set()
     for item in plan:
         collisions[item.after_relative_path.casefold()] = (
             collisions.get(item.after_relative_path.casefold(), 0) + 1
         )
+        before_companion = Path(item.before_relative_path).with_suffix("").as_posix()
+        after_companion = Path(item.after_relative_path).with_suffix("").as_posix()
+        companion_key = after_companion.casefold()
+        companion_collisions[companion_key] = companion_collisions.get(companion_key, 0) + 1
+        if before_companion != after_companion:
+            changed_companion_keys.add(companion_key)
     result: list[PlanItem] = []
     for item in plan:
         warning = item.warning
         if collisions[item.after_relative_path.casefold()] > 1 and warning is None:
             warning = f"多个源文件会写入同一目标：{item.after_relative_path}"
+        companion_key = Path(item.after_relative_path).with_suffix("").as_posix().casefold()
+        if (
+            companion_key in changed_companion_keys
+            and companion_collisions[companion_key] > 1
+            and warning is None
+        ):
+            warning = f"多个源文件会共用同名标注或元数据：{companion_key}"
         result.append(replace(item, warning=warning))
     return result
 
@@ -148,8 +185,16 @@ def _target_size(width: int, height: int, request: PreprocessRequest) -> tuple[i
     return max(1, round(width * scale)), max(1, round(height * scale))
 
 
-def _target_path(relative_path: str, request: PreprocessRequest) -> str:
+def _target_path(relative_path: str, request: PreprocessRequest, position: int) -> str:
     path = Path(relative_path)
+    if request.rename is not None:
+        index = str(request.rename.start_index + position).zfill(request.rename.padding)
+        values = {"name": path.stem, "index": index}
+        stem = _RENAME_FIELD_PATTERN.sub(
+            lambda match: values[match.group(1)], request.rename.template
+        )
+        _validate_filename(stem, path.suffix)
+        path = path.with_name(f"{stem}{path.suffix}")
     if request.convert is None:
         return path.as_posix()
     suffix = {
@@ -157,4 +202,30 @@ def _target_path(relative_path: str, request: PreprocessRequest) -> str:
         OutputFormat.JPEG: ".jpg",
         OutputFormat.PNG: ".png",
     }[request.convert.format]
-    return path.with_suffix(suffix).as_posix()
+    converted = path.with_suffix(suffix)
+    _validate_filename(converted.stem, converted.suffix)
+    return converted.as_posix()
+
+
+def _validate_filename(stem: str, suffix: str) -> None:
+    filename = f"{stem}{suffix}"
+    if not stem or stem in {".", ".."}:
+        raise ValueError("重命名后文件名不能为空。")
+    if stem.endswith((" ", ".")):
+        raise ValueError(f"文件名不能以空格或句点结尾：{filename}")
+    if any(character in _INVALID_FILENAME_CHARACTERS or ord(character) < 32 for character in stem):
+        raise ValueError(f"文件名包含 Windows 不支持的字符：{filename}")
+    reserved_name = stem.split(".", 1)[0].rstrip(" .").upper()
+    if reserved_name in _WINDOWS_RESERVED_NAMES:
+        raise ValueError(f"文件名是 Windows 保留名称：{filename}")
+    if len(filename) > 255:
+        raise ValueError(f"文件名超过 255 个字符：{filename}")
+
+
+def _same_file(first: Path, second: Path) -> bool:
+    if not first.exists() or not second.exists():
+        return False
+    try:
+        return first.samefile(second)
+    except OSError:
+        return False

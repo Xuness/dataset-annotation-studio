@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class OutputFormat(StrEnum):
@@ -26,17 +26,34 @@ class ConvertOptions(BaseModel):
     effort: int = Field(default=4, ge=0, le=6)
 
 
+class RenameOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    template: str = Field(min_length=1, max_length=200)
+    start_index: int = Field(default=1, ge=0, le=9_999_999_999)
+    padding: int = Field(default=6, ge=1, le=12)
+
+    @field_validator("template")
+    @classmethod
+    def validate_template_fields(cls, value: str) -> str:
+        remainder = value.replace("{name}", "").replace("{index}", "")
+        if "{" in remainder or "}" in remainder:
+            raise ValueError("重命名模板仅支持 {name} 和 {index} 占位符。")
+        return value
+
+
 class PreprocessRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     asset_ids: list[str] = Field(default_factory=list)
     resize: ResizeOptions | None = None
     convert: ConvertOptions | None = None
+    rename: RenameOptions | None = None
 
     @model_validator(mode="after")
     def require_an_operation(self):
-        if self.resize is None and self.convert is None:
-            raise ValueError("至少需要启用缩放或格式转换。")
+        if self.resize is None and self.convert is None and self.rename is None:
+            raise ValueError("至少需要启用缩放、格式转换或批量重命名。")
         return self
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import secrets
 import shutil
 import threading
@@ -23,6 +24,8 @@ from dataset_studio.modules.preprocessing.models import (
 from dataset_studio.modules.preprocessing.planner import PlanItem, build_plan, preview_token
 from dataset_studio.modules.preprocessing.repository import PreprocessRepository
 from dataset_studio.modules.workspaces.service import WorkspaceService
+
+_SIDECAR_SUFFIXES = (".txt", ".json")
 
 
 class PreprocessService:
@@ -167,14 +170,59 @@ class PreprocessService:
     def _execute_item(self, paths, operation_id, item, request) -> Path:
         source = paths.root / item.before_relative_path
         target = paths.root / item.after_relative_path
+        paths_differ = item.before_relative_path != item.after_relative_path
         if sha256(source) != item.before_hash:
             raise ValueError(f"源文件在预览后发生了变化，请重新预览：{item.before_relative_path}")
-        if source.resolve() != target.resolve() and target.exists():
+        if paths_differ and target.exists() and not self._same_file(source, target):
             raise ValueError(f"目标文件在执行前已出现，拒绝覆盖：{item.after_relative_path}")
         recovery = paths.recovery / operation_id / "files" / Path(item.before_relative_path)
         atomic_copy_file(source, recovery)
+        sidecars = self._sidecar_paths(source, target, recovery)
+        sidecar_states: list[tuple[Path, Path, Path, bool]] = []
+        for before_sidecar, after_sidecar, recovery_sidecar in sidecars:
+            if after_sidecar.exists() and not self._same_file(before_sidecar, after_sidecar):
+                raise ValueError(
+                    f"目标同名伴随文件在执行前已出现，拒绝覆盖："
+                    f"{after_sidecar.relative_to(paths.root)}"
+                )
+            existed = before_sidecar.is_file()
+            if existed:
+                atomic_copy_file(before_sidecar, recovery_sidecar)
+            sidecar_states.append((before_sidecar, after_sidecar, recovery_sidecar, existed))
+        moved_sidecars: list[tuple[Path, Path, Path]] = []
         try:
-            render_image(source, target, item, request.convert)
+            requires_render = (
+                item.before_width != item.after_width
+                or item.before_height != item.after_height
+                or request.convert is not None
+            )
+            if requires_render:
+                render_image(source, target, item, request.convert)
+            elif paths_differ:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(source, target)
+            for before_sidecar, after_sidecar, recovery_sidecar, existed in sidecar_states:
+                if existed:
+                    if not before_sidecar.is_file():
+                        raise ValueError(
+                            f"同名伴随文件在执行期间发生了变化："
+                            f"{before_sidecar.relative_to(paths.root)}"
+                        )
+                    if after_sidecar.exists() and not self._same_file(
+                        before_sidecar, after_sidecar
+                    ):
+                        raise ValueError(
+                            f"目标同名伴随文件在执行前已出现，拒绝覆盖："
+                            f"{after_sidecar.relative_to(paths.root)}"
+                        )
+                    after_sidecar.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(before_sidecar, after_sidecar)
+                    moved_sidecars.append((before_sidecar, after_sidecar, recovery_sidecar))
+                elif before_sidecar.exists():
+                    raise ValueError(
+                        f"同名伴随文件在执行期间发生了变化："
+                        f"{before_sidecar.relative_to(paths.root)}"
+                    )
             self._update_asset(
                 paths.database,
                 item.asset_id,
@@ -184,8 +232,18 @@ class PreprocessService:
                 item.after_width,
                 item.after_height,
             )
-        except BaseException:
-            self._restore_file(source, target, recovery)
+        except BaseException as error:
+            compensation_errors: list[str] = []
+            try:
+                self._restore_executed_sidecars(moved_sidecars)
+            except Exception as sidecar_error:
+                compensation_errors.append(f"伴随文件恢复失败：{sidecar_error}")
+            try:
+                self._restore_file(source, target, recovery, paths_differ=paths_differ)
+            except Exception as image_error:
+                compensation_errors.append(f"图片恢复失败：{image_error}")
+            if compensation_errors:
+                raise RuntimeError("；".join(compensation_errors)) from error
             raise
         return recovery
 
@@ -216,14 +274,30 @@ class PreprocessService:
             current = root / str(item["after_relative_path"])
             before = root / str(item["before_relative_path"])
             original = root / str(item["recovery_relative_path"])
+            paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
             if not current.is_file() or sha256(current) != str(item["after_hash"]):
                 raise ValueError(
                     f"当前文件已在预处理后被修改，无法安全撤销：{item['after_relative_path']}"
                 )
             if not original.is_file():
                 raise ValueError(f"恢复文件缺失：{item['recovery_relative_path']}")
-            if before.resolve() != current.resolve() and before.exists():
+            if (
+                paths_differ
+                and before.exists()
+                and not PreprocessService._same_file(before, current)
+            ):
                 raise ValueError(f"原路径已出现新文件，拒绝覆盖：{item['before_relative_path']}")
+            for before_sidecar, after_sidecar, _ in PreprocessService._sidecar_paths(
+                before, current, original
+            ):
+                if after_sidecar.exists() and not after_sidecar.is_file():
+                    raise ValueError(f"当前同名伴随路径不是文件：{after_sidecar.relative_to(root)}")
+                if before_sidecar.exists() and not PreprocessService._same_file(
+                    before_sidecar, after_sidecar
+                ):
+                    raise ValueError(
+                        f"原同名伴随路径已出现新文件，拒绝覆盖：{before_sidecar.relative_to(root)}"
+                    )
 
     @classmethod
     def _undo_item(
@@ -236,16 +310,19 @@ class PreprocessService:
         current = root / str(item["after_relative_path"])
         before = root / str(item["before_relative_path"])
         original = root / str(item["recovery_relative_path"])
-        paths_differ = before.resolve() != current.resolve()
+        paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
+        sidecars = cls._sidecar_paths(before, current, original)
         atomic_copy_file(current, backup)
+        cls._backup_current_sidecars(sidecars, backup)
         before_written = False
         try:
-            if paths_differ and before.exists():
+            if paths_differ and before.exists() and not cls._same_file(before, current):
                 raise ValueError(f"原路径已出现新文件，拒绝覆盖：{item['before_relative_path']}")
-            atomic_copy_file(original, before)
-            before_written = True
             if paths_differ:
                 current.unlink()
+            atomic_copy_file(original, before)
+            before_written = True
+            cls._undo_sidecars(sidecars)
             cls._update_asset(
                 database_path,
                 str(item["asset_id"]),
@@ -256,6 +333,7 @@ class PreprocessService:
                 int(item["before_height"]),
             )
         except BaseException:
+            cls._restore_processed_sidecars(sidecars, backup)
             if before_written and paths_differ:
                 before.unlink(missing_ok=True)
             atomic_copy_file(backup, current)
@@ -271,9 +349,12 @@ class PreprocessService:
     ) -> None:
         after = root / str(item["after_relative_path"])
         before = root / str(item["before_relative_path"])
-        if before.resolve() != after.resolve():
-            if before.is_file() and sha256(before) != str(item["before_hash"]):
-                raise RuntimeError(f"撤销补偿时原路径又被修改：{item['before_relative_path']}")
+        original = root / str(item["recovery_relative_path"])
+        paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
+        if paths_differ and before.is_file() and sha256(before) != str(item["before_hash"]):
+            raise RuntimeError(f"撤销补偿时原路径又被修改：{item['before_relative_path']}")
+        cls._restore_processed_sidecars(cls._sidecar_paths(before, after, original), backup)
+        if paths_differ:
             before.unlink(missing_ok=True)
         atomic_copy_file(backup, after)
         cls._update_asset(
@@ -387,7 +468,22 @@ class PreprocessService:
             try:
                 after = root / item.after_relative_path
                 before = root / item.before_relative_path
-                cls._restore_file(before, after, recovery)
+                bundle_errors: list[str] = []
+                try:
+                    cls._restore_original_sidecars(cls._sidecar_paths(before, after, recovery))
+                except Exception as sidecar_error:
+                    bundle_errors.append(f"伴随文件恢复失败：{sidecar_error}")
+                try:
+                    cls._restore_file(
+                        before,
+                        after,
+                        recovery,
+                        paths_differ=item.before_relative_path != item.after_relative_path,
+                    )
+                except Exception as image_error:
+                    bundle_errors.append(f"图片恢复失败：{image_error}")
+                if bundle_errors:
+                    raise RuntimeError("；".join(bundle_errors))
                 cls._update_asset(
                     database_path,
                     item.asset_id,
@@ -403,7 +499,83 @@ class PreprocessService:
             raise RuntimeError("；".join(errors))
 
     @staticmethod
-    def _restore_file(before: Path, after: Path, recovery: Path) -> None:
-        if before.resolve() != after.resolve():
+    def _restore_file(
+        before: Path,
+        after: Path,
+        recovery: Path,
+        *,
+        paths_differ: bool,
+    ) -> None:
+        if paths_differ:
             after.unlink(missing_ok=True)
         atomic_copy_file(recovery, before)
+
+    @staticmethod
+    def _sidecar_paths(
+        before_image: Path,
+        after_image: Path,
+        recovery_image: Path,
+    ) -> list[tuple[Path, Path, Path]]:
+        paths: list[tuple[Path, Path, Path]] = []
+        for suffix in _SIDECAR_SUFFIXES:
+            before = before_image.with_suffix(suffix)
+            after = after_image.with_suffix(suffix)
+            if before.as_posix() != after.as_posix():
+                paths.append((before, after, recovery_image.with_suffix(suffix)))
+        return paths
+
+    @staticmethod
+    def _same_file(first: Path, second: Path) -> bool:
+        if not first.exists() or not second.exists():
+            return False
+        try:
+            return first.samefile(second)
+        except OSError:
+            return False
+
+    @staticmethod
+    def _restore_executed_sidecars(sidecars: list[tuple[Path, Path, Path]]) -> None:
+        for before, after, recovery in reversed(sidecars):
+            after.unlink(missing_ok=True)
+            atomic_copy_file(recovery, before)
+
+    @staticmethod
+    def _restore_original_sidecars(sidecars: list[tuple[Path, Path, Path]]) -> None:
+        for before, after, recovery in sidecars:
+            if recovery.is_file():
+                after.unlink(missing_ok=True)
+                atomic_copy_file(recovery, before)
+
+    @staticmethod
+    def _backup_current_sidecars(
+        sidecars: list[tuple[Path, Path, Path]],
+        backup_image: Path,
+    ) -> None:
+        for _, after, _ in sidecars:
+            backup = backup_image.with_suffix(after.suffix)
+            if after.is_file():
+                atomic_copy_file(after, backup)
+            else:
+                backup.unlink(missing_ok=True)
+
+    @staticmethod
+    def _undo_sidecars(sidecars: list[tuple[Path, Path, Path]]) -> None:
+        for before, after, recovery in sidecars:
+            if after.is_file():
+                before.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(after, before)
+            elif recovery.is_file():
+                atomic_copy_file(recovery, before)
+
+    @staticmethod
+    def _restore_processed_sidecars(
+        sidecars: list[tuple[Path, Path, Path]],
+        backup_image: Path,
+    ) -> None:
+        for before, after, recovery in sidecars:
+            backup = backup_image.with_suffix(after.suffix)
+            if not backup.is_file() and not recovery.is_file():
+                continue
+            before.unlink(missing_ok=True)
+            if backup.is_file():
+                atomic_copy_file(backup, after)

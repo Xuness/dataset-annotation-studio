@@ -12,6 +12,7 @@ from dataset_studio.modules.preprocessing.models import (
     PreprocessExecuteRequest,
     PreprocessPreview,
     PreprocessRequest,
+    RenameOptions,
     ResizeOptions,
 )
 from dataset_studio.modules.preprocessing.service import PreprocessService
@@ -82,6 +83,190 @@ def test_resize_convert_and_undo_preserves_asset_identity(tmp_path: Path) -> Non
     assert restored.relative_path == "sample.png"
     with Image.open(project / "sample.png") as image:
         assert image.size == (400, 200)
+
+
+def test_batch_rename_moves_sidecars_without_reencoding_and_undoes(tmp_path: Path) -> None:
+    workspaces, assets, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    first_image = project / "a.png"
+    second_image = project / "b.jpg"
+    Image.new("RGB", (80, 40), "white").save(first_image)
+    Image.new("RGB", (64, 32), "black").save(second_image)
+    (project / "a.txt").write_text("original annotation", encoding="utf-8")
+    (project / "a.json").write_text('{"source": "original"}', encoding="utf-8")
+    original_hashes = {
+        "a.png": file_sha256(first_image),
+        "b.jpg": file_sha256(second_image),
+    }
+    summary, _ = workspaces.open(str(project))
+    before_assets = assets.list_assets(summary.project_id).items
+    before_ids = {item.filename: item.id for item in before_assets}
+    request = PreprocessRequest(
+        rename=RenameOptions(template="asset_{index}", start_index=7, padding=3)
+    )
+
+    preview = preprocessing.preview(summary.project_id, request)
+
+    assert [item.after_relative_path for item in preview.items] == [
+        "asset_007.png",
+        "asset_008.jpg",
+    ]
+    operation = _execute(preprocessing, summary.project_id, request, preview)
+    assert not first_image.exists()
+    assert not second_image.exists()
+    assert file_sha256(project / "asset_007.png") == original_hashes["a.png"]
+    assert file_sha256(project / "asset_008.jpg") == original_hashes["b.jpg"]
+    assert (project / "asset_007.txt").read_text(encoding="utf-8") == "original annotation"
+    assert (project / "asset_007.json").read_text(encoding="utf-8") == '{"source": "original"}'
+    renamed_assets = assets.list_assets(summary.project_id).items
+    assert {item.filename: item.id for item in renamed_assets} == {
+        "asset_007.png": before_ids["a.png"],
+        "asset_008.jpg": before_ids["b.jpg"],
+    }
+    assert renamed_assets[0].metadata_relative_path == "asset_007.json"
+
+    (project / "asset_007.txt").write_text("edited after rename", encoding="utf-8")
+    (project / "asset_007.json").unlink()
+    undone = preprocessing.undo(summary.project_id, operation.id)
+
+    assert undone.status == "undone"
+    assert file_sha256(first_image) == original_hashes["a.png"]
+    assert file_sha256(second_image) == original_hashes["b.jpg"]
+    assert (project / "a.txt").read_text(encoding="utf-8") == "edited after rename"
+    assert (project / "a.json").read_text(encoding="utf-8") == '{"source": "original"}'
+    assert not (project / "asset_007.png").exists()
+    assert not (project / "asset_008.jpg").exists()
+
+
+def test_rename_can_combine_with_conversion(tmp_path: Path) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (96, 48), "white").save(project / "sample.png")
+    (project / "sample.txt").write_text("caption", encoding="utf-8")
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(
+        rename=RenameOptions(template="converted_{index}", start_index=1, padding=2),
+        convert=ConvertOptions(format=OutputFormat.WEBP),
+    )
+
+    operation = _execute(preprocessing, summary.project_id, request)
+
+    assert operation.status == "completed"
+    assert (project / "converted_01.webp").is_file()
+    assert (project / "converted_01.txt").read_text(encoding="utf-8") == "caption"
+    assert not (project / "sample.png").exists()
+    assert not (project / "sample.txt").exists()
+
+
+def test_case_only_rename_and_undo_use_the_requested_filename_casing(tmp_path: Path) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (64, 32), "white").save(project / "sample.png")
+    (project / "sample.txt").write_text("caption", encoding="utf-8")
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(rename=RenameOptions(template="SAMPLE"))
+
+    operation = _execute(preprocessing, summary.project_id, request)
+
+    visible_names = {path.name for path in project.iterdir() if path.is_file()}
+    assert {"SAMPLE.png", "SAMPLE.txt"}.issubset(visible_names)
+    preprocessing.undo(summary.project_id, operation.id)
+    visible_names = {path.name for path in project.iterdir() if path.is_file()}
+    assert {"sample.png", "sample.txt"}.issubset(visible_names)
+
+
+def test_rename_sidecar_collision_and_invalid_names_are_rejected(tmp_path: Path) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (64, 64), "white").save(project / "sample.png")
+    (project / "renamed.txt").write_text("occupied", encoding="utf-8")
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(rename=RenameOptions(template="renamed"))
+
+    preview = preprocessing.preview(summary.project_id, request)
+
+    assert preview.warning_count == 1
+    assert "伴随文件已经存在" in (preview.items[0].warning or "")
+    with pytest.raises(ValueError, match="伴随文件已经存在"):
+        _execute(preprocessing, summary.project_id, request, preview)
+    with pytest.raises(ValueError, match="Windows 保留名称"):
+        preprocessing.preview(
+            summary.project_id,
+            PreprocessRequest(rename=RenameOptions(template="CON")),
+        )
+    with pytest.raises(ValueError, match="仅支持"):
+        RenameOptions(template="image_{number}")
+
+
+def test_rename_rejects_multiple_images_sharing_a_companion_basename(tmp_path: Path) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (64, 64), "white").save(project / "a.jpg")
+    Image.new("RGB", (64, 64), "black").save(project / "b.png")
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(rename=RenameOptions(template="shared"))
+
+    preview = preprocessing.preview(summary.project_id, request)
+
+    assert preview.warning_count == 2
+    assert all(item.warning and "共用同名标注" in item.warning for item in preview.items)
+    with pytest.raises(ValueError, match="共用同名标注"):
+        _execute(preprocessing, summary.project_id, request, preview)
+
+
+def test_undo_rename_refuses_to_overwrite_new_sidecar_at_original_path(tmp_path: Path) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (64, 32), "white").save(project / "sample.png")
+    (project / "sample.txt").write_text("original", encoding="utf-8")
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(rename=RenameOptions(template="renamed"))
+    operation = _execute(preprocessing, summary.project_id, request)
+    (project / "sample.txt").write_text("new occupant", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="原同名伴随路径已出现新文件"):
+        preprocessing.undo(summary.project_id, operation.id)
+
+    assert (project / "sample.txt").read_text(encoding="utf-8") == "new occupant"
+    assert (project / "renamed.png").is_file()
+    assert (project / "renamed.txt").read_text(encoding="utf-8") == "original"
+    assert preprocessing.list_operations(summary.project_id)[0].status == "completed"
+
+
+def test_failed_rename_restores_image_and_sidecars(tmp_path: Path, monkeypatch) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    image = project / "sample.png"
+    Image.new("RGB", (64, 32), "white").save(image)
+    (project / "sample.txt").write_text("caption", encoding="utf-8")
+    (project / "sample.json").write_text('{"value": 1}', encoding="utf-8")
+    original_hash = file_sha256(image)
+    summary, _ = workspaces.open(str(project))
+
+    def fail_asset_update(*_args, **_kwargs):
+        raise RuntimeError("simulated rename database failure")
+
+    monkeypatch.setattr(preprocessing, "_update_asset", fail_asset_update)
+    with pytest.raises(RuntimeError, match="simulated rename database failure"):
+        _execute(
+            preprocessing,
+            summary.project_id,
+            PreprocessRequest(rename=RenameOptions(template="renamed_{index}")),
+        )
+
+    assert file_sha256(image) == original_hash
+    assert (project / "sample.txt").read_text(encoding="utf-8") == "caption"
+    assert (project / "sample.json").read_text(encoding="utf-8") == '{"value": 1}'
+    assert not (project / "renamed_000001.png").exists()
+    assert not (project / "renamed_000001.txt").exists()
+    assert not (project / "renamed_000001.json").exists()
 
 
 def test_failed_asset_update_restores_original_file(tmp_path: Path, monkeypatch) -> None:
@@ -256,6 +441,16 @@ def test_multiframe_image_is_not_silently_flattened(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="多帧图片"):
         _execute(preprocessing, summary.project_id, request, preview)
     with Image.open(image_path) as image:
+        assert image.n_frames == 2
+
+    original_hash = file_sha256(image_path)
+    rename = PreprocessRequest(rename=RenameOptions(template="renamed_{name}"))
+    rename_preview = preprocessing.preview(summary.project_id, rename)
+    assert rename_preview.warning_count == 0
+    _execute(preprocessing, summary.project_id, rename, rename_preview)
+    renamed = project / "renamed_pages.tiff"
+    assert file_sha256(renamed) == original_hash
+    with Image.open(renamed) as image:
         assert image.n_frames == 2
 
 

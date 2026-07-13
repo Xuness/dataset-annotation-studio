@@ -245,10 +245,17 @@ export interface ConvertOptions {
   effort: number;
 }
 
+export interface RenameOptions {
+  template: string;
+  start_index: number;
+  padding: number;
+}
+
 export interface PreprocessRequest {
   asset_ids: string[];
   resize: ResizeOptions | null;
   convert: ConvertOptions | null;
+  rename: RenameOptions | null;
 }
 
 export interface PreprocessPreviewItem {
