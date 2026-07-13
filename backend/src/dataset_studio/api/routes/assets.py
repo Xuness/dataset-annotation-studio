@@ -5,7 +5,11 @@ from fastapi.responses import FileResponse
 
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
-from dataset_studio.modules.assets.models import AssetListResponse, MetadataDocument
+from dataset_studio.modules.assets.models import (
+    AssetIdListResponse,
+    AssetListResponse,
+    MetadataDocument,
+)
 from dataset_studio.modules.prompts.composer import PromptPreview, preview_user_prompt
 
 router = APIRouter(prefix="/workspaces/{project_id}/assets", tags=["assets"])
@@ -27,6 +31,20 @@ def list_assets(
         annotation_status=status,
         offset=offset,
         limit=limit,
+    )
+
+
+@router.get("/ids", response_model=AssetIdListResponse)
+def list_asset_ids(
+    project_id: str,
+    container: Container,
+    search: str = "",
+    status: str | None = None,
+):
+    return container.assets.list_asset_ids(
+        project_id,
+        search=search,
+        annotation_status=status,
     )
 
 

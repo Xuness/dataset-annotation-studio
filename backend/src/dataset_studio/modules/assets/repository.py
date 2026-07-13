@@ -91,17 +91,7 @@ class AssetRepository:
         offset: int = 0,
         limit: int = 200,
     ) -> tuple[list[AssetSummary], int, dict[str, int]]:
-        clauses = ["is_present = 1"]
-        parameters: list[object] = []
-        if search:
-            clauses.append("relative_path LIKE ? ESCAPE '\\'")
-            escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            parameters.append(f"%{escaped}%")
-        if annotation_status:
-            clauses.append("annotation_status = ?")
-            parameters.append(annotation_status)
-
-        where = " AND ".join(clauses)
+        where, parameters = self._asset_filter(search, annotation_status)
         connection = connect(self._database_path)
         try:
             total = int(
@@ -133,6 +123,41 @@ class AssetRepository:
             return ([AssetSummary.model_validate(dict(row)) for row in rows], total, status_counts)
         finally:
             connection.close()
+
+    def list_asset_ids(
+        self,
+        *,
+        search: str = "",
+        annotation_status: str | None = None,
+    ) -> list[str]:
+        where, parameters = self._asset_filter(search, annotation_status)
+        connection = connect(self._database_path)
+        try:
+            rows = connection.execute(
+                f"""
+                SELECT id
+                FROM assets
+                WHERE {where}
+                ORDER BY relative_path COLLATE NOCASE
+                """,
+                parameters,
+            ).fetchall()
+            return [str(row["id"]) for row in rows]
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _asset_filter(search: str, annotation_status: str | None) -> tuple[str, list[object]]:
+        clauses = ["is_present = 1"]
+        parameters: list[object] = []
+        if search:
+            clauses.append("relative_path LIKE ? ESCAPE '\\'")
+            escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            parameters.append(f"%{escaped}%")
+        if annotation_status:
+            clauses.append("annotation_status = ?")
+            parameters.append(annotation_status)
+        return " AND ".join(clauses), parameters
 
     def get_asset(self, asset_id: str) -> sqlite3.Row | None:
         connection = connect(self._database_path)

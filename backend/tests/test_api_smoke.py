@@ -24,3 +24,13 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
         listed = client.get(f"/api/v1/workspaces/{project_id}/assets")
         assert listed.status_code == 200
         assert listed.json()["items"][0]["relative_path"] == "sample.webp"
+
+        matching_ids = client.get(
+            f"/api/v1/workspaces/{project_id}/assets/ids",
+            params={"search": "sample", "status": "missing"},
+        )
+        assert matching_ids.status_code == 200
+        assert matching_ids.json() == {
+            "ids": [listed.json()["items"][0]["id"]],
+            "total": 1,
+        }

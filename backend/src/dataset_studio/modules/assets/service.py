@@ -9,6 +9,7 @@ from PIL import Image, ImageOps
 
 from dataset_studio.core.errors import AssetNotFoundError
 from dataset_studio.modules.assets.models import (
+    AssetIdListResponse,
     AssetListResponse,
     MetadataDocument,
 )
@@ -62,6 +63,20 @@ class AssetService:
             limit=min(max(limit, 1), 10_000),
             status_counts=status_counts,
         )
+
+    def list_asset_ids(
+        self,
+        project_id: str,
+        *,
+        search: str = "",
+        annotation_status: str | None = None,
+    ) -> AssetIdListResponse:
+        paths, _ = self._workspaces.get(project_id)
+        ids = AssetRepository(paths.database).list_asset_ids(
+            search=search,
+            annotation_status=annotation_status,
+        )
+        return AssetIdListResponse(ids=ids, total=len(ids))
 
     def image_path(self, project_id: str, asset_id: str) -> Path:
         paths, _ = self._workspaces.get(project_id)

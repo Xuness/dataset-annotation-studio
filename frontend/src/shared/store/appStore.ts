@@ -8,6 +8,7 @@ interface AppState {
   setActiveProject: (projectId: string | null) => void;
   selectAsset: (assetId: string | null) => void;
   toggleCheckedAsset: (assetId: string) => void;
+  setAssetsChecked: (assetIds: string[], checked: boolean) => void;
   clearCheckedAssets: () => void;
   setDirtyScope: (scope: string, dirty: boolean) => void;
   clearDirtyScopes: () => void;
@@ -31,6 +32,21 @@ export const useAppStore = create<AppState>((set) => ({
         ? state.checkedAssetIds.filter((id) => id !== assetId)
         : [...state.checkedAssetIds, assetId],
     })),
+  setAssetsChecked: (assetIds, checked) =>
+    set((state) => {
+      if (!assetIds.length) return state;
+      const next = new Set(state.checkedAssetIds);
+      let changed = false;
+      for (const assetId of assetIds) {
+        if (checked && !next.has(assetId)) {
+          next.add(assetId);
+          changed = true;
+        } else if (!checked && next.delete(assetId)) {
+          changed = true;
+        }
+      }
+      return changed ? { checkedAssetIds: [...next] } : state;
+    }),
   clearCheckedAssets: () => set({ checkedAssetIds: [] }),
   setDirtyScope: (scope, dirty) =>
     set((state) => {

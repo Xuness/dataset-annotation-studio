@@ -59,6 +59,11 @@ export interface AssetListResponse {
   status_counts: Record<string, number>;
 }
 
+export interface AssetIdListResponse {
+  ids: string[];
+  total: number;
+}
+
 export interface ValidationIssue {
   code: string;
   message: string;

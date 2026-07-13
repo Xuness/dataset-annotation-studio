@@ -1,5 +1,10 @@
 import { apiAssetUrl, apiRequest } from "../../shared/api/client";
-import type { AssetListResponse, MetadataDocument, PromptPreview } from "../../shared/api/types";
+import type {
+  AssetIdListResponse,
+  AssetListResponse,
+  MetadataDocument,
+  PromptPreview,
+} from "../../shared/api/types";
 
 export interface AssetQuery {
   search?: string;
@@ -15,6 +20,13 @@ export function listAssets(projectId: string, query: AssetQuery): Promise<AssetL
   parameters.set("offset", String(query.offset ?? 0));
   parameters.set("limit", String(query.limit ?? 10_000));
   return apiRequest(`/api/v1/workspaces/${projectId}/assets?${parameters}`);
+}
+
+export function listAssetIds(projectId: string, query: AssetQuery): Promise<AssetIdListResponse> {
+  const parameters = new URLSearchParams();
+  if (query.search) parameters.set("search", query.search);
+  if (query.status) parameters.set("status", query.status);
+  return apiRequest(`/api/v1/workspaces/${projectId}/assets/ids?${parameters}`);
 }
 
 export function getMetadata(projectId: string, assetId: string): Promise<MetadataDocument> {
@@ -37,7 +49,5 @@ export function thumbnailUrl(
   size = 320,
 ): string {
   const parameters = new URLSearchParams({ size: String(size), v: contentVersion });
-  return apiAssetUrl(
-    `/api/v1/workspaces/${projectId}/assets/${assetId}/thumbnail?${parameters}`,
-  );
+  return apiAssetUrl(`/api/v1/workspaces/${projectId}/assets/${assetId}/thumbnail?${parameters}`);
 }

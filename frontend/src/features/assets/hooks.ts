@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
-import { getMetadata, getPromptPreview, listAssets, type AssetQuery } from "./api";
+import { getMetadata, getPromptPreview, listAssetIds, listAssets, type AssetQuery } from "./api";
 
 export function useAssets(projectId: string, query: AssetQuery) {
   return useQuery({
@@ -21,6 +21,15 @@ export function useInfiniteAssets(projectId: string, query: AssetQuery, pageSize
       return nextOffset < lastPage.total ? nextOffset : undefined;
     },
     enabled: Boolean(projectId),
+  });
+}
+
+export function useAssetIds(projectId: string, query: AssetQuery) {
+  return useQuery({
+    queryKey: ["assets", projectId, "ids", query],
+    queryFn: () => listAssetIds(projectId, query),
+    enabled: false,
+    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useInfiniteAssets } from "../../features/assets/hooks";
+import { useAssetIds, useInfiniteAssets } from "../../features/assets/hooks";
 import {
   useRescanWorkspace,
   useUpdateWorkspace,
@@ -41,7 +41,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const selectedAssetId = useAppStore((state) => state.selectedAssetId);
   const selectAsset = useAppStore((state) => state.selectAsset);
   const checkedAssetIds = useAppStore((state) => state.checkedAssetIds);
-  const toggleCheckedAsset = useAppStore((state) => state.toggleCheckedAsset);
+  const setAssetsChecked = useAppStore((state) => state.setAssetsChecked);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<AnnotationStatus | null>(
@@ -54,11 +54,27 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
 
   const assetQuery = useMemo(() => ({ search, status: statusFilter }), [search, statusFilter]);
   const assets = useInfiniteAssets(projectId, assetQuery);
+  const matchingAssetIds = useAssetIds(projectId, assetQuery);
   const assetItems = useMemo(
     () => assets.data?.pages.flatMap((page) => page.items) ?? [],
     [assets.data?.pages],
   );
   const assetResult = assets.data?.pages[0];
+  const loadedMatchingAssetIds = useMemo(() => {
+    if (!assetResult || assets.hasNextPage || assetItems.length !== assetResult.total) return null;
+    return assetItems.map((asset) => asset.id);
+  }, [assetItems, assetResult, assets.hasNextPage]);
+  const knownMatchingAssetIds =
+    matchingAssetIds.data &&
+    !matchingAssetIds.isStale &&
+    matchingAssetIds.data.total === assetResult?.total
+      ? matchingAssetIds.data.ids
+      : loadedMatchingAssetIds;
+  const allMatchingSelected = useMemo(() => {
+    if (!knownMatchingAssetIds?.length) return false;
+    const checked = new Set(checkedAssetIds);
+    return knownMatchingAssetIds.every((assetId) => checked.has(assetId));
+  }, [checkedAssetIds, knownMatchingAssetIds]);
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = assets;
   const loadMoreAssets = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
@@ -106,6 +122,24 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     },
     [editorDirty, selectAsset],
   );
+
+  const toggleAllMatchingAssets = useCallback(async () => {
+    let assetIds = knownMatchingAssetIds;
+    if (!assetIds) {
+      const result = await matchingAssetIds.refetch();
+      if (!result.data) {
+        window.alert(
+          result.error instanceof Error ? result.error.message : "读取全选范围失败，请稍后重试。",
+        );
+        return;
+      }
+      assetIds = result.data.ids;
+    }
+
+    const checked = new Set(useAppStore.getState().checkedAssetIds);
+    const shouldCheck = !assetIds.length || !assetIds.every((assetId) => checked.has(assetId));
+    setAssetsChecked(assetIds, shouldCheck);
+  }, [knownMatchingAssetIds, matchingAssetIds, setAssetsChecked]);
 
   const layoutStyle = {
     "--asset-pane-width": `${layout.assetPaneWidth}px`,
@@ -158,13 +192,16 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
           hasMore={Boolean(assets.hasNextPage)}
           loading={assets.isLoading}
           loadingMore={assets.isFetchingNextPage}
+          selectAllPending={matchingAssetIds.isFetching}
+          allMatchingSelected={allMatchingSelected}
           error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
           onLoadMore={loadMoreAssets}
           recursive={workspace.data.settings.recursive_scan}
           onSearchChange={setSearch}
           onStatusChange={setStatusFilter}
           onSelect={requestSelectAsset}
-          onToggleChecked={toggleCheckedAsset}
+          onSetChecked={setAssetsChecked}
+          onToggleAll={() => void toggleAllMatchingAssets()}
           onRecursiveChange={(recursive_scan) =>
             void updateWorkspace.mutateAsync({ recursive_scan })
           }

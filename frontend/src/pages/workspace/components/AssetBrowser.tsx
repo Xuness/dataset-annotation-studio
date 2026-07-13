@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { CheckCircle2, CircleAlert, FileQuestion, Search } from "lucide-react";
 
@@ -23,11 +23,14 @@ interface AssetBrowserProps {
   hasMore: boolean;
   loading: boolean;
   loadingMore: boolean;
+  selectAllPending: boolean;
+  allMatchingSelected: boolean;
   error: string | null;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: StatusFilter) => void;
   onSelect: (assetId: string) => void;
-  onToggleChecked: (assetId: string) => void;
+  onSetChecked: (assetIds: string[], checked: boolean) => void;
+  onToggleAll: () => void;
   onRecursiveChange: (value: boolean) => void;
   onLoadMore: () => void;
 }
@@ -63,16 +66,21 @@ export function AssetBrowser({
   hasMore,
   loading,
   loadingMore,
+  selectAllPending,
+  allMatchingSelected,
   error,
   onSearchChange,
   onStatusChange,
   onSelect,
-  onToggleChecked,
+  onSetChecked,
+  onToggleAll,
   onRecursiveChange,
   onLoadMore,
 }: AssetBrowserProps) {
   const filters = mode === "review" ? reviewFilters : assetFilters;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rangeAnchorIdRef = useRef<string | null>(null);
+  const checkedAssetIdSet = useMemo(() => new Set(checkedAssetIds), [checkedAssetIds]);
   const virtualizer = useVirtualizer({
     count: assets.length,
     getScrollElement: () => scrollRef.current,
@@ -87,6 +95,38 @@ export function AssetBrowser({
       onLoadMore();
     }
   }, [assets.length, hasMore, loadingMore, onLoadMore, virtualItems]);
+
+  useEffect(() => {
+    rangeAnchorIdRef.current = null;
+  }, [mode, projectId, search, statusFilter]);
+
+  function toggleChecked(assetId: string, shiftKey: boolean) {
+    const targetIndex = assets.findIndex((asset) => asset.id === assetId);
+    const anchorId = rangeAnchorIdRef.current ?? selectedAssetId;
+    const anchorIndex = anchorId ? assets.findIndex((asset) => asset.id === anchorId) : -1;
+    const shouldCheck = !checkedAssetIdSet.has(assetId);
+
+    if (shiftKey && targetIndex >= 0 && anchorIndex >= 0) {
+      const start = Math.min(anchorIndex, targetIndex);
+      const end = Math.max(anchorIndex, targetIndex);
+      onSetChecked(
+        assets.slice(start, end + 1).map((asset) => asset.id),
+        shouldCheck,
+      );
+    } else {
+      onSetChecked([assetId], shouldCheck);
+    }
+    rangeAnchorIdRef.current = assetId;
+  }
+
+  function handleRowClick(assetId: string, shiftKey: boolean) {
+    if (shiftKey) {
+      toggleChecked(assetId, true);
+      return;
+    }
+    rangeAnchorIdRef.current = assetId;
+    onSelect(assetId);
+  }
 
   return (
     <aside className="asset-browser">
@@ -130,6 +170,25 @@ export function AssetBrowser({
         })}
       </div>
 
+      <div className="asset-selection-toolbar">
+        <button
+          type="button"
+          className="asset-selection-toolbar__toggle"
+          aria-pressed={allMatchingSelected}
+          disabled={loading || selectAllPending || total === 0}
+          onClick={onToggleAll}
+        >
+          <span className={`asset-check ${allMatchingSelected ? "is-checked" : ""}`}>
+            {allMatchingSelected ? "✓" : ""}
+          </span>
+          {selectAllPending ? "正在全选…" : allMatchingSelected ? "取消全选" : "全选"}
+        </button>
+        <span className="asset-selection-toolbar__count">已选 {checkedAssetIds.length}</span>
+        <span className="asset-selection-toolbar__hint" title="按住 Shift 点击可连续选择或取消">
+          Shift 连选
+        </span>
+      </div>
+
       <div className="asset-list" ref={scrollRef}>
         {loading ? (
           <div className="asset-list__empty">
@@ -149,26 +208,27 @@ export function AssetBrowser({
                   key={asset.id}
                   className={`asset-row ${asset.id === selectedAssetId ? "is-selected" : ""}`}
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
-                  onClick={() => onSelect(asset.id)}
+                  onClick={(event) => handleRowClick(asset.id, event.shiftKey)}
                 >
                   <span
-                    className={`asset-check ${checkedAssetIds.includes(asset.id) ? "is-checked" : ""}`}
+                    className={`asset-check ${checkedAssetIdSet.has(asset.id) ? "is-checked" : ""}`}
                     role="checkbox"
-                    aria-checked={checkedAssetIds.includes(asset.id)}
+                    aria-label={`选择 ${asset.filename}`}
+                    aria-checked={checkedAssetIdSet.has(asset.id)}
                     tabIndex={0}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onToggleChecked(asset.id);
+                      toggleChecked(asset.id, event.shiftKey);
                     }}
                     onKeyDown={(event) => {
                       if (event.key === " " || event.key === "Enter") {
                         event.preventDefault();
                         event.stopPropagation();
-                        onToggleChecked(asset.id);
+                        toggleChecked(asset.id, event.shiftKey);
                       }
                     }}
                   >
-                    {checkedAssetIds.includes(asset.id) ? "✓" : ""}
+                    {checkedAssetIdSet.has(asset.id) ? "✓" : ""}
                   </span>
                   <img
                     src={thumbnailUrl(projectId, asset.id, asset.content_version, 160)}

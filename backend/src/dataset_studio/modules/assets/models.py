@@ -52,6 +52,11 @@ class AssetListResponse(BaseModel):
     status_counts: dict[str, int] = Field(default_factory=dict)
 
 
+class AssetIdListResponse(BaseModel):
+    ids: list[str]
+    total: int
+
+
 class MetadataDocument(BaseModel):
     exists: bool
     path: str | None = None
