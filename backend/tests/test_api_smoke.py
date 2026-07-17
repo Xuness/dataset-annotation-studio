@@ -62,3 +62,27 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
             "ids": [listed.json()["items"][0]["id"]],
             "total": 1,
         }
+
+        preprocess_request = {
+            "asset_ids": [],
+            "resize": {"max_edge": 128, "allow_upscale": True},
+            "convert": None,
+            "rename": None,
+        }
+        preprocess_preview = client.post(
+            f"/api/v1/workspaces/{project_id}/preprocessing/preview",
+            json=preprocess_request,
+        )
+        assert preprocess_preview.status_code == 200
+        executed = client.post(
+            f"/api/v1/workspaces/{project_id}/preprocessing/execute",
+            json={
+                "request": preprocess_request,
+                "preview_token": preprocess_preview.json()["preview_token"],
+                "execution": {"max_workers": 2},
+            },
+        )
+        assert executed.status_code == 200
+        assert executed.json()["status"] == "completed"
+        with Image.open(project / "sample.webp") as resized:
+            assert resized.size == (128, 64)

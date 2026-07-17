@@ -13,7 +13,8 @@ from pathlib import Path
 from dataset_studio.core.files import atomic_copy_file
 from dataset_studio.core.sqlite import transaction
 from dataset_studio.modules.assets.scanner import IMAGE_METADATA_VERSION, AssetScanner
-from dataset_studio.modules.preprocessing.image_pipeline import render_image, sha256
+from dataset_studio.modules.preprocessing.executor import PreparedItem, PreprocessItemPreparer
+from dataset_studio.modules.preprocessing.image_pipeline import sha256
 from dataset_studio.modules.preprocessing.models import (
     PreprocessExecuteRequest,
     PreprocessOperation,
@@ -82,12 +83,27 @@ class PreprocessService:
             if not any(item.will_change for item in plan):
                 raise ValueError("当前参数不会修改任何图片，无需执行预处理。")
             repository.start(operation_id, request)
+            operation_root = paths.recovery / operation_id
             try:
-                for item in plan:
-                    if item.will_change:
-                        recovery = self._execute_item(paths, operation_id, item, request)
-                        completed.append((item, recovery))
-                        self._record_item(repository, paths.root, operation_id, item, recovery)
+                changed_items = [item for item in plan if item.will_change]
+                with PreprocessItemPreparer(
+                    root=paths.root,
+                    operation_root=operation_root,
+                    items=changed_items,
+                    request=request,
+                    execution=execution.execution,
+                ) as preparer:
+                    for prepared in preparer:
+                        self._commit_prepared_item(paths, prepared)
+                        completed.append((prepared.plan, prepared.recovery_path))
+                        self._record_item(
+                            repository,
+                            paths.root,
+                            operation_id,
+                            prepared.plan,
+                            prepared.recovery_path,
+                            prepared.after_hash,
+                        )
                 repository.complete(operation_id)
                 self._scanner.scan(paths, manifest)
             except Exception as error:
@@ -108,6 +124,8 @@ class PreprocessService:
                     details = "；".join(compensation_errors)
                     raise RuntimeError(f"预处理失败，且补偿未完全完成：{details}") from error
                 raise
+            finally:
+                shutil.rmtree(operation_root / "staging", ignore_errors=True)
         operation = repository.get(operation_id)
         if operation is None:
             raise RuntimeError("预处理操作记录创建失败。")
@@ -167,17 +185,21 @@ class PreprocessService:
             raise RuntimeError("预处理操作记录丢失。")
         return updated
 
-    def _execute_item(self, paths, operation_id, item, request) -> Path:
+    def _commit_prepared_item(self, paths, prepared: PreparedItem) -> None:
+        item = prepared.plan
         source = paths.root / item.before_relative_path
         target = paths.root / item.after_relative_path
         paths_differ = item.before_relative_path != item.after_relative_path
-        if sha256(source) != item.before_hash:
-            raise ValueError(f"源文件在预览后发生了变化，请重新预览：{item.before_relative_path}")
+        source_stat = source.stat()
+        if (
+            source_stat.st_size != prepared.source_size
+            or source_stat.st_mtime_ns != prepared.source_modified_ns
+        ):
+            raise ValueError(f"源文件在并发准备后发生了变化：{item.before_relative_path}")
         if paths_differ and target.exists() and not self._same_file(source, target):
             raise ValueError(f"目标文件在执行前已出现，拒绝覆盖：{item.after_relative_path}")
-        recovery = paths.recovery / operation_id / "files" / Path(item.before_relative_path)
-        atomic_copy_file(source, recovery)
-        sidecars = self._sidecar_paths(source, target, recovery)
+        target_was_source = paths_differ and self._same_file(source, target)
+        sidecars = self._sidecar_paths(source, target, prepared.recovery_path)
         sidecar_states: list[tuple[Path, Path, Path, bool]] = []
         for before_sidecar, after_sidecar, recovery_sidecar in sidecars:
             if after_sidecar.exists() and not self._same_file(before_sidecar, after_sidecar):
@@ -191,13 +213,11 @@ class PreprocessService:
             sidecar_states.append((before_sidecar, after_sidecar, recovery_sidecar, existed))
         moved_sidecars: list[tuple[Path, Path, Path]] = []
         try:
-            requires_render = (
-                item.before_width != item.after_width
-                or item.before_height != item.after_height
-                or request.convert is not None
-            )
-            if requires_render:
-                render_image(source, target, item, request.convert)
+            if prepared.staging_path is not None:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(prepared.staging_path, target)
+                if paths_differ and not target_was_source:
+                    source.unlink()
             elif paths_differ:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(source, target)
@@ -228,7 +248,7 @@ class PreprocessService:
                 item.asset_id,
                 target,
                 paths.root,
-                sha256(target),
+                prepared.after_hash,
                 item.after_width,
                 item.after_height,
             )
@@ -239,17 +259,20 @@ class PreprocessService:
             except Exception as sidecar_error:
                 compensation_errors.append(f"伴随文件恢复失败：{sidecar_error}")
             try:
-                self._restore_file(source, target, recovery, paths_differ=paths_differ)
+                self._restore_file(
+                    source,
+                    target,
+                    prepared.recovery_path,
+                    paths_differ=paths_differ,
+                )
             except Exception as image_error:
                 compensation_errors.append(f"图片恢复失败：{image_error}")
             if compensation_errors:
                 raise RuntimeError("；".join(compensation_errors)) from error
             raise
-        return recovery
 
     @staticmethod
-    def _record_item(repository, root, operation_id, item, recovery) -> None:
-        target = root / item.after_relative_path
+    def _record_item(repository, root, operation_id, item, recovery, after_hash) -> None:
         repository.add_item(
             operation_id,
             (
@@ -259,7 +282,7 @@ class PreprocessService:
                 item.before_relative_path,
                 item.after_relative_path,
                 item.before_hash,
-                sha256(target),
+                after_hash,
                 item.before_width,
                 item.before_height,
                 item.after_width,

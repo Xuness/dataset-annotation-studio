@@ -6,7 +6,7 @@ import {
   previewPreprocessing,
   undoPreprocessOperation,
 } from "./api";
-import type { PreprocessRequest } from "../../shared/api/types";
+import type { PreprocessExecutionOptions, PreprocessRequest } from "../../shared/api/types";
 
 export function usePreprocessOperations(projectId: string) {
   return useQuery({
@@ -30,10 +30,12 @@ export function usePreprocessingActions(projectId: string) {
       mutationFn: ({
         request,
         previewToken,
+        execution,
       }: {
         request: PreprocessRequest;
         previewToken: string;
-      }) => executePreprocessing(projectId, request, previewToken),
+        execution: PreprocessExecutionOptions;
+      }) => executePreprocessing(projectId, request, previewToken, execution),
       onSuccess: refresh,
     }),
     undo: useMutation({

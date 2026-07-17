@@ -311,6 +311,10 @@ export interface PreprocessPreview {
   preview_token: string;
 }
 
+export interface PreprocessExecutionOptions {
+  max_workers: number | null;
+}
+
 export interface PreprocessOperation {
   id: string;
   status: string;

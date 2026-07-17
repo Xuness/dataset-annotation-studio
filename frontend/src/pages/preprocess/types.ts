@@ -7,6 +7,8 @@ export interface PreprocessFormState {
   format: "webp" | "jpeg" | "png";
   quality: number;
   effort: number;
+  concurrencyMode: "auto" | "manual";
+  maxWorkers: number;
   renameEnabled: boolean;
   renameTemplate: string;
   renameStartIndex: number;

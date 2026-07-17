@@ -79,11 +79,18 @@ class PreprocessPreview(BaseModel):
     preview_token: str
 
 
+class PreprocessExecutionOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    max_workers: int | None = Field(default=None, ge=1, le=16)
+
+
 class PreprocessExecuteRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     request: PreprocessRequest
     preview_token: str = Field(pattern=r"^[0-9a-f]{64}$")
+    execution: PreprocessExecutionOptions = Field(default_factory=PreprocessExecutionOptions)
 
 
 class PreprocessOperation(BaseModel):

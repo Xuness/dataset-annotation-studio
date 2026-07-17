@@ -8,7 +8,7 @@ import {
   usePreprocessingActions,
 } from "../../features/preprocessing/hooks";
 import { useRescanWorkspace, useWorkspace } from "../../features/workspaces/hooks";
-import type { PreprocessRequest } from "../../shared/api/types";
+import type { PreprocessExecutionOptions, PreprocessRequest } from "../../shared/api/types";
 import { useAppStore } from "../../shared/store/appStore";
 import { Spinner } from "../../shared/ui/Spinner";
 import { Button } from "../../shared/ui/Button";
@@ -30,6 +30,8 @@ const initialForm: PreprocessFormState = {
   format: "webp",
   quality: 90,
   effort: 4,
+  concurrencyMode: "auto",
+  maxWorkers: 8,
   renameEnabled: false,
   renameTemplate: "image_{index}",
   renameStartIndex: 1,
@@ -69,6 +71,12 @@ export function PreprocessPage() {
         : null,
     }),
     [checkedAssetIds, form],
+  );
+  const execution = useMemo<PreprocessExecutionOptions>(
+    () => ({
+      max_workers: form.concurrencyMode === "manual" ? form.maxWorkers : null,
+    }),
+    [form.concurrencyMode, form.maxWorkers],
   );
   const requestFingerprint = useMemo(() => JSON.stringify(request), [request]);
   const validPreview = previewFingerprint === requestFingerprint ? actions.preview.data : undefined;
@@ -119,6 +127,7 @@ export function PreprocessPage() {
       await actions.execute.mutateAsync({
         request,
         previewToken: previewData.preview_token,
+        execution,
       });
       actions.preview.reset();
       setPreviewFingerprint(null);

@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 
 import pytest
@@ -6,10 +7,12 @@ from PIL import Image
 from dataset_studio.core.config import Settings
 from dataset_studio.core.files import file_sha256
 from dataset_studio.modules.assets.service import AssetService
+from dataset_studio.modules.preprocessing import executor as preprocessing_executor
 from dataset_studio.modules.preprocessing.models import (
     ConvertOptions,
     OutputFormat,
     PreprocessExecuteRequest,
+    PreprocessExecutionOptions,
     PreprocessPreview,
     PreprocessRequest,
     RenameOptions,
@@ -35,11 +38,16 @@ def _execute(
     project_id: str,
     request: PreprocessRequest,
     preview: PreprocessPreview | None = None,
+    execution: PreprocessExecutionOptions | None = None,
 ):
     preview = preview or preprocessing.preview(project_id, request)
     return preprocessing.execute(
         project_id,
-        PreprocessExecuteRequest(request=request, preview_token=preview.preview_token),
+        PreprocessExecuteRequest(
+            request=request,
+            preview_token=preview.preview_token,
+            execution=execution or PreprocessExecutionOptions(),
+        ),
     )
 
 
@@ -83,6 +91,143 @@ def test_resize_convert_and_undo_preserves_asset_identity(tmp_path: Path) -> Non
     assert restored.relative_path == "sample.png"
     with Image.open(project / "sample.png") as image:
         assert image.size == (400, 200)
+
+
+def test_resize_execution_uses_configured_worker_limit(tmp_path: Path, monkeypatch) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    for index in range(4):
+        Image.new("RGB", (320, 160), (index * 30, 120, 180)).save(project / f"{index}.png")
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(resize=ResizeOptions(max_edge=64))
+    original_render = preprocessing_executor.render_image_to_staging
+    barrier = threading.Barrier(2, timeout=5)
+    state_lock = threading.Lock()
+    active = 0
+    peak_active = 0
+    worker_names: set[str] = set()
+
+    def observed_render(*args, **kwargs):
+        nonlocal active, peak_active
+        with state_lock:
+            active += 1
+            peak_active = max(peak_active, active)
+            worker_names.add(threading.current_thread().name)
+        try:
+            barrier.wait()
+            return original_render(*args, **kwargs)
+        finally:
+            with state_lock:
+                active -= 1
+
+    monkeypatch.setattr(
+        preprocessing_executor,
+        "render_image_to_staging",
+        observed_render,
+    )
+    operation = _execute(
+        preprocessing,
+        summary.project_id,
+        request,
+        execution=PreprocessExecutionOptions(max_workers=2),
+    )
+
+    assert operation.status == "completed"
+    assert peak_active == 2
+    assert len(worker_names) == 2
+    assert all(name.startswith("preprocess-resize") for name in worker_names)
+    for index in range(4):
+        with Image.open(project / f"{index}.png") as image:
+            assert image.size == (64, 32)
+    operation_root = project / ".annotation-workspace" / "recovery" / operation.id
+    assert not (operation_root / "staging").exists()
+
+
+def test_parallel_resize_can_combine_with_rename_and_undo(tmp_path: Path) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    original_hashes: dict[str, str] = {}
+    for index, name in enumerate(("a", "b", "c")):
+        image_path = project / f"{name}.png"
+        Image.new("RGB", (320, 160), (index * 40, 100, 200)).save(image_path)
+        (project / f"{name}.txt").write_text(f"caption-{name}", encoding="utf-8")
+        original_hashes[name] = file_sha256(image_path)
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(
+        resize=ResizeOptions(max_edge=64),
+        rename=RenameOptions(template="resized_{index}", start_index=1, padding=2),
+    )
+
+    operation = _execute(
+        preprocessing,
+        summary.project_id,
+        request,
+        execution=PreprocessExecutionOptions(max_workers=3),
+    )
+
+    for index, name in enumerate(("a", "b", "c"), start=1):
+        target = project / f"resized_{index:02}.png"
+        with Image.open(target) as image:
+            assert image.size == (64, 32)
+        assert (project / f"resized_{index:02}.txt").read_text(encoding="utf-8") == (
+            f"caption-{name}"
+        )
+        assert not (project / f"{name}.png").exists()
+
+    preprocessing.undo(summary.project_id, operation.id)
+    for name in ("a", "b", "c"):
+        assert file_sha256(project / f"{name}.png") == original_hashes[name]
+        assert (project / f"{name}.txt").read_text(encoding="utf-8") == f"caption-{name}"
+
+
+def test_parallel_render_failure_rolls_back_committed_items(tmp_path: Path, monkeypatch) -> None:
+    workspaces, assets, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    original_hashes: dict[str, str] = {}
+    for index, name in enumerate(("a", "b", "c")):
+        image_path = project / f"{name}.png"
+        Image.new("RGB", (256, 128), (index * 50, 80, 160)).save(image_path)
+        original_hashes[name] = file_sha256(image_path)
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(
+        resize=ResizeOptions(max_edge=64),
+        convert=ConvertOptions(format=OutputFormat.WEBP),
+    )
+    original_render = preprocessing_executor.render_image_to_staging
+
+    def fail_second_image(source, *args, **kwargs):
+        if source.name == "b.png":
+            raise RuntimeError("simulated parallel render failure")
+        return original_render(source, *args, **kwargs)
+
+    monkeypatch.setattr(
+        preprocessing_executor,
+        "render_image_to_staging",
+        fail_second_image,
+    )
+    with pytest.raises(RuntimeError, match="simulated parallel render failure"):
+        _execute(
+            preprocessing,
+            summary.project_id,
+            request,
+            execution=PreprocessExecutionOptions(max_workers=2),
+        )
+
+    for name in ("a", "b", "c"):
+        assert file_sha256(project / f"{name}.png") == original_hashes[name]
+        assert not (project / f"{name}.webp").exists()
+    assert [item.relative_path for item in assets.list_assets(summary.project_id).items] == [
+        "a.png",
+        "b.png",
+        "c.png",
+    ]
+    failed_operation = preprocessing.list_operations(summary.project_id)[0]
+    assert failed_operation.status == "failed"
+    operation_root = project / ".annotation-workspace" / "recovery" / failed_operation.id
+    assert not (operation_root / "staging").exists()
 
 
 def test_batch_rename_moves_sidecars_without_reencoding_and_undoes(tmp_path: Path) -> None:
@@ -176,6 +321,31 @@ def test_case_only_rename_and_undo_use_the_requested_filename_casing(tmp_path: P
     preprocessing.undo(summary.project_id, operation.id)
     visible_names = {path.name for path in project.iterdir() if path.is_file()}
     assert {"sample.png", "sample.txt"}.issubset(visible_names)
+
+
+def test_resize_with_case_only_rename_keeps_rendered_output(tmp_path: Path) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (160, 80), "white").save(project / "sample.png")
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(
+        resize=ResizeOptions(max_edge=64),
+        rename=RenameOptions(template="SAMPLE"),
+    )
+
+    operation = _execute(preprocessing, summary.project_id, request)
+
+    visible_names = {path.name for path in project.iterdir() if path.is_file()}
+    assert "SAMPLE.png" in visible_names
+    with Image.open(project / "SAMPLE.png") as image:
+        assert image.size == (64, 32)
+
+    preprocessing.undo(summary.project_id, operation.id)
+    visible_names = {path.name for path in project.iterdir() if path.is_file()}
+    assert "sample.png" in visible_names
+    with Image.open(project / "sample.png") as image:
+        assert image.size == (160, 80)
 
 
 def test_rename_sidecar_collision_and_invalid_names_are_rejected(tmp_path: Path) -> None:

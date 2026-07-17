@@ -1,5 +1,6 @@
 import { apiRequest } from "../../shared/api/client";
 import type {
+  PreprocessExecutionOptions,
   PreprocessOperation,
   PreprocessPreview,
   PreprocessRequest,
@@ -21,10 +22,11 @@ export function executePreprocessing(
   projectId: string,
   request: PreprocessRequest,
   previewToken: string,
+  execution: PreprocessExecutionOptions,
 ): Promise<PreprocessOperation> {
   return apiRequest(`${path(projectId)}/execute`, {
     method: "POST",
-    body: JSON.stringify({ request, preview_token: previewToken }),
+    body: JSON.stringify({ request, preview_token: previewToken, execution }),
   });
 }
 

@@ -37,8 +37,13 @@ export function PreprocessSettingsPanel({
       form.renameStartIndex >= 0 &&
       form.renamePadding >= 1 &&
       form.renamePadding <= 12);
+  const imageRenderingEnabled = form.resizeEnabled || form.convertEnabled;
+  const validConcurrency =
+    !imageRenderingEnabled ||
+    form.concurrencyMode === "auto" ||
+    (Number.isInteger(form.maxWorkers) && form.maxWorkers >= 1 && form.maxWorkers <= 16);
   const validRequest =
-    (form.resizeEnabled || form.convertEnabled || form.renameEnabled) && validScope && validRename;
+    (imageRenderingEnabled || form.renameEnabled) && validScope && validRename && validConcurrency;
   return (
     <aside className="preprocess-settings">
       <header>
@@ -148,6 +153,41 @@ export function PreprocessSettingsPanel({
         </label>
       </section>
       <section className="preprocess-option">
+        <span className="preprocess-option-title">图片处理并发</span>
+        <div className="preprocess-inline-fields preprocess-concurrency-fields">
+          <label className="form-field">
+            <span>线程模式</span>
+            <select
+              value={form.concurrencyMode}
+              disabled={!imageRenderingEnabled}
+              onChange={(event) =>
+                onChange({
+                  concurrencyMode: event.target.value as PreprocessFormState["concurrencyMode"],
+                })
+              }
+            >
+              <option value="auto">自动（推荐）</option>
+              <option value="manual">手动</option>
+            </select>
+          </label>
+          <label className="form-field">
+            <span>最大线程数</span>
+            <input
+              type="number"
+              min="1"
+              max="16"
+              value={form.maxWorkers}
+              disabled={!imageRenderingEnabled || form.concurrencyMode !== "manual"}
+              onChange={(event) => onChange({ maxWorkers: Number(event.target.value) })}
+            />
+          </label>
+        </div>
+        <small>
+          仅并行执行图片解码、Lanczos 缩放和重新编码；重命名、数据库写入与回滚仍按顺序执行。
+          自动模式最多使用 8 个线程，并会根据图片尺寸降低并发。
+        </small>
+      </section>
+      <section className="preprocess-option">
         <label className="option-toggle">
           <input
             type="checkbox"
@@ -208,7 +248,12 @@ export function PreprocessSettingsPanel({
         <Button
           tone="primary"
           icon={executePending ? <Spinner /> : <Play size={14} />}
-          disabled={!preview?.changed_count || Boolean(preview.warning_count) || executePending}
+          disabled={
+            !validRequest ||
+            !preview?.changed_count ||
+            Boolean(preview.warning_count) ||
+            executePending
+          }
           onClick={onExecute}
         >
           应用处理

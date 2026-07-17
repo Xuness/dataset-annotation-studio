@@ -112,10 +112,21 @@
   line-height: 1.6;
 }
 
+.preprocess-option-title {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 10px;
+  font-weight: 650;
+}
+
 .preprocess-inline-fields {
   display: grid;
   grid-template-columns: 1fr 0.72fr;
   gap: 8px;
+}
+
+.preprocess-concurrency-fields {
+  margin-bottom: 9px;
 }
 
 .preprocess-rename-fields {

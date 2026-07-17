@@ -15,15 +15,15 @@ def sha256(path: Path) -> str:
     return file_sha256(path)
 
 
-def render_image(
+def render_image_to_staging(
     source: Path,
-    target: Path,
+    staging: Path,
     item: PlanItem,
     convert: ConvertOptions | None,
 ) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
+    staging.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{target.stem}.", suffix=target.suffix, dir=target.parent
+        prefix=f".{staging.stem}.", suffix=staging.suffix, dir=staging.parent
     )
     os.close(descriptor)
     temporary = Path(temporary_name)
@@ -34,11 +34,9 @@ def render_image(
                 image = image.resize(
                     (item.after_width, item.after_height), Image.Resampling.LANCZOS
                 )
-            image, save_options = _encoding_options(image, target.suffix, convert)
+            image, save_options = _encoding_options(image, staging.suffix, convert)
             image.save(temporary, **save_options)
-        os.replace(temporary, target)
-        if source.resolve() != target.resolve():
-            source.unlink()
+        os.replace(temporary, staging)
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
