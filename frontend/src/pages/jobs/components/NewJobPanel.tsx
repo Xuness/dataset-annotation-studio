@@ -91,12 +91,12 @@ export function NewJobPanel({
       </div>
 
       <label className="form-field">
-        <span>API 配置</span>
+        <span>模型连接</span>
         <select
           value={providerProfileId}
           onChange={(event) => setProviderProfileId(event.target.value)}
         >
-          {!providerProfiles.data?.length ? <option value="">尚未创建 API 配置</option> : null}
+          {!providerProfiles.data?.length ? <option value="">尚未创建模型连接</option> : null}
           {providerProfiles.data?.map((profile) => (
             <option key={profile.id} value={profile.id}>
               {profile.name} · {profile.model}

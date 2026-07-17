@@ -10,6 +10,7 @@ from dataset_studio.modules.presets.models import (
     ProviderProfileCreate,
     ProviderProfileUpdate,
     ProviderRequestOptions,
+    ProviderType,
     SystemPreset,
     SystemPresetCreate,
     SystemPresetUpdate,
@@ -77,8 +78,17 @@ class PresetService:
         return self._provider_from_row(row)
 
     def get_api_key(self, profile_id: str) -> str:
-        self.get_provider(profile_id)
-        api_key = self._secrets.get(self._secret_key(profile_id))
+        profile = self.get_provider(profile_id)
+        credential = self.get_provider_credential(profile)
+        if credential is None:
+            raise ValueError("当前供应商不使用 API Key。")
+        return credential
+
+    def get_provider_credential(self, profile: ProviderProfile) -> str | None:
+        self.get_provider(profile.id)
+        if not profile.provider_type.requires_api_key:
+            return None
+        api_key = self._secrets.get(self._secret_key(profile.id))
         if not api_key:
             raise ValueError("当前 API 配置尚未保存 API Key。")
         return api_key
@@ -90,7 +100,7 @@ class PresetService:
             profile_id,
             data.name.strip(),
             data.provider_type.value,
-            data.base_url.rstrip("/"),
+            data.base_url.rstrip("/") if data.provider_type.requires_base_url else "",
             data.model.strip(),
             data.temperature,
             data.max_output_tokens,
@@ -117,10 +127,19 @@ class PresetService:
         current = self.get_provider(profile_id)
         values = data.model_dump(exclude_none=True, exclude={"api_key"})
         updated = ProviderProfile.model_validate({**current.model_dump(), **values})
+        if not updated.provider_type.requires_base_url:
+            updated = updated.model_copy(update={"base_url": ""})
+            if data.api_key:
+                raise ValueError("Codex 使用自身的 ChatGPT 登录，不接受 API Key。")
         updated_at = utc_now_iso()
         secret_key = self._secret_key(profile_id)
-        old_api_key = self._secrets.get(secret_key) if data.api_key is not None else None
-        if data.api_key is not None:
+        should_update_secret = (
+            data.api_key is not None or not updated.provider_type.requires_api_key
+        )
+        old_api_key = self._secrets.get(secret_key) if should_update_secret else None
+        if not updated.provider_type.requires_api_key:
+            self._secrets.delete(secret_key)
+        elif data.api_key is not None:
             if data.api_key:
                 self._secrets.set(secret_key, data.api_key)
             else:
@@ -131,7 +150,7 @@ class PresetService:
                 self._provider_values(updated, updated_at),
             )
         except BaseException as error:
-            if data.api_key is not None:
+            if should_update_secret:
                 self._restore_secret(secret_key, old_api_key)
             if isinstance(error, sqlite3.IntegrityError):
                 raise ValueError(f"API 配置名称已存在：{updated.name}") from error
@@ -159,7 +178,10 @@ class PresetService:
             values["request_options"] = ProviderRequestOptions.model_validate_json(options_json)
         except ValueError:
             values["request_options"] = ProviderRequestOptions()
-        values["has_api_key"] = bool(self._secrets.get(self._secret_key(str(row["id"]))))
+        provider_type = ProviderType(str(values["provider_type"]))
+        values["has_api_key"] = provider_type.requires_api_key and bool(
+            self._secrets.get(self._secret_key(str(row["id"])))
+        )
         return ProviderProfile.model_validate(values)
 
     @staticmethod

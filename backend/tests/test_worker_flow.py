@@ -24,6 +24,7 @@ from dataset_studio.modules.presets.models import (
 )
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.service import PresetService
+from dataset_studio.modules.providers.codex_runtime import CodexRuntime
 from dataset_studio.modules.providers.models import ProviderResponse
 from dataset_studio.modules.statistics.service import StatisticsService
 from dataset_studio.modules.workspaces.models import WorkspaceSettingsUpdate
@@ -64,6 +65,7 @@ def _runtime(tmp_path: Path):
         jobs=jobs,
         preprocessing=PreprocessService(workspaces),
         statistics=StatisticsService(workspaces),
+        codex=CodexRuntime(),
     )
     return container, workspaces, presets, jobs
 

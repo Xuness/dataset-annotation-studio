@@ -1,13 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  cancelCodexLogin,
   createProviderProfile,
   createSystemPreset,
   deleteProviderProfile,
   deleteSystemPreset,
+  getCodexAccount,
+  getCodexLoginStatus,
   listProviderProfiles,
   listSystemPresets,
   searchProviderModels,
+  startCodexLogin,
   updateProviderProfile,
   updateSystemPreset,
   type ProviderProfileInput,
@@ -18,10 +22,36 @@ import {
 export const presetKeys = {
   system: ["presets", "system"] as const,
   providers: ["presets", "providers"] as const,
+  codexAccount: ["providers", "codex", "account"] as const,
 };
 
 export function useSystemPresets() {
   return useQuery({ queryKey: presetKeys.system, queryFn: listSystemPresets });
+}
+
+export function useCodexAccount(enabled: boolean) {
+  return useQuery({
+    queryKey: presetKeys.codexAccount,
+    queryFn: getCodexAccount,
+    enabled,
+    staleTime: 5_000,
+  });
+}
+
+export function useCodexLoginStatus(loginId: string | null) {
+  return useQuery({
+    queryKey: ["providers", "codex", "login", loginId],
+    queryFn: () => getCodexLoginStatus(loginId as string),
+    enabled: Boolean(loginId),
+    refetchInterval: (query) => (query.state.data?.state === "pending" ? 1_000 : false),
+  });
+}
+
+export function useCodexAuthMutations() {
+  return {
+    start: useMutation({ mutationFn: startCodexLogin }),
+    cancel: useMutation({ mutationFn: cancelCodexLogin }),
+  };
 }
 
 export function useProviderProfiles() {

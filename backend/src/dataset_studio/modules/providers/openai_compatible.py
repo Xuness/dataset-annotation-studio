@@ -129,12 +129,14 @@ class OpenAICompatibleProvider:
     async def complete(
         self,
         profile: ProviderProfile,
-        api_key: str,
+        credential: str | None,
         request: MultimodalRequest,
     ) -> ProviderResponse:
+        if not credential:
+            raise ProviderRequestError("当前 API 配置尚未保存 API Key。")
         url = f"{profile.base_url.rstrip('/')}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": f"Bearer {credential}",
             "Content-Type": "application/json",
         }
         if profile.provider_type == ProviderType.OPENROUTER:

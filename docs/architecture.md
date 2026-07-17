@@ -33,8 +33,8 @@ flowchart LR
 - `modules/assets`：图片发现、增量索引、缩略图和元数据读取。
 - `modules/annotations`：原文保存、删除、历史以及轻量校验。
 - `modules/prompts`：User Prompt 与选定 JSON 字段的纯函数组合。
-- `modules/presets`：全局 System Prompt / API 配置；密钥通过 `SecretStore` 隔离。
-- `modules/providers`：统一 `ModelProvider` 协议及各供应商适配器。
+- `modules/presets`：全局 System Prompt / 模型连接配置；API 密钥通过 `SecretStore` 隔离。
+- `modules/providers`：统一 `ModelProvider` 协议、各供应商适配器，以及惰性共享的 Codex Runtime。
 - `modules/jobs`：任务创建、查询投影、原子认领、尝试记录和 Worker。
 - `modules/preprocessing`：计划、图像渲染、恢复记录和撤销编排。
 - `modules/statistics`：只读派生统计；当前实现为标签频次分析器。
@@ -60,7 +60,9 @@ flowchart LR
 
 ### 新供应商
 
-实现 `ModelProvider.complete()`，在工厂中注册 `ProviderType`，并为其编写无网络适配器测试。任务、重试、保存和校验无需改动。
+实现 `ModelProvider.complete()`，在工厂中注册 `ProviderType`，并为其编写无网络适配器测试。需要外部登录或长生命周期客户端的供应商，应把会话生命周期封装在独立 Runtime 中；任务、重试、保存和校验无需理解其认证协议。
+
+Codex 连接由官方 Python SDK 驱动：SDK 源码固定到 OpenAI `3f74f00295dcb1346340686bb09c5bfd4f0237c4` 提交，对应 CLI Runtime `0.144.4`，避免协议模型与运行时独立漂移。API 进程与 Worker 各自惰性维护一个 app-server，复用 Codex 自身缓存的 ChatGPT 登录。每张图片创建独立的临时 Thread，完成后丢弃；System Prompt 映射为 `developer_instructions`，最终 Assistant 回复原样进入统一的 `ProviderResponse.content`。标注任务支持到 `max` 推理强度；需要子代理的 `ultra` 不进入单图标注参数面。
 
 ### 新校验与统计
 

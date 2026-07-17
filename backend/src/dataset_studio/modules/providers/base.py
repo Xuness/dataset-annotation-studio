@@ -10,6 +10,6 @@ class ModelProvider(Protocol):
     async def complete(
         self,
         profile: ProviderProfile,
-        api_key: str,
+        credential: str | None,
         request: MultimodalRequest,
     ) -> ProviderResponse: ...

@@ -18,8 +18,12 @@ async def run_worker() -> None:
 
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
-    worker = AnnotationWorker(AppContainer.create(settings))
-    await worker.run(stopped)
+    container = AppContainer.create(settings)
+    worker = AnnotationWorker(container)
+    try:
+        await worker.run(stopped)
+    finally:
+        await container.aclose()
 
 
 def main() -> None:

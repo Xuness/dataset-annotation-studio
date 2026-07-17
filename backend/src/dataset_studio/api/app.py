@@ -14,6 +14,7 @@ from dataset_studio.api.routes import (
     jobs,
     preprocessing,
     presets,
+    providers,
     statistics,
     workspaces,
 )
@@ -25,8 +26,12 @@ from dataset_studio.modules.providers.models import ProviderRequestError
 def create_app(app_settings: Settings = settings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        app.state.container = AppContainer.create(app_settings)
-        yield
+        container = AppContainer.create(app_settings)
+        app.state.container = container
+        try:
+            yield
+        finally:
+            await container.aclose()
 
     app = FastAPI(
         title="Dataset Annotation Studio API",
@@ -67,6 +72,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(assets.router, prefix=api_prefix)
     app.include_router(annotations.router, prefix=api_prefix)
     app.include_router(presets.router, prefix=api_prefix)
+    app.include_router(providers.router, prefix=api_prefix)
     app.include_router(jobs.router, prefix=api_prefix)
     app.include_router(jobs.global_router, prefix=api_prefix)
     app.include_router(preprocessing.router, prefix=api_prefix)

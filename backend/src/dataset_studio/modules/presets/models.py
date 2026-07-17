@@ -39,6 +39,15 @@ class ProviderType(StrEnum):
     OPENROUTER = "openrouter"
     OPENAI_COMPATIBLE = "openai_compatible"
     GEMINI = "gemini"
+    CODEX = "codex"
+
+    @property
+    def requires_api_key(self) -> bool:
+        return self != ProviderType.CODEX
+
+    @property
+    def requires_base_url(self) -> bool:
+        return self != ProviderType.CODEX
 
 
 class ServiceTier(StrEnum):
@@ -87,11 +96,17 @@ class ProviderProfile(BaseModel):
     created_at: str
     updated_at: str
 
+    @model_validator(mode="after")
+    def validate_provider_requirements(self) -> ProviderProfile:
+        if self.provider_type.requires_base_url and not self.base_url.strip():
+            raise ValueError("当前供应商需要 API 地址。")
+        return self
+
 
 class ProviderProfileCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     provider_type: ProviderType
-    base_url: str = Field(min_length=1)
+    base_url: str = ""
     model: str = Field(min_length=1)
     api_key: str | None = None
     temperature: float = Field(default=0.2, ge=0, le=2)
@@ -100,13 +115,21 @@ class ProviderProfileCreate(BaseModel):
     timeout_seconds: int = Field(default=180, ge=1, le=3600)
     request_options: ProviderRequestOptions = Field(default_factory=ProviderRequestOptions)
 
-    _validate_text = field_validator("name", "base_url", "model")(_require_non_blank)
+    _validate_text = field_validator("name", "model")(_require_non_blank)
+
+    @model_validator(mode="after")
+    def validate_provider_requirements(self) -> ProviderProfileCreate:
+        if self.provider_type.requires_base_url and not self.base_url.strip():
+            raise ValueError("当前供应商需要 API 地址。")
+        if self.provider_type == ProviderType.CODEX and self.api_key:
+            raise ValueError("Codex 使用自身的 ChatGPT 登录，不接受 API Key。")
+        return self
 
 
 class ProviderProfileUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     provider_type: ProviderType | None = None
-    base_url: str | None = Field(default=None, min_length=1)
+    base_url: str | None = None
     model: str | None = Field(default=None, min_length=1)
     api_key: str | None = None
     temperature: float | None = Field(default=None, ge=0, le=2)
@@ -115,7 +138,7 @@ class ProviderProfileUpdate(BaseModel):
     timeout_seconds: int | None = Field(default=None, ge=1, le=3600)
     request_options: ProviderRequestOptions | None = None
 
-    _validate_text = field_validator("name", "base_url", "model")(_require_non_blank)
+    _validate_text = field_validator("name", "model")(_require_non_blank)
 
 
 class ProviderModelSearchRequest(BaseModel):
@@ -128,6 +151,8 @@ class ProviderModelSearchRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_catalog_target(self) -> ProviderModelSearchRequest:
-        if self.profile_id or (self.provider_type and self.base_url):
+        if self.profile_id or self.provider_type == ProviderType.CODEX:
+            return self
+        if self.provider_type and self.base_url:
             return self
         raise ValueError("搜索模型需要已有 API 配置，或供应商协议与 API 地址。")

@@ -9,6 +9,7 @@ from dataset_studio.modules.presets.models import (
     ProviderProfile,
     ProviderProfileCreate,
     ProviderProfileUpdate,
+    ProviderType,
     SystemPreset,
     SystemPresetCreate,
     SystemPresetUpdate,
@@ -82,6 +83,8 @@ async def search_models(data: ProviderModelSearchRequest, container: Container):
             except ValueError:
                 api_key = None
 
+    if provider_type == ProviderType.CODEX:
+        return await container.codex.search_models(data.query, data.limit)
     if provider_type is None or not base_url:
         raise ValueError("无法确定模型目录对应的供应商与 API 地址。")
     return await search_provider_models(

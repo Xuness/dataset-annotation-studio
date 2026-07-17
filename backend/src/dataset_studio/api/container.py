@@ -10,6 +10,7 @@ from dataset_studio.modules.preprocessing.service import PreprocessService
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.secrets import KeyringSecretStore
 from dataset_studio.modules.presets.service import PresetService
+from dataset_studio.modules.providers.codex_runtime import CodexRuntime
 from dataset_studio.modules.statistics.service import StatisticsService
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -26,6 +27,7 @@ class AppContainer:
     jobs: JobService
     preprocessing: PreprocessService
     statistics: StatisticsService
+    codex: CodexRuntime
 
     @classmethod
     def create(cls, settings: Settings) -> AppContainer:
@@ -36,6 +38,7 @@ class AppContainer:
         annotations = AnnotationService(workspaces)
         presets = PresetService(PresetRepository(global_database), KeyringSecretStore())
         jobs = JobService(workspaces, presets, annotations)
+        codex = CodexRuntime()
         return cls(
             settings=settings,
             workspaces=workspaces,
@@ -45,4 +48,8 @@ class AppContainer:
             jobs=jobs,
             preprocessing=PreprocessService(workspaces, has_active_jobs=jobs.has_active),
             statistics=StatisticsService(workspaces),
+            codex=codex,
         )
+
+    async def aclose(self) -> None:
+        await self.codex.close()

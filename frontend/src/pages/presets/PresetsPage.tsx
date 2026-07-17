@@ -59,11 +59,11 @@ export function PresetsPage() {
           >
             <Cable size={16} />
             <span>
-              <strong>API 配置</strong>
-              <small>供应商、模型和运行参数</small>
+              <strong>模型连接</strong>
+              <small>API 或 Codex OAuth</small>
             </span>
           </button>
-          <p>API Key 保存在系统凭据库，不会写入数据集项目。</p>
+          <p>API Key 保存在系统凭据库；Codex OAuth 凭据由 Codex 自身管理，均不会写入数据集项目。</p>
         </nav>
         {tab === "system" ? (
           <SystemPresetsPanel createSignal={createSignal} />

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, RefreshCw, Search, X } from "lucide-react";
 
 import { useProviderModelSearch } from "../../../features/presets/hooks";
+import { providerCapabilities } from "../../../features/presets/providerCapabilities";
 import type { ProviderModelSummary, ProviderType } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
@@ -27,6 +28,7 @@ export function ProviderModelPicker({
 }: ProviderModelPickerProps) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const capabilities = providerCapabilities[providerType];
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 280);
@@ -37,20 +39,26 @@ export function ProviderModelPicker({
     {
       profile_id: profileId,
       provider_type: providerType,
-      base_url: baseUrl,
+      base_url: baseUrl || undefined,
       api_key: apiKey || undefined,
       query: debouncedQuery,
       limit: 40,
     },
-    Boolean(baseUrl.trim()),
+    capabilities.modelCatalog === "codex" || Boolean(baseUrl.trim()),
   );
+
+  const isCodex = capabilities.modelCatalog === "codex";
 
   return (
     <section className="model-picker form-field--wide" aria-label="模型目录">
       <header>
         <div>
           <strong>选择多模态模型</strong>
-          <small>OpenRouter 模型目录 · 图像输入 / 文本输出</small>
+          <small>
+            {isCodex
+              ? "当前 ChatGPT 账号可用的 Codex 模型 · 图像输入 / 文本输出"
+              : "OpenRouter 模型目录 · 图像输入 / 文本输出"}
+          </small>
         </div>
         <Button type="button" icon={<X size={13} />} onClick={onClose}>
           关闭
@@ -62,7 +70,9 @@ export function ProviderModelPicker({
           autoFocus
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索模型名称或 ID，例如 Gemini、Claude、GPT…"
+          placeholder={
+            isCodex ? "搜索 Codex 模型名称或 ID…" : "搜索模型，例如 Gemini、Claude、GPT…"
+          }
         />
         <Button
           type="button"
@@ -87,7 +97,9 @@ export function ProviderModelPicker({
             </span>
             <code>{model.id}</code>
             <span className="model-picker__facts">
-              {model.context_length ? <small>{formatTokens(model.context_length)} 上下文</small> : null}
+              {model.context_length ? (
+                <small>{formatTokens(model.context_length)} 上下文</small>
+              ) : null}
               {model.max_output_tokens ? (
                 <small>{formatTokens(model.max_output_tokens)} 最大输出</small>
               ) : null}

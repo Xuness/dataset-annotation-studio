@@ -15,13 +15,13 @@ class JobStopped(Exception):
 async def complete_until_stopped(
     provider: ModelProvider,
     profile: ProviderProfile,
-    api_key: str,
+    credential: str | None,
     request: MultimodalRequest,
     is_stop_requested: Callable[[], bool],
     *,
     poll_interval: float = 0.5,
 ) -> ProviderResponse:
-    request_task = asyncio.create_task(provider.complete(profile, api_key, request))
+    request_task = asyncio.create_task(provider.complete(profile, credential, request))
     try:
         while not request_task.done():
             await asyncio.wait({request_task}, timeout=poll_interval)

@@ -140,7 +140,7 @@ export interface SystemPreset {
   updated_at: string;
 }
 
-export type ProviderType = "openrouter" | "openai_compatible" | "gemini";
+export type ProviderType = "openrouter" | "openai_compatible" | "gemini" | "codex";
 export type ServiceTier = "flex" | "priority";
 export type ReasoningEffort = "max" | "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
 export type PromptCacheStrategy = "explicit_system";
@@ -180,6 +180,26 @@ export interface ProviderModelSummary {
   reasoning_efforts: string[];
   prompt_price: string | null;
   completion_price: string | null;
+}
+
+export interface CodexAccountStatus {
+  logged_in: boolean;
+  uses_chatgpt: boolean;
+  account_type: string | null;
+  email: string | null;
+  plan_type: string | null;
+  requires_openai_auth: boolean;
+}
+
+export interface CodexLoginStart {
+  login_id: string;
+  auth_url: string;
+}
+
+export interface CodexLoginStatus {
+  login_id: string;
+  state: "pending" | "succeeded" | "failed" | "cancelled";
+  error: string | null;
 }
 
 export type JobStatus =

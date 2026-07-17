@@ -29,6 +29,8 @@ New-Item -ItemType Directory -Force -Path $WorkPath | Out-Null
     --windowed `
     --name $Name `
     --paths (Join-Path $Root "backend/src") `
+    --collect-all openai_codex `
+    --collect-all codex_cli_bin `
     --distpath $Binaries `
     --workpath $WorkPath `
     --specpath $WorkPath `

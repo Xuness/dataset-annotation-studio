@@ -8,6 +8,7 @@
     "core:webview:allow-set-webview-zoom",
     "core:window:allow-destroy",
     "dialog:allow-open",
-    "dialog:allow-confirm"
+    "dialog:allow-confirm",
+    "opener:default"
   ]
 }

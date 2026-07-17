@@ -14,7 +14,8 @@ from dataset_studio.modules.jobs.worker import AnnotationWorker
 
 async def run_service() -> None:
     stopped = asyncio.Event()
-    worker = AnnotationWorker(AppContainer.create(settings))
+    worker_container = AppContainer.create(settings)
+    worker = AnnotationWorker(worker_container)
     worker_task = asyncio.create_task(worker.run(stopped))
     server = uvicorn.Server(
         uvicorn.Config(
@@ -30,6 +31,7 @@ async def run_service() -> None:
     finally:
         stopped.set()
         await worker_task
+        await worker_container.aclose()
 
 
 def configure_logging() -> None:

@@ -7,6 +7,7 @@ dependencies = [
     "fastapi>=0.116,<1",
     "httpx>=0.28,<1",
     "keyring>=25.6,<26",
+    "openai-codex",
     "pillow>=11.3,<13",
     "pydantic>=2.11,<3",
     "uvicorn[standard]>=0.35,<1",
@@ -48,3 +49,7 @@ ignore = ["RUF001"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.uv.sources]
+# Official Python SDK stable-release commit paired with Codex CLI 0.144.4.
+openai-codex = { url = "https://github.com/openai/codex/archive/3f74f00295dcb1346340686bb09c5bfd4f0237c4.tar.gz", subdirectory = "sdk/python" }

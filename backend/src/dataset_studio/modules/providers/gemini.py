@@ -31,9 +31,11 @@ class GeminiProvider:
     async def complete(
         self,
         profile: ProviderProfile,
-        api_key: str,
+        credential: str | None,
         request: MultimodalRequest,
     ) -> ProviderResponse:
+        if not credential:
+            raise ProviderRequestError("当前 API 配置尚未保存 API Key。")
         base_url = profile.base_url.rstrip("/")
         url = f"{base_url}/models/{request.model}:generateContent"
         payload = {
@@ -56,7 +58,7 @@ class GeminiProvider:
         }
         try:
             async with httpx.AsyncClient(timeout=request.timeout_seconds) as client:
-                response = await client.post(url, params={"key": api_key}, json=payload)
+                response = await client.post(url, params={"key": credential}, json=payload)
         except httpx.HTTPError as error:
             raise ProviderRequestError(f"Gemini 请求失败：{error}") from error
 

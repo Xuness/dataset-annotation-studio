@@ -1,5 +1,8 @@
 import { apiRequest } from "../../shared/api/client";
 import type {
+  CodexAccountStatus,
+  CodexLoginStart,
+  CodexLoginStatus,
   ProviderModelSummary,
   ProviderProfile,
   ProviderRequestOptions,
@@ -28,7 +31,7 @@ export interface ProviderProfileInput {
 export interface ProviderModelSearchInput {
   profile_id?: string;
   provider_type: ProviderType;
-  base_url: string;
+  base_url?: string;
   api_key?: string;
   query: string;
   limit?: number;
@@ -90,5 +93,23 @@ export function searchProviderModels(
   return apiRequest("/api/v1/presets/provider-models/search", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export function getCodexAccount(): Promise<CodexAccountStatus> {
+  return apiRequest("/api/v1/providers/codex/account");
+}
+
+export function startCodexLogin(): Promise<CodexLoginStart> {
+  return apiRequest("/api/v1/providers/codex/login", { method: "POST" });
+}
+
+export function getCodexLoginStatus(loginId: string): Promise<CodexLoginStatus> {
+  return apiRequest(`/api/v1/providers/codex/login/${encodeURIComponent(loginId)}`);
+}
+
+export function cancelCodexLogin(loginId: string): Promise<void> {
+  return apiRequest(`/api/v1/providers/codex/login/${encodeURIComponent(loginId)}`, {
+    method: "DELETE",
   });
 }

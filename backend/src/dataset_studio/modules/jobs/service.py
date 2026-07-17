@@ -51,7 +51,7 @@ class JobService:
                 "项目关联的 System Prompt 预设已不存在，请在素材页重新选择并保存。"
             ) from error
         provider_profile = self._presets.get_provider(request.provider_profile_id)
-        self._presets.get_api_key(provider_profile.id)
+        self._presets.get_provider_credential(provider_profile)
         asset_ids = self._select_assets(
             paths.database,
             request.scope,

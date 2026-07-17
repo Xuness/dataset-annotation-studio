@@ -31,10 +31,12 @@ class AnnotationWorker:
     def __init__(
         self,
         container: AppContainer,
-        provider_factory: Callable[[ProviderType], ModelProvider] = create_provider,
+        provider_factory: Callable[[ProviderType], ModelProvider] | None = None,
     ) -> None:
         self._container = container
-        self._provider_factory = provider_factory
+        self._provider_factory = provider_factory or (
+            lambda provider_type: create_provider(provider_type, container.codex)
+        )
         self._active: set[asyncio.Task[None]] = set()
         self._active_profiles: dict[asyncio.Task[None], str] = {}
 
@@ -156,7 +158,7 @@ class AnnotationWorker:
 
         profile = ProviderProfile.model_validate_json(str(job["provider_snapshot"]))
         try:
-            api_key = self._container.presets.get_api_key(str(job["provider_profile_id"]))
+            credential = self._container.presets.get_provider_credential(profile)
         except ValueError as error:
             repository.finish_item(item_id, JobItemStatus.FAILED, error=str(error))
             return
@@ -193,7 +195,7 @@ class AnnotationWorker:
                 response = await complete_until_stopped(
                     provider,
                     profile,
-                    api_key,
+                    credential,
                     request,
                     lambda: repository.is_stop_requested(job_id),
                 )

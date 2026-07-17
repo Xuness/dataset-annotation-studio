@@ -138,3 +138,47 @@ def test_presets_reject_whitespace_only_required_text() -> None:
             model="   ",
             api_key="secret",
         )
+
+
+def test_codex_profile_uses_no_endpoint_or_project_secret(tmp_path: Path) -> None:
+    service, _, secrets = _service(tmp_path)
+
+    profile = service.create_provider(
+        ProviderProfileCreate(
+            name="Codex subscription",
+            provider_type=ProviderType.CODEX,
+            base_url="https://should-not-be-stored.invalid",
+            model="gpt-example",
+            concurrency=1,
+        )
+    )
+
+    assert profile.base_url == ""
+    assert profile.has_api_key is False
+    assert service.get_provider_credential(profile) is None
+    assert secrets.values == {}
+
+
+def test_codex_profile_rejects_api_key() -> None:
+    with pytest.raises(ValidationError, match="不接受 API Key"):
+        ProviderProfileCreate(
+            name="Codex subscription",
+            provider_type=ProviderType.CODEX,
+            model="gpt-example",
+            api_key="must-not-be-stored",
+        )
+
+
+def test_switching_api_profile_to_codex_removes_saved_secret(tmp_path: Path) -> None:
+    service, _, secrets = _service(tmp_path)
+    profile = service.create_provider(_provider("Profile", "secret"))
+
+    updated = service.update_provider(
+        profile.id,
+        ProviderProfileUpdate(provider_type=ProviderType.CODEX),
+    )
+
+    assert updated.provider_type == ProviderType.CODEX
+    assert updated.base_url == ""
+    assert updated.has_api_key is False
+    assert secrets.values == {}

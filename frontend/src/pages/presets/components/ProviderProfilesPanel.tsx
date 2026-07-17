@@ -3,31 +3,27 @@ import { Cable, KeyRound, Save, Search, Trash2 } from "lucide-react";
 
 import type { ProviderProfileInput } from "../../../features/presets/api";
 import { useProviderProfileMutations, useProviderProfiles } from "../../../features/presets/hooks";
+import { providerCapabilities } from "../../../features/presets/providerCapabilities";
 import type { ProviderProfile, ProviderType } from "../../../shared/api/types";
 import { useUnsavedChangesGuard, useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
+import { CodexConnectionPanel } from "./CodexConnectionPanel";
 import { ProviderModelPicker } from "./ProviderModelPicker";
 import { ProviderRequestOptionsFields } from "./ProviderRequestOptionsFields";
 import { usePresetEditorSelection } from "../hooks/usePresetEditorSelection";
-
-const defaultUrls: Record<ProviderType, string> = {
-  openrouter: "https://openrouter.ai/api/v1",
-  openai_compatible: "http://127.0.0.1:8000/v1",
-  gemini: "https://generativelanguage.googleapis.com/v1beta",
-};
 
 type ProviderProfileForm = ProviderProfileInput & { api_key: string };
 
 const emptyForm: ProviderProfileForm = {
   name: "",
   provider_type: "openrouter" as ProviderType,
-  base_url: defaultUrls.openrouter,
+  base_url: providerCapabilities.openrouter.defaultBaseUrl,
   model: "",
   api_key: "",
   temperature: 0.2,
   max_output_tokens: 4096,
-  concurrency: 4,
+  concurrency: providerCapabilities.openrouter.defaultConcurrency,
   timeout_seconds: 180,
   request_options: {
     top_p: null,
@@ -74,7 +70,28 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
   }
 
   function changeProvider(provider_type: ProviderType) {
-    setForm((current) => ({ ...current, provider_type, base_url: defaultUrls[provider_type] }));
+    const nextCapabilities = providerCapabilities[provider_type];
+    setShowModelPicker(false);
+    setForm((current) => {
+      const currentCapabilities = providerCapabilities[current.provider_type];
+      return {
+        ...current,
+        provider_type,
+        base_url: nextCapabilities.defaultBaseUrl,
+        api_key: "",
+        concurrency:
+          nextCapabilities.authMode === currentCapabilities.authMode
+            ? current.concurrency
+            : nextCapabilities.defaultConcurrency,
+        request_options: {
+          top_p: null,
+          seed: null,
+          service_tier: null,
+          reasoning_effort: null,
+          prompt_cache_strategy: null,
+        },
+      };
+    });
   }
 
   async function save() {
@@ -89,18 +106,18 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
       }
       setField("api_key", "");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法保存 API 配置。");
+      setError(reason instanceof Error ? reason.message : "无法保存模型连接。");
     }
   }
 
   async function remove() {
-    if (!selected || !window.confirm(`删除 API 配置“${selected.name}”？`)) return;
+    if (!selected || !window.confirm(`删除模型连接“${selected.name}”？`)) return;
     setError(null);
     try {
       await mutations.remove.mutateAsync(selected.id);
       selection.clear();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法删除 API 配置。");
+      setError(reason instanceof Error ? reason.message : "无法删除模型连接。");
     }
   }
 
@@ -118,7 +135,12 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
 
   const pending =
     mutations.create.isPending || mutations.update.isPending || mutations.remove.isPending;
-  const canSave = Boolean(form.name.trim() && form.base_url.trim() && form.model.trim());
+  const capabilities = providerCapabilities[form.provider_type];
+  const canSave = Boolean(
+    form.name.trim() &&
+    form.model.trim() &&
+    (!capabilities.requiresBaseUrl || form.base_url.trim()),
+  );
   const baseline = selected ? profileToForm(selected) : emptyForm;
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
   useUnsavedScope("provider-profile", dirty);
@@ -127,7 +149,7 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
     <section className="preset-workarea">
       <aside className="preset-list">
         <header>
-          <span className="eyebrow">API connections</span>
+          <span className="eyebrow">Model connections</span>
           <strong>{profiles.data?.length ?? 0} 套配置</strong>
         </header>
         <div>
@@ -150,14 +172,14 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               {profile.has_api_key ? <KeyRound size={12} /> : null}
             </button>
           ))}
-          {!profiles.data?.length ? <p>还没有保存 API 配置。</p> : null}
+          {!profiles.data?.length ? <p>还没有保存模型连接。</p> : null}
         </div>
       </aside>
       <div className="preset-editor preset-editor--provider">
         <header>
           <div>
             <span className="eyebrow">{selected ? "Edit connection" : "New connection"}</span>
-            <h1>{selected ? selected.name : "新的 API 配置"}</h1>
+            <h1>{selected ? selected.name : "新的模型连接"}</h1>
           </div>
           <div>
             <Button
@@ -184,7 +206,9 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
             <input
               value={form.name}
               onChange={(event) => setField("name", event.target.value)}
-              placeholder="我的 OpenRouter"
+              placeholder={
+                capabilities.authMode === "codex_oauth" ? "我的 Codex" : "我的 OpenRouter"
+              }
             />
           </label>
           <label className="form-field">
@@ -196,15 +220,19 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               <option value="openrouter">OpenRouter</option>
               <option value="openai_compatible">OpenAI 兼容</option>
               <option value="gemini">Gemini 原生</option>
+              <option value="codex">Codex · ChatGPT OAuth</option>
             </select>
           </label>
-          <label className="form-field form-field--wide">
-            <span>API 地址</span>
-            <input
-              value={form.base_url}
-              onChange={(event) => setField("base_url", event.target.value)}
-            />
-          </label>
+          {capabilities.authMode === "codex_oauth" ? <CodexConnectionPanel /> : null}
+          {capabilities.requiresBaseUrl ? (
+            <label className="form-field form-field--wide">
+              <span>API 地址</span>
+              <input
+                value={form.base_url}
+                onChange={(event) => setField("base_url", event.target.value)}
+              />
+            </label>
+          ) : null}
           <div className="form-field form-field--wide">
             <span>默认模型</span>
             <div className="model-input-row">
@@ -213,18 +241,18 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
                 onChange={(event) => setField("model", event.target.value)}
                 placeholder="模型 ID"
               />
-              {form.provider_type === "openrouter" ? (
+              {capabilities.modelCatalog ? (
                 <Button
                   type="button"
                   icon={<Search size={13} />}
                   onClick={() => setShowModelPicker((current) => !current)}
                 >
-                  搜索模型
+                  {capabilities.modelCatalog === "codex" ? "选择模型" : "搜索模型"}
                 </Button>
               ) : null}
             </div>
           </div>
-          {showModelPicker && form.provider_type === "openrouter" ? (
+          {showModelPicker && capabilities.modelCatalog ? (
             <ProviderModelPicker
               providerType={form.provider_type}
               baseUrl={form.base_url}
@@ -238,45 +266,49 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               onClose={() => setShowModelPicker(false)}
             />
           ) : null}
-          <div className="form-field form-field--wide">
-            <span>API Key {selected?.has_api_key ? "· 已安全保存，留空保持不变" : ""}</span>
-            <input
-              type="password"
-              value={form.api_key}
-              onChange={(event) => setField("api_key", event.target.value)}
-              placeholder={selected?.has_api_key ? "••••••••••••" : "输入 API Key"}
-            />
-            {selected?.has_api_key ? (
-              <Button
-                type="button"
-                tone="danger"
-                disabled={pending}
-                onClick={() => void clearApiKey()}
-              >
-                清除已保存的 Key
-              </Button>
-            ) : null}
-          </div>
-          <label className="form-field">
-            <span>温度</span>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              max="2"
-              value={form.temperature}
-              onChange={(event) => setField("temperature", Number(event.target.value))}
-            />
-          </label>
-          <label className="form-field">
-            <span>最大输出长度</span>
-            <input
-              type="number"
-              min="1"
-              value={form.max_output_tokens}
-              onChange={(event) => setField("max_output_tokens", Number(event.target.value))}
-            />
-          </label>
+          {capabilities.authMode === "api_key" ? (
+            <>
+              <div className="form-field form-field--wide">
+                <span>API Key {selected?.has_api_key ? "· 已安全保存，留空保持不变" : ""}</span>
+                <input
+                  type="password"
+                  value={form.api_key}
+                  onChange={(event) => setField("api_key", event.target.value)}
+                  placeholder={selected?.has_api_key ? "••••••••••••" : "输入 API Key"}
+                />
+                {selected?.has_api_key ? (
+                  <Button
+                    type="button"
+                    tone="danger"
+                    disabled={pending}
+                    onClick={() => void clearApiKey()}
+                  >
+                    清除已保存的 Key
+                  </Button>
+                ) : null}
+              </div>
+              <label className="form-field">
+                <span>温度</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="2"
+                  value={form.temperature}
+                  onChange={(event) => setField("temperature", Number(event.target.value))}
+                />
+              </label>
+              <label className="form-field">
+                <span>最大输出长度</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.max_output_tokens}
+                  onChange={(event) => setField("max_output_tokens", Number(event.target.value))}
+                />
+              </label>
+            </>
+          ) : null}
           <label className="form-field">
             <span>并发数</span>
             <input

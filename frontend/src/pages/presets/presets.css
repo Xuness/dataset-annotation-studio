@@ -256,6 +256,76 @@
   line-height: 1.6;
 }
 
+.codex-connection {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 90%, var(--accent-soft));
+}
+
+.codex-connection__status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 13px;
+}
+
+.codex-connection__status > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted);
+  background: var(--surface-soft);
+}
+
+.codex-connection__status > span.is-ready {
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+.codex-connection__status strong,
+.codex-connection__status small {
+  display: block;
+}
+
+.codex-connection__status strong {
+  color: var(--ink-soft);
+  font-size: 10px;
+}
+
+.codex-connection__status small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.codex-connection__actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 13px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-raised);
+}
+
+.codex-connection__link {
+  margin-left: auto;
+  padding: 3px;
+  color: var(--accent-deep);
+  font-size: 8px;
+  text-decoration: underline;
+  background: transparent;
+  cursor: pointer;
+}
+
+.codex-connection > .form-error {
+  margin: 0;
+  padding: 0 13px 11px;
+}
+
 .model-picker {
   overflow: hidden;
   border: 1px solid var(--line);

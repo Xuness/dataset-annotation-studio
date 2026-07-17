@@ -7,8 +7,8 @@
 - 递归或仅当前层扫描 PNG、JPG/JPEG、WebP
 - 缩略图浏览、筛选、批量选择与中央大图预览
 - 同名 JSON 字段选择、User Prompt 拼接和最终 Prompt 预览
-- 全局 System Prompt 预设与独立 API 连接预设
-- OpenRouter、OpenAI 兼容接口和 Gemini 原生接口适配层
+- 全局 System Prompt 预设与独立模型连接预设
+- OpenRouter、OpenAI 兼容接口、Gemini 原生接口，以及复用 ChatGPT OAuth 的 Codex 适配层
 - 持久化批量任务、并发、停止、断点续跑、失败重试和人工采用
 - 模型原始响应直接写入同名 `.txt`，并保留每次请求响应
 - 标签闭合轻量校验、异常优先查看、显式编辑保存和标注历史
@@ -62,4 +62,5 @@ pnpm build
 - 应用不会把图片复制到全局素材库，也不会继续依赖最初导入来源。
 - `.annotation-workspace/` 是项目的一部分，默认永久保留；移动整个文件夹后重新打开即可识别原项目。
 - API Key 不写入项目或 SQLite，而由操作系统凭据存储保存。
+- Codex OAuth Token 不由本应用读写，也不会保存到项目或应用数据库；凭据存储与现有登录复用均由官方 Codex Runtime 管理。
 - 运行服务默认只监听 `127.0.0.1:8765`，架构允许日后替换传输层，但当前不提供局域网服务入口。
