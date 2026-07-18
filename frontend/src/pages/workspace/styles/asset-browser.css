@@ -175,6 +175,11 @@
   padding: 6px 0 10px;
 }
 
+.asset-list:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, white);
+  outline-offset: -2px;
+}
+
 .asset-list__loading {
   padding: 6px 10px;
   color: var(--muted);

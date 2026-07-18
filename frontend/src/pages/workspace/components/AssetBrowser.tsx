@@ -28,7 +28,7 @@ interface AssetBrowserProps {
   error: string | null;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: StatusFilter) => void;
-  onSelect: (assetId: string) => void;
+  onSelect: (assetId: string) => Promise<boolean>;
   onSetChecked: (assetIds: string[], checked: boolean) => void;
   onToggleAll: () => void;
   onRecursiveChange: (value: boolean) => void;
@@ -121,22 +121,42 @@ export function AssetBrowser({
     rangeAnchorIdRef.current = assetId;
   }
 
-  function handleRowClick(assetId: string, shiftKey: boolean) {
-    if (shiftKey) {
-      toggleChecked(assetId, true);
-      return;
-    }
-    rangeAnchorIdRef.current = assetId;
-    onSelect(assetId);
+  function focusList() {
+    scrollRef.current?.focus({ preventScroll: true });
   }
 
-  function selectByIndex(nextIndex: number) {
+  async function handleRowClick(assetId: string, shiftKey: boolean) {
+    if (shiftKey) {
+      toggleChecked(assetId, true);
+      focusList();
+      return;
+    }
+    if (assetId === selectedAssetId) {
+      rangeAnchorIdRef.current = assetId;
+      focusList();
+      return;
+    }
+
+    const selected = await onSelect(assetId);
+    if (!selected) return;
+    rangeAnchorIdRef.current = assetId;
+    focusList();
+  }
+
+  async function selectByIndex(nextIndex: number) {
     const clampedIndex = Math.min(assets.length - 1, Math.max(0, nextIndex));
     const next = assets[clampedIndex];
-    if (!next || next.id === selectedAssetId) return;
+    if (!next) return;
+    if (next.id === selectedAssetId) {
+      focusList();
+      return;
+    }
+
+    const selected = await onSelect(next.id);
+    if (!selected) return;
     rangeAnchorIdRef.current = next.id;
-    onSelect(next.id);
     virtualizer.scrollToIndex(clampedIndex, { align: "auto" });
+    focusList();
     if (clampedIndex >= assets.length - 12 && hasMore && !loadingMore) onLoadMore();
   }
 
@@ -152,27 +172,27 @@ export function AssetBrowser({
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
-        selectByIndex(currentIndex < 0 ? 0 : currentIndex + 1);
+        void selectByIndex(currentIndex < 0 ? 0 : currentIndex + 1);
         break;
       case "ArrowUp":
         event.preventDefault();
-        selectByIndex(currentIndex < 0 ? 0 : currentIndex - 1);
+        void selectByIndex(currentIndex < 0 ? 0 : currentIndex - 1);
         break;
       case "PageDown":
         event.preventDefault();
-        selectByIndex(currentIndex < 0 ? 0 : currentIndex + pageSize);
+        void selectByIndex(currentIndex < 0 ? 0 : currentIndex + pageSize);
         break;
       case "PageUp":
         event.preventDefault();
-        selectByIndex(currentIndex < 0 ? 0 : currentIndex - pageSize);
+        void selectByIndex(currentIndex < 0 ? 0 : currentIndex - pageSize);
         break;
       case "Home":
         event.preventDefault();
-        selectByIndex(0);
+        void selectByIndex(0);
         break;
       case "End":
         event.preventDefault();
-        selectByIndex(assets.length - 1);
+        void selectByIndex(assets.length - 1);
         break;
       default:
         break;
@@ -243,7 +263,14 @@ export function AssetBrowser({
         </span>
       </div>
 
-      <div className="asset-list" ref={scrollRef} onKeyDown={handleListKeyDown}>
+      <div
+        className="asset-list"
+        ref={scrollRef}
+        role="region"
+        aria-label="素材列表，使用方向键切换图片"
+        tabIndex={0}
+        onKeyDown={handleListKeyDown}
+      >
         {loading ? (
           <div className="asset-list__empty">
             <Spinner label="读取素材" />
@@ -262,7 +289,7 @@ export function AssetBrowser({
                   key={asset.id}
                   className={`asset-row ${asset.id === selectedAssetId ? "is-selected" : ""}`}
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
-                  onClick={(event) => handleRowClick(asset.id, event.shiftKey)}
+                  onClick={(event) => void handleRowClick(asset.id, event.shiftKey)}
                 >
                   <span
                     className={`asset-check ${checkedAssetIdSet.has(asset.id) ? "is-checked" : ""}`}

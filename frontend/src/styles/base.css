@@ -219,18 +219,23 @@ select:focus-visible {
 }
 
 .dialog-backdrop {
-  position: fixed;
-  z-index: 40;
-  display: grid;
-  padding: 24px;
-  place-items: center;
+  width: min(430px, calc(100% - 48px));
+  max-width: none;
+  max-height: calc(100% - 48px);
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+}
+
+.dialog-backdrop::backdrop {
   background: rgb(48 45 42 / 30%);
   animation: dialog-fade 140ms ease;
-  inset: 0;
 }
 
 .dialog {
-  width: min(430px, 100%);
+  width: 100%;
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -280,7 +285,8 @@ select:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
-  *::after {
+  *::after,
+  .dialog-backdrop::backdrop {
     scroll-behavior: auto !important;
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;

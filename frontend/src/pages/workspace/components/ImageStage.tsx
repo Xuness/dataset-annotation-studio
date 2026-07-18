@@ -59,10 +59,7 @@ export function ImageStage({ projectId, asset }: ImageStageProps) {
   }, [asset, fitScale, zoom]);
 
   // 保证任何尺寸的图片都能放大到实际像素
-  const maxZoom = useMemo(
-    () => (fitScale ? Math.min(12, Math.max(3, 1 / fitScale)) : 3),
-    [fitScale],
-  );
+  const maxZoom = useMemo(() => (fitScale ? Math.max(3, 1 / fitScale) : 3), [fitScale]);
 
   const canPan = Boolean(
     displaySize &&

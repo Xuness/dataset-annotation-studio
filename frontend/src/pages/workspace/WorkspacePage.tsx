@@ -117,19 +117,20 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const selectedAsset = assetItems.find((asset) => asset.id === selectedAssetId) ?? null;
 
   const requestSelectAsset = useCallback(
-    (assetId: string) => {
+    async (assetId: string): Promise<boolean> => {
       if (!editorDirty) {
         selectAsset(assetId);
-        return;
+        return true;
       }
-      void confirmDialog("当前标注尚未保存，切换图片会丢弃未保存的修改。", {
+      const confirmed = await confirmDialog("当前标注尚未保存，切换图片会丢弃未保存的修改。", {
         title: "尚未保存",
         tone: "danger",
         confirmLabel: "丢弃并切换",
         cancelLabel: "继续编辑",
-      }).then((confirmed) => {
-        if (confirmed) selectAsset(assetId);
       });
+      if (!confirmed) return false;
+      selectAsset(assetId);
+      return true;
     },
     [editorDirty, selectAsset],
   );
