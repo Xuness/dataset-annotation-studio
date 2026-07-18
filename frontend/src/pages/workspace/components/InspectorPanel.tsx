@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 
 import type { AssetSummary, WorkspaceSummary } from "../../../shared/api/types";
 import { useAppStore } from "../../../shared/store/appStore";
+import { confirmDialog } from "../../../shared/ui/dialogs";
 import { MetadataSettingsPanel } from "./MetadataSettingsPanel";
 import { OverviewPanel } from "./OverviewPanel";
 import { PromptSettingsPanel } from "./PromptSettingsPanel";
@@ -33,15 +34,21 @@ export function InspectorPanel({ projectId, workspace, asset }: InspectorPanelPr
 
   function selectTab(tab: InspectorTab) {
     if (tab === activeTab) return;
-    if (
-      activeTab === "prompt" &&
-      promptDirty &&
-      !window.confirm("项目提示词配置尚未保存，仍要离开这个面板吗？")
-    ) {
+    if (activeTab !== "prompt" || !promptDirty) {
+      setActiveTab(tab);
       return;
     }
-    if (activeTab === "prompt") setDirtyScope(promptScope, false);
-    setActiveTab(tab);
+    void (async () => {
+      const confirmed = await confirmDialog("项目提示词配置尚未保存，离开这个面板会丢弃修改。", {
+        title: "尚未保存",
+        tone: "danger",
+        confirmLabel: "丢弃修改",
+        cancelLabel: "继续编辑",
+      });
+      if (!confirmed) return;
+      setDirtyScope(promptScope, false);
+      setActiveTab(tab);
+    })();
   }
 
   return (

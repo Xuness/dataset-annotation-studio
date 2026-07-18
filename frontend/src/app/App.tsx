@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { useCloseGuard } from "../shared/desktop/useCloseGuard";
 import { useApplyInterfaceScale } from "../shared/desktop/useInterfaceScale";
+import { DialogHost } from "../shared/ui/DialogHost";
 import { Spinner } from "../shared/ui/Spinner";
 
 const HomePage = lazy(() =>
@@ -31,23 +32,26 @@ export function App() {
   useCloseGuard();
   useApplyInterfaceScale();
   return (
-    <Suspense
-      fallback={
-        <div className="workspace-loading">
-          <Spinner />
-          <p>正在打开页面…</p>
-        </div>
-      }
-    >
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/workspace/:projectId" element={<WorkspacePage />} />
-        <Route path="/workspace/:projectId/review" element={<WorkspacePage mode="review" />} />
-        <Route path="/workspace/:projectId/jobs" element={<JobsPage />} />
-        <Route path="/workspace/:projectId/preprocess" element={<PreprocessPage />} />
-        <Route path="/presets" element={<PresetsPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+    <>
+      <Suspense
+        fallback={
+          <div className="workspace-loading">
+            <Spinner />
+            <p>正在打开页面…</p>
+          </div>
+        }
+      >
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/workspace/:projectId" element={<WorkspacePage />} />
+          <Route path="/workspace/:projectId/review" element={<WorkspacePage mode="review" />} />
+          <Route path="/workspace/:projectId/jobs" element={<JobsPage />} />
+          <Route path="/workspace/:projectId/preprocess" element={<PreprocessPage />} />
+          <Route path="/presets" element={<PresetsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+      <DialogHost />
+    </>
   );
 }

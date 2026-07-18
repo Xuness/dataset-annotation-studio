@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { CheckCircle2, CircleAlert, FileQuestion, Search } from "lucide-react";
 
@@ -86,7 +86,7 @@ export function AssetBrowser({
   const virtualizer = useVirtualizer({
     count: assets.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 70,
+    estimateSize: () => 72,
     overscan: 8,
   });
   const virtualItems = virtualizer.getVirtualItems();
@@ -128,6 +128,55 @@ export function AssetBrowser({
     }
     rangeAnchorIdRef.current = assetId;
     onSelect(assetId);
+  }
+
+  function selectByIndex(nextIndex: number) {
+    const clampedIndex = Math.min(assets.length - 1, Math.max(0, nextIndex));
+    const next = assets[clampedIndex];
+    if (!next || next.id === selectedAssetId) return;
+    rangeAnchorIdRef.current = next.id;
+    onSelect(next.id);
+    virtualizer.scrollToIndex(clampedIndex, { align: "auto" });
+    if (clampedIndex >= assets.length - 12 && hasMore && !loadingMore) onLoadMore();
+  }
+
+  function handleListKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+      event.preventDefault();
+      onToggleAll();
+      return;
+    }
+    if (!assets.length) return;
+    const currentIndex = assets.findIndex((asset) => asset.id === selectedAssetId);
+    const pageSize = Math.max(2, Math.floor((scrollRef.current?.clientHeight ?? 500) / 72) - 1);
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        selectByIndex(currentIndex < 0 ? 0 : currentIndex + 1);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        selectByIndex(currentIndex < 0 ? 0 : currentIndex - 1);
+        break;
+      case "PageDown":
+        event.preventDefault();
+        selectByIndex(currentIndex < 0 ? 0 : currentIndex + pageSize);
+        break;
+      case "PageUp":
+        event.preventDefault();
+        selectByIndex(currentIndex < 0 ? 0 : currentIndex - pageSize);
+        break;
+      case "Home":
+        event.preventDefault();
+        selectByIndex(0);
+        break;
+      case "End":
+        event.preventDefault();
+        selectByIndex(assets.length - 1);
+        break;
+      default:
+        break;
+    }
   }
 
   return (
@@ -186,12 +235,15 @@ export function AssetBrowser({
           {selectAllPending ? "正在全选…" : allMatchingSelected ? "取消全选" : "全选"}
         </button>
         <span className="asset-selection-toolbar__count">已选 {checkedAssetIds.length}</span>
-        <span className="asset-selection-toolbar__hint" title="按住 Shift 点击可连续选择或取消">
+        <span
+          className="asset-selection-toolbar__hint"
+          title="按住 Shift 点击可连续选择或取消；方向键切换图片，Ctrl+A 全选当前筛选"
+        >
           Shift 连选
         </span>
       </div>
 
-      <div className="asset-list" ref={scrollRef}>
+      <div className="asset-list" ref={scrollRef} onKeyDown={handleListKeyDown}>
         {loading ? (
           <div className="asset-list__empty">
             <Spinner label="读取素材" />

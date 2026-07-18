@@ -12,6 +12,7 @@ import {
 } from "../../../features/annotations/hooks";
 import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
+import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { StatusDot } from "../../../shared/ui/StatusDot";
 
@@ -111,7 +112,12 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
 
   async function handleDelete() {
     if (!assetId || !annotation.data?.exists) return;
-    if (!window.confirm("删除当前图片旁的同名标注文件？内部历史仍会保留。")) return;
+    const confirmed = await confirmDialog("删除当前图片旁的同名标注文件？内部历史仍会保留。", {
+      title: "删除标注",
+      tone: "danger",
+      confirmLabel: "删除",
+    });
+    if (!confirmed) return;
     setActionError(null);
     try {
       await remove.mutateAsync();

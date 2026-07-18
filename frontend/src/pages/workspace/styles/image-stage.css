@@ -11,7 +11,7 @@
   justify-items: center;
   gap: 9px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--text-sm);
 }
 
 .image-stage__header {
@@ -37,13 +37,13 @@
 
 .image-stage__header strong {
   max-width: 42vw;
-  font-size: 10px;
+  font-size: var(--text-md);
 }
 
 .image-stage__header > div:first-child span {
   margin-left: 9px;
   color: var(--muted);
-  font-size: 8px;
+  font-size: var(--text-xs);
 }
 
 .zoom-controls {
@@ -54,8 +54,8 @@
 
 .zoom-controls button {
   display: grid;
-  width: 27px;
-  height: 27px;
+  width: 28px;
+  height: 28px;
   place-items: center;
   border-radius: 5px;
   color: var(--ink-soft);
@@ -67,11 +67,18 @@
   background: var(--surface-soft);
 }
 
+.zoom-controls__actual {
+  font-size: var(--text-2xs);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
 .zoom-controls > span {
-  width: 42px;
+  width: 46px;
   color: var(--muted);
   text-align: center;
-  font-size: 8px;
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
 }
 
 .image-stage__canvas {
@@ -79,6 +86,15 @@
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+.image-stage__canvas.is-pannable {
+  cursor: grab;
+}
+
+.image-stage__canvas.is-panning {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .image-stage__checker {

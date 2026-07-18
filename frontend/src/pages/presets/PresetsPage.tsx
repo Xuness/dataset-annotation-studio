@@ -17,14 +17,29 @@ export function PresetsPage() {
   const [createSignal, setCreateSignal] = useState(0);
 
   function changeTab(nextTab: PresetTab) {
-    if (nextTab === tab || confirmDiscard()) setTab(nextTab);
+    if (nextTab === tab) return;
+    void (async () => {
+      if (await confirmDiscard()) setTab(nextTab);
+    })();
+  }
+
+  function leavePage() {
+    void (async () => {
+      if (await confirmDiscard()) navigate(-1);
+    })();
+  }
+
+  function requestCreate() {
+    void (async () => {
+      if (await confirmDiscard()) setCreateSignal((n) => n + 1);
+    })();
   }
 
   return (
     <main className="presets-page">
       <header className="presets-topbar">
         <div>
-          <Button icon={<ArrowLeft size={15} />} onClick={() => confirmDiscard() && navigate(-1)}>
+          <Button icon={<ArrowLeft size={15} />} onClick={leavePage}>
             返回
           </Button>
           <span>
@@ -32,11 +47,7 @@ export function PresetsPage() {
             <small>全局复用，任务会保存当时的完整快照</small>
           </span>
         </div>
-        <Button
-          tone="primary"
-          icon={<Plus size={15} />}
-          onClick={() => confirmDiscard() && setCreateSignal((n) => n + 1)}
-        >
+        <Button tone="primary" icon={<Plus size={15} />} onClick={requestCreate}>
           新建{tab === "system" ? "预设" : "连接"}
         </Button>
       </header>

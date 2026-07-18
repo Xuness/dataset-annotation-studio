@@ -8,6 +8,7 @@ import { useUpdateWorkspace } from "../../../features/workspaces/hooks";
 import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import type { AssetSummary, WorkspaceSummary } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
+import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
 
 interface PromptSettingsPanelProps {
@@ -44,8 +45,18 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
   );
 
   function openPresetLibrary() {
-    if (dirty && !window.confirm("项目提示词配置尚未保存，仍要前往全局预设吗？")) return;
-    navigate("/presets");
+    void (async () => {
+      if (dirty) {
+        const confirmed = await confirmDialog("项目提示词配置尚未保存，前往全局预设会丢弃修改。", {
+          title: "尚未保存",
+          tone: "danger",
+          confirmLabel: "丢弃并前往",
+          cancelLabel: "继续编辑",
+        });
+        if (!confirmed) return;
+      }
+      navigate("/presets");
+    })();
   }
 
   async function savePrompt() {

@@ -6,6 +6,7 @@ import { useOpenWorkspace, useRecentWorkspaces } from "../../features/workspaces
 import { pickWorkspaceFolder } from "../../shared/desktop/pickFolder";
 import { useAppStore } from "../../shared/store/appStore";
 import { Button } from "../../shared/ui/Button";
+import { alertDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
 import "./home.css";
 import "./home-illustration.css";
@@ -28,8 +29,9 @@ export function HomePage() {
           .slice(0, 5)
           .map((issue) => `${issue.path}：${issue.message}`)
           .join("\n");
-        window.alert(
+        await alertDialog(
           `工作区已打开，但跳过了 ${result.scan.failed} 个损坏或无法读取的图片。\n${examples}`,
+          { title: "部分图片被跳过" },
         );
       }
       setActiveProject(result.workspace.project_id);

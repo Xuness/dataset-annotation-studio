@@ -19,14 +19,17 @@ export function WorkspaceTopbar({ workspace, rescanning, onRescan }: WorkspaceTo
   const { confirmDiscard } = useUnsavedChangesGuard();
   const jobs = useJobs(workspace.project_id);
   const activeJobCount = jobs.data?.length ?? 0;
+
+  function leaveTo(path: string) {
+    void (async () => {
+      if (await confirmDiscard()) navigate(path);
+    })();
+  }
+
   return (
     <header className="workspace-topbar">
       <div className="workspace-topbar__identity">
-        <button
-          className="icon-button"
-          onClick={() => confirmDiscard() && navigate("/")}
-          title="返回项目首页"
-        >
+        <button className="icon-button" onClick={() => leaveTo("/")} title="返回项目首页">
           <ChevronLeft size={17} />
         </button>
         <span className="workspace-glyph" aria-hidden="true">
@@ -54,13 +57,10 @@ export function WorkspaceTopbar({ workspace, rescanning, onRescan }: WorkspaceTo
         >
           重新扫描
         </Button>
-        <Button
-          icon={<Settings2 size={15} />}
-          onClick={() => confirmDiscard() && navigate("/presets")}
-        >
+        <Button icon={<Settings2 size={15} />} onClick={() => leaveTo("/presets")}>
           预设
         </Button>
-        <Button icon={<FolderOpen size={15} />} onClick={() => confirmDiscard() && navigate("/")}>
+        <Button icon={<FolderOpen size={15} />} onClick={() => leaveTo("/")}>
           项目
         </Button>
       </div>

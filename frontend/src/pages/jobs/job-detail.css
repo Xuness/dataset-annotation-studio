@@ -7,7 +7,7 @@
 .job-detail-panel--empty {
   place-items: center;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--text-sm);
 }
 
 .job-detail-panel > header {
@@ -29,7 +29,7 @@
 .job-detail-panel > header p {
   margin: 0;
   color: var(--muted);
-  font-size: 8px;
+  font-size: var(--text-xs);
 }
 
 .job-detail-panel > header > div:last-child {
@@ -40,9 +40,9 @@
 }
 
 .job-detail-panel .button {
-  min-height: 29px;
-  padding: 0 9px;
-  font-size: 8px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: var(--text-xs);
 }
 
 .job-summary-grid {
@@ -72,7 +72,7 @@
 .job-summary-grid span {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 8px;
+  font-size: var(--text-xs);
 }
 
 .job-summary-grid .is-alert strong {
@@ -85,13 +85,13 @@
   justify-content: space-between;
   padding: 6px 0 9px;
   color: var(--ink-soft);
-  font-size: 9px;
+  font-size: var(--text-xs);
   font-weight: 650;
 }
 
 .failed-items-header small {
   color: var(--muted);
-  font-size: 8px;
+  font-size: var(--text-2xs);
 }
 
 .failed-items-list {
@@ -120,18 +120,18 @@
   color: var(--ink);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
 
 .failed-item > header span {
   color: var(--muted);
-  font-size: 7px;
+  font-size: var(--text-2xs);
 }
 
 .failed-item > p {
   margin: 8px 0;
   color: var(--danger);
-  font-size: 8px;
+  font-size: var(--text-xs);
 }
 
 .failed-item pre {
@@ -142,7 +142,7 @@
   border-radius: 4px;
   background: var(--surface-raised);
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 7px;
+  font-size: var(--text-2xs);
   line-height: 1.5;
   white-space: pre-wrap;
 }

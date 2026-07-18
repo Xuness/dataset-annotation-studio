@@ -4,6 +4,7 @@ import { FileText, Save, Trash2 } from "lucide-react";
 import { useSystemPresetMutations, useSystemPresets } from "../../../features/presets/hooks";
 import { useUnsavedChangesGuard, useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
+import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { usePresetEditorSelection } from "../hooks/usePresetEditorSelection";
 
@@ -41,7 +42,13 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
   }
 
   async function remove() {
-    if (!selected || !window.confirm(`删除全局预设“${selected.name}”？`)) return;
+    if (!selected) return;
+    const confirmed = await confirmDialog(`删除全局预设“${selected.name}”？`, {
+      title: "删除预设",
+      tone: "danger",
+      confirmLabel: "删除",
+    });
+    if (!confirmed) return;
     setError(null);
     try {
       await mutations.remove.mutateAsync(selected.id);
@@ -75,7 +82,9 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
               }
               onClick={() => {
                 if (selection.selectedId === preset.id && !selection.isCreating) return;
-                if (confirmDiscard()) selection.select(preset.id);
+                void confirmDiscard().then((confirmed) => {
+                  if (confirmed) selection.select(preset.id);
+                });
               }}
             >
               <FileText size={15} />

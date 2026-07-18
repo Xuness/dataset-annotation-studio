@@ -11,6 +11,7 @@ import {
 import type { AssetFilterStatus } from "../../shared/api/types";
 import { useAppStore } from "../../shared/store/appStore";
 import { Button } from "../../shared/ui/Button";
+import { alertDialog, confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
 import { AnnotationEditor } from "./components/AnnotationEditor";
 import { AssetBrowser } from "./components/AssetBrowser";
@@ -117,8 +118,18 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
 
   const requestSelectAsset = useCallback(
     (assetId: string) => {
-      if (editorDirty && !window.confirm("当前标注尚未保存，仍要切换图片吗？")) return;
-      selectAsset(assetId);
+      if (!editorDirty) {
+        selectAsset(assetId);
+        return;
+      }
+      void confirmDialog("当前标注尚未保存，切换图片会丢弃未保存的修改。", {
+        title: "尚未保存",
+        tone: "danger",
+        confirmLabel: "丢弃并切换",
+        cancelLabel: "继续编辑",
+      }).then((confirmed) => {
+        if (confirmed) selectAsset(assetId);
+      });
     },
     [editorDirty, selectAsset],
   );
@@ -128,8 +139,9 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     if (!assetIds) {
       const result = await matchingAssetIds.refetch();
       if (!result.data) {
-        window.alert(
+        await alertDialog(
           result.error instanceof Error ? result.error.message : "读取全选范围失败，请稍后重试。",
+          { title: "全选失败" },
         );
         return;
       }

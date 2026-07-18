@@ -10,6 +10,7 @@ import {
 import { useRescanWorkspace, useWorkspace } from "../../features/workspaces/hooks";
 import type { PreprocessExecutionOptions, PreprocessRequest } from "../../shared/api/types";
 import { useAppStore } from "../../shared/store/appStore";
+import { confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
 import { Button } from "../../shared/ui/Button";
 import { NavigationRail } from "../workspace/components/NavigationRail";
@@ -116,12 +117,11 @@ export function PreprocessPage() {
   async function execute() {
     const previewData = validPreview;
     if (!previewData || previewData.warning_count) return;
-    if (
-      !window.confirm(
-        `对 ${previewData.changed_count} 张图片执行预处理？原文件会保存在当前项目的恢复区。${request.rename ? "同名 .txt / .json 也会一起重命名。" : ""}`,
-      )
-    )
-      return;
+    const confirmed = await confirmDialog(
+      `对 ${previewData.changed_count} 张图片执行预处理？原文件会保存在当前项目的恢复区。${request.rename ? "同名 .txt / .json 也会一起重命名。" : ""}`,
+      { title: "执行预处理", confirmLabel: "执行" },
+    );
+    if (!confirmed) return;
     setError(null);
     try {
       await actions.execute.mutateAsync({
@@ -137,7 +137,11 @@ export function PreprocessPage() {
   }
 
   async function undo(operationId: string) {
-    if (!window.confirm("撤销这次预处理并恢复原文件？撤销前会再次校验当前文件。")) return;
+    const confirmed = await confirmDialog(
+      "撤销这次预处理并恢复原文件？撤销前会再次校验当前文件。",
+      { title: "撤销预处理", tone: "danger", confirmLabel: "撤销并恢复" },
+    );
+    if (!confirmed) return;
     setError(null);
     try {
       await actions.undo.mutateAsync(operationId);

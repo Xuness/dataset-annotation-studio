@@ -25,10 +25,10 @@
 .switch-label {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   color: var(--muted);
   cursor: pointer;
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
 
 .switch-label input {
@@ -40,8 +40,8 @@
 
 .switch-label > span {
   position: relative;
-  width: 25px;
-  height: 14px;
+  width: 31px;
+  height: 18px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: var(--surface-soft);
@@ -50,10 +50,10 @@
 
 .switch-label > span::after {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 8px;
-  height: 8px;
+  top: 3px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--faint);
   content: "";
@@ -68,7 +68,7 @@
 }
 
 .switch-label input:checked + span::after {
-  transform: translateX(11px);
+  transform: translateX(13px);
   background: var(--accent);
 }
 
@@ -94,7 +94,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  font-size: 11px;
+  font-size: var(--text-sm);
 }
 
 .search-field input::placeholder {
@@ -111,19 +111,20 @@
 
 .asset-filters button {
   display: inline-flex;
-  height: 25px;
+  height: 28px;
   align-items: center;
-  gap: 4px;
-  padding: 0 7px;
+  gap: 5px;
+  padding: 0 9px;
   border-radius: 5px;
   color: var(--muted);
   background: transparent;
   cursor: pointer;
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
 
 .asset-filters button span {
   color: var(--faint);
+  font-size: var(--text-2xs);
 }
 
 .asset-filters button.is-active {
@@ -136,21 +137,21 @@
   min-width: 0;
   align-items: center;
   gap: 7px;
-  padding: 6px 0;
+  padding: 7px 0;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
 
 .asset-selection-toolbar__toggle {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px;
+  padding: 3px;
   color: var(--ink-soft);
   background: transparent;
   cursor: pointer;
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
 
 .asset-selection-toolbar__toggle:disabled {
@@ -164,7 +165,7 @@
 }
 
 .asset-selection-toolbar__hint {
-  color: var(--faint);
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -178,7 +179,7 @@
   padding: 6px 10px;
   color: var(--muted);
   text-align: center;
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
 
 .asset-list__virtual {
@@ -192,8 +193,8 @@
   left: 0;
   display: grid;
   width: 100%;
-  height: 66px;
-  grid-template-columns: 15px 47px minmax(0, 1fr) 10px;
+  height: 68px;
+  grid-template-columns: 18px 52px minmax(0, 1fr) 12px;
   align-items: center;
   gap: 9px;
   padding: 7px;
@@ -210,14 +211,14 @@
 
 .asset-check {
   display: grid;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   place-items: center;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   color: white;
   background: var(--surface-raised);
-  font-size: 9px;
+  font-size: var(--text-2xs);
 }
 
 .asset-check.is-checked {
@@ -231,8 +232,8 @@
 }
 
 .asset-row img {
-  width: 47px;
-  height: 47px;
+  width: 52px;
+  height: 52px;
   border-radius: 6px;
   object-fit: cover;
   background: var(--paper-deep);
@@ -240,6 +241,7 @@
 
 .asset-row__copy {
   min-width: 0;
+  line-height: 1.35;
 }
 
 .asset-row__copy strong,
@@ -252,20 +254,20 @@
 }
 
 .asset-row__copy strong {
-  margin-bottom: 4px;
-  font-size: 10px;
+  margin-bottom: 3px;
+  font-size: var(--text-sm);
   font-weight: 650;
 }
 
 .asset-row__copy small {
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   color: var(--ink-soft);
-  font-size: 8px;
+  font-size: var(--text-xs);
 }
 
 .asset-row__copy > span {
   color: var(--muted);
-  font-size: 8px;
+  font-size: var(--text-xs);
 }
 
 .asset-list__empty {
@@ -273,7 +275,7 @@
   min-height: 180px;
   place-content: center;
   justify-items: center;
-  color: var(--faint);
+  color: var(--muted);
   text-align: center;
-  font-size: 10px;
+  font-size: var(--text-sm);
 }

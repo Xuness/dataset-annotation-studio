@@ -22,11 +22,13 @@ export function NavigationRail({
 
   function open(id: string) {
     if (id === active) return;
-    if (!confirmDiscard()) return;
-    if (id === "assets") navigate(`/workspace/${projectId}`);
-    if (id === "review") navigate(`/workspace/${projectId}/review`);
-    if (id === "jobs") navigate(`/workspace/${projectId}/jobs`);
-    if (id === "preprocess") navigate(`/workspace/${projectId}/preprocess`);
+    void (async () => {
+      if (!(await confirmDiscard())) return;
+      if (id === "assets") navigate(`/workspace/${projectId}`);
+      if (id === "review") navigate(`/workspace/${projectId}/review`);
+      if (id === "jobs") navigate(`/workspace/${projectId}/jobs`);
+      if (id === "preprocess") navigate(`/workspace/${projectId}/preprocess`);
+    })();
   }
 
   return (

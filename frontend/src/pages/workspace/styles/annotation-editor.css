@@ -2,7 +2,7 @@
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: 38px minmax(0, 1fr) 24px;
+  grid-template-rows: 38px minmax(0, 1fr) 26px;
   background: var(--surface);
 }
 
@@ -26,13 +26,13 @@
 }
 
 .annotation-editor__title strong {
-  font-size: 10px;
+  font-size: var(--text-sm);
 }
 
 .annotation-editor__actions .button {
-  min-height: 28px;
-  padding: 0 9px;
-  font-size: 9px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: var(--text-xs);
 }
 
 .unsaved-mark {
@@ -40,7 +40,7 @@
   border-radius: 4px;
   color: var(--warning);
   background: var(--warning-soft);
-  font-size: 8px;
+  font-size: var(--text-2xs);
 }
 
 .annotation-editor__body {
@@ -60,7 +60,7 @@
 
 .annotation-editor__history > p {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--text-sm);
 }
 
 .annotation-editor__history article {
@@ -85,7 +85,7 @@
 .annotation-editor__history article small {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 8px;
+  font-size: var(--text-xs);
 }
 
 .annotation-editor__history pre {
@@ -97,7 +97,7 @@
   white-space: pre-wrap;
   color: var(--ink-soft);
   background: var(--paper);
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
 
 .annotation-editor__codemirror,
@@ -145,8 +145,8 @@
   display: grid;
   height: 100%;
   place-items: center;
-  color: var(--faint);
-  font-size: 10px;
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
 .annotation-editor__footer {
@@ -155,7 +155,7 @@
   border-top: 1px solid var(--line);
   color: var(--muted);
   background: var(--surface);
-  font-size: 8px;
+  font-size: var(--text-2xs);
 }
 
 .validation-warning {

@@ -6,7 +6,7 @@
 .workspace-page {
   display: grid;
   height: 100%;
-  grid-template-rows: 52px minmax(0, 1fr) 27px;
+  grid-template-rows: 52px minmax(0, 1fr) 30px;
   background: var(--paper-deep);
 }
 
@@ -50,7 +50,7 @@
 .workspace-topbar__identity small {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
 
 .workspace-glyph {
@@ -93,7 +93,7 @@
   gap: 5px;
   margin-right: 5px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 .workspace-body {
@@ -124,8 +124,8 @@
 
 .navigation-rail button {
   display: flex;
-  width: 42px;
-  min-height: 44px;
+  width: 44px;
+  min-height: 46px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -134,7 +134,7 @@
   color: var(--muted);
   background: transparent;
   cursor: pointer;
-  font-size: 8px;
+  font-size: var(--text-2xs);
 }
 
 .navigation-rail button.is-active {
@@ -233,10 +233,10 @@
 }
 
 .interface-scale-control > span {
-  width: 38px;
+  width: 42px;
   color: var(--muted);
   text-align: center;
-  font-size: 8px;
+  font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -248,7 +248,7 @@
   border-top: 1px solid var(--line);
   color: var(--muted);
   background: var(--surface);
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
 
 .workspace-statusbar__path {

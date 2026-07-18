@@ -7,6 +7,7 @@ import { providerCapabilities } from "../../../features/presets/providerCapabili
 import type { ProviderProfile, ProviderType } from "../../../shared/api/types";
 import { useUnsavedChangesGuard, useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
+import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { CodexConnectionPanel } from "./CodexConnectionPanel";
 import { ProviderModelPicker } from "./ProviderModelPicker";
@@ -111,7 +112,13 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
   }
 
   async function remove() {
-    if (!selected || !window.confirm(`删除模型连接“${selected.name}”？`)) return;
+    if (!selected) return;
+    const confirmed = await confirmDialog(`删除模型连接“${selected.name}”？`, {
+      title: "删除模型连接",
+      tone: "danger",
+      confirmLabel: "删除",
+    });
+    if (!confirmed) return;
     setError(null);
     try {
       await mutations.remove.mutateAsync(selected.id);
@@ -122,9 +129,13 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
   }
 
   async function clearApiKey() {
-    if (!selected?.has_api_key || !window.confirm("清除这个 API 配置中已保存的 API Key？")) {
-      return;
-    }
+    if (!selected?.has_api_key) return;
+    const confirmed = await confirmDialog("清除这个 API 配置中已保存的 API Key？", {
+      title: "清除 API Key",
+      tone: "danger",
+      confirmLabel: "清除",
+    });
+    if (!confirmed) return;
     setError(null);
     try {
       await mutations.update.mutateAsync({ id: selected.id, input: { api_key: "" } });
@@ -161,7 +172,9 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               }
               onClick={() => {
                 if (selection.selectedId === profile.id && !selection.isCreating) return;
-                if (confirmDiscard()) selection.select(profile.id);
+                void confirmDiscard().then((confirmed) => {
+                  if (confirmed) selection.select(profile.id);
+                });
               }}
             >
               <Cable size={15} />

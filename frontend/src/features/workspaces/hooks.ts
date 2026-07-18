@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { alertDialog } from "../../shared/ui/dialogs";
 import {
   getWorkspace,
   listWorkspaces,
@@ -50,10 +51,15 @@ export function useRescanWorkspace(projectId: string) {
           .slice(0, 5)
           .map((issue) => `${issue.path}：${issue.message}`)
           .join("\n");
-        window.alert(`扫描跳过了 ${result.failed} 个无法读取的图片。\n${examples}`);
+        void alertDialog(`扫描跳过了 ${result.failed} 个无法读取的图片。\n${examples}`, {
+          title: "扫描完成，但有跳过",
+        });
       }
     },
-    onError: (error) => window.alert(error instanceof Error ? error.message : "重新扫描失败。"),
+    onError: (error) =>
+      void alertDialog(error instanceof Error ? error.message : "重新扫描失败。", {
+        title: "重新扫描失败",
+      }),
   });
 }
 

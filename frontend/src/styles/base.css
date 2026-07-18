@@ -71,7 +71,7 @@ select:focus-visible {
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-md);
   font-weight: 600;
   transition:
     border-color var(--transition),
@@ -134,7 +134,7 @@ select:focus-visible {
 
 .eyebrow {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -143,7 +143,7 @@ select:focus-visible {
 .inline-error {
   margin: 12px 0 0;
   color: var(--danger);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .spinner {
@@ -172,7 +172,7 @@ select:focus-visible {
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 .status-dot > span {
@@ -216,4 +216,74 @@ select:focus-visible {
 
 .placeholder-page p {
   color: var(--muted);
+}
+
+.dialog-backdrop {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  background: rgb(48 45 42 / 30%);
+  animation: dialog-fade 140ms ease;
+  inset: 0;
+}
+
+.dialog {
+  width: min(430px, 100%);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-float);
+  animation: dialog-pop 170ms cubic-bezier(0.2, 0.65, 0.3, 1);
+}
+
+.dialog h2 {
+  margin: 0 0 10px;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.dialog__message {
+  max-height: 46vh;
+  margin: 0;
+  overflow: auto;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+@keyframes dialog-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }

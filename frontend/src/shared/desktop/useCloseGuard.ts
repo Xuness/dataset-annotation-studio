@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { confirm, message } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { getActiveJobs, stopAllWorkspaceJobs } from "../../features/jobs/api";
@@ -40,7 +40,10 @@ export function useCloseGuard(): void {
           }
           const active = await getActiveJobs();
           if (active.preprocessing_count) {
-            window.alert("图片预处理或撤销正在写入文件，请等待操作完成后再关闭软件。");
+            await message("图片预处理或撤销正在写入文件，请等待操作完成后再关闭软件。", {
+              title: "暂时无法关闭",
+              kind: "warning",
+            });
             return;
           }
           if (!active.annotation_job_count) {
@@ -63,8 +66,9 @@ export function useCloseGuard(): void {
             await getCurrentWindow().destroy();
           }
         } catch {
-          const forceClose = window.confirm(
+          const forceClose = await confirm(
             "无法确认后台是否仍在写入文件。强制关闭可能导致当前操作不完整，仍要关闭吗？",
+            { title: "确认关闭", kind: "warning" },
           );
           if (forceClose) await getCurrentWindow().destroy();
         }

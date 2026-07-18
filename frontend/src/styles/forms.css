@@ -7,7 +7,7 @@
 
 .form-field > span {
   color: var(--ink-soft);
-  font-size: 9px;
+  font-size: var(--text-xs);
   font-weight: 650;
 }
 
@@ -31,7 +31,7 @@
 .form-field select {
   height: 36px;
   padding: 0 10px;
-  font-size: 10px;
+  font-size: var(--text-md);
 }
 
 .form-field select {
@@ -54,7 +54,7 @@
   padding: 13px;
   resize: none;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 10px;
+  font-size: var(--text-sm);
   line-height: 1.65;
 }
 
@@ -109,5 +109,5 @@
 .form-error {
   margin: 12px 0 0;
   color: var(--danger);
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
