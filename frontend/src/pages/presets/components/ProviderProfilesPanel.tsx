@@ -10,6 +10,8 @@ import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { CodexConnectionPanel } from "./CodexConnectionPanel";
+import { OpenCodeGoModelPicker } from "./opencode-go/OpenCodeGoModelPicker";
+import { OpenCodeGoOptionsFields } from "./opencode-go/OpenCodeGoOptionsFields";
 import { ProviderModelPicker } from "./ProviderModelPicker";
 import { ProviderRequestOptionsFields } from "./ProviderRequestOptionsFields";
 import { usePresetEditorSelection } from "../hooks/usePresetEditorSelection";
@@ -74,16 +76,13 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
     const nextCapabilities = providerCapabilities[provider_type];
     setShowModelPicker(false);
     setForm((current) => {
-      const currentCapabilities = providerCapabilities[current.provider_type];
       return {
         ...current,
         provider_type,
         base_url: nextCapabilities.defaultBaseUrl,
+        model: "",
         api_key: "",
-        concurrency:
-          nextCapabilities.authMode === currentCapabilities.authMode
-            ? current.concurrency
-            : nextCapabilities.defaultConcurrency,
+        concurrency: nextCapabilities.defaultConcurrency,
         request_options: {
           top_p: null,
           seed: null,
@@ -97,7 +96,11 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
 
   async function save() {
     setError(null);
-    const input = { ...form, api_key: form.api_key || undefined };
+    const changedProvider = Boolean(selected && selected.provider_type !== form.provider_type);
+    const input = {
+      ...form,
+      api_key: form.api_key || (changedProvider ? "" : undefined),
+    };
     try {
       if (selected) {
         await mutations.update.mutateAsync({ id: selected.id, input });
@@ -147,6 +150,9 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
   const pending =
     mutations.create.isPending || mutations.update.isPending || mutations.remove.isPending;
   const capabilities = providerCapabilities[form.provider_type];
+  const hasMatchingSavedApiKey = Boolean(
+    selected?.has_api_key && selected.provider_type === form.provider_type,
+  );
   const canSave = Boolean(
     form.name.trim() &&
     form.model.trim() &&
@@ -220,7 +226,11 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               value={form.name}
               onChange={(event) => setField("name", event.target.value)}
               placeholder={
-                capabilities.authMode === "codex_oauth" ? "我的 Codex" : "我的 OpenRouter"
+                form.provider_type === "opencode_go"
+                  ? "我的 OpenCode Go"
+                  : capabilities.authMode === "codex_oauth"
+                    ? "我的 Codex"
+                    : "我的 OpenRouter"
               }
             />
           </label>
@@ -232,6 +242,7 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
             >
               <option value="openrouter">OpenRouter</option>
               <option value="openai_compatible">OpenAI 兼容</option>
+              <option value="opencode_go">OpenCode Go</option>
               <option value="gemini">Gemini 原生</option>
               <option value="codex">Codex · ChatGPT OAuth</option>
             </select>
@@ -260,36 +271,64 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
                   icon={<Search size={13} />}
                   onClick={() => setShowModelPicker((current) => !current)}
                 >
-                  {capabilities.modelCatalog === "codex" ? "选择模型" : "搜索模型"}
+                  {capabilities.modelCatalog === "openrouter" ? "搜索模型" : "选择模型"}
                 </Button>
               ) : null}
             </div>
           </div>
           {showModelPicker && capabilities.modelCatalog ? (
-            <ProviderModelPicker
-              providerType={form.provider_type}
-              baseUrl={form.base_url}
-              profileId={selected?.id}
-              apiKey={form.api_key}
-              selectedModel={form.model}
-              onSelect={(model) => {
-                setField("model", model.id);
-                setShowModelPicker(false);
-              }}
-              onClose={() => setShowModelPicker(false)}
-            />
+            capabilities.modelCatalog === "opencode_go" ? (
+              <OpenCodeGoModelPicker
+                baseUrl={form.base_url}
+                profileId={selected?.id}
+                apiKey={form.api_key}
+                selectedModel={form.model}
+                onSelect={(model) => {
+                  setForm((current) => ({
+                    ...current,
+                    model: model.id,
+                    max_output_tokens: model.max_output_tokens
+                      ? Math.min(current.max_output_tokens, model.max_output_tokens)
+                      : current.max_output_tokens,
+                    request_options: {
+                      ...current.request_options,
+                      reasoning_effort:
+                        current.request_options.reasoning_effort &&
+                        model.reasoning_efforts.includes(current.request_options.reasoning_effort)
+                          ? current.request_options.reasoning_effort
+                          : null,
+                    },
+                  }));
+                  setShowModelPicker(false);
+                }}
+                onClose={() => setShowModelPicker(false)}
+              />
+            ) : (
+              <ProviderModelPicker
+                providerType={form.provider_type}
+                baseUrl={form.base_url}
+                profileId={selected?.id}
+                apiKey={form.api_key}
+                selectedModel={form.model}
+                onSelect={(model) => {
+                  setField("model", model.id);
+                  setShowModelPicker(false);
+                }}
+                onClose={() => setShowModelPicker(false)}
+              />
+            )
           ) : null}
           {capabilities.authMode === "api_key" ? (
             <>
               <div className="form-field form-field--wide">
-                <span>API Key {selected?.has_api_key ? "· 已安全保存，留空保持不变" : ""}</span>
+                <span>API Key {hasMatchingSavedApiKey ? "· 已安全保存，留空保持不变" : ""}</span>
                 <input
                   type="password"
                   value={form.api_key}
                   onChange={(event) => setField("api_key", event.target.value)}
-                  placeholder={selected?.has_api_key ? "••••••••••••" : "输入 API Key"}
+                  placeholder={hasMatchingSavedApiKey ? "••••••••••••" : "输入 API Key"}
                 />
-                {selected?.has_api_key ? (
+                {hasMatchingSavedApiKey ? (
                   <Button
                     type="button"
                     tone="danger"
@@ -300,26 +339,32 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
                   </Button>
                 ) : null}
               </div>
-              <label className="form-field">
-                <span>温度</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="2"
-                  value={form.temperature}
-                  onChange={(event) => setField("temperature", Number(event.target.value))}
-                />
-              </label>
-              <label className="form-field">
-                <span>最大输出长度</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={form.max_output_tokens}
-                  onChange={(event) => setField("max_output_tokens", Number(event.target.value))}
-                />
-              </label>
+              {form.provider_type !== "opencode_go" ? (
+                <>
+                  <label className="form-field">
+                    <span>温度</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="2"
+                      value={form.temperature}
+                      onChange={(event) => setField("temperature", Number(event.target.value))}
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>最大输出长度</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={form.max_output_tokens}
+                      onChange={(event) =>
+                        setField("max_output_tokens", Number(event.target.value))
+                      }
+                    />
+                  </label>
+                </>
+              ) : null}
             </>
           ) : null}
           <label className="form-field">
@@ -341,11 +386,30 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               onChange={(event) => setField("timeout_seconds", Number(event.target.value))}
             />
           </label>
-          <ProviderRequestOptionsFields
-            providerType={form.provider_type}
-            value={form.request_options}
-            onChange={(request_options) => setField("request_options", request_options)}
-          />
+          {form.provider_type === "opencode_go" ? (
+            <OpenCodeGoOptionsFields
+              baseUrl={form.base_url}
+              profileId={selected?.id}
+              apiKey={form.api_key}
+              model={form.model}
+              temperature={form.temperature}
+              maxOutputTokens={form.max_output_tokens}
+              requestOptions={form.request_options}
+              onTemperatureChange={(temperature) => setField("temperature", temperature)}
+              onMaxOutputTokensChange={(max_output_tokens) =>
+                setField("max_output_tokens", max_output_tokens)
+              }
+              onRequestOptionsChange={(request_options) =>
+                setField("request_options", request_options)
+              }
+            />
+          ) : (
+            <ProviderRequestOptionsFields
+              providerType={form.provider_type}
+              value={form.request_options}
+              onChange={(request_options) => setField("request_options", request_options)}
+            />
+          )}
         </div>
         {error ? <p className="form-error">{error}</p> : null}
       </div>

@@ -13,6 +13,7 @@ from dataset_studio.modules.providers.models import (
     ProviderRequestError,
     ProviderResponse,
 )
+from dataset_studio.modules.providers.reasoning import extract_chat_message_reasoning
 
 
 def _extract_content(value: object) -> str:
@@ -67,14 +68,20 @@ def _parse_response(raw: object, response_text: str) -> ProviderResponse:
     _raise_api_error(raw, response_text)
     try:
         choice = raw["choices"][0]
-        content = _extract_content(choice["message"].get("content"))
+        message = choice["message"]
+        content = _extract_content(message.get("content"))
         usage = raw.get("usage") or {}
+        prompt_details = usage.get("prompt_tokens_details") or {}
+        completion_details = usage.get("completion_tokens_details") or {}
         return ProviderResponse(
             content=content,
             raw_payload=raw,
+            reasoning_content=extract_chat_message_reasoning(message),
             finish_reason=choice.get("finish_reason"),
             input_tokens=usage.get("prompt_tokens"),
             output_tokens=usage.get("completion_tokens"),
+            cache_read_tokens=prompt_details.get("cached_tokens"),
+            reasoning_tokens=completion_details.get("reasoning_tokens"),
         )
     except (AttributeError, KeyError, IndexError, TypeError, ValueError) as error:
         raise ProviderRequestError("API 响应结构无法识别。", response_text=response_text) from error

@@ -11,6 +11,7 @@ from dataset_studio.modules.assets.models import (
     AssetListResponse,
     MetadataDocument,
 )
+from dataset_studio.modules.jobs.traces import AssetAnnotationTrace
 from dataset_studio.modules.prompts.composer import RequestPromptPreview, preview_request_prompt
 
 router = APIRouter(prefix="/workspaces/{project_id}/assets", tags=["assets"])
@@ -94,3 +95,8 @@ def get_prompt_preview(project_id: str, asset_id: str, container: Container):
         selected_fields=workspace.settings.json_fields,
         configuration_issue=configuration_issue,
     )
+
+
+@router.get("/{asset_id}/annotation-trace", response_model=AssetAnnotationTrace | None)
+def get_annotation_trace(project_id: str, asset_id: str, container: Container):
+    return container.annotation_traces.get(project_id, asset_id)

@@ -4,7 +4,7 @@ export interface ProviderCapabilities {
   authMode: "api_key" | "codex_oauth";
   defaultBaseUrl: string;
   defaultConcurrency: number;
-  modelCatalog: "openrouter" | "codex" | null;
+  modelCatalog: "openrouter" | "opencode_go" | "codex" | null;
   requiresBaseUrl: boolean;
   supportsPromptCache: boolean;
   supportsReasoningEffort: boolean;
@@ -33,6 +33,17 @@ export const providerCapabilities: Record<ProviderType, ProviderCapabilities> = 
     supportsPromptCache: false,
     supportsReasoningEffort: false,
     supportsSamplingControls: true,
+    supportsServiceTier: false,
+  },
+  opencode_go: {
+    authMode: "api_key",
+    defaultBaseUrl: "https://opencode.ai/zen/go/v1",
+    defaultConcurrency: 2,
+    modelCatalog: "opencode_go",
+    requiresBaseUrl: true,
+    supportsPromptCache: false,
+    supportsReasoningEffort: false,
+    supportsSamplingControls: false,
     supportsServiceTier: false,
   },
   gemini: {

@@ -69,6 +69,9 @@ class JobAttempt(BaseModel):
     finished_at: str | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    reasoning_tokens: int | None = None
     finish_reason: str | None = None
 
 

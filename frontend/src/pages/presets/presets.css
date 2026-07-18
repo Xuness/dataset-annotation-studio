@@ -256,6 +256,10 @@
   line-height: 1.6;
 }
 
+.provider-option-note--error {
+  color: var(--danger);
+}
+
 .codex-connection {
   overflow: hidden;
   border: 1px solid var(--line);

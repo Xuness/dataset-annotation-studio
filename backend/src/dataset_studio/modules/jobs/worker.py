@@ -191,6 +191,15 @@ class AnnotationWorker:
                 repository.finish_item(item_id, JobItemStatus.INTERRUPTED)
                 return
             attempt_id, attempt_number = repository.start_attempt(item_id)
+            payload_path = self._save_request_payload(
+                workspace_root,
+                runs_root,
+                job_id,
+                asset_id,
+                attempt_number,
+                profile,
+                request,
+            )
             try:
                 response = await complete_until_stopped(
                     provider,
@@ -205,6 +214,8 @@ class AnnotationWorker:
                     job_id,
                     asset_id,
                     attempt_number,
+                    profile,
+                    request,
                     response,
                 )
                 validation = validate_tag_balance(response.content)
@@ -218,6 +229,9 @@ class AnnotationWorker:
                         provider_payload_path=payload_path,
                         input_tokens=response.input_tokens,
                         output_tokens=response.output_tokens,
+                        cache_read_tokens=response.cache_read_tokens,
+                        cache_write_tokens=response.cache_write_tokens,
+                        reasoning_tokens=response.reasoning_tokens,
                         finish_reason=response.finish_reason,
                     )
                 else:
@@ -230,6 +244,9 @@ class AnnotationWorker:
                             provider_payload_path=payload_path,
                             input_tokens=response.input_tokens,
                             output_tokens=response.output_tokens,
+                            cache_read_tokens=response.cache_read_tokens,
+                            cache_write_tokens=response.cache_write_tokens,
+                            reasoning_tokens=response.reasoning_tokens,
                             finish_reason=response.finish_reason,
                         )
                         repository.finish_item(item_id, JobItemStatus.SKIPPED)
@@ -244,6 +261,9 @@ class AnnotationWorker:
                         provider_payload_path=payload_path,
                         input_tokens=response.input_tokens,
                         output_tokens=response.output_tokens,
+                        cache_read_tokens=response.cache_read_tokens,
+                        cache_write_tokens=response.cache_write_tokens,
+                        reasoning_tokens=response.reasoning_tokens,
                         finish_reason=response.finish_reason,
                     )
                     repository.finish_item(
@@ -257,6 +277,7 @@ class AnnotationWorker:
                     attempt_id,
                     status="interrupted",
                     error_message="任务已由用户停止。",
+                    provider_payload_path=payload_path,
                 )
                 repository.finish_item(item_id, JobItemStatus.INTERRUPTED)
                 return
@@ -268,6 +289,8 @@ class AnnotationWorker:
                     job_id,
                     asset_id,
                     attempt_number,
+                    profile,
+                    request,
                     error,
                 )
                 repository.finish_attempt(
@@ -282,6 +305,7 @@ class AnnotationWorker:
                     attempt_id,
                     status="interrupted",
                     error_message="应用关闭或任务被停止。",
+                    provider_payload_path=payload_path,
                 )
                 repository.finish_item(item_id, JobItemStatus.INTERRUPTED)
                 raise
@@ -291,6 +315,7 @@ class AnnotationWorker:
                     attempt_id,
                     status="internal_error",
                     error_message=last_error,
+                    provider_payload_path=payload_path,
                 )
 
             if cycle_attempt < max_attempts:
@@ -309,20 +334,48 @@ class AnnotationWorker:
         )
 
     @staticmethod
+    def _save_request_payload(
+        workspace_root: Path,
+        runs_root: Path,
+        job_id: str,
+        asset_id: str,
+        attempt_number: int,
+        profile: ProviderProfile,
+        request: MultimodalRequest,
+    ) -> str:
+        path = runs_root / job_id / asset_id / f"attempt-{attempt_number}.json"
+        payload = {
+            "artifact_version": 2,
+            "kind": "request",
+            "request": AnnotationWorker._request_snapshot(profile, request),
+        }
+        atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+        return path.relative_to(workspace_root).as_posix()
+
+    @staticmethod
     def _save_response_payload(
         workspace_root: Path,
         runs_root: Path,
         job_id: str,
         asset_id: str,
         attempt_number: int,
+        profile: ProviderProfile,
+        request: MultimodalRequest,
         response: ProviderResponse,
     ) -> str:
         path = runs_root / job_id / asset_id / f"attempt-{attempt_number}.json"
         payload = {
+            "artifact_version": 2,
+            "kind": "response",
+            "request": AnnotationWorker._request_snapshot(profile, request),
             "content": response.content,
+            "reasoning_content": response.reasoning_content,
             "finish_reason": response.finish_reason,
             "input_tokens": response.input_tokens,
             "output_tokens": response.output_tokens,
+            "cache_read_tokens": response.cache_read_tokens,
+            "cache_write_tokens": response.cache_write_tokens,
+            "reasoning_tokens": response.reasoning_tokens,
             "raw": response.raw_payload,
         }
         atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
@@ -335,13 +388,49 @@ class AnnotationWorker:
         job_id: str,
         asset_id: str,
         attempt_number: int,
+        profile: ProviderProfile,
+        request: MultimodalRequest,
         error: ProviderRequestError,
     ) -> str:
-        path = runs_root / job_id / asset_id / f"attempt-{attempt_number}-error.json"
+        path = runs_root / job_id / asset_id / f"attempt-{attempt_number}.json"
         payload = {
+            "artifact_version": 2,
+            "kind": "error",
+            "request": AnnotationWorker._request_snapshot(profile, request),
             "error": str(error),
             "status_code": error.status_code,
             "response": error.response_text,
         }
         atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
         return path.relative_to(workspace_root).as_posix()
+
+    @staticmethod
+    def _request_snapshot(
+        profile: ProviderProfile,
+        request: MultimodalRequest,
+    ) -> dict[str, object]:
+        options = profile.request_options
+        return {
+            "system_prompt": request.system_prompt,
+            "user_prompt": request.user_prompt,
+            "image_filename": request.image_path.name,
+            "parameters": {
+                "provider_type": profile.provider_type.value,
+                "provider_profile_name": profile.name,
+                "model": request.model,
+                "temperature": request.temperature,
+                "max_output_tokens": request.max_output_tokens,
+                "timeout_seconds": request.timeout_seconds,
+                "top_p": options.top_p,
+                "seed": options.seed,
+                "service_tier": options.service_tier.value if options.service_tier else None,
+                "reasoning_effort": (
+                    options.reasoning_effort.value if options.reasoning_effort else None
+                ),
+                "prompt_cache_strategy": (
+                    options.prompt_cache_strategy.value
+                    if options.prompt_cache_strategy
+                    else None
+                ),
+            },
+        }

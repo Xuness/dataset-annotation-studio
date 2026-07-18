@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -57,11 +58,7 @@ def migrate_database(database_path: Path, migrations: tuple[Migration, ...]) -> 
         for migration in migrations:
             recorded = applied.get(migration.version)
             if recorded:
-                if recorded != (migration.name, migration.checksum):
-                    raise RuntimeError(
-                        f"数据库迁移 {migration.version} ({migration.name}) 校验失败；"
-                        "请勿修改已发布的迁移。"
-                    )
+                _verify_recorded_migration(migration, recorded)
                 continue
             _apply_migration(connection, migration)
     finally:
@@ -80,22 +77,61 @@ def _validate_plan(migrations: tuple[Migration, ...]) -> None:
 
 
 def _apply_migration(connection, migration: Migration) -> None:
-    escaped_name = migration.name.replace("'", "''")
-    script = f"""
-BEGIN IMMEDIATE;
-{migration.sql}
-INSERT INTO schema_migrations (version, name, checksum, applied_at)
-VALUES (
-    {migration.version},
-    '{escaped_name}',
-    '{migration.checksum}',
-    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-);
-COMMIT;
-"""
     try:
-        connection.executescript(script)
+        connection.execute("BEGIN IMMEDIATE")
+        recorded_row = connection.execute(
+            "SELECT name, checksum FROM schema_migrations WHERE version = ?",
+            (migration.version,),
+        ).fetchone()
+        if recorded_row is not None:
+            _verify_recorded_migration(
+                migration,
+                (str(recorded_row["name"]), str(recorded_row["checksum"])),
+            )
+            connection.commit()
+            return
+
+        _execute_migration_sql(connection, migration.sql)
+        connection.execute(
+            """
+            INSERT INTO schema_migrations (version, name, checksum, applied_at)
+            VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+            """,
+            (migration.version, migration.name, migration.checksum),
+        )
+        connection.commit()
     except BaseException:
         if connection.in_transaction:
             connection.rollback()
         raise
+
+
+def _verify_recorded_migration(
+    migration: Migration,
+    recorded: tuple[str, str],
+) -> None:
+    if recorded != (migration.name, migration.checksum):
+        raise RuntimeError(
+            f"数据库迁移 {migration.version} ({migration.name}) 校验失败；"
+            "请勿修改已发布的迁移。"
+        )
+
+
+def _execute_migration_sql(connection, script: str) -> None:
+    """Execute a SQL script without sqlite3.executescript's implicit commit."""
+
+    buffer: list[str] = []
+    for character in script:
+        buffer.append(character)
+        if character != ";":
+            continue
+        statement = "".join(buffer)
+        if not sqlite3.complete_statement(statement):
+            continue
+        if statement.strip():
+            connection.execute(statement)
+        buffer.clear()
+
+    remainder = "".join(buffer).strip()
+    if remainder:
+        raise ValueError("数据库迁移 SQL 的最后一条语句缺少分号。")

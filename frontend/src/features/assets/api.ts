@@ -1,5 +1,6 @@
 import { apiAssetUrl, apiRequest } from "../../shared/api/client";
 import type {
+  AssetAnnotationTrace,
   AssetIdListResponse,
   AssetListResponse,
   MetadataDocument,
@@ -35,6 +36,13 @@ export function getMetadata(projectId: string, assetId: string): Promise<Metadat
 
 export function getPromptPreview(projectId: string, assetId: string): Promise<PromptPreview> {
   return apiRequest(`/api/v1/workspaces/${projectId}/assets/${assetId}/prompt-preview`);
+}
+
+export function getAnnotationTrace(
+  projectId: string,
+  assetId: string,
+): Promise<AssetAnnotationTrace | null> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/assets/${assetId}/annotation-trace`);
 }
 
 export function imageUrl(projectId: string, assetId: string, contentVersion: string): string {

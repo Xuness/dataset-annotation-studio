@@ -144,11 +144,18 @@ CREATE INDEX IF NOT EXISTS idx_job_items_asset_updated
 ON job_items(asset_id, updated_at DESC);
 """
 
-WORKSPACE_SCHEMA_VERSION = 3
+JOB_ATTEMPT_USAGE_DETAILS_MIGRATION = """
+ALTER TABLE job_attempts ADD COLUMN cache_read_tokens INTEGER;
+ALTER TABLE job_attempts ADD COLUMN cache_write_tokens INTEGER;
+ALTER TABLE job_attempts ADD COLUMN reasoning_tokens INTEGER;
+"""
+
+WORKSPACE_SCHEMA_VERSION = 4
 WORKSPACE_MIGRATIONS = (
     Migration(1, "initial_workspace_schema", WORKSPACE_SCHEMA),
     Migration(2, "image_metadata_version", IMAGE_METADATA_VERSION_MIGRATION),
     Migration(3, "job_item_asset_updated_index", JOB_ITEM_ASSET_UPDATED_INDEX_MIGRATION),
+    Migration(4, "job_attempt_usage_details", JOB_ATTEMPT_USAGE_DETAILS_MIGRATION),
 )
 
 

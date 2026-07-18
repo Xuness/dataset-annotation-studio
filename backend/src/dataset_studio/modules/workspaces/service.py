@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import uuid
 from pathlib import Path
 
@@ -31,6 +32,8 @@ class WorkspaceService:
         self._settings = settings
         self._registry = registry
         self._scanner = scanner or AssetScanner()
+        self._initialized_databases: set[Path] = set()
+        self._database_init_lock = threading.Lock()
 
     def open(self, raw_path: str) -> tuple[WorkspaceSummary, ScanResult]:
         root = Path(raw_path).expanduser().resolve()
@@ -40,7 +43,7 @@ class WorkspaceService:
         paths = WorkspacePaths.from_root(root, self._settings)
         paths.ensure_directories()
         manifest = self._load_or_create_manifest(paths)
-        initialize_workspace_database(paths.database)
+        self._ensure_database(paths.database)
         scan_result = self._scanner.scan(paths, manifest)
         opened_at = utc_now_iso()
         self._registry.upsert(manifest, root, opened_at)
@@ -77,7 +80,10 @@ class WorkspaceService:
         if root is None or not root.is_dir():
             raise WorkspaceNotFoundError(f"工作区不可用：{project_id}")
         paths = WorkspacePaths.from_root(root.resolve(), self._settings)
-        return paths, self._load_manifest(paths)
+        manifest = self._load_manifest(paths)
+        paths.ensure_directories()
+        self._ensure_database(paths.database)
+        return paths, manifest
 
     def get_summary(self, project_id: str) -> WorkspaceSummary:
         paths, manifest = self.get(project_id)
@@ -107,6 +113,16 @@ class WorkspaceService:
         )
         self._save_manifest(paths, manifest)
         return manifest
+
+    def _ensure_database(self, database_path: Path) -> None:
+        resolved = database_path.resolve()
+        if resolved in self._initialized_databases:
+            return
+        with self._database_init_lock:
+            if resolved in self._initialized_databases:
+                return
+            initialize_workspace_database(resolved)
+            self._initialized_databases.add(resolved)
 
     @staticmethod
     def _load_manifest(paths: WorkspacePaths) -> WorkspaceManifest:

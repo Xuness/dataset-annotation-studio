@@ -119,6 +119,56 @@ export interface PromptPreview {
   configuration_issue: string | null;
 }
 
+export interface AnnotationTraceRequestParameters {
+  provider_type: string;
+  provider_profile_name: string;
+  model: string;
+  temperature: number | null;
+  max_output_tokens: number | null;
+  timeout_seconds: number | null;
+  top_p: number | null;
+  seed: number | null;
+  service_tier: string | null;
+  reasoning_effort: string | null;
+  prompt_cache_strategy: string | null;
+}
+
+export interface AnnotationTraceRequest {
+  system_prompt: string;
+  user_prompt: string;
+  source: "recorded" | "reconstructed";
+  parameters: AnnotationTraceRequestParameters;
+}
+
+export interface AnnotationTraceResponse {
+  reasoning_content: string | null;
+  final_content: string | null;
+  error_message: string | null;
+  finish_reason: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_read_tokens: number | null;
+  cache_write_tokens: number | null;
+  reasoning_tokens: number | null;
+}
+
+export interface AssetAnnotationTrace {
+  job_id: string;
+  job_status: string;
+  item_id: string;
+  item_status: string;
+  attempt_id: string;
+  attempt_number: number;
+  attempt_status: string;
+  started_at: string;
+  finished_at: string | null;
+  annotation_exists: boolean;
+  annotation_source: string | null;
+  matches_current_annotation: boolean;
+  request: AnnotationTraceRequest;
+  response: AnnotationTraceResponse;
+}
+
 export interface FrequencyBucket {
   value: string;
   count: number;
@@ -140,7 +190,7 @@ export interface SystemPreset {
   updated_at: string;
 }
 
-export type ProviderType = "openrouter" | "openai_compatible" | "gemini" | "codex";
+export type ProviderType = "openrouter" | "openai_compatible" | "opencode_go" | "gemini" | "codex";
 export type ServiceTier = "flex" | "priority";
 export type ReasoningEffort = "max" | "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
 export type PromptCacheStrategy = "explicit_system";
@@ -246,6 +296,9 @@ export interface JobAttempt {
   finished_at: string | null;
   input_tokens: number | null;
   output_tokens: number | null;
+  cache_read_tokens: number | null;
+  cache_write_tokens: number | null;
+  reasoning_tokens: number | null;
   finish_reason: string | null;
 }
 

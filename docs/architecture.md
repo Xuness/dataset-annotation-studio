@@ -35,7 +35,7 @@ flowchart LR
 - `modules/prompts`：User Prompt 与选定 JSON 字段的纯函数组合。
 - `modules/presets`：全局 System Prompt / 模型连接配置；API 密钥通过 `SecretStore` 隔离。
 - `modules/providers`：统一 `ModelProvider` 协议、各供应商适配器，以及惰性共享的 Codex Runtime。
-- `modules/jobs`：任务创建、查询投影、原子认领、尝试记录和 Worker。
+- `modules/jobs`：任务创建、查询投影、原子认领、尝试记录、单图调用追踪和 Worker。
 - `modules/preprocessing`：计划、图像渲染、恢复记录和撤销编排。
 - `modules/statistics`：只读派生统计；当前实现为标签频次分析器。
 - `api/routes`：HTTP 输入输出映射，不承载业务规则。
@@ -52,6 +52,16 @@ flowchart LR
 
 图片列表使用虚拟化，面向 2,000 余项仍只渲染可见行。页面使用按路由懒加载，工作区编辑器不会拖慢项目首页启动。
 
+## 单图调用追踪
+
+Worker 在外部请求开始前写入项目 `runs` 目录中的脱敏请求快照，只保留 System/User
+Prompt、模型和非敏感请求参数，不保存 API Key、图片 Base64 或绝对路径。供应商响应统一拆分为
+可见推理、最终输出、Token 用量和原始响应；供应商未返回可见推理时不会把空值解释为“没有推理”。
+
+素材页通过 `modules/jobs/traces.py` 查找最终输出与当前 `.txt` 完全一致的尝试，因此后续失败重试
+不会覆盖当前标注的来源记录。旧版运行产物没有独立请求快照时，会从任务快照与当前元数据重建
+Prompt，并在界面明确标记为重建结果。
+
 ## 扩展点
 
 ### 新数据源
@@ -61,6 +71,11 @@ flowchart LR
 ### 新供应商
 
 实现 `ModelProvider.complete()`，在工厂中注册 `ProviderType`，并为其编写无网络适配器测试。需要外部登录或长生命周期客户端的供应商，应把会话生命周期封装在独立 Runtime 中；任务、重试、保存和校验无需理解其认证协议。
+
+OpenCode Go 适配器位于独立的 `modules/providers/opencode_go` 包。模型规格负责选择
+Chat Completions 或 Anthropic Messages 通道、声明可用推理档位和缓存模式；实时模型目录
+只与这份已审计规格取交集，未知模型不会回退到通用 OpenAI 兼容协议。两条传输实现只共享
+供应商中立的请求、响应与图片编码工具，不导入其它供应商适配器的内部函数。
 
 Codex 连接由官方 Python SDK 驱动：SDK 源码固定到 OpenAI `3f74f00295dcb1346340686bb09c5bfd4f0237c4` 提交，对应 CLI Runtime `0.144.4`，避免协议模型与运行时独立漂移。API 进程与 Worker 各自惰性维护一个 app-server，复用 Codex 自身缓存的 ChatGPT 登录。每张图片创建独立的临时 Thread，完成后丢弃；System Prompt 映射为 `developer_instructions`，最终 Assistant 回复原样进入统一的 `ProviderResponse.content`。标注任务支持到 `max` 推理强度；需要子代理的 `ultra` 不进入单图标注参数面。
 
@@ -76,4 +91,4 @@ Codex 连接由官方 Python SDK 驱动：SDK 源码固定到 OpenAI `3f74f00295
 
 ## 持久化与升级
 
-全局数据库和每个项目数据库都有独立的 `schema_migrations`。迁移按版本连续执行并校验 SHA-256；修改旧迁移会拒绝启动，从而避免静默破坏旧项目。项目清单也有独立 `schema_version`，供未来非 SQLite 格式升级使用。
+全局数据库和每个项目数据库都有独立的 `schema_migrations`。迁移按版本连续执行并校验 SHA-256；修改旧迁移会拒绝启动，从而避免静默破坏旧项目。API 与 Worker 每个进程首次取得工作区时都会确认迁移已经完成，并在 SQLite 写锁内重新检查版本，避免两个进程同时启动时重复应用迁移。项目清单也有独立 `schema_version`，供未来非 SQLite 格式升级使用。

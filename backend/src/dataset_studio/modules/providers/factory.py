@@ -4,6 +4,7 @@ from dataset_studio.modules.providers.codex import CodexProvider
 from dataset_studio.modules.providers.codex_runtime import CodexRuntime
 from dataset_studio.modules.providers.gemini import GeminiProvider
 from dataset_studio.modules.providers.openai_compatible import OpenAICompatibleProvider
+from dataset_studio.modules.providers.opencode_go import OpenCodeGoProvider
 
 
 def create_provider(
@@ -16,4 +17,6 @@ def create_provider(
         return CodexProvider(codex_runtime)
     if provider_type == ProviderType.GEMINI:
         return GeminiProvider()
+    if provider_type == ProviderType.OPENCODE_GO:
+        return OpenCodeGoProvider()
     return OpenAICompatibleProvider()

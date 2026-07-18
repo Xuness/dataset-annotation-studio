@@ -21,9 +21,13 @@ class MultimodalRequest:
 class ProviderResponse:
     content: str
     raw_payload: dict[str, object]
+    reasoning_content: str | None = None
     finish_reason: str | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    reasoning_tokens: int | None = None
 
 
 class ProviderModelSummary(BaseModel):

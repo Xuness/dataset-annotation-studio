@@ -6,11 +6,11 @@
 
 - 递归或仅当前层扫描 PNG、JPG/JPEG、WebP
 - 缩略图浏览、筛选、批量选择与中央大图预览
-- 同名 JSON 字段选择、User Prompt 拼接和最终 Prompt 预览
+- 同名 JSON 字段选择、User Prompt 拼接、下一次请求预览与单图实际请求/推理/最终输出追踪
 - 全局 System Prompt 预设与独立模型连接预设
-- OpenRouter、OpenAI 兼容接口、Gemini 原生接口，以及复用 ChatGPT OAuth 的 Codex 适配层
+- OpenRouter、OpenAI 兼容接口、OpenCode Go 专用协议、Gemini 原生接口，以及复用 ChatGPT OAuth 的 Codex 适配层
 - 持久化批量任务、并发、停止、断点续跑、失败重试和人工采用
-- 模型原始响应直接写入同名 `.txt`，并保留每次请求响应
+- 模型原始响应直接写入同名 `.txt`，并保留每次脱敏请求快照与供应商响应
 - 标签闭合轻量校验、异常优先查看、显式编辑保存和标注历史
 - 有界多线程最长边 Lanczos 缩放、WebP/JPEG/PNG 转换与模板化批量重命名，执行前预览、项目内原图恢复和逆序撤销
 - Tauri 桌面窗口；发行构建会把 Python API 与 Worker 打包为本地 sidecar

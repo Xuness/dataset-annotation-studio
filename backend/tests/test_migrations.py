@@ -1,13 +1,21 @@
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 
+from dataset_studio.core.config import Settings
 from dataset_studio.core.migrations import migrate_database
 from dataset_studio.core.sqlite import connect
+from dataset_studio.core.time import utc_now_iso
+from dataset_studio.modules.workspaces.models import WorkspaceManifest
+from dataset_studio.modules.workspaces.paths import WorkspacePaths
+from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.schema import (
     WORKSPACE_MIGRATIONS,
     initialize_workspace_database,
 )
+from dataset_studio.modules.workspaces.service import WorkspaceService
 from dataset_studio.platform.global_store import GLOBAL_MIGRATIONS, initialize_global_database
 
 
@@ -141,8 +149,80 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
             entry["name"]
             for entry in connection.execute("PRAGMA index_list('job_items')").fetchall()
         }
+        attempt_columns = {
+            entry["name"]: entry
+            for entry in connection.execute("PRAGMA table_info('job_attempts')").fetchall()
+        }
     finally:
         connection.close()
     assert row["image_metadata_version"] == 1
-    assert versions == [1, 2, 3]
+    assert versions == [1, 2, 3, 4]
     assert "idx_job_items_asset_updated" in indexes
+    assert {
+        "cache_read_tokens",
+        "cache_write_tokens",
+        "reasoning_tokens",
+    }.issubset(attempt_columns)
+    assert attempt_columns["cache_read_tokens"]["notnull"] == 0
+
+
+def test_workspace_migration_is_safe_when_api_and_worker_start_together(tmp_path: Path) -> None:
+    database = tmp_path / "workspace.sqlite3"
+    migrate_database(database, WORKSPACE_MIGRATIONS[:3])
+    barrier = threading.Barrier(4)
+
+    def initialize() -> None:
+        barrier.wait()
+        initialize_workspace_database(database)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(initialize) for _ in range(4)]
+        for future in futures:
+            future.result()
+
+    connection = connect(database)
+    try:
+        versions = [
+            row["version"]
+            for row in connection.execute(
+                "SELECT version FROM schema_migrations ORDER BY version"
+            ).fetchall()
+        ]
+    finally:
+        connection.close()
+    assert versions == [1, 2, 3, 4]
+
+
+def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None:
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+    settings.ensure_directories()
+    global_database = settings.app_data_dir / "global.sqlite3"
+    initialize_global_database(global_database)
+    registry = WorkspaceRegistry(global_database)
+
+    root = tmp_path / "dataset"
+    root.mkdir()
+    paths = WorkspacePaths.from_root(root, settings)
+    paths.ensure_directories()
+    manifest = WorkspaceManifest(
+        project_id="recent-project",
+        name="dataset",
+        created_at=utc_now_iso(),
+    )
+    paths.manifest.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
+    migrate_database(paths.database, WORKSPACE_MIGRATIONS[:3])
+    registry.upsert(manifest, root, utc_now_iso())
+
+    WorkspaceService(settings, registry).get(manifest.project_id)
+
+    connection = connect(paths.database)
+    try:
+        versions = [
+            row["version"]
+            for row in connection.execute(
+                "SELECT version FROM schema_migrations ORDER BY version"
+            ).fetchall()
+        ]
+    finally:
+        connection.close()
+    assert versions == [1, 2, 3, 4]

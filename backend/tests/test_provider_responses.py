@@ -49,11 +49,19 @@ def test_openai_compatible_parses_standard_response() -> None:
         {
             "choices": [
                 {
-                    "message": {"content": "<caption>VRchat</caption>"},
+                    "message": {
+                        "content": "<caption>VRchat</caption>",
+                        "reasoning_content": "Inspect the visible scene.",
+                    },
                     "finish_reason": "stop",
                 }
             ],
-            "usage": {"prompt_tokens": 12, "completion_tokens": 5},
+            "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 5,
+                "prompt_tokens_details": {"cached_tokens": 8},
+                "completion_tokens_details": {"reasoning_tokens": 3},
+            },
         },
         "unused",
     )
@@ -62,3 +70,6 @@ def test_openai_compatible_parses_standard_response() -> None:
     assert response.finish_reason == "stop"
     assert response.input_tokens == 12
     assert response.output_tokens == 5
+    assert response.cache_read_tokens == 8
+    assert response.reasoning_tokens == 3
+    assert response.reasoning_content == "Inspect the visible scene."

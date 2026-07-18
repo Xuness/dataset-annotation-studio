@@ -1,6 +1,13 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
-import { getMetadata, getPromptPreview, listAssetIds, listAssets, type AssetQuery } from "./api";
+import {
+  getAnnotationTrace,
+  getMetadata,
+  getPromptPreview,
+  listAssetIds,
+  listAssets,
+  type AssetQuery,
+} from "./api";
 
 export function useAssets(projectId: string, query: AssetQuery) {
   return useQuery({
@@ -38,6 +45,22 @@ export function usePromptPreview(projectId: string, assetId: string | null) {
     queryKey: ["prompt-preview", projectId, assetId],
     queryFn: () => getPromptPreview(projectId, assetId!),
     enabled: Boolean(projectId && assetId),
+  });
+}
+
+export function useAnnotationTrace(projectId: string, assetId: string | null) {
+  return useQuery({
+    queryKey: ["annotation-trace", projectId, assetId],
+    queryFn: () => getAnnotationTrace(projectId, assetId!),
+    enabled: Boolean(projectId && assetId),
+    refetchInterval: (query) => {
+      const trace = query.state.data;
+      if (!trace) return 5000;
+      return ["queued", "running", "stopping"].includes(trace.job_status) ||
+        trace.attempt_status === "running"
+        ? 1000
+        : false;
+    },
   });
 }
 

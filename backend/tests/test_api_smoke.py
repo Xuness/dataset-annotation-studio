@@ -26,6 +26,12 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
         assert listed.json()["items"][0]["relative_path"] == "sample.webp"
         asset_id = listed.json()["items"][0]["id"]
 
+        trace = client.get(
+            f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation-trace"
+        )
+        assert trace.status_code == 200
+        assert trace.json() is None
+
         unconfigured_preview = client.get(
             f"/api/v1/workspaces/{project_id}/assets/{asset_id}/prompt-preview"
         )

@@ -14,6 +14,7 @@ from dataset_studio.modules.providers.models import (
     ProviderRequestError,
     ProviderResponse,
 )
+from dataset_studio.modules.providers.reasoning import extract_codex_reasoning
 
 _ANNOTATION_CONFIG: dict[str, object] = {
     "web_search": "disabled",
@@ -76,13 +77,14 @@ class CodexProvider:
         except Exception as error:
             raise ProviderRequestError(f"Codex 请求失败：{error}") from error
 
+        raw_items = [_model_dump(item) for item in result.items]
         raw_payload = {
             "provider": "codex",
             "thread_id": thread.id,
             "turn_id": result.id,
             "status": _enum_value(result.status),
             "error": _model_dump(result.error),
-            "items": [_model_dump(item) for item in result.items],
+            "items": raw_items,
             "usage": _model_dump(result.usage),
         }
         if result.error is not None:
@@ -97,9 +99,12 @@ class CodexProvider:
         return ProviderResponse(
             content=result.final_response,
             raw_payload=raw_payload,
+            reasoning_content=extract_codex_reasoning(raw_items),
             finish_reason=_enum_value(result.status),
             input_tokens=getattr(last_usage, "input_tokens", None),
             output_tokens=getattr(last_usage, "output_tokens", None),
+            cache_read_tokens=getattr(last_usage, "cached_input_tokens", None),
+            reasoning_tokens=getattr(last_usage, "reasoning_output_tokens", None),
         )
 
 

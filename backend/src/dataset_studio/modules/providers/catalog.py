@@ -4,6 +4,9 @@ import httpx
 
 from dataset_studio.modules.presets.models import ProviderType
 from dataset_studio.modules.providers.models import ProviderModelSummary, ProviderRequestError
+from dataset_studio.modules.providers.opencode_go.catalog import (
+    search_models as search_opencode_models,
+)
 
 
 async def search_provider_models(
@@ -13,8 +16,10 @@ async def search_provider_models(
     query: str,
     limit: int,
 ) -> list[ProviderModelSummary]:
+    if provider_type == ProviderType.OPENCODE_GO:
+        return await search_opencode_models(base_url, api_key, query, limit)
     if provider_type != ProviderType.OPENROUTER:
-        raise ValueError("模型目录搜索目前仅支持 OpenRouter 配置。")
+        raise ValueError("模型目录搜索目前仅支持 OpenRouter 与 OpenCode Go 配置。")
     return await _search_openrouter_models(base_url, api_key, query, limit)
 
 

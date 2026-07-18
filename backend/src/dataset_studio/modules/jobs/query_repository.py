@@ -144,7 +144,8 @@ class JobQueryRepository:
             attempt_rows = connection.execute(
                 f"""
                 SELECT id, job_item_id, attempt_number, status, response_content, error_message,
-                       started_at, finished_at, input_tokens, output_tokens, finish_reason
+                       started_at, finished_at, input_tokens, output_tokens,
+                       cache_read_tokens, cache_write_tokens, reasoning_tokens, finish_reason
                 FROM job_attempts
                 WHERE job_item_id IN ({placeholders})
                 ORDER BY job_item_id, attempt_number, started_at

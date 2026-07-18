@@ -38,6 +38,7 @@ class SystemPresetUpdate(BaseModel):
 class ProviderType(StrEnum):
     OPENROUTER = "openrouter"
     OPENAI_COMPATIBLE = "openai_compatible"
+    OPENCODE_GO = "opencode_go"
     GEMINI = "gemini"
     CODEX = "codex"
 

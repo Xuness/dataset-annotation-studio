@@ -104,6 +104,9 @@ class JobExecutionRepository:
         provider_payload_path: str | None = None,
         input_tokens: int | None = None,
         output_tokens: int | None = None,
+        cache_read_tokens: int | None = None,
+        cache_write_tokens: int | None = None,
+        reasoning_tokens: int | None = None,
         finish_reason: str | None = None,
     ) -> None:
         with transaction(self._database_path) as connection:
@@ -112,7 +115,8 @@ class JobExecutionRepository:
                 UPDATE job_attempts
                 SET status = ?, response_content = ?, error_message = ?,
                     provider_payload_path = ?, finished_at = ?, input_tokens = ?,
-                    output_tokens = ?, finish_reason = ?
+                    output_tokens = ?, cache_read_tokens = ?, cache_write_tokens = ?,
+                    reasoning_tokens = ?, finish_reason = ?
                 WHERE id = ?
                 """,
                 (
@@ -123,6 +127,9 @@ class JobExecutionRepository:
                     utc_now_iso(),
                     input_tokens,
                     output_tokens,
+                    cache_read_tokens,
+                    cache_write_tokens,
+                    reasoning_tokens,
                     finish_reason,
                     attempt_id,
                 ),

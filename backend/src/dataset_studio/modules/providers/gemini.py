@@ -9,6 +9,7 @@ from dataset_studio.modules.providers.models import (
     ProviderRequestError,
     ProviderResponse,
 )
+from dataset_studio.modules.providers.reasoning import extract_gemini_reasoning
 
 
 def _build_generation_config(
@@ -71,18 +72,22 @@ class GeminiProvider:
         try:
             raw = response.json()
             candidate = raw["candidates"][0]
+            parts = candidate["content"].get("parts", [])
             content = "".join(
                 str(part.get("text", ""))
-                for part in candidate["content"].get("parts", [])
-                if isinstance(part, dict)
+                for part in parts
+                if isinstance(part, dict) and part.get("thought") is not True
             )
             usage = raw.get("usageMetadata") or {}
             return ProviderResponse(
                 content=content,
                 raw_payload=raw,
+                reasoning_content=extract_gemini_reasoning(parts),
                 finish_reason=candidate.get("finishReason"),
                 input_tokens=usage.get("promptTokenCount"),
                 output_tokens=usage.get("candidatesTokenCount"),
+                cache_read_tokens=usage.get("cachedContentTokenCount"),
+                reasoning_tokens=usage.get("thoughtsTokenCount"),
             )
         except (KeyError, IndexError, TypeError, ValueError) as error:
             raise ProviderRequestError(

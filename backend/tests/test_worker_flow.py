@@ -1,4 +1,5 @@
 import asyncio
+import json
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ from dataset_studio.modules.jobs.models import (
     JobStatus,
 )
 from dataset_studio.modules.jobs.service import JobService
+from dataset_studio.modules.jobs.traces import AnnotationTraceService
 from dataset_studio.modules.jobs.worker import AnnotationWorker
 from dataset_studio.modules.preprocessing.service import PreprocessService
 from dataset_studio.modules.presets.models import (
@@ -43,7 +45,13 @@ class RecordingProvider:
         return ProviderResponse(
             content="<caption>quiet garden</caption>",
             raw_payload={"source": "fake"},
+            reasoning_content="The scene contains a quiet garden.",
             finish_reason="stop",
+            input_tokens=120,
+            output_tokens=30,
+            cache_read_tokens=80,
+            cache_write_tokens=10,
+            reasoning_tokens=12,
         )
 
 
@@ -56,13 +64,15 @@ def _runtime(tmp_path: Path):
     annotations = AnnotationService(workspaces)
     presets = PresetService(PresetRepository(global_database), MemorySecrets())
     jobs = JobService(workspaces, presets, annotations)
+    assets = AssetService(workspaces)
     container = AppContainer(
         settings=settings,
         workspaces=workspaces,
-        assets=AssetService(workspaces),
+        assets=assets,
         annotations=annotations,
         presets=presets,
         jobs=jobs,
+        annotation_traces=AnnotationTraceService(workspaces, assets, annotations),
         preprocessing=PreprocessService(workspaces),
         statistics=StatisticsService(workspaces),
         codex=CodexRuntime(),
@@ -131,8 +141,26 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
     detail = jobs.get(workspace.project_id, created.id)
     assert detail.succeeded == 1
     assert detail.items[0].attempts[0].response_content == "<caption>quiet garden</caption>"
+    assert detail.items[0].attempts[0].cache_read_tokens == 80
+    assert detail.items[0].attempts[0].cache_write_tokens == 10
+    assert detail.items[0].attempts[0].reasoning_tokens == 12
     payloads = list((project / ".annotation-workspace" / "runs").rglob("attempt-1.json"))
     assert len(payloads) == 1
+    payload = json.loads(payloads[0].read_text(encoding="utf-8"))
+    assert payload["kind"] == "response"
+    assert payload["request"]["system_prompt"] == "Return one XML element."
+    assert payload["request"]["user_prompt"] == "Describe the image.\n\nartist: Mori"
+    assert payload["request"]["parameters"]["model"] == "fake-model"
+    assert payload["reasoning_content"] == "The scene contains a quiet garden."
+    assert "local-test-key" not in payloads[0].read_text(encoding="utf-8")
+
+    trace = container.annotation_traces.get(workspace.project_id, detail.items[0].asset_id)
+    assert trace is not None
+    assert trace.matches_current_annotation
+    assert trace.request.source == "recorded"
+    assert trace.request.user_prompt == "Describe the image.\n\nartist: Mori"
+    assert trace.response.reasoning_content == "The scene contains a quiet garden."
+    assert trace.response.final_content == "<caption>quiet garden</caption>"
 
 
 @pytest.mark.asyncio

@@ -6,6 +6,7 @@ from dataset_studio.core.config import Settings
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.service import JobService
+from dataset_studio.modules.jobs.traces import AnnotationTraceService
 from dataset_studio.modules.preprocessing.service import PreprocessService
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.secrets import KeyringSecretStore
@@ -25,6 +26,7 @@ class AppContainer:
     annotations: AnnotationService
     presets: PresetService
     jobs: JobService
+    annotation_traces: AnnotationTraceService
     preprocessing: PreprocessService
     statistics: StatisticsService
     codex: CodexRuntime
@@ -36,16 +38,18 @@ class AppContainer:
         initialize_global_database(global_database)
         workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
         annotations = AnnotationService(workspaces)
+        assets = AssetService(workspaces)
         presets = PresetService(PresetRepository(global_database), KeyringSecretStore())
         jobs = JobService(workspaces, presets, annotations)
         codex = CodexRuntime()
         return cls(
             settings=settings,
             workspaces=workspaces,
-            assets=AssetService(workspaces),
+            assets=assets,
             annotations=annotations,
             presets=presets,
             jobs=jobs,
+            annotation_traces=AnnotationTraceService(workspaces, assets, annotations),
             preprocessing=PreprocessService(workspaces, has_active_jobs=jobs.has_active),
             statistics=StatisticsService(workspaces),
             codex=codex,
