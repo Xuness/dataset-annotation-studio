@@ -20,6 +20,12 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-shell = "2"
 
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61.3", features = ["ApplicationModel_DataTransfer"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+windows = { version = "0.61.3", features = ["Win32_System_WinRT"] }
+
 [profile.dev]
 debug = 0
 incremental = true

@@ -661,6 +661,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-plugin-shell",
+ "windows",
 ]
 
 [[package]]
