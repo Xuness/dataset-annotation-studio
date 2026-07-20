@@ -33,7 +33,7 @@ class OpenCodeGoProvider:
                 f"OpenCode Go 模型 {request.model} 尚未登记协议规格；"
                 "为避免误用协议，本次请求已停止。"
             )
-        if "image" not in spec.input_modalities:
+        if request.image_path is not None and "image" not in spec.input_modalities:
             raise ProviderRequestError(f"OpenCode Go 模型 {request.model} 不支持图像输入。")
         if request.max_output_tokens > spec.max_output_tokens:
             raise ProviderRequestError(

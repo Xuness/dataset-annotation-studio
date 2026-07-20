@@ -53,11 +53,11 @@ export function ProviderModelPicker({
     <section className="model-picker form-field--wide" aria-label="模型目录">
       <header>
         <div>
-          <strong>选择多模态模型</strong>
+          <strong>选择模型</strong>
           <small>
             {isCodex
-              ? "当前 ChatGPT 账号可用的 Codex 模型 · 点击添加或移除"
-              : "OpenRouter 模型目录 · 点击添加或移除"}
+              ? "当前 ChatGPT 账号可用的 Codex 模型 · 包含纯文本与多模态模型"
+              : "OpenRouter 完整模型目录 · 包含纯文本与多模态模型"}
           </small>
         </div>
         <Button type="button" icon={<X size={13} />} onClick={onClose}>
@@ -99,6 +99,9 @@ export function ProviderModelPicker({
               </span>
               <code>{model.id}</code>
               <span className="model-picker__facts">
+                {model.input_modalities.length ? (
+                  <small>输入 {formatModalities(model.input_modalities)}</small>
+                ) : null}
                 {model.context_length ? (
                   <small>{formatTokens(model.context_length)} 上下文</small>
                 ) : null}
@@ -124,7 +127,7 @@ export function ProviderModelPicker({
           </p>
         ) : null}
         {!models.isLoading && !models.isError && !models.data?.length ? (
-          <p className="model-picker__message">没有找到匹配的多模态模型。</p>
+          <p className="model-picker__message">没有找到匹配的模型。</p>
         ) : null}
       </div>
     </section>
@@ -143,6 +146,16 @@ function formatPrice(value: string | null): string | null {
   if (!Number.isFinite(perMillion)) return null;
   if (perMillion === 0) return "免费";
   return `$${trimNumber(perMillion)} / M`;
+}
+
+function formatModalities(modalities: string[]): string {
+  const labels: Record<string, string> = {
+    text: "文本",
+    image: "图片",
+    audio: "音频",
+    video: "视频",
+  };
+  return modalities.map((modality) => labels[modality] ?? modality).join(" / ");
 }
 
 function trimNumber(value: number): string {

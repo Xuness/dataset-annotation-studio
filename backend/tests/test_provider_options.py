@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import httpx
+import pytest
 from PIL import Image
 
 from dataset_studio.modules.presets.models import (
@@ -10,6 +12,7 @@ from dataset_studio.modules.presets.models import (
     ReasoningEffort,
     ServiceTier,
 )
+from dataset_studio.modules.providers import catalog as provider_catalog
 from dataset_studio.modules.providers.catalog import _parse_openrouter_model
 from dataset_studio.modules.providers.gemini import _build_generation_config
 from dataset_studio.modules.providers.models import MultimodalRequest
@@ -188,6 +191,57 @@ def test_openrouter_catalog_parser_exposes_picker_metadata() -> None:
     assert model.input_modalities == ["text", "image"]
     assert model.reasoning_efforts == ["high", "low"]
     assert model.prompt_price == "0.000001"
+
+
+@pytest.mark.asyncio
+async def test_openrouter_catalog_search_does_not_filter_input_or_output_modalities(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_params: dict[str, str] = {}
+
+    class FakeAsyncClient:
+        def __init__(self, *, timeout: int) -> None:
+            assert timeout == 30
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args) -> None:
+            return None
+
+        async def get(self, _url: str, *, headers, params):
+            assert headers["Accept"] == "application/json"
+            captured_params.update(params)
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "id": "example/text-model",
+                            "architecture": {"input_modalities": ["text"]},
+                        },
+                        {
+                            "id": "example/image-model",
+                            "architecture": {"input_modalities": ["text", "image"]},
+                        },
+                    ]
+                },
+            )
+
+    monkeypatch.setattr(provider_catalog.httpx, "AsyncClient", FakeAsyncClient)
+
+    models = await provider_catalog._search_openrouter_models(
+        "https://openrouter.ai/api/v1",
+        None,
+        "cheap",
+        40,
+    )
+
+    assert captured_params == {"sort": "most-popular", "q": "cheap"}
+    assert [model.id for model in models] == [
+        "example/text-model",
+        "example/image-model",
+    ]
 
 
 def test_gemini_generation_config_maps_common_sampling_options(tmp_path: Path) -> None:

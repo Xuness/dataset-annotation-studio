@@ -69,17 +69,18 @@ def _request(tmp_path: Path, profile: ProviderProfile) -> MultimodalRequest:
     )
 
 
-def test_catalog_intersects_live_ids_with_audited_multimodal_specs() -> None:
+def test_catalog_intersects_live_ids_with_all_audited_model_specs() -> None:
     models = models_from_catalog_ids(
         ["glm-5.2", "unknown-model", "grok-4.5", "qwen3.7-plus", "grok-4.5"],
         "",
         40,
     )
 
-    assert [model.id for model in models] == ["grok-4.5", "qwen3.7-plus"]
-    assert models[0].reasoning_efforts == ["low", "medium", "high"]
-    assert "automatic_prompt_cache" in models[0].supported_parameters
-    assert "explicit_prompt_cache" in models[1].supported_parameters
+    assert [model.id for model in models] == ["glm-5.2", "grok-4.5", "qwen3.7-plus"]
+    assert models[0].input_modalities == ["text"]
+    assert models[1].reasoning_efforts == ["low", "medium", "high"]
+    assert "automatic_prompt_cache" in models[1].supported_parameters
+    assert "explicit_prompt_cache" in models[2].supported_parameters
 
 
 def test_chat_payload_sends_native_reasoning_effort_without_cache_control(
@@ -262,6 +263,55 @@ async def test_provider_dispatches_registered_model_to_its_transport(
     assert response.content == "ok"
     assert captured["credential"] == "secret"
     assert captured["request"] is request
+
+
+@pytest.mark.asyncio
+async def test_provider_allows_text_only_model_for_text_only_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile = _profile("glm-5.2")
+    request = MultimodalRequest(
+        image_path=None,
+        system_prompt="translate",
+        user_prompt="source text",
+        model=profile.model,
+        temperature=profile.temperature,
+        max_output_tokens=profile.max_output_tokens,
+        timeout_seconds=profile.timeout_seconds,
+    )
+    captured: dict[str, object] = {}
+
+    async def fake_complete(spec, received_profile, credential, received_request):
+        captured.update(
+            {
+                "spec": spec,
+                "profile": received_profile,
+                "credential": credential,
+                "request": received_request,
+            }
+        )
+        return ProviderResponse(content="译文", raw_payload={})
+
+    monkeypatch.setattr(
+        "dataset_studio.modules.providers.opencode_go.chat_completions.complete",
+        fake_complete,
+    )
+
+    response = await OpenCodeGoProvider().complete(profile, "secret", request)
+
+    assert response.content == "译文"
+    assert captured["request"] is request
+
+
+@pytest.mark.asyncio
+async def test_provider_rejects_text_only_model_when_request_contains_image(
+    tmp_path: Path,
+) -> None:
+    profile = _profile("glm-5.2")
+    request = _request(tmp_path, profile)
+
+    with pytest.raises(ProviderRequestError, match="不支持图像输入"):
+        await OpenCodeGoProvider().complete(profile, "secret", request)
 
 
 @pytest.mark.asyncio

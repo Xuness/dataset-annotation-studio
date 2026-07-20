@@ -60,7 +60,7 @@ def models_from_catalog_ids(
             continue
         seen.add(model_id)
         spec = get_model_spec(model_id)
-        if spec is None or "image" not in spec.input_modalities:
+        if spec is None:
             continue
         if needle and needle not in f"{spec.id}\n{spec.name}\n{spec.description}".casefold():
             continue

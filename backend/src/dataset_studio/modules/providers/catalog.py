@@ -32,11 +32,7 @@ async def _search_openrouter_models(
     headers = {"Accept": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    params = {
-        "input_modalities": "image",
-        "output_modalities": "text",
-        "sort": "most-popular",
-    }
+    params = {"sort": "most-popular"}
     if query.strip():
         params["q"] = query.strip()
 

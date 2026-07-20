@@ -253,13 +253,13 @@ class FakeLoginHandle:
 
 
 @pytest.mark.asyncio
-async def test_codex_runtime_maps_account_and_image_model_catalog() -> None:
+async def test_codex_runtime_maps_account_and_all_model_modalities() -> None:
     client = FakeRuntimeClient()
     runtime = CodexRuntime(client_factory=lambda: client)
     working_directory = runtime.working_directory()
     try:
         account = await runtime.account_status()
-        models = await runtime.search_models("vision", 10)
+        models = await runtime.search_models("", 10)
         default_effort = await runtime.resolve_reasoning_effort("vision", None)
     finally:
         await runtime.close()
@@ -267,8 +267,9 @@ async def test_codex_runtime_maps_account_and_image_model_catalog() -> None:
     assert account.logged_in is True
     assert account.uses_chatgpt is True
     assert account.plan_type == "plus"
-    assert [model.id for model in models] == ["vision"]
+    assert [model.id for model in models] == ["vision", "text"]
     assert models[0].reasoning_efforts == ["medium", "max"]
+    assert models[1].input_modalities == ["text"]
     assert default_effort == "medium"
     assert client.closed is True
     assert not working_directory.exists()

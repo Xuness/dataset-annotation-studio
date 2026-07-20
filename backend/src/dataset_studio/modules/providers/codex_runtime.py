@@ -195,8 +195,6 @@ class CodexRuntime:
         models: list[ProviderModelSummary] = []
         for model in await self._model_catalog():
             modalities = [_enum_value(value) for value in model.input_modalities]
-            if "image" not in modalities:
-                continue
             model_id = str(model.model or model.id)
             display_name = str(model.display_name or model_id)
             description = str(model.description or "")

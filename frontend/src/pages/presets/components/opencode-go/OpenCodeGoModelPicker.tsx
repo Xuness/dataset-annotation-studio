@@ -47,8 +47,8 @@ export function OpenCodeGoModelPicker({
     <section className="model-picker form-field--wide" aria-label="OpenCode Go 模型目录">
       <header>
         <div>
-          <strong>选择 OpenCode Go 多模态模型</strong>
-          <small>实时目录与本地协议规格的交集 · 点击添加或移除</small>
+          <strong>选择 OpenCode Go 模型</strong>
+          <small>实时目录与已登记协议规格的交集 · 包含纯文本与多模态模型</small>
         </div>
         <Button type="button" icon={<X size={13} />} onClick={onClose}>
           关闭
@@ -88,6 +88,9 @@ export function OpenCodeGoModelPicker({
               </span>
               <code>{model.id}</code>
               <span className="model-picker__facts">
+                {model.input_modalities.length ? (
+                  <small>输入 {formatModalities(model.input_modalities)}</small>
+                ) : null}
                 <small>{explicitCache ? "Messages 通道" : "Chat Completions"}</small>
                 {model.context_length ? (
                   <small>{formatTokens(model.context_length)} 上下文</small>
@@ -119,7 +122,7 @@ export function OpenCodeGoModelPicker({
           </p>
         ) : null}
         {!models.isLoading && !models.isError && !models.data?.length ? (
-          <p className="model-picker__message">没有找到已登记且支持图像输入的可用模型。</p>
+          <p className="model-picker__message">没有找到已登记且当前可用的模型。</p>
         ) : null}
       </div>
     </section>
@@ -138,6 +141,16 @@ function formatPrice(value: string | null): string | null {
   if (!Number.isFinite(perMillion)) return null;
   if (perMillion === 0) return "免费";
   return `$${trimNumber(perMillion)} / M`;
+}
+
+function formatModalities(modalities: string[]): string {
+  const labels: Record<string, string> = {
+    text: "文本",
+    image: "图片",
+    audio: "音频",
+    video: "视频",
+  };
+  return modalities.map((modality) => labels[modality] ?? modality).join(" / ");
 }
 
 function trimNumber(value: number): string {
