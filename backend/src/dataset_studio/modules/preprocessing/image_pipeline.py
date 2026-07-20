@@ -4,11 +4,38 @@ import os
 import tempfile
 from pathlib import Path
 
+import cv2
+import numpy as np
 from PIL import Image, ImageOps
 
 from dataset_studio.core.files import file_sha256
-from dataset_studio.modules.preprocessing.models import ConvertOptions, OutputFormat
+from dataset_studio.modules.preprocessing.models import (
+    ConvertOptions,
+    OutputFormat,
+    ResizeAlgorithm,
+    ResizeOptions,
+)
 from dataset_studio.modules.preprocessing.planner import PlanItem
+
+_LOW_HALO_BOX_THRESHOLD = 2.0
+_BYTE_IMAGE_MODES = {
+    "L",
+    "LA",
+    "La",
+    "RGB",
+    "RGBA",
+    "RGBa",
+    "RGBX",
+    "CMYK",
+    "YCbCr",
+    "HSV",
+    "LAB",
+}
+
+# Image preparation already uses its own bounded thread pool. Prevent OpenCV's
+# Lanczos4 implementation from creating another pool inside every worker.
+cv2.setNumThreads(1)
+cv2.ocl.setUseOpenCL(False)
 
 
 def sha256(path: Path) -> str:
@@ -19,6 +46,7 @@ def render_image_to_staging(
     source: Path,
     staging: Path,
     item: PlanItem,
+    resize: ResizeOptions | None,
     convert: ConvertOptions | None,
 ) -> None:
     staging.parent.mkdir(parents=True, exist_ok=True)
@@ -31,8 +59,11 @@ def render_image_to_staging(
         with Image.open(source) as opened:
             image = ImageOps.exif_transpose(opened)
             if image.size != (item.after_width, item.after_height):
-                image = image.resize(
-                    (item.after_width, item.after_height), Image.Resampling.LANCZOS
+                algorithm = resize.algorithm if resize else ResizeAlgorithm.LANCZOS3
+                image = _resize_image(
+                    image,
+                    (item.after_width, item.after_height),
+                    algorithm,
                 )
             image, save_options = _encoding_options(image, staging.suffix, convert)
             image.save(temporary, **save_options)
@@ -40,6 +71,83 @@ def render_image_to_staging(
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
+
+
+def _resize_image(
+    image: Image.Image,
+    target_size: tuple[int, int],
+    algorithm: ResizeAlgorithm,
+) -> Image.Image:
+    image = _prepare_resize_mode(image)
+    if algorithm == ResizeAlgorithm.LANCZOS4:
+        return _resize_lanczos4(image, target_size)
+    resampling = _select_pillow_resampling(image.size, target_size, algorithm)
+    return image.resize(target_size, resampling)
+
+
+def _prepare_resize_mode(image: Image.Image) -> Image.Image:
+    if image.mode == "1":
+        return image.convert("RGB")
+    if image.mode in {"P", "PA"}:
+        has_alpha = image.mode == "PA" or "transparency" in image.info
+        return image.convert("RGBA" if has_alpha else "RGB")
+    return image
+
+
+def _select_pillow_resampling(
+    source_size: tuple[int, int],
+    target_size: tuple[int, int],
+    algorithm: ResizeAlgorithm,
+) -> Image.Resampling:
+    if algorithm == ResizeAlgorithm.LANCZOS3:
+        return Image.Resampling.LANCZOS
+    if algorithm == ResizeAlgorithm.ANIME_LOW_HALO:
+        shrink_factor = max(
+            source_size[0] / target_size[0],
+            source_size[1] / target_size[1],
+        )
+        if shrink_factor >= _LOW_HALO_BOX_THRESHOLD:
+            return Image.Resampling.BOX
+        return Image.Resampling.HAMMING
+    raise ValueError(f"缩放算法不能由 Pillow 执行：{algorithm}")
+
+
+def _resize_lanczos4(image: Image.Image, target_size: tuple[int, int]) -> Image.Image:
+    restore_mode: str | None = None
+    working = image
+    if image.mode == "RGBA":
+        working = image.convert("RGBa")
+        restore_mode = "RGBA"
+    elif image.mode == "LA":
+        working = image.convert("La")
+        restore_mode = "LA"
+
+    source_array = np.asarray(working)
+    if source_array.dtype == np.int32:
+        resized_array = cv2.resize(
+            source_array.astype(np.float32),
+            target_size,
+            interpolation=cv2.INTER_LANCZOS4,
+        )
+        result = Image.fromarray(np.rint(resized_array).astype(np.int32))
+    else:
+        if not source_array.dtype.isnative:
+            source_array = source_array.astype(source_array.dtype.newbyteorder("="))
+        resized_array = cv2.resize(
+            source_array,
+            target_size,
+            interpolation=cv2.INTER_LANCZOS4,
+        )
+        resized_array = np.ascontiguousarray(resized_array)
+        if working.mode in _BYTE_IMAGE_MODES and resized_array.dtype == np.uint8:
+            result = Image.frombytes(working.mode, target_size, resized_array.tobytes())
+        else:
+            result = Image.fromarray(resized_array)
+
+    if restore_mode is not None:
+        result = result.convert(restore_mode)
+    result.info = image.info.copy()
+    return result
 
 
 def _encoding_options(

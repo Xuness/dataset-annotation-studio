@@ -5,6 +5,12 @@ import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 import type { PreprocessFormState } from "../types";
 
+const resizeAlgorithmDescriptions: Record<PreprocessFormState["resizeAlgorithm"], string> = {
+  lanczos3: "Lanczos 3 保留较多细节，作为锐利默认值。",
+  lanczos4: "Lanczos 4 使用更宽的采样邻域，通常更锐利，也可能产生更明显的边缘振铃。",
+  anime_low_halo: "缩小达到 2 倍时使用 BOX，否则使用 Hamming，减少线稿和平涂边缘光晕。",
+};
+
 interface Props {
   form: PreprocessFormState;
   onChange: (update: Partial<PreprocessFormState>) => void;
@@ -90,6 +96,22 @@ export function PreprocessSettingsPanel({
             onChange={(event) => onChange({ maxEdge: Number(event.target.value) })}
           />
         </label>
+        <label className="form-field">
+          <span>缩放算法</span>
+          <select
+            value={form.resizeAlgorithm}
+            disabled={!form.resizeEnabled}
+            onChange={(event) =>
+              onChange({
+                resizeAlgorithm: event.target.value as PreprocessFormState["resizeAlgorithm"],
+              })
+            }
+          >
+            <option value="lanczos3">Lanczos 3（锐利，默认）</option>
+            <option value="lanczos4">Lanczos 4（更锐利）</option>
+            <option value="anime_low_halo">二次元低光晕（自适应）</option>
+          </select>
+        </label>
         <label className="check-line">
           <input
             type="checkbox"
@@ -99,7 +121,10 @@ export function PreprocessSettingsPanel({
           />
           允许放大小图
         </label>
-        <small>始终保持比例，不裁切、不补边，使用高质量 Lanczos。</small>
+        <small>
+          始终保持比例，不裁切、不补边。{resizeAlgorithmDescriptions[form.resizeAlgorithm]}
+          索引色和 1 位图会先转换为 RGB/RGBA。
+        </small>
       </section>
       <section className="preprocess-option">
         <label className="option-toggle">
@@ -183,7 +208,7 @@ export function PreprocessSettingsPanel({
           </label>
         </div>
         <small>
-          仅并行执行图片解码、Lanczos 缩放和重新编码；重命名、数据库写入与回滚仍按顺序执行。
+          仅并行执行图片解码、缩放和重新编码；重命名、数据库写入与回滚仍按顺序执行。
           自动模式最多使用 8 个线程，并会根据图片尺寸降低并发。
         </small>
       </section>

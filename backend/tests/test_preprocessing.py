@@ -8,6 +8,7 @@ from dataset_studio.core.config import Settings
 from dataset_studio.core.files import file_sha256
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.preprocessing import executor as preprocessing_executor
+from dataset_studio.modules.preprocessing import image_pipeline as preprocessing_image_pipeline
 from dataset_studio.modules.preprocessing.models import (
     ConvertOptions,
     OutputFormat,
@@ -16,6 +17,7 @@ from dataset_studio.modules.preprocessing.models import (
     PreprocessPreview,
     PreprocessRequest,
     RenameOptions,
+    ResizeAlgorithm,
     ResizeOptions,
 )
 from dataset_studio.modules.preprocessing.service import PreprocessService
@@ -49,6 +51,97 @@ def _execute(
             execution=execution or PreprocessExecutionOptions(),
         ),
     )
+
+
+def test_resize_algorithm_defaults_and_low_halo_filter_selection() -> None:
+    assert ResizeOptions(max_edge=64).algorithm == ResizeAlgorithm.LANCZOS3
+    assert (
+        preprocessing_image_pipeline._select_pillow_resampling(
+            (256, 128),
+            (128, 64),
+            ResizeAlgorithm.ANIME_LOW_HALO,
+        )
+        == Image.Resampling.BOX
+    )
+    assert (
+        preprocessing_image_pipeline._select_pillow_resampling(
+            (150, 75),
+            (100, 50),
+            ResizeAlgorithm.ANIME_LOW_HALO,
+        )
+        == Image.Resampling.HAMMING
+    )
+    assert (
+        preprocessing_image_pipeline._select_pillow_resampling(
+            (64, 32),
+            (128, 64),
+            ResizeAlgorithm.ANIME_LOW_HALO,
+        )
+        == Image.Resampling.HAMMING
+    )
+
+
+@pytest.mark.parametrize(
+    ("mode", "transparency", "expected_mode"),
+    [
+        ("P", None, "RGB"),
+        ("P", 0, "RGBA"),
+        ("1", None, "RGB"),
+    ],
+)
+def test_indexed_and_one_bit_images_convert_before_resizing(
+    mode: str,
+    transparency: int | None,
+    expected_mode: str,
+) -> None:
+    image = Image.new(mode, (64, 32))
+    if mode == "P":
+        image.putpalette([0, 0, 0, 255, 255, 255] + [0, 0, 0] * 254)
+    for x in range(32, 64):
+        for y in range(32):
+            image.putpixel((x, y), 1)
+    if transparency is not None:
+        image.info["transparency"] = transparency
+
+    resized = preprocessing_image_pipeline._resize_image(
+        image,
+        (128, 64),
+        ResizeAlgorithm.LANCZOS3,
+    )
+
+    assert resized.mode == expected_mode
+    assert resized.size == (128, 64)
+    transition_source = resized.getchannel("A") if resized.mode == "RGBA" else resized.convert("L")
+    transition = [transition_source.getpixel((x, 32)) for x in range(60, 68)]
+    assert any(value not in {0, 255} for value in transition)
+
+
+def test_lanczos4_uses_opencv_and_preserves_rgba(
+    monkeypatch,
+) -> None:
+    calls: list[int] = []
+    original_resize = preprocessing_image_pipeline.cv2.resize
+
+    def observed_resize(*args, **kwargs):
+        calls.append(kwargs["interpolation"])
+        return original_resize(*args, **kwargs)
+
+    monkeypatch.setattr(preprocessing_image_pipeline.cv2, "resize", observed_resize)
+    image = Image.new("RGBA", (64, 32), (255, 0, 0, 0))
+    for x in range(32, 64):
+        for y in range(32):
+            image.putpixel((x, y), (0, 0, 255, 255))
+
+    resized = preprocessing_image_pipeline._resize_image(
+        image,
+        (128, 64),
+        ResizeAlgorithm.LANCZOS4,
+    )
+
+    assert calls == [preprocessing_image_pipeline.cv2.INTER_LANCZOS4]
+    assert resized.mode == "RGBA"
+    assert resized.size == (128, 64)
+    assert all(red == 0 for red, _green, _blue, _alpha in resized.get_flattened_data())
 
 
 def test_resize_convert_and_undo_preserves_asset_identity(tmp_path: Path) -> None:
@@ -479,6 +572,19 @@ def test_execute_rejects_stale_preview_parameters_and_source(tmp_path: Path) -> 
             summary.project_id,
             PreprocessExecuteRequest(
                 request=changed_request,
+                preview_token=preview.preview_token,
+            ),
+        )
+    assert Image.open(image_path).size == (192, 96)
+
+    changed_algorithm = PreprocessRequest(
+        resize=ResizeOptions(max_edge=64, algorithm=ResizeAlgorithm.LANCZOS4)
+    )
+    with pytest.raises(ValueError, match="预览已失效"):
+        preprocessing.execute(
+            summary.project_id,
+            PreprocessExecuteRequest(
+                request=changed_algorithm,
                 preview_token=preview.preview_token,
             ),
         )

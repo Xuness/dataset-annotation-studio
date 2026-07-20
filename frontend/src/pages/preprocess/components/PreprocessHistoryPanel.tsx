@@ -4,6 +4,12 @@ import type { PreprocessOperation } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 
+const resizeAlgorithmLabels = {
+  lanczos3: "Lanczos 3",
+  lanczos4: "Lanczos 4",
+  anime_low_halo: "二次元低光晕",
+} as const;
+
 export function PreprocessHistoryPanel({
   operations,
   undoPending,
@@ -27,7 +33,11 @@ export function PreprocessHistoryPanel({
       <div>
         {operations.map((operation) => {
           const details = [
-            operation.options.resize ? `最长边 ${operation.options.resize.max_edge}` : null,
+            operation.options.resize
+              ? `最长边 ${operation.options.resize.max_edge} · ${
+                  resizeAlgorithmLabels[operation.options.resize.algorithm]
+                }`
+              : null,
             operation.options.convert ? operation.options.convert.format.toUpperCase() : null,
             operation.options.rename ? `重命名 ${operation.options.rename.template}` : null,
           ].filter(Boolean);

@@ -318,9 +318,12 @@ export interface JobDetail extends JobSummary {
   items: JobItemDetail[];
 }
 
+export type ResizeAlgorithm = "lanczos3" | "lanczos4" | "anime_low_halo";
+
 export interface ResizeOptions {
   max_edge: number;
   allow_upscale: boolean;
+  algorithm: ResizeAlgorithm;
 }
 
 export interface ConvertOptions {

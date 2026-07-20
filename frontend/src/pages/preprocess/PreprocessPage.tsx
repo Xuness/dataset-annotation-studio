@@ -27,6 +27,7 @@ const initialForm: PreprocessFormState = {
   resizeEnabled: true,
   maxEdge: 2048,
   allowUpscale: false,
+  resizeAlgorithm: "lanczos3",
   convertEnabled: false,
   format: "webp",
   quality: 90,
@@ -58,7 +59,11 @@ export function PreprocessPage() {
     () => ({
       asset_ids: form.scope === "selected" ? checkedAssetIds : [],
       resize: form.resizeEnabled
-        ? { max_edge: form.maxEdge, allow_upscale: form.allowUpscale }
+        ? {
+            max_edge: form.maxEdge,
+            allow_upscale: form.allowUpscale,
+            algorithm: form.resizeAlgorithm,
+          }
         : null,
       convert: form.convertEnabled
         ? { format: form.format, quality: form.quality, effort: form.effort }

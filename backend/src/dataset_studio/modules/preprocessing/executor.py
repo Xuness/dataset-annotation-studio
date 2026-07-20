@@ -159,7 +159,13 @@ class PreprocessItemPreparer:
             if requires_render(item, self._request):
                 target_suffix = Path(item.after_relative_path).suffix
                 staging = self._operation_root / "staging" / f"{item.asset_id}{target_suffix}"
-                render_image_to_staging(recovery, staging, item, self._request.convert)
+                render_image_to_staging(
+                    recovery,
+                    staging,
+                    item,
+                    self._request.resize,
+                    self._request.convert,
+                )
                 after_hash = sha256(staging)
             else:
                 after_hash = item.before_hash

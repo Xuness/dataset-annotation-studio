@@ -71,7 +71,11 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
 
         preprocess_request = {
             "asset_ids": [],
-            "resize": {"max_edge": 128, "allow_upscale": True},
+            "resize": {
+                "max_edge": 128,
+                "allow_upscale": True,
+                "algorithm": "lanczos4",
+            },
             "convert": None,
             "rename": None,
         }
@@ -90,5 +94,6 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
         )
         assert executed.status_code == 200
         assert executed.json()["status"] == "completed"
+        assert executed.json()["options"]["resize"]["algorithm"] == "lanczos4"
         with Image.open(project / "sample.webp") as resized:
             assert resized.size == (128, 64)

@@ -11,11 +11,18 @@ class OutputFormat(StrEnum):
     PNG = "png"
 
 
+class ResizeAlgorithm(StrEnum):
+    LANCZOS3 = "lanczos3"
+    LANCZOS4 = "lanczos4"
+    ANIME_LOW_HALO = "anime_low_halo"
+
+
 class ResizeOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_edge: int = Field(ge=64, le=65_536)
     allow_upscale: bool = False
+    algorithm: ResizeAlgorithm = ResizeAlgorithm.LANCZOS3
 
 
 class ConvertOptions(BaseModel):
