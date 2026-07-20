@@ -58,6 +58,7 @@ class WorkspaceService:
                 paths = WorkspacePaths.from_root(root, self._settings)
                 try:
                     manifest = self._load_manifest(paths)
+                    self._ensure_database(paths.database)
                     summaries.append(self._summary(paths, manifest, str(row["last_opened_at"])))
                     continue
                 except (OSError, ValueError, json.JSONDecodeError):

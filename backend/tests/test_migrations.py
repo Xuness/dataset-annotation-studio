@@ -236,3 +236,41 @@ def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None
     finally:
         connection.close()
     assert versions == [1, 2, 3, 4, 5]
+
+
+def test_recent_workspace_list_applies_missing_migrations_before_summary(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+    settings.ensure_directories()
+    global_database = settings.app_data_dir / "global.sqlite3"
+    initialize_global_database(global_database)
+    registry = WorkspaceRegistry(global_database)
+
+    root = tmp_path / "dataset"
+    root.mkdir()
+    paths = WorkspacePaths.from_root(root, settings)
+    paths.ensure_directories()
+    manifest = WorkspaceManifest(
+        project_id="recent-project",
+        name="dataset",
+        created_at=utc_now_iso(),
+    )
+    paths.manifest.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
+    migrate_database(paths.database, WORKSPACE_MIGRATIONS[:4])
+    registry.upsert(manifest, root, utc_now_iso())
+
+    summaries = WorkspaceService(settings, registry).list_recent()
+
+    connection = connect(paths.database)
+    try:
+        versions = [
+            row["version"]
+            for row in connection.execute(
+                "SELECT version FROM schema_migrations ORDER BY version"
+            ).fetchall()
+        ]
+    finally:
+        connection.close()
+    assert [summary.project_id for summary in summaries] == [manifest.project_id]
+    assert versions == [1, 2, 3, 4, 5]
