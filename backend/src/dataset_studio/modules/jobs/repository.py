@@ -18,6 +18,8 @@ class JobCreationRepository:
         self,
         *,
         job_id: str,
+        kind: str,
+        configuration_snapshot: str,
         system_preset_id: str,
         system_prompt_snapshot: str,
         provider_profile_id: str,
@@ -34,15 +36,18 @@ class JobCreationRepository:
             connection.execute(
                 """
                 INSERT INTO jobs (
-                    id, status, system_preset_id, system_prompt_snapshot,
+                    id, status, kind, configuration_snapshot,
+                    system_preset_id, system_prompt_snapshot,
                     provider_profile_id, provider_snapshot, user_prompt_snapshot,
                     json_fields_snapshot, scope, overwrite_existing, retry_limit, stop_requested,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
                 """,
                 (
                     job_id,
                     JobStatus.QUEUED.value,
+                    kind,
+                    configuration_snapshot,
                     system_preset_id,
                     system_prompt_snapshot,
                     provider_profile_id,

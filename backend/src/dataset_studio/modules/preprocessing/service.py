@@ -11,7 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from dataset_studio.core.files import atomic_copy_file
-from dataset_studio.core.sqlite import transaction
+from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.modules.assets.scanner import IMAGE_METADATA_VERSION, AssetScanner
 from dataset_studio.modules.preprocessing.executor import PreparedItem, PreprocessItemPreparer
 from dataset_studio.modules.preprocessing.image_pipeline import sha256
@@ -24,9 +24,8 @@ from dataset_studio.modules.preprocessing.models import (
 )
 from dataset_studio.modules.preprocessing.planner import PlanItem, build_plan, preview_token
 from dataset_studio.modules.preprocessing.repository import PreprocessRepository
+from dataset_studio.modules.translations.service import LANGUAGE_PATTERN
 from dataset_studio.modules.workspaces.service import WorkspaceService
-
-_SIDECAR_SUFFIXES = (".txt", ".json")
 
 
 class PreprocessService:
@@ -148,7 +147,7 @@ class PreprocessService:
             if repository.latest_completed_id() != operation_id:
                 raise ValueError("只能从最新的一次预处理开始依次撤销。")
             items = list(repository.items(operation_id))
-            self._verify_undo(paths.root, items)
+            self._verify_undo(paths.root, paths.database, items)
             backup_root = paths.recovery / operation_id / "undo-backup"
             completed: list[tuple[object, Path]] = []
             try:
@@ -199,7 +198,12 @@ class PreprocessService:
         if paths_differ and target.exists() and not self._same_file(source, target):
             raise ValueError(f"目标文件在执行前已出现，拒绝覆盖：{item.after_relative_path}")
         target_was_source = paths_differ and self._same_file(source, target)
-        sidecars = self._sidecar_paths(source, target, prepared.recovery_path)
+        sidecars = self._sidecar_paths(
+            source,
+            target,
+            prepared.recovery_path,
+            self._claimed_annotation_paths(paths.database, paths.root),
+        )
         sidecar_states: list[tuple[Path, Path, Path, bool]] = []
         for before_sidecar, after_sidecar, recovery_sidecar in sidecars:
             if after_sidecar.exists() and not self._same_file(before_sidecar, after_sidecar):
@@ -292,7 +296,11 @@ class PreprocessService:
         )
 
     @staticmethod
-    def _verify_undo(root: Path, items) -> None:
+    def _verify_undo(root: Path, database_path: Path, items) -> None:
+        claimed_annotations = PreprocessService._claimed_annotation_paths(
+            database_path,
+            root,
+        )
         for item in items:
             current = root / str(item["after_relative_path"])
             before = root / str(item["before_relative_path"])
@@ -311,7 +319,10 @@ class PreprocessService:
             ):
                 raise ValueError(f"原路径已出现新文件，拒绝覆盖：{item['before_relative_path']}")
             for before_sidecar, after_sidecar, _ in PreprocessService._sidecar_paths(
-                before, current, original
+                before,
+                current,
+                original,
+                claimed_annotations,
             ):
                 if after_sidecar.exists() and not after_sidecar.is_file():
                     raise ValueError(f"当前同名伴随路径不是文件：{after_sidecar.relative_to(root)}")
@@ -334,7 +345,12 @@ class PreprocessService:
         before = root / str(item["before_relative_path"])
         original = root / str(item["recovery_relative_path"])
         paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
-        sidecars = cls._sidecar_paths(before, current, original)
+        sidecars = cls._sidecar_paths(
+            before,
+            current,
+            original,
+            cls._claimed_annotation_paths(database_path, root),
+        )
         atomic_copy_file(current, backup)
         cls._backup_current_sidecars(sidecars, backup)
         before_written = False
@@ -376,7 +392,15 @@ class PreprocessService:
         paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
         if paths_differ and before.is_file() and sha256(before) != str(item["before_hash"]):
             raise RuntimeError(f"撤销补偿时原路径又被修改：{item['before_relative_path']}")
-        cls._restore_processed_sidecars(cls._sidecar_paths(before, after, original), backup)
+        cls._restore_processed_sidecars(
+            cls._sidecar_paths(
+                before,
+                after,
+                original,
+                cls._claimed_annotation_paths(database_path, root),
+            ),
+            backup,
+        )
         if paths_differ:
             before.unlink(missing_ok=True)
         atomic_copy_file(backup, after)
@@ -429,6 +453,21 @@ class PreprocessService:
                     asset_id,
                 ),
             )
+            translation_rows = connection.execute(
+                "SELECT language FROM annotation_translations WHERE asset_id = ?",
+                (asset_id,),
+            ).fetchall()
+            for row in translation_rows:
+                language = str(row["language"])
+                translation = annotation.with_name(f"{annotation.stem}.{language}.txt")
+                connection.execute(
+                    """
+                    UPDATE annotation_translations
+                    SET translation_relative_path = ?
+                    WHERE asset_id = ? AND language = ?
+                    """,
+                    (translation.relative_to(root).as_posix(), asset_id, language),
+                )
 
     def active_overview(self) -> tuple[int, int]:
         with self._active_lock:
@@ -450,7 +489,7 @@ class PreprocessService:
 
     def _ensure_no_active_jobs(self, project_id: str) -> None:
         if self._has_active_jobs(project_id):
-            raise ValueError("当前工作区仍有标注任务运行，请先停止任务再修改图片文件。")
+            raise ValueError("当前工作区仍有标注或翻译任务运行，请先停止任务再修改图片文件。")
 
     @contextmanager
     def guard_workspace(self, project_id: str, operation_id: str):
@@ -487,13 +526,21 @@ class PreprocessService:
         completed: list[tuple[PlanItem, Path]],
     ) -> None:
         errors: list[str] = []
+        claimed_annotations = cls._claimed_annotation_paths(database_path, root)
         for item, recovery in reversed(completed):
             try:
                 after = root / item.after_relative_path
                 before = root / item.before_relative_path
                 bundle_errors: list[str] = []
                 try:
-                    cls._restore_original_sidecars(cls._sidecar_paths(before, after, recovery))
+                    cls._restore_original_sidecars(
+                        cls._sidecar_paths(
+                            before,
+                            after,
+                            recovery,
+                            claimed_annotations,
+                        )
+                    )
                 except Exception as sidecar_error:
                     bundle_errors.append(f"伴随文件恢复失败：{sidecar_error}")
                 try:
@@ -538,14 +585,76 @@ class PreprocessService:
         before_image: Path,
         after_image: Path,
         recovery_image: Path,
+        claimed_annotations: set[str],
     ) -> list[tuple[Path, Path, Path]]:
-        paths: list[tuple[Path, Path, Path]] = []
-        for suffix in _SIDECAR_SUFFIXES:
-            before = before_image.with_suffix(suffix)
-            after = after_image.with_suffix(suffix)
-            if before.as_posix() != after.as_posix():
-                paths.append((before, after, recovery_image.with_suffix(suffix)))
-        return paths
+        paths: list[tuple[Path, Path, Path]] = [
+            (
+                before_image.with_suffix(".txt"),
+                after_image.with_suffix(".txt"),
+                recovery_image.with_suffix(".txt"),
+            ),
+            (
+                before_image.with_suffix(".json"),
+                after_image.with_suffix(".json"),
+                recovery_image.with_suffix(".json"),
+            ),
+        ]
+        languages = (
+            PreprocessService._translation_languages(before_image, claimed_annotations)
+            | PreprocessService._translation_languages(after_image, claimed_annotations)
+            | PreprocessService._translation_languages(recovery_image, set())
+        )
+        for language in sorted(languages):
+            paths.append(
+                (
+                    before_image.with_name(f"{before_image.stem}.{language}.txt"),
+                    after_image.with_name(f"{after_image.stem}.{language}.txt"),
+                    recovery_image.with_name(f"{recovery_image.stem}.{language}.txt"),
+                )
+            )
+        return [
+            (before, after, recovery)
+            for before, after, recovery in paths
+            if before.as_posix() != after.as_posix()
+        ]
+
+    @staticmethod
+    def _translation_languages(
+        image_path: Path,
+        claimed_annotations: set[str],
+    ) -> set[str]:
+        if not image_path.parent.is_dir():
+            return set()
+        prefix = f"{image_path.stem}."
+        languages: set[str] = set()
+        for candidate in image_path.parent.glob(f"{image_path.stem}.*.txt"):
+            if PreprocessService._path_key(candidate) in claimed_annotations:
+                continue
+            language = candidate.name[len(prefix) : -len(".txt")]
+            if LANGUAGE_PATTERN.fullmatch(language):
+                languages.add(language)
+        return languages
+
+    @staticmethod
+    def _claimed_annotation_paths(database_path: Path, root: Path) -> set[str]:
+        connection = connect(database_path)
+        try:
+            return {
+                PreprocessService._path_key(root / str(row["annotation_relative_path"]))
+                for row in connection.execute(
+                    """
+                    SELECT annotation_relative_path
+                    FROM assets
+                    WHERE is_present = 1
+                    """
+                )
+            }
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _path_key(path: Path) -> str:
+        return path.resolve().as_posix().casefold()
 
     @staticmethod
     def _same_file(first: Path, second: Path) -> bool:
@@ -575,7 +684,7 @@ class PreprocessService:
         backup_image: Path,
     ) -> None:
         for _, after, _ in sidecars:
-            backup = backup_image.with_suffix(after.suffix)
+            backup = backup_image.parent / after.name
             if after.is_file():
                 atomic_copy_file(after, backup)
             else:
@@ -596,7 +705,7 @@ class PreprocessService:
         backup_image: Path,
     ) -> None:
         for before, after, recovery in sidecars:
-            backup = backup_image.with_suffix(after.suffix)
+            backup = backup_image.parent / after.name
             if not backup.is_file() and not recovery.is_file():
                 continue
             before.unlink(missing_ok=True)

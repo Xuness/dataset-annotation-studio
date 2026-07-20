@@ -10,6 +10,7 @@ import {
   useDeleteAnnotation,
   useSaveAnnotation,
 } from "../../../features/annotations/hooks";
+import { useTranslation, useTranslations } from "../../../features/translations/hooks";
 import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
@@ -22,6 +23,8 @@ interface AnnotationEditorProps {
   onDirtyChange: (dirty: boolean) => void;
 }
 
+type EditorMode = "source" | "translation" | "compare";
+
 const FONT_SIZE_STORAGE_KEY = "dataset-studio.annotation-font-size";
 const REVISION_SOURCE_LABELS: Record<string, string> = {
   manual_edit: "手动保存",
@@ -29,6 +32,15 @@ const REVISION_SOURCE_LABELS: Record<string, string> = {
   manual_accept: "人工采用",
   deleted_snapshot: "删除前快照",
 };
+const DEFAULT_LANGUAGES = ["zh-CN", "zh-TW", "en", "ja", "ko"];
+const TRANSLATION_STATUS_LABELS = {
+  missing: "尚无译文",
+  current: "译文最新",
+  stale: "译文已过期",
+  untracked: "外部译文",
+  source_missing: "缺少源标注",
+  conflict: "文件名冲突",
+} as const;
 
 function readFontSize(): number {
   const stored = Number.parseInt(window.localStorage.getItem(FONT_SIZE_STORAGE_KEY) ?? "12", 10);
@@ -39,12 +51,23 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
   const annotation = useAnnotation(projectId, assetId);
   const save = useSaveAnnotation(projectId, assetId ?? "");
   const remove = useDeleteAnnotation(projectId, assetId ?? "");
+  const translations = useTranslations(projectId, assetId);
+  const [language, setLanguage] = useState("zh-CN");
+  const translation = useTranslation(projectId, assetId, language);
+  const [mode, setMode] = useState<EditorMode>("source");
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
   const [fontSize, setFontSize] = useState(readFontSize);
   const [showHistory, setShowHistory] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const history = useAnnotationHistory(projectId, assetId, showHistory);
+  const languageOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([...DEFAULT_LANGUAGES, ...(translations.data?.map((item) => item.language) ?? [])]),
+      ),
+    [translations.data],
+  );
 
   const dirty = content !== savedContent;
   const dirtyRef = useRef(dirty);
@@ -133,39 +156,121 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
     setShowHistory(false);
   }
 
+  function readonlyEditor(value: string, placeholder: string) {
+    return (
+      <CodeMirror
+        className="annotation-editor__codemirror annotation-editor__codemirror--readonly"
+        value={value}
+        height="100%"
+        maxHeight="100%"
+        extensions={extensions}
+        editable={false}
+        placeholder={placeholder}
+        basicSetup={{
+          lineNumbers: true,
+          foldGutter: true,
+          highlightActiveLine: false,
+          highlightActiveLineGutter: false,
+        }}
+      />
+    );
+  }
+
+  const translationStatus = translation.data?.status;
+  const translationUnavailable =
+    !translation.data?.exists ||
+    translation.data.status === "source_missing" ||
+    translation.data.status === "conflict";
+
   return (
     <section className="annotation-editor">
       <header className="annotation-editor__header">
         <div className="annotation-editor__title">
           <FileText size={15} />
-          <strong>标注文本</strong>
-          {annotation.data ? <StatusDot status={annotation.data.status} showLabel /> : null}
+          <strong>标注与译文</strong>
+          {mode === "source" && annotation.data ? (
+            <StatusDot status={annotation.data.status} showLabel />
+          ) : null}
+          {mode !== "source" && translationStatus ? (
+            <span className={`translation-status translation-status--${translationStatus}`}>
+              {TRANSLATION_STATUS_LABELS[translationStatus]}
+            </span>
+          ) : null}
           {dirty ? <span className="unsaved-mark">尚未保存</span> : null}
         </div>
+        <div className="annotation-editor__view-controls">
+          <div className="annotation-view-tabs">
+            <button
+              className={mode === "source" ? "is-active" : ""}
+              onClick={() => {
+                setMode("source");
+                setShowHistory(false);
+              }}
+            >
+              原文
+            </button>
+            <button
+              className={mode === "translation" ? "is-active" : ""}
+              onClick={() => {
+                setMode("translation");
+                setShowHistory(false);
+              }}
+            >
+              译文
+            </button>
+            <button
+              className={mode === "compare" ? "is-active" : ""}
+              onClick={() => {
+                setMode("compare");
+                setShowHistory(false);
+              }}
+            >
+              对照
+            </button>
+          </div>
+          {mode !== "source" ? (
+            <select
+              className="annotation-language-select"
+              aria-label="译文语言"
+              value={language}
+              onChange={(event) => setLanguage(event.target.value)}
+            >
+              {languageOptions.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </div>
         <div className="annotation-editor__actions">
-          <Button
-            icon={<History size={14} />}
-            onClick={() => setShowHistory((current) => !current)}
-            disabled={!assetId}
-          >
-            历史
-          </Button>
-          <Button
-            tone="danger"
-            icon={<Trash2 size={14} />}
-            onClick={() => void handleDelete()}
-            disabled={!annotation.data?.exists || remove.isPending}
-          >
-            删除
-          </Button>
-          <Button
-            tone="primary"
-            icon={save.isPending ? <Spinner /> : <Save size={14} />}
-            onClick={() => void handleSaveClick()}
-            disabled={!assetId || !dirty || save.isPending}
-          >
-            保存
-          </Button>
+          {mode === "source" ? (
+            <>
+              <Button
+                icon={<History size={14} />}
+                onClick={() => setShowHistory((current) => !current)}
+                disabled={!assetId}
+              >
+                历史
+              </Button>
+              <Button
+                tone="danger"
+                icon={<Trash2 size={14} />}
+                onClick={() => void handleDelete()}
+                disabled={!annotation.data?.exists || remove.isPending}
+              >
+                删除
+              </Button>
+              <Button
+                tone="primary"
+                icon={save.isPending ? <Spinner /> : <Save size={14} />}
+                onClick={() => void handleSaveClick()}
+                disabled={!assetId || !dirty || save.isPending}
+              >
+                保存
+              </Button>
+            </>
+          ) : null}
         </div>
       </header>
 
@@ -182,7 +287,7 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
             无法读取标注：
             {annotation.error instanceof Error ? annotation.error.message : "未知错误"}
           </div>
-        ) : assetId && showHistory ? (
+        ) : assetId && showHistory && mode === "source" ? (
           <div className="annotation-editor__history">
             {history.isLoading ? <Spinner label="读取历史" /> : null}
             {history.isError ? (
@@ -209,7 +314,7 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
             ))}
             {!history.isLoading && !history.data?.length ? <p>当前还没有历史版本。</p> : null}
           </div>
-        ) : assetId ? (
+        ) : assetId && mode === "source" ? (
           <CodeMirror
             className="annotation-editor__codemirror"
             value={content}
@@ -225,6 +330,53 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
               highlightActiveLineGutter: false,
             }}
           />
+        ) : assetId && mode === "translation" ? (
+          translation.isLoading ? (
+            <div className="annotation-editor__empty">
+              <Spinner label="读取译文" />
+            </div>
+          ) : translation.isError && !translation.data ? (
+            <div className="annotation-editor__empty validation-warning">
+              无法读取译文：
+              {translation.error instanceof Error ? translation.error.message : "未知错误"}
+            </div>
+          ) : translationUnavailable ? (
+            <div className="annotation-editor__empty annotation-editor__translation-empty">
+              <strong>{TRANSLATION_STATUS_LABELS[translation.data?.status ?? "missing"]}</strong>
+              <span>
+                {translation.data?.issue ?? `在任务页选择素材并创建 ${language} 翻译任务。`}
+              </span>
+            </div>
+          ) : (
+            readonlyEditor(translation.data?.content ?? "", "当前没有译文。")
+          )
+        ) : assetId && mode === "compare" ? (
+          <div className="annotation-editor__compare">
+            <section>
+              <header>
+                <strong>原文</strong>
+                <small>{annotation.data?.path}</small>
+              </header>
+              <div>{readonlyEditor(content, "当前没有源标注。")}</div>
+            </section>
+            <section>
+              <header>
+                <strong>{language} 译文</strong>
+                <small>{translation.data?.path}</small>
+              </header>
+              <div>
+                {translation.isLoading ? (
+                  <div className="annotation-editor__empty">
+                    <Spinner label="读取译文" />
+                  </div>
+                ) : translationUnavailable ? (
+                  <div className="annotation-editor__empty">尚无可对照的译文</div>
+                ) : (
+                  readonlyEditor(translation.data?.content ?? "", "当前没有译文。")
+                )}
+              </div>
+            </section>
+          </div>
         ) : (
           <div className="annotation-editor__empty">选择图片后可查看和编辑同名 .txt</div>
         )}
@@ -232,19 +384,37 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
 
       <footer className="annotation-editor__footer">
         {actionError ? <span className="validation-warning">{actionError}</span> : null}
-        <span>{content.length.toLocaleString()} 字符</span>
-        {dirty ? (
-          <span>保存后重新校验标签</span>
+        {mode === "source" ? (
+          <>
+            <span>{content.length.toLocaleString()} 字符</span>
+            {dirty ? (
+              <span>保存后重新校验标签</span>
+            ) : (
+              <span>{annotation.data?.validation?.tag_count ?? 0} 个标签</span>
+            )}
+            {!dirty && annotation.data?.validation?.issues.length ? (
+              <span className="validation-warning">
+                <TriangleAlert size={12} /> {annotation.data.validation.issues[0].message}
+              </span>
+            ) : null}
+          </>
         ) : (
-          <span>{annotation.data?.validation?.tag_count ?? 0} 个标签</span>
+          <>
+            <span>{translation.data?.content.length.toLocaleString() ?? 0} 个译文字符</span>
+            <span>{translation.data?.path ?? `*.${language}.txt`}</span>
+            {dirty ? (
+              <span className="translation-stale-warning">原文尚未保存；保存后现有译文会过期</span>
+            ) : null}
+            {translation.data?.provider_profile_name ? (
+              <span>
+                {translation.data.provider_profile_name} · {translation.data.model}
+              </span>
+            ) : null}
+          </>
         )}
-        {!dirty && annotation.data?.validation?.issues.length ? (
-          <span className="validation-warning">
-            <TriangleAlert size={12} /> {annotation.data.validation.issues[0].message}
-          </span>
-        ) : null}
         <span className="annotation-editor__shortcut">
-          {fontSize}px · Ctrl+滚轮调整字号 · Ctrl+S 保存
+          {fontSize}px · Ctrl+滚轮调整字号
+          {mode === "source" ? " · Ctrl+S 保存" : " · 译文只读"}
         </span>
       </footer>
     </section>

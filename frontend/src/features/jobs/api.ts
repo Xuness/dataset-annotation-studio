@@ -1,11 +1,20 @@
 import { apiRequest } from "../../shared/api/client";
-import type { JobDetail, JobSummary } from "../../shared/api/types";
+import type {
+  ExistingTranslationPolicy,
+  JobDetail,
+  JobKind,
+  JobSummary,
+} from "../../shared/api/types";
 
 export interface CreateJobInput {
   provider_profile_id: string;
+  kind: JobKind;
   scope: "all" | "selected";
   asset_ids: string[];
   overwrite_existing?: boolean;
+  translation_prompt_preset_id?: string;
+  target_language?: string;
+  translation_policy?: ExistingTranslationPolicy;
 }
 
 const jobsPath = (projectId: string) => `/api/v1/workspaces/${projectId}/jobs`;
@@ -47,6 +56,7 @@ export function getActiveJobs(): Promise<{
   count: number;
   project_count: number;
   annotation_job_count: number;
+  translation_job_count: number;
   preprocessing_count: number;
 }> {
   return apiRequest("/api/v1/jobs/active");

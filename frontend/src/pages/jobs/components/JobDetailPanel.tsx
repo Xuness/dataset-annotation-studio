@@ -55,8 +55,15 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
       <header>
         <div>
           <span className="eyebrow">Task detail</span>
-          <h2>{job.data.system_preset_name}</h2>
-          <p>{job.data.provider_profile_name}</p>
+          <h2>
+            {job.data.kind === "translation"
+              ? `${job.data.target_language ?? "目标语言"} 译文任务`
+              : job.data.system_preset_name}
+          </h2>
+          <p>
+            {job.data.provider_profile_name}
+            {job.data.kind === "translation" ? ` · ${job.data.system_preset_name}` : ""}
+          </p>
         </div>
         <div>
           {active ? (
@@ -145,7 +152,9 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
                   }
                   disabled={actions.accept.isPending}
                 >
-                  人工确认并写入 TXT
+                  {job.data.kind === "translation"
+                    ? `人工确认并写入 .${job.data.target_language}.txt`
+                    : "人工确认并写入 TXT"}
                 </Button>
               ) : null}
             </article>

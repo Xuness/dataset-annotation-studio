@@ -61,7 +61,12 @@ class JobExecutionRepository:
                 )
             return [dict(row) for row in rows]
 
-    def start_attempt(self, item_id: str) -> tuple[str, int]:
+    def start_attempt(
+        self,
+        item_id: str,
+        *,
+        source_annotation_hash: str | None = None,
+    ) -> tuple[str, int]:
         attempt_id = str(uuid.uuid4())
         now = utc_now_iso()
         with transaction(self._database_path) as connection:
@@ -87,10 +92,11 @@ class JobExecutionRepository:
             connection.execute(
                 """
                 INSERT INTO job_attempts (
-                    id, job_item_id, attempt_number, status, started_at
-                ) VALUES (?, ?, ?, 'running', ?)
+                    id, job_item_id, attempt_number, status, started_at,
+                    source_annotation_hash
+                ) VALUES (?, ?, ?, 'running', ?, ?)
                 """,
-                (attempt_id, item_id, attempt_number, now),
+                (attempt_id, item_id, attempt_number, now, source_annotation_hash),
             )
         return attempt_id, attempt_number
 

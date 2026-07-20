@@ -39,20 +39,22 @@ class GeminiProvider:
             raise ProviderRequestError("当前 API 配置尚未保存 API Key。")
         base_url = profile.base_url.rstrip("/")
         url = f"{base_url}/models/{request.model}:generateContent"
+        parts: list[dict[str, object]] = [{"text": request.user_prompt}]
+        if request.image_path is not None:
+            parts.append(
+                {
+                    "inlineData": {
+                        "mimeType": image_mime_type(request.image_path),
+                        "data": encode_image_base64(request.image_path),
+                    }
+                }
+            )
         payload = {
             "systemInstruction": {"parts": [{"text": request.system_prompt}]},
             "contents": [
                 {
                     "role": "user",
-                    "parts": [
-                        {"text": request.user_prompt},
-                        {
-                            "inlineData": {
-                                "mimeType": image_mime_type(request.image_path),
-                                "data": encode_image_base64(request.image_path),
-                            }
-                        },
-                    ],
+                    "parts": parts,
                 }
             ],
             "generationConfig": _build_generation_config(profile, request),

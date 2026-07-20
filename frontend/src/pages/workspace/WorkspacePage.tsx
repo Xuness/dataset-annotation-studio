@@ -321,7 +321,9 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         </span>
         <span>已标注 {workspace.data.annotated_count}</span>
         <span>异常 {workspace.data.invalid_count}</span>
-        <span className="workspace-statusbar__path">UTF-8 · 同名 .txt · 标签闭合轻量校验</span>
+        <span className="workspace-statusbar__path">
+          UTF-8 · 原文 .txt · 译文 .语言.txt · 标签结构校验
+        </span>
       </footer>
     </main>
   );

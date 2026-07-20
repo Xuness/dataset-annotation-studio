@@ -35,6 +35,30 @@ class SystemPresetUpdate(BaseModel):
     _validate_prompt = field_validator("system_prompt")(_require_non_blank)
 
 
+class TranslationPromptPreset(BaseModel):
+    id: str
+    name: str
+    system_prompt: str
+    created_at: str
+    updated_at: str
+
+
+class TranslationPromptPresetCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    system_prompt: str = Field(min_length=1)
+
+    _validate_name = field_validator("name")(_require_non_blank)
+    _validate_prompt = field_validator("system_prompt")(_require_non_blank)
+
+
+class TranslationPromptPresetUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    system_prompt: str | None = Field(default=None, min_length=1)
+
+    _validate_name = field_validator("name")(_require_non_blank)
+    _validate_prompt = field_validator("system_prompt")(_require_non_blank)
+
+
 class ProviderType(StrEnum):
     OPENROUTER = "openrouter"
     OPENAI_COMPATIBLE = "openai_compatible"

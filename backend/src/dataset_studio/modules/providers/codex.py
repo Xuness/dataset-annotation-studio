@@ -56,13 +56,10 @@ class CodexProvider:
                     model=request.model,
                     sandbox=Sandbox.read_only,
                 )
-                handle = await thread.turn(
-                    [
-                        TextInput(text=request.user_prompt),
-                        LocalImageInput(path=str(request.image_path.resolve())),
-                    ],
-                    effort=effort,
-                )
+                inputs = [TextInput(text=request.user_prompt)]
+                if request.image_path is not None:
+                    inputs.append(LocalImageInput(path=str(request.image_path.resolve())))
+                handle = await thread.turn(inputs, effort=effort)
                 result = await handle.run()
         except TimeoutError as error:
             _interrupt_in_background(handle)

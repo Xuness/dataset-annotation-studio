@@ -118,6 +118,44 @@ def test_chat_payload_omits_temperature_for_models_that_do_not_accept_it(
     assert "temperature" not in payload
 
 
+def test_opencode_go_payloads_support_text_only_requests(tmp_path: Path) -> None:
+    chat_profile = _profile("grok-4.5")
+    chat_request = _request(tmp_path, chat_profile)
+    chat_request = MultimodalRequest(
+        image_path=None,
+        system_prompt=chat_request.system_prompt,
+        user_prompt=chat_request.user_prompt,
+        model=chat_request.model,
+        temperature=chat_request.temperature,
+        max_output_tokens=chat_request.max_output_tokens,
+        timeout_seconds=chat_request.timeout_seconds,
+    )
+    chat_spec = get_model_spec(chat_profile.model)
+    assert chat_spec is not None
+    chat_payload = build_chat_payload(chat_spec, chat_profile, chat_request)
+    assert chat_payload["messages"][1]["content"] == [
+        {"type": "text", "text": "describe this image"}
+    ]
+
+    messages_profile = _profile("qwen3.7-plus")
+    messages_spec = get_model_spec(messages_profile.model)
+    assert messages_spec is not None
+    messages_payload = build_messages_payload(
+        messages_spec,
+        messages_profile,
+        MultimodalRequest(
+            image_path=None,
+            system_prompt="system",
+            user_prompt="translate",
+            model=messages_profile.model,
+            temperature=messages_profile.temperature,
+            max_output_tokens=messages_profile.max_output_tokens,
+            timeout_seconds=messages_profile.timeout_seconds,
+        ),
+    )
+    assert messages_payload["messages"][0]["content"] == [{"type": "text", "text": "translate"}]
+
+
 def test_chat_response_records_cache_hits_and_reasoning_tokens() -> None:
     response = parse_chat_response(
         {

@@ -26,9 +26,7 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
         assert listed.json()["items"][0]["relative_path"] == "sample.webp"
         asset_id = listed.json()["items"][0]["id"]
 
-        trace = client.get(
-            f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation-trace"
-        )
+        trace = client.get(f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation-trace")
         assert trace.status_code == 200
         assert trace.json() is None
 
@@ -43,6 +41,23 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
             json={"name": "XML caption", "system_prompt": "Return balanced XML."},
         )
         assert preset.status_code == 201
+        translation_presets = client.get("/api/v1/presets/translation-prompts")
+        assert translation_presets.status_code == 200
+        assert translation_presets.json()[0]["id"] == "default-translation-prompt"
+        custom_translation_prompt = client.post(
+            "/api/v1/presets/translation-prompts",
+            json={
+                "name": "API translation",
+                "system_prompt": "Translate to {target_language}.",
+            },
+        )
+        assert custom_translation_prompt.status_code == 201
+        renamed_translation_prompt = client.patch(
+            f"/api/v1/presets/translation-prompts/{custom_translation_prompt.json()['id']}",
+            json={"name": "API translation updated"},
+        )
+        assert renamed_translation_prompt.status_code == 200
+        assert renamed_translation_prompt.json()["name"] == "API translation updated"
         configured = client.patch(
             f"/api/v1/workspaces/{project_id}",
             json={

@@ -10,8 +10,10 @@ from dataset_studio.core.config import Settings
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.models import (
+    ExistingTranslationPolicy,
     JobCreateRequest,
     JobItemStatus,
+    JobKind,
     JobScope,
     JobStatus,
 )
@@ -23,12 +25,15 @@ from dataset_studio.modules.presets.models import (
     ProviderProfileCreate,
     ProviderType,
     SystemPresetCreate,
+    TranslationPromptPresetCreate,
+    TranslationPromptPresetUpdate,
 )
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.providers.codex_runtime import CodexRuntime
 from dataset_studio.modules.providers.models import ProviderResponse
 from dataset_studio.modules.statistics.service import StatisticsService
+from dataset_studio.modules.translations.service import TranslationService
 from dataset_studio.modules.workspaces.models import WorkspaceSettingsUpdate
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -55,6 +60,18 @@ class RecordingProvider:
         )
 
 
+class TranslationProvider(RecordingProvider):
+    async def complete(self, _profile, _api_key, request):
+        self.requests.append(request)
+        return ProviderResponse(
+            content="<caption>安静的花园</caption>",
+            raw_payload={"source": "fake-translation"},
+            finish_reason="stop",
+            input_tokens=80,
+            output_tokens=20,
+        )
+
+
 def _runtime(tmp_path: Path):
     settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
     settings.ensure_directories()
@@ -62,14 +79,16 @@ def _runtime(tmp_path: Path):
     initialize_global_database(global_database)
     workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
     annotations = AnnotationService(workspaces)
+    translations = TranslationService(workspaces)
     presets = PresetService(PresetRepository(global_database), MemorySecrets())
-    jobs = JobService(workspaces, presets, annotations)
+    jobs = JobService(workspaces, presets, annotations, translations)
     assets = AssetService(workspaces)
     container = AppContainer(
         settings=settings,
         workspaces=workspaces,
         assets=assets,
         annotations=annotations,
+        translations=translations,
         presets=presets,
         jobs=jobs,
         annotation_traces=AnnotationTraceService(workspaces, assets, annotations),
@@ -219,3 +238,74 @@ async def test_worker_marks_item_failed_when_image_disappears(tmp_path: Path) ->
     assert "图片已不存在" in (detail.items[0].last_error or "")
     assert detail.items[0].attempts == []
     assert provider.requests == []
+
+
+@pytest.mark.asyncio
+async def test_worker_translates_annotation_without_sending_image(tmp_path: Path) -> None:
+    container, workspaces, presets, jobs = _runtime(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (48, 48), "white").save(project / "sample.png")
+    workspace, _ = workspaces.open(str(project))
+    asset = container.assets.list_assets(workspace.project_id).items[0]
+    source = "<caption>quiet garden</caption>"
+    container.annotations.save(workspace.project_id, asset.id, source)
+    profile = presets.create_provider(
+        ProviderProfileCreate(
+            name="Fake translator",
+            provider_type=ProviderType.OPENAI_COMPATIBLE,
+            base_url="https://example.invalid/v1",
+            model="fake-translation-model",
+            api_key="local-test-key",
+            concurrency=1,
+        )
+    )
+    prompt_preset = presets.create_translation_prompt(
+        TranslationPromptPresetCreate(
+            name="Snapshot translation",
+            system_prompt="Translate into {target_language}; locale={language_code}.",
+        )
+    )
+    created = jobs.create(
+        workspace.project_id,
+        JobCreateRequest(
+            provider_profile_id=profile.id,
+            kind=JobKind.TRANSLATION,
+            scope=JobScope.SELECTED,
+            asset_ids=[asset.id],
+            translation_prompt_preset_id=prompt_preset.id,
+            target_language="zh-CN",
+            translation_policy=ExistingTranslationPolicy.SKIP,
+        ),
+    )
+    presets.update_translation_prompt(
+        prompt_preset.id,
+        TranslationPromptPresetUpdate(system_prompt="This later edit must not be used."),
+    )
+
+    provider = TranslationProvider()
+    worker = AnnotationWorker(container, provider_factory=lambda _kind: provider)
+    stopped = asyncio.Event()
+    worker_task = asyncio.create_task(worker.run(stopped))
+    try:
+        for _ in range(80):
+            current = jobs.get(workspace.project_id, created.id)
+            if current.status in {JobStatus.COMPLETED, JobStatus.COMPLETED_WITH_ERRORS}:
+                break
+            await asyncio.sleep(0.05)
+        else:
+            pytest.fail("worker did not complete the translation job")
+    finally:
+        stopped.set()
+        await asyncio.wait_for(worker_task, timeout=2)
+
+    assert (project / "sample.txt").read_text(encoding="utf-8") == source
+    assert (project / "sample.zh-CN.txt").read_text(encoding="utf-8") == (
+        "<caption>安静的花园</caption>"
+    )
+    assert provider.requests[0].image_path is None
+    assert provider.requests[0].system_prompt == "Translate into 简体中文; locale=zh-CN."
+    assert source in provider.requests[0].user_prompt
+    translation = container.translations.get(workspace.project_id, asset.id, "zh-CN")
+    assert translation.status.value == "current"
+    assert translation.provider_profile_name == "Fake translator"

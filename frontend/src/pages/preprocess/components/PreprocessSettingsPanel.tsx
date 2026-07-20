@@ -257,8 +257,8 @@ export function PreprocessSettingsPanel({
           </label>
         </div>
         <small>
-          支持 {"{name}"}（原文件名）和 {"{index}"}（序号）；保留原目录和最终扩展名，并同步同名 .txt
-          / .json。
+          支持 {"{name}"}（原文件名）和 {"{index}"}（序号）；保留原目录和最终扩展名，并同步原标注
+          .txt、各语言译文与 .json。
         </small>
       </section>
       {error ? <p className="form-error">{error}</p> : null}

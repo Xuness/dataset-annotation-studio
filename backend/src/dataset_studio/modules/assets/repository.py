@@ -11,6 +11,10 @@ LATEST_JOB_STATUS_SQL = """
     SELECT job_items.status
     FROM job_items
     WHERE job_items.asset_id = assets.id
+      AND EXISTS (
+          SELECT 1 FROM jobs
+          WHERE jobs.id = job_items.job_id AND jobs.kind = 'annotation'
+      )
     ORDER BY job_items.updated_at DESC, job_items.created_at DESC, job_items.id DESC
     LIMIT 1
 )
@@ -21,6 +25,10 @@ LATEST_JOB_ERROR_SQL = """
     SELECT job_items.last_error
     FROM job_items
     WHERE job_items.asset_id = assets.id
+      AND EXISTS (
+          SELECT 1 FROM jobs
+          WHERE jobs.id = job_items.job_id AND jobs.kind = 'annotation'
+      )
     ORDER BY job_items.updated_at DESC, job_items.created_at DESC, job_items.id DESC
     LIMIT 1
 )

@@ -1,19 +1,24 @@
 import { useState } from "react";
-import { ArrowLeft, Braces, Cable, Plus } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Braces, Cable, Languages, Plus } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useUnsavedChangesGuard } from "../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../shared/ui/Button";
 import { ProviderProfilesPanel } from "./components/ProviderProfilesPanel";
 import { SystemPresetsPanel } from "./components/SystemPresetsPanel";
+import { TranslationPromptsPanel } from "./components/TranslationPromptsPanel";
 import "./presets.css";
 
-type PresetTab = "system" | "providers";
+type PresetTab = "system" | "translation" | "providers";
 
 export function PresetsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { confirmDiscard } = useUnsavedChangesGuard();
-  const [tab, setTab] = useState<PresetTab>("system");
+  const [tab, setTab] = useState<PresetTab>(() => {
+    const requestedTab = searchParams.get("tab");
+    return requestedTab === "translation" || requestedTab === "providers" ? requestedTab : "system";
+  });
   const [createSignal, setCreateSignal] = useState(0);
 
   function changeTab(nextTab: PresetTab) {
@@ -48,7 +53,7 @@ export function PresetsPage() {
           </span>
         </div>
         <Button tone="primary" icon={<Plus size={15} />} onClick={requestCreate}>
-          新建{tab === "system" ? "预设" : "连接"}
+          新建{tab === "providers" ? "连接" : "预设"}
         </Button>
       </header>
       <div className="presets-layout">
@@ -65,6 +70,16 @@ export function PresetsPage() {
             </span>
           </button>
           <button
+            className={tab === "translation" ? "is-active" : ""}
+            onClick={() => changeTab("translation")}
+          >
+            <Languages size={16} />
+            <span>
+              <strong>翻译 Prompt</strong>
+              <small>译文 System Prompt</small>
+            </span>
+          </button>
+          <button
             className={tab === "providers" ? "is-active" : ""}
             onClick={() => changeTab("providers")}
           >
@@ -74,13 +89,14 @@ export function PresetsPage() {
               <small>API 或 Codex OAuth</small>
             </span>
           </button>
-          <p>API Key 保存在系统凭据库；Codex OAuth 凭据由 Codex 自身管理，均不会写入数据集项目。</p>
+          <p>
+            Prompt 与连接均为全局配置；任务创建后保存完整快照。API Key
+            保存在系统凭据库，不会写入数据集项目。
+          </p>
         </nav>
-        {tab === "system" ? (
-          <SystemPresetsPanel createSignal={createSignal} />
-        ) : (
-          <ProviderProfilesPanel createSignal={createSignal} />
-        )}
+        {tab === "system" ? <SystemPresetsPanel createSignal={createSignal} /> : null}
+        {tab === "translation" ? <TranslationPromptsPanel createSignal={createSignal} /> : null}
+        {tab === "providers" ? <ProviderProfilesPanel createSignal={createSignal} /> : null}
       </div>
     </main>
   );

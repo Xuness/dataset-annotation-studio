@@ -102,19 +102,22 @@ def _build_payload(profile: ProviderProfile, request: MultimodalRequest) -> dict
             }
         ]
 
+    user_content: list[dict[str, object]] = [{"type": "text", "text": request.user_prompt}]
+    if request.image_path is not None:
+        user_content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": image_data_url(request.image_path)},
+            }
+        )
+
     payload: dict[str, object] = {
         "model": request.model,
         "messages": [
             {"role": "system", "content": system_content},
             {
                 "role": "user",
-                "content": [
-                    {"type": "text", "text": request.user_prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": image_data_url(request.image_path)},
-                    },
-                ],
+                "content": user_content,
             },
         ],
         "temperature": request.temperature,

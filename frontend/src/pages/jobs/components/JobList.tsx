@@ -66,8 +66,15 @@ export function JobList({
                 </span>
                 <small>{new Date(job.created_at).toLocaleString()}</small>
               </div>
-              <strong>{job.system_preset_name}</strong>
-              <span>{job.provider_profile_name}</span>
+              <strong>
+                {job.kind === "translation"
+                  ? `${job.target_language ?? "目标语言"} 译文`
+                  : job.system_preset_name}
+              </strong>
+              <span>
+                {job.provider_profile_name}
+                {job.kind === "translation" ? ` · ${job.system_preset_name}` : ""}
+              </span>
               <div className="job-card__progress">
                 <span style={{ width: `${progress}%` }} />
               </div>
@@ -88,7 +95,7 @@ export function JobList({
         {!loading && !error && !jobs.length ? (
           <div className="job-list-empty">
             <Clock3 size={22} />
-            <p>还没有标注任务。</p>
+            <p>还没有任务。</p>
           </div>
         ) : null}
         {hasMore && !error ? (

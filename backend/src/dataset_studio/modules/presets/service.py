@@ -14,6 +14,9 @@ from dataset_studio.modules.presets.models import (
     SystemPreset,
     SystemPresetCreate,
     SystemPresetUpdate,
+    TranslationPromptPreset,
+    TranslationPromptPresetCreate,
+    TranslationPromptPresetUpdate,
 )
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.secrets import SecretStore
@@ -67,6 +70,63 @@ class PresetService:
     def delete_system(self, preset_id: str) -> None:
         if not self._repository.delete_system(preset_id):
             raise PresetNotFoundError(f"找不到 System Prompt 预设：{preset_id}")
+
+    def list_translation_prompts(self) -> list[TranslationPromptPreset]:
+        return [
+            TranslationPromptPreset.model_validate(dict(row))
+            for row in self._repository.list_translation_prompts()
+        ]
+
+    def get_translation_prompt(self, preset_id: str) -> TranslationPromptPreset:
+        row = self._repository.get_translation_prompt(preset_id)
+        if row is None:
+            raise PresetNotFoundError(f"找不到翻译 Prompt 预设：{preset_id}")
+        return TranslationPromptPreset.model_validate(dict(row))
+
+    def create_translation_prompt(
+        self,
+        data: TranslationPromptPresetCreate,
+    ) -> TranslationPromptPreset:
+        now = utc_now_iso()
+        preset = TranslationPromptPreset(
+            id=str(uuid.uuid4()),
+            name=data.name.strip(),
+            system_prompt=data.system_prompt,
+            created_at=now,
+            updated_at=now,
+        )
+        try:
+            self._repository.insert_translation_prompt(
+                (preset.id, preset.name, preset.system_prompt, preset.created_at, preset.updated_at)
+            )
+        except sqlite3.IntegrityError as error:
+            raise ValueError(f"翻译 Prompt 预设名称已存在：{preset.name}") from error
+        return preset
+
+    def update_translation_prompt(
+        self,
+        preset_id: str,
+        data: TranslationPromptPresetUpdate,
+    ) -> TranslationPromptPreset:
+        current = self.get_translation_prompt(preset_id)
+        updated = current.model_copy(update=data.model_dump(exclude_none=True))
+        updated = updated.model_copy(
+            update={"name": updated.name.strip(), "updated_at": utc_now_iso()}
+        )
+        try:
+            self._repository.update_translation_prompt(
+                preset_id,
+                updated.name,
+                updated.system_prompt,
+                updated.updated_at,
+            )
+        except sqlite3.IntegrityError as error:
+            raise ValueError(f"翻译 Prompt 预设名称已存在：{updated.name}") from error
+        return updated
+
+    def delete_translation_prompt(self, preset_id: str) -> None:
+        if not self._repository.delete_translation_prompt(preset_id):
+            raise PresetNotFoundError(f"找不到翻译 Prompt 预设：{preset_id}")
 
     def list_providers(self) -> list[ProviderProfile]:
         return [self._provider_from_row(row) for row in self._repository.list_provider()]

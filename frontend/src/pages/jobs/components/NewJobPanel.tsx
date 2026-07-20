@@ -1,10 +1,19 @@
 import { useEffect, useState } from "react";
-import { Bot, Play, Settings2 } from "lucide-react";
+import { Bot, Languages, Play, Settings2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useJobActions } from "../../../features/jobs/hooks";
-import { useProviderProfiles, useSystemPresets } from "../../../features/presets/hooks";
-import type { JobDetail, WorkspaceSummary } from "../../../shared/api/types";
+import {
+  useProviderProfiles,
+  useSystemPresets,
+  useTranslationPromptPresets,
+} from "../../../features/presets/hooks";
+import type {
+  ExistingTranslationPolicy,
+  JobDetail,
+  JobKind,
+  WorkspaceSummary,
+} from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 
@@ -23,10 +32,15 @@ export function NewJobPanel({
 }: NewJobPanelProps) {
   const navigate = useNavigate();
   const systemPresets = useSystemPresets();
+  const translationPromptPresets = useTranslationPromptPresets();
   const providerProfiles = useProviderProfiles();
   const actions = useJobActions(projectId);
+  const [kind, setKind] = useState<JobKind>("annotation");
   const [providerProfileId, setProviderProfileId] = useState("");
+  const [translationPromptPresetId, setTranslationPromptPresetId] = useState("");
   const [scope, setScope] = useState<"all" | "selected">("all");
+  const [targetLanguage, setTargetLanguage] = useState("zh-CN");
+  const [translationPolicy, setTranslationPolicy] = useState<ExistingTranslationPolicy>("skip");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,13 +49,29 @@ export function NewJobPanel({
     }
   }, [providerProfileId, providerProfiles.data]);
 
+  useEffect(() => {
+    const available = translationPromptPresets.data;
+    if (!available?.length) {
+      if (translationPromptPresetId) setTranslationPromptPresetId("");
+      return;
+    }
+    if (!available.some((preset) => preset.id === translationPromptPresetId)) {
+      setTranslationPromptPresetId(available[0].id);
+    }
+  }, [translationPromptPresetId, translationPromptPresets.data]);
+
   async function create() {
     setError(null);
     try {
       const job = await actions.create.mutateAsync({
         provider_profile_id: providerProfileId,
+        kind,
         scope,
         asset_ids: scope === "selected" ? checkedAssetIds : [],
+        translation_prompt_preset_id:
+          kind === "translation" ? translationPromptPresetId : undefined,
+        target_language: targetLanguage,
+        translation_policy: translationPolicy,
       });
       onCreated(job);
     } catch (reason) {
@@ -59,36 +89,96 @@ export function NewJobPanel({
       : systemPresets.isSuccess && !configuredSystemPreset
         ? "项目关联的 System Prompt 预设已不存在"
         : null;
+  const configuredTranslationPrompt = translationPromptPresets.data?.find(
+    (preset) => preset.id === translationPromptPresetId,
+  );
+  const translationPromptIssue = translationPromptPresets.isError
+    ? "无法读取翻译 Prompt 预设"
+    : translationPromptPresets.isSuccess && !configuredTranslationPrompt
+      ? "尚未创建可用的翻译 Prompt 预设"
+      : null;
   const ready = Boolean(
-    configuredSystemPreset && providerProfileId && (scope === "all" || checkedAssetIds.length > 0),
+    (kind === "translation" ? configuredTranslationPrompt : configuredSystemPreset) &&
+    providerProfileId &&
+    (scope === "all" || checkedAssetIds.length > 0),
   );
 
   return (
     <aside className="new-job-panel">
       <header>
         <span className="new-job-icon">
-          <Bot size={18} />
+          {kind === "annotation" ? <Bot size={18} /> : <Languages size={18} />}
         </span>
         <div>
-          <span className="eyebrow">New annotation run</span>
-          <h2>创建标注任务</h2>
+          <span className="eyebrow">New processing run</span>
+          <h2>创建任务</h2>
         </div>
       </header>
 
-      <div className={`job-prompt-source ${promptConfigurationIssue ? "has-error" : ""}`}>
-        <span>项目提示词</span>
-        <strong>
-          {systemPresets.isLoading
-            ? "正在读取项目配置…"
-            : (configuredSystemPreset?.name ?? promptConfigurationIssue)}
-        </strong>
-        <small>System Prompt 与 User Prompt 均沿用素材页最后保存的配置。</small>
-        {promptConfigurationIssue ? (
-          <button onClick={() => navigate(`/workspace/${projectId}?panel=prompt`)}>
-            回到素材页配置
-          </button>
-        ) : null}
+      <div className="job-kind-switch" aria-label="任务类型">
+        <button
+          className={kind === "annotation" ? "is-active" : ""}
+          onClick={() => setKind("annotation")}
+        >
+          <Bot size={14} /> 标注
+        </button>
+        <button
+          className={kind === "translation" ? "is-active" : ""}
+          onClick={() => setKind("translation")}
+        >
+          <Languages size={14} /> 翻译
+        </button>
       </div>
+
+      {kind === "annotation" ? (
+        <div className={`job-prompt-source ${promptConfigurationIssue ? "has-error" : ""}`}>
+          <span>项目提示词</span>
+          <strong>
+            {systemPresets.isLoading
+              ? "正在读取项目配置…"
+              : (configuredSystemPreset?.name ?? promptConfigurationIssue)}
+          </strong>
+          <small>System Prompt 与 User Prompt 均沿用素材页最后保存的配置。</small>
+          {promptConfigurationIssue ? (
+            <button onClick={() => navigate(`/workspace/${projectId}?panel=prompt`)}>
+              回到素材页配置
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <label className="form-field">
+            <span>翻译 Prompt 预设</span>
+            <select
+              value={translationPromptPresetId}
+              onChange={(event) => setTranslationPromptPresetId(event.target.value)}
+            >
+              {!translationPromptPresets.data?.length ? (
+                <option value="">尚未创建翻译 Prompt 预设</option>
+              ) : null}
+              {translationPromptPresets.data?.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className={`job-prompt-source ${translationPromptIssue ? "has-error" : ""}`}>
+            <span>任务快照</span>
+            <strong>
+              {translationPromptPresets.isLoading
+                ? "正在读取翻译 Prompt…"
+                : (configuredTranslationPrompt?.name ?? translationPromptIssue)}
+            </strong>
+            <small>目标语言变量会在创建任务时展开；后续修改预设不会影响本次任务。</small>
+            {translationPromptIssue ? (
+              <button onClick={() => navigate("/presets?tab=translation")}>
+                前往创建翻译 Prompt
+              </button>
+            ) : null}
+          </div>
+        </>
+      )}
 
       <label className="form-field">
         <span>模型连接</span>
@@ -105,10 +195,46 @@ export function NewJobPanel({
         </select>
       </label>
 
+      {kind === "translation" ? (
+        <>
+          <label className="form-field">
+            <span>目标语言</span>
+            <select
+              value={targetLanguage}
+              onChange={(event) => setTargetLanguage(event.target.value)}
+            >
+              <option value="zh-CN">简体中文 · zh-CN</option>
+              <option value="zh-TW">繁體中文 · zh-TW</option>
+              <option value="en">English · en</option>
+              <option value="ja">日本語 · ja</option>
+              <option value="ko">한국어 · ko</option>
+            </select>
+          </label>
+          <label className="form-field">
+            <span>已有译文</span>
+            <select
+              value={translationPolicy}
+              onChange={(event) =>
+                setTranslationPolicy(event.target.value as ExistingTranslationPolicy)
+              }
+            >
+              <option value="skip">跳过已有译文</option>
+              <option value="stale">补齐缺失并重译过期项</option>
+              <option value="overwrite">覆盖范围内全部译文</option>
+            </select>
+          </label>
+        </>
+      ) : null}
+
       <div className="job-scope">
         <span>处理范围</span>
         <button className={scope === "all" ? "is-active" : ""} onClick={() => setScope("all")}>
-          全部未标注 <small>{Math.max(workspace.asset_count - workspace.annotated_count, 0)}</small>
+          {kind === "annotation" ? "全部未标注" : "全部有源标注"}
+          <small>
+            {kind === "annotation"
+              ? Math.max(workspace.asset_count - workspace.annotated_count, 0)
+              : workspace.annotated_count}
+          </small>
         </button>
         <button
           className={scope === "selected" ? "is-active" : ""}
@@ -120,8 +246,8 @@ export function NewJobPanel({
 
       <dl className="job-rules">
         <div>
-          <dt>已有 TXT</dt>
-          <dd>自动跳过</dd>
+          <dt>{kind === "annotation" ? "已有 TXT" : "文件命名"}</dt>
+          <dd>{kind === "annotation" ? "自动跳过" : `*.${targetLanguage}.txt`}</dd>
         </div>
         <div>
           <dt>失败重试</dt>
@@ -129,17 +255,26 @@ export function NewJobPanel({
         </div>
         <div>
           <dt>输出处理</dt>
-          <dd>原样写入</dd>
+          <dd>{kind === "annotation" ? "原样写入" : "标签结构校验"}</dd>
         </div>
         <div>
-          <dt>User Prompt</dt>
-          <dd>{workspace.settings.user_prompt ? "项目内已设置" : "当前为空"}</dd>
+          <dt>{kind === "annotation" ? "User Prompt" : "源标注"}</dt>
+          <dd>
+            {kind === "annotation"
+              ? workspace.settings.user_prompt
+                ? "项目内已设置"
+                : "当前为空"
+              : "只读读取同名 TXT"}
+          </dd>
         </div>
       </dl>
 
       {error ? <p className="form-error">{error}</p> : null}
       <div className="new-job-panel__actions">
-        <Button icon={<Settings2 size={14} />} onClick={() => navigate("/presets")}>
+        <Button
+          icon={<Settings2 size={14} />}
+          onClick={() => navigate(kind === "translation" ? "/presets?tab=translation" : "/presets")}
+        >
           管理预设
         </Button>
         <Button

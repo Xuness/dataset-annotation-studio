@@ -139,6 +139,29 @@ async def test_codex_provider_returns_exact_final_response_and_discards_thread(
     assert "output_schema" not in thread.turn_options
 
 
+@pytest.mark.asyncio
+async def test_codex_provider_accepts_text_only_request(tmp_path: Path) -> None:
+    handle = FakeTurnHandle("<caption>译文</caption>")
+    thread = FakeThread(handle)
+    runtime = FakeCodexRuntime(FakeCodexClient(thread), tmp_path / "codex-runtime")
+    request = _request(tmp_path / "unused.png")
+    request = MultimodalRequest(
+        image_path=None,
+        system_prompt=request.system_prompt,
+        user_prompt=request.user_prompt,
+        model=request.model,
+        temperature=request.temperature,
+        max_output_tokens=request.max_output_tokens,
+        timeout_seconds=request.timeout_seconds,
+    )
+
+    response = await CodexProvider(runtime).complete(_profile(), None, request)
+
+    assert response.content == "<caption>译文</caption>"
+    assert len(thread.inputs) == 1
+    assert isinstance(thread.inputs[0], TextInput)
+
+
 class BlockingTurnHandle(FakeTurnHandle):
     async def run(self):
         await asyncio.Event().wait()

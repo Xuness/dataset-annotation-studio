@@ -198,6 +198,10 @@
   display: block;
 }
 
+.preset-editor--translation {
+  grid-template-rows: auto auto auto minmax(220px, 1fr) auto;
+}
+
 .preset-editor > header {
   display: flex;
   align-items: center;
@@ -216,6 +220,38 @@
 .preset-editor > header > div:last-child {
   display: flex;
   gap: 7px;
+}
+
+.preset-template-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: var(--surface-raised);
+}
+
+.preset-template-hint strong {
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.preset-template-hint code {
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: var(--accent-deep);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: var(--text-xs);
+  background: var(--accent-soft);
+}
+
+.preset-template-hint small {
+  width: 100%;
+  font-size: var(--text-xs);
+  line-height: 1.55;
 }
 
 .model-input-row {

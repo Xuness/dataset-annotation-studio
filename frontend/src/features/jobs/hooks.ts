@@ -55,6 +55,7 @@ export function useJobActions(projectId: string) {
     if (jobId) void queryClient.invalidateQueries({ queryKey: ["jobs", projectId, jobId] });
     void queryClient.invalidateQueries({ queryKey: ["assets", projectId] });
     void queryClient.invalidateQueries({ queryKey: ["annotation-trace", projectId] });
+    void queryClient.invalidateQueries({ queryKey: ["translations", projectId] });
     void queryClient.invalidateQueries({ queryKey: ["workspaces", projectId] });
   };
   return {

@@ -150,12 +150,38 @@ ALTER TABLE job_attempts ADD COLUMN cache_write_tokens INTEGER;
 ALTER TABLE job_attempts ADD COLUMN reasoning_tokens INTEGER;
 """
 
-WORKSPACE_SCHEMA_VERSION = 4
+TRANSLATION_JOBS_MIGRATION = """
+CREATE TABLE annotation_translations (
+    asset_id TEXT NOT NULL,
+    language TEXT NOT NULL,
+    translation_relative_path TEXT NOT NULL,
+    source_annotation_hash TEXT NOT NULL,
+    translation_modified_ns INTEGER NOT NULL,
+    validation_status TEXT NOT NULL,
+    provider_profile_id TEXT,
+    provider_profile_name TEXT,
+    model TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(asset_id, language),
+    FOREIGN KEY(asset_id) REFERENCES assets(id)
+);
+
+CREATE UNIQUE INDEX idx_annotation_translations_path
+ON annotation_translations(translation_relative_path);
+
+ALTER TABLE jobs ADD COLUMN kind TEXT NOT NULL DEFAULT 'annotation';
+ALTER TABLE jobs ADD COLUMN configuration_snapshot TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE job_attempts ADD COLUMN source_annotation_hash TEXT;
+"""
+
+WORKSPACE_SCHEMA_VERSION = 5
 WORKSPACE_MIGRATIONS = (
     Migration(1, "initial_workspace_schema", WORKSPACE_SCHEMA),
     Migration(2, "image_metadata_version", IMAGE_METADATA_VERSION_MIGRATION),
     Migration(3, "job_item_asset_updated_index", JOB_ITEM_ASSET_UPDATED_INDEX_MIGRATION),
     Migration(4, "job_attempt_usage_details", JOB_ATTEMPT_USAGE_DETAILS_MIGRATION),
+    Migration(5, "translation_jobs", TRANSLATION_JOBS_MIGRATION),
 )
 
 

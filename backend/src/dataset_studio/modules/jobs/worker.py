@@ -12,7 +12,7 @@ from dataset_studio.core.files import atomic_write_text
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
-from dataset_studio.modules.jobs.models import JobItemStatus
+from dataset_studio.modules.jobs.models import JobItemStatus, JobKind
 from dataset_studio.modules.jobs.provider_call import JobStopped, complete_until_stopped
 from dataset_studio.modules.presets.models import ProviderProfile, ProviderType
 from dataset_studio.modules.prompts.composer import compose_user_prompt
@@ -23,6 +23,9 @@ from dataset_studio.modules.providers.models import (
     ProviderRequestError,
     ProviderResponse,
 )
+from dataset_studio.modules.translations.prompt import translation_user_prompt
+from dataset_studio.modules.translations.service import TranslationSourceChangedError
+from dataset_studio.modules.translations.validation import validate_translation_structure
 
 LOGGER = logging.getLogger("dataset_studio.worker")
 
@@ -163,15 +166,44 @@ class AnnotationWorker:
             repository.finish_item(item_id, JobItemStatus.FAILED, error=str(error))
             return
 
-        image_path = self._container.assets.image_path(project_id, asset_id)
-        metadata = self._container.assets.metadata(project_id, asset_id)
-        selected_fields = json.loads(str(job["json_fields_snapshot"]))
-        user_prompt = compose_user_prompt(
-            str(job["user_prompt_snapshot"]),
-            metadata.value if metadata.exists and not metadata.error else None,
-            selected_fields,
-        )
         system_snapshot = json.loads(str(job["system_prompt_snapshot"]))
+        kind = JobKind(str(job["kind"]))
+        source_content: str | None = None
+        source_hash: str | None = None
+        translation_configuration: dict[str, object] = {}
+        if kind == JobKind.TRANSLATION:
+            translation_configuration = json.loads(str(job["configuration_snapshot"]))
+            language = str(translation_configuration["target_language"])
+            policy = str(translation_configuration["translation_policy"])
+            source = self._container.translations.read_source(project_id, asset_id)
+            if source is None:
+                repository.finish_item(
+                    item_id,
+                    JobItemStatus.FAILED,
+                    error="源标注已不存在，无法翻译。",
+                    validation_status="source_missing",
+                )
+                return
+            if not self._container.translations.should_translate(
+                project_id,
+                asset_id,
+                language,
+                policy,
+            ):
+                repository.finish_item(item_id, JobItemStatus.SKIPPED)
+                return
+            source_content, source_hash = source
+            image_path = None
+            user_prompt = translation_user_prompt(language, source_content)
+        else:
+            image_path = self._container.assets.image_path(project_id, asset_id)
+            metadata = self._container.assets.metadata(project_id, asset_id)
+            selected_fields = json.loads(str(job["json_fields_snapshot"]))
+            user_prompt = compose_user_prompt(
+                str(job["user_prompt_snapshot"]),
+                metadata.value if metadata.exists and not metadata.error else None,
+                selected_fields,
+            )
         request = MultimodalRequest(
             image_path=image_path,
             system_prompt=str(system_snapshot["system_prompt"]),
@@ -190,7 +222,10 @@ class AnnotationWorker:
             if repository.is_stop_requested(job_id):
                 repository.finish_item(item_id, JobItemStatus.INTERRUPTED)
                 return
-            attempt_id, attempt_number = repository.start_attempt(item_id)
+            attempt_id, attempt_number = repository.start_attempt(
+                item_id,
+                source_annotation_hash=source_hash,
+            )
             payload_path = self._save_request_payload(
                 workspace_root,
                 runs_root,
@@ -218,9 +253,20 @@ class AnnotationWorker:
                     request,
                     response,
                 )
-                validation = validate_tag_balance(response.content)
-                if not validation.valid:
-                    last_error = validation.issues[0].message
+                if kind == JobKind.TRANSLATION:
+                    assert source_content is not None
+                    validation_valid, validation_status = validate_translation_structure(
+                        source_content,
+                        response.content,
+                    )
+                    validation_error = None if validation_valid else validation_status
+                else:
+                    validation = validate_tag_balance(response.content)
+                    validation_valid = validation.valid
+                    validation_status = validation.status.value
+                    validation_error = None if validation.valid else validation.issues[0].message
+                if not validation_valid:
+                    last_error = validation_error or "响应内容校验失败。"
                     repository.finish_attempt(
                         attempt_id,
                         status="validation_failed",
@@ -235,25 +281,62 @@ class AnnotationWorker:
                         finish_reason=response.finish_reason,
                     )
                 else:
-                    annotation_path = workspace_root / str(item["annotation_relative_path"])
-                    if annotation_path.is_file() and not bool(job["overwrite_existing"]):
-                        repository.finish_attempt(
-                            attempt_id,
-                            status="skipped_existing",
-                            response_content=response.content,
-                            provider_payload_path=payload_path,
-                            input_tokens=response.input_tokens,
-                            output_tokens=response.output_tokens,
-                            cache_read_tokens=response.cache_read_tokens,
-                            cache_write_tokens=response.cache_write_tokens,
-                            reasoning_tokens=response.reasoning_tokens,
-                            finish_reason=response.finish_reason,
+                    if kind == JobKind.TRANSLATION:
+                        language = str(translation_configuration["target_language"])
+                        policy = str(translation_configuration["translation_policy"])
+                        if not self._container.translations.should_translate(
+                            project_id,
+                            asset_id,
+                            language,
+                            policy,
+                        ):
+                            repository.finish_attempt(
+                                attempt_id,
+                                status="skipped_existing",
+                                response_content=response.content,
+                                provider_payload_path=payload_path,
+                                input_tokens=response.input_tokens,
+                                output_tokens=response.output_tokens,
+                                cache_read_tokens=response.cache_read_tokens,
+                                cache_write_tokens=response.cache_write_tokens,
+                                reasoning_tokens=response.reasoning_tokens,
+                                finish_reason=response.finish_reason,
+                            )
+                            repository.finish_item(item_id, JobItemStatus.SKIPPED)
+                            return
+                        assert source_hash is not None
+                        self._container.translations.save_generated(
+                            project_id,
+                            asset_id,
+                            language,
+                            response.content,
+                            expected_source_hash=source_hash,
+                            provider_profile_id=profile.id,
+                            provider_profile_name=profile.name,
+                            model=profile.model,
                         )
-                        repository.finish_item(item_id, JobItemStatus.SKIPPED)
-                        return
-                    self._container.annotations.save_generated(
-                        project_id, asset_id, response.content
-                    )
+                    else:
+                        annotation_path = workspace_root / str(item["annotation_relative_path"])
+                        if annotation_path.is_file() and not bool(job["overwrite_existing"]):
+                            repository.finish_attempt(
+                                attempt_id,
+                                status="skipped_existing",
+                                response_content=response.content,
+                                provider_payload_path=payload_path,
+                                input_tokens=response.input_tokens,
+                                output_tokens=response.output_tokens,
+                                cache_read_tokens=response.cache_read_tokens,
+                                cache_write_tokens=response.cache_write_tokens,
+                                reasoning_tokens=response.reasoning_tokens,
+                                finish_reason=response.finish_reason,
+                            )
+                            repository.finish_item(item_id, JobItemStatus.SKIPPED)
+                            return
+                        self._container.annotations.save_generated(
+                            project_id,
+                            asset_id,
+                            response.content,
+                        )
                     repository.finish_attempt(
                         attempt_id,
                         status="succeeded",
@@ -269,9 +352,31 @@ class AnnotationWorker:
                     repository.finish_item(
                         item_id,
                         JobItemStatus.SUCCEEDED,
-                        validation_status=validation.status.value,
+                        validation_status=validation_status,
                     )
                     return
+            except TranslationSourceChangedError as error:
+                last_error = str(error)
+                repository.finish_attempt(
+                    attempt_id,
+                    status="source_changed",
+                    response_content=response.content,
+                    error_message=last_error,
+                    provider_payload_path=payload_path,
+                    input_tokens=response.input_tokens,
+                    output_tokens=response.output_tokens,
+                    cache_read_tokens=response.cache_read_tokens,
+                    cache_write_tokens=response.cache_write_tokens,
+                    reasoning_tokens=response.reasoning_tokens,
+                    finish_reason=response.finish_reason,
+                )
+                repository.finish_item(
+                    item_id,
+                    JobItemStatus.FAILED,
+                    error=last_error,
+                    validation_status="source_changed",
+                )
+                return
             except JobStopped:
                 repository.finish_attempt(
                     attempt_id,
@@ -413,7 +518,7 @@ class AnnotationWorker:
         return {
             "system_prompt": request.system_prompt,
             "user_prompt": request.user_prompt,
-            "image_filename": request.image_path.name,
+            "image_filename": request.image_path.name if request.image_path else None,
             "parameters": {
                 "provider_type": profile.provider_type.value,
                 "provider_profile_name": profile.name,
@@ -428,9 +533,7 @@ class AnnotationWorker:
                     options.reasoning_effort.value if options.reasoning_effort else None
                 ),
                 "prompt_cache_strategy": (
-                    options.prompt_cache_strategy.value
-                    if options.prompt_cache_strategy
-                    else None
+                    options.prompt_cache_strategy.value if options.prompt_cache_strategy else None
                 ),
             },
         }

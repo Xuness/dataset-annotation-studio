@@ -10,6 +10,8 @@ from dataset_studio.modules.presets.models import (
     ProviderRequestOptions,
     ProviderType,
     SystemPresetCreate,
+    TranslationPromptPresetCreate,
+    TranslationPromptPresetUpdate,
 )
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.service import PresetService
@@ -131,6 +133,8 @@ def test_presets_reject_whitespace_only_required_text() -> None:
     with pytest.raises(ValidationError):
         SystemPresetCreate(name="   ", system_prompt="prompt")
     with pytest.raises(ValidationError):
+        TranslationPromptPresetCreate(name="Translation", system_prompt="   ")
+    with pytest.raises(ValidationError):
         ProviderProfileCreate(
             name="Profile",
             provider_type=ProviderType.OPENAI_COMPATIBLE,
@@ -138,6 +142,35 @@ def test_presets_reject_whitespace_only_required_text() -> None:
             model="   ",
             api_key="secret",
         )
+
+
+def test_translation_prompt_presets_include_editable_default_and_support_crud(
+    tmp_path: Path,
+) -> None:
+    service, _, _ = _service(tmp_path)
+
+    default = service.list_translation_prompts()[0]
+    assert default.id == "default-translation-prompt"
+    assert "{target_language}" in default.system_prompt
+
+    created = service.create_translation_prompt(
+        TranslationPromptPresetCreate(
+            name="Concise translation",
+            system_prompt="Translate to {target_language} ({language_code}).",
+        )
+    )
+    updated = service.update_translation_prompt(
+        created.id,
+        TranslationPromptPresetUpdate(
+            name="Strict translation",
+            system_prompt="Use {language_code}; return only the result.",
+        ),
+    )
+    assert updated.name == "Strict translation"
+    assert service.get_translation_prompt(created.id).system_prompt.startswith("Use ")
+
+    service.delete_translation_prompt(created.id)
+    assert [preset.id for preset in service.list_translation_prompts()] == [default.id]
 
 
 def test_codex_profile_uses_no_endpoint_or_project_secret(tmp_path: Path) -> None:

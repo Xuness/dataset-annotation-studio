@@ -8,9 +8,15 @@ import type {
   ProviderRequestOptions,
   ProviderType,
   SystemPreset,
+  TranslationPromptPreset,
 } from "../../shared/api/types";
 
 export interface SystemPresetInput {
+  name: string;
+  system_prompt: string;
+}
+
+export interface TranslationPromptPresetInput {
   name: string;
   system_prompt: string;
 }
@@ -60,6 +66,35 @@ export function updateSystemPreset(
 
 export function deleteSystemPreset(id: string): Promise<void> {
   return apiRequest(`/api/v1/presets/system/${id}`, { method: "DELETE" });
+}
+
+export function listTranslationPromptPresets(): Promise<TranslationPromptPreset[]> {
+  return apiRequest("/api/v1/presets/translation-prompts");
+}
+
+export function createTranslationPromptPreset(
+  input: TranslationPromptPresetInput,
+): Promise<TranslationPromptPreset> {
+  return apiRequest("/api/v1/presets/translation-prompts", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateTranslationPromptPreset(
+  id: string,
+  input: Partial<TranslationPromptPresetInput>,
+): Promise<TranslationPromptPreset> {
+  return apiRequest(`/api/v1/presets/translation-prompts/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteTranslationPromptPreset(id: string): Promise<void> {
+  return apiRequest(`/api/v1/presets/translation-prompts/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export function listProviderProfiles(): Promise<ProviderProfile[]> {

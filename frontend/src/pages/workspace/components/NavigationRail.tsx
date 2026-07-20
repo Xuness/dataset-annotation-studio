@@ -6,7 +6,7 @@ import { useUnsavedChangesGuard } from "../../../shared/desktop/useUnsavedChange
 const items = [
   { id: "assets", icon: Images, label: "素材" },
   { id: "preprocess", icon: SlidersHorizontal, label: "预处理" },
-  { id: "jobs", icon: Bot, label: "标注任务" },
+  { id: "jobs", icon: Bot, label: "任务" },
   { id: "review", icon: ListChecks, label: "审核" },
 ];
 

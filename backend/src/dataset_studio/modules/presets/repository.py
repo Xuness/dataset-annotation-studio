@@ -41,6 +41,58 @@ class PresetRepository:
             cursor = connection.execute("DELETE FROM system_presets WHERE id = ?", (preset_id,))
             return cursor.rowcount > 0
 
+    def list_translation_prompts(self):
+        return self._fetch_all(
+            """
+            SELECT * FROM translation_prompt_presets
+            ORDER BY
+                CASE WHEN id = 'default-translation-prompt' THEN 0 ELSE 1 END,
+                name COLLATE NOCASE
+            """
+        )
+
+    def get_translation_prompt(self, preset_id: str):
+        return self._fetch_one(
+            "SELECT * FROM translation_prompt_presets WHERE id = ?",
+            (preset_id,),
+        )
+
+    def insert_translation_prompt(self, values: tuple[object, ...]) -> None:
+        with transaction(self._database_path) as connection:
+            connection.execute(
+                """
+                INSERT INTO translation_prompt_presets (
+                    id, name, system_prompt, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                values,
+            )
+
+    def update_translation_prompt(
+        self,
+        preset_id: str,
+        name: str,
+        prompt: str,
+        updated_at: str,
+    ) -> None:
+        with transaction(self._database_path) as connection:
+            connection.execute(
+                """
+                UPDATE translation_prompt_presets
+                SET name = ?, system_prompt = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (name, prompt, updated_at, preset_id),
+            )
+
+    def delete_translation_prompt(self, preset_id: str) -> bool:
+        with transaction(self._database_path) as connection:
+            cursor = connection.execute(
+                "DELETE FROM translation_prompt_presets WHERE id = ?",
+                (preset_id,),
+            )
+            return cursor.rowcount > 0
+
     def list_provider(self):
         return self._fetch_all("SELECT * FROM provider_profiles ORDER BY name COLLATE NOCASE")
 

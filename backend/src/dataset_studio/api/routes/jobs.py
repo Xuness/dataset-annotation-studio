@@ -27,7 +27,8 @@ def active_jobs(container: Container):
     return ActiveJobsOverview(
         count=jobs.count + preprocessing_count,
         project_count=len(active_projects),
-        annotation_job_count=jobs.count,
+        annotation_job_count=jobs.annotation_job_count,
+        translation_job_count=jobs.translation_job_count,
         preprocessing_count=preprocessing_count,
     )
 

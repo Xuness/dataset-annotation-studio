@@ -148,7 +148,7 @@ class AnnotationTraceService:
                 FROM job_attempts ja
                 JOIN job_items ji ON ji.id = ja.job_item_id
                 JOIN jobs j ON j.id = ji.job_id
-                WHERE ji.asset_id = ?
+                WHERE ji.asset_id = ? AND j.kind = 'annotation'
                 ORDER BY ja.started_at DESC, ja.rowid DESC
                 LIMIT 100
                 """,

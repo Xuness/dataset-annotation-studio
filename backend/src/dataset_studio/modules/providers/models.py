@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 @dataclass(frozen=True, slots=True)
 class MultimodalRequest:
-    image_path: Path
+    image_path: Path | None
     system_prompt: str
     user_prompt: str
     model: str

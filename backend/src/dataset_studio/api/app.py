@@ -16,6 +16,7 @@ from dataset_studio.api.routes import (
     presets,
     providers,
     statistics,
+    translations,
     workspaces,
 )
 from dataset_studio.core.config import Settings, settings
@@ -71,6 +72,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(workspaces.router, prefix=api_prefix)
     app.include_router(assets.router, prefix=api_prefix)
     app.include_router(annotations.router, prefix=api_prefix)
+    app.include_router(translations.router, prefix=api_prefix)
     app.include_router(presets.router, prefix=api_prefix)
     app.include_router(providers.router, prefix=api_prefix)
     app.include_router(jobs.router, prefix=api_prefix)

@@ -6,6 +6,7 @@ from PIL import Image
 
 from dataset_studio.core.config import Settings
 from dataset_studio.core.files import file_sha256
+from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.preprocessing import executor as preprocessing_executor
 from dataset_studio.modules.preprocessing import image_pipeline as preprocessing_image_pipeline
@@ -333,6 +334,8 @@ def test_batch_rename_moves_sidecars_without_reencoding_and_undoes(tmp_path: Pat
     Image.new("RGB", (64, 32), "black").save(second_image)
     (project / "a.txt").write_text("original annotation", encoding="utf-8")
     (project / "a.json").write_text('{"source": "original"}', encoding="utf-8")
+    (project / "a.zh-CN.txt").write_text("简体译文", encoding="utf-8")
+    (project / "a.ja.txt").write_text("日本語訳", encoding="utf-8")
     original_hashes = {
         "a.png": file_sha256(first_image),
         "b.jpg": file_sha256(second_image),
@@ -340,6 +343,22 @@ def test_batch_rename_moves_sidecars_without_reencoding_and_undoes(tmp_path: Pat
     summary, _ = workspaces.open(str(project))
     before_assets = assets.list_assets(summary.project_id).items
     before_ids = {item.filename: item.id for item in before_assets}
+    paths, _ = workspaces.get(summary.project_id)
+    with connect(paths.database) as connection:
+        connection.executemany(
+            """
+            INSERT INTO annotation_translations (
+                asset_id, language, translation_relative_path,
+                source_annotation_hash, translation_modified_ns,
+                validation_status, created_at, updated_at
+            ) VALUES (?, ?, ?, 'source-hash', 1, 'structure_preserved', 'now', 'now')
+            """,
+            [
+                (before_ids["a.png"], "zh-CN", "a.zh-CN.txt"),
+                (before_ids["a.png"], "ja", "a.ja.txt"),
+            ],
+        )
+        connection.commit()
     request = PreprocessRequest(
         rename=RenameOptions(template="asset_{index}", start_index=7, padding=3)
     )
@@ -357,6 +376,19 @@ def test_batch_rename_moves_sidecars_without_reencoding_and_undoes(tmp_path: Pat
     assert file_sha256(project / "asset_008.jpg") == original_hashes["b.jpg"]
     assert (project / "asset_007.txt").read_text(encoding="utf-8") == "original annotation"
     assert (project / "asset_007.json").read_text(encoding="utf-8") == '{"source": "original"}'
+    assert (project / "asset_007.zh-CN.txt").read_text(encoding="utf-8") == "简体译文"
+    assert (project / "asset_007.ja.txt").read_text(encoding="utf-8") == "日本語訳"
+    with connect(paths.database) as connection:
+        translated_paths = {
+            row["language"]: row["translation_relative_path"]
+            for row in connection.execute(
+                "SELECT language, translation_relative_path FROM annotation_translations"
+            )
+        }
+    assert translated_paths == {
+        "zh-CN": "asset_007.zh-CN.txt",
+        "ja": "asset_007.ja.txt",
+    }
     renamed_assets = assets.list_assets(summary.project_id).items
     assert {item.filename: item.id for item in renamed_assets} == {
         "asset_007.png": before_ids["a.png"],
@@ -365,6 +397,7 @@ def test_batch_rename_moves_sidecars_without_reencoding_and_undoes(tmp_path: Pat
     assert renamed_assets[0].metadata_relative_path == "asset_007.json"
 
     (project / "asset_007.txt").write_text("edited after rename", encoding="utf-8")
+    (project / "asset_007.zh-CN.txt").write_text("重命名后编辑", encoding="utf-8")
     (project / "asset_007.json").unlink()
     undone = preprocessing.undo(summary.project_id, operation.id)
 
@@ -373,8 +406,44 @@ def test_batch_rename_moves_sidecars_without_reencoding_and_undoes(tmp_path: Pat
     assert file_sha256(second_image) == original_hashes["b.jpg"]
     assert (project / "a.txt").read_text(encoding="utf-8") == "edited after rename"
     assert (project / "a.json").read_text(encoding="utf-8") == '{"source": "original"}'
+    assert (project / "a.zh-CN.txt").read_text(encoding="utf-8") == "重命名后编辑"
+    assert (project / "a.ja.txt").read_text(encoding="utf-8") == "日本語訳"
+    with connect(paths.database) as connection:
+        restored_paths = {
+            row["language"]: row["translation_relative_path"]
+            for row in connection.execute(
+                "SELECT language, translation_relative_path FROM annotation_translations"
+            )
+        }
+    assert restored_paths == {"zh-CN": "a.zh-CN.txt", "ja": "a.ja.txt"}
     assert not (project / "asset_007.png").exists()
     assert not (project / "asset_008.jpg").exists()
+
+
+def test_rename_does_not_capture_another_assets_locale_shaped_annotation(
+    tmp_path: Path,
+) -> None:
+    workspaces, assets, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (80, 40), "white").save(project / "sample.png")
+    Image.new("RGB", (64, 32), "black").save(project / "sample.zh-CN.png")
+    (project / "sample.txt").write_text("first annotation", encoding="utf-8")
+    (project / "sample.zh-CN.txt").write_text("second annotation", encoding="utf-8")
+    summary, _ = workspaces.open(str(project))
+    by_name = {asset.filename: asset for asset in assets.list_assets(summary.project_id).items}
+    request = PreprocessRequest(
+        asset_ids=[by_name["sample.png"].id],
+        rename=RenameOptions(template="renamed_{index}", start_index=1, padding=2),
+    )
+
+    operation = _execute(preprocessing, summary.project_id, request)
+
+    assert operation.status == "completed"
+    assert (project / "renamed_01.png").is_file()
+    assert (project / "renamed_01.txt").read_text(encoding="utf-8") == "first annotation"
+    assert (project / "sample.zh-CN.png").is_file()
+    assert (project / "sample.zh-CN.txt").read_text(encoding="utf-8") == ("second annotation")
 
 
 def test_rename_can_combine_with_conversion(tmp_path: Path) -> None:
@@ -758,7 +827,7 @@ def test_preprocessing_refuses_to_run_while_annotation_job_is_active(tmp_path: P
     request = PreprocessRequest(resize=ResizeOptions(max_edge=64))
     preview = preprocessing.preview(summary.project_id, request)
 
-    with pytest.raises(ValueError, match="标注任务运行"):
+    with pytest.raises(ValueError, match="任务运行"):
         _execute(preprocessing, summary.project_id, request, preview)
 
     with Image.open(image_path) as image:

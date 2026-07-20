@@ -30,22 +30,40 @@ class JobScope(StrEnum):
     SELECTED = "selected"
 
 
+class JobKind(StrEnum):
+    ANNOTATION = "annotation"
+    TRANSLATION = "translation"
+
+
+class ExistingTranslationPolicy(StrEnum):
+    SKIP = "skip"
+    STALE = "stale"
+    OVERWRITE = "overwrite"
+
+
 class JobCreateRequest(BaseModel):
     provider_profile_id: str
+    kind: JobKind = JobKind.ANNOTATION
     scope: JobScope = JobScope.ALL
     asset_ids: list[str] = Field(default_factory=list)
     overwrite_existing: bool = False
+    translation_prompt_preset_id: str | None = None
+    target_language: str = "zh-CN"
+    translation_policy: ExistingTranslationPolicy = ExistingTranslationPolicy.SKIP
 
 
 class JobSummary(BaseModel):
     id: str
     status: JobStatus
+    kind: JobKind = JobKind.ANNOTATION
     system_preset_id: str
     system_preset_name: str
     provider_profile_id: str
     provider_profile_name: str
     scope: JobScope
     overwrite_existing: bool
+    target_language: str | None = None
+    translation_policy: ExistingTranslationPolicy | None = None
     retry_limit: int
     total: int = 0
     pending: int = 0
@@ -95,4 +113,5 @@ class ActiveJobsOverview(BaseModel):
     count: int
     project_count: int
     annotation_job_count: int = 0
+    translation_job_count: int = 0
     preprocessing_count: int = 0

@@ -76,12 +76,14 @@ class JobQueryRepository:
         finally:
             connection.close()
 
-    def latest_failed_response(self, job_id: str, item_id: str) -> tuple[str, str] | None:
+    def latest_failed_response(
+        self, job_id: str, item_id: str
+    ) -> tuple[str, str, str | None] | None:
         connection = connect(self._database_path)
         try:
             row = connection.execute(
                 """
-                SELECT ji.asset_id, ja.response_content
+                SELECT ji.asset_id, ja.response_content, ja.source_annotation_hash
                 FROM job_items ji
                 JOIN job_attempts ja ON ja.job_item_id = ji.id
                 WHERE ji.job_id = ?
@@ -96,7 +98,11 @@ class JobQueryRepository:
             ).fetchone()
             if row is None:
                 return None
-            return str(row["asset_id"]), str(row["response_content"])
+            return (
+                str(row["asset_id"]),
+                str(row["response_content"]),
+                str(row["source_annotation_hash"]) if row["source_annotation_hash"] else None,
+            )
         finally:
             connection.close()
 
@@ -187,15 +193,28 @@ class JobQueryRepository:
             }
         provider = json.loads(str(row["provider_snapshot"]))
         system = json.loads(str(row["system_prompt_snapshot"]))
+        configuration = json.loads(str(row["configuration_snapshot"]))
+        kind = str(row["kind"])
         return JobSummary(
             id=str(row["id"]),
             status=str(row["status"]),
+            kind=kind,
             system_preset_id=str(row["system_preset_id"]),
             system_preset_name=str(system.get("name", "未命名预设")),
             provider_profile_id=str(row["provider_profile_id"]),
             provider_profile_name=str(provider.get("name", "未命名 API 配置")),
             scope=str(row["scope"]),
             overwrite_existing=bool(row["overwrite_existing"]),
+            target_language=(
+                str(configuration["target_language"])
+                if kind == "translation" and configuration.get("target_language")
+                else None
+            ),
+            translation_policy=(
+                str(configuration["translation_policy"])
+                if kind == "translation" and configuration.get("translation_policy")
+                else None
+            ),
             retry_limit=int(row["retry_limit"]),
             total=sum(counts.values()),
             pending=counts.get(JobItemStatus.PENDING.value, 0)

@@ -101,6 +101,28 @@ export interface AnnotationRevision {
   content: string;
 }
 
+export type TranslationStatus =
+  "missing" | "current" | "stale" | "untracked" | "source_missing" | "conflict";
+
+export interface TranslationDocument {
+  asset_id: string;
+  language: string;
+  path: string;
+  exists: boolean;
+  content: string;
+  status: TranslationStatus;
+  source_exists: boolean;
+  source_hash: string | null;
+  current_source_hash: string | null;
+  validation_status: string | null;
+  provider_profile_id: string | null;
+  provider_profile_name: string | null;
+  model: string | null;
+  modified_at: string | null;
+  updated_at: string | null;
+  issue: string | null;
+}
+
 export interface MetadataDocument {
   exists: boolean;
   path: string | null;
@@ -190,6 +212,14 @@ export interface SystemPreset {
   updated_at: string;
 }
 
+export interface TranslationPromptPreset {
+  id: string;
+  name: string;
+  system_prompt: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ProviderType = "openrouter" | "openai_compatible" | "opencode_go" | "gemini" | "codex";
 export type ServiceTier = "flex" | "priority";
 export type ReasoningEffort = "max" | "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
@@ -264,15 +294,21 @@ export type JobStatus =
 export type JobItemStatus =
   "pending" | "running" | "succeeded" | "failed" | "interrupted" | "skipped" | "manually_accepted";
 
+export type JobKind = "annotation" | "translation";
+export type ExistingTranslationPolicy = "skip" | "stale" | "overwrite";
+
 export interface JobSummary {
   id: string;
   status: JobStatus;
+  kind: JobKind;
   system_preset_id: string;
   system_preset_name: string;
   provider_profile_id: string;
   provider_profile_name: string;
   scope: "all" | "selected";
   overwrite_existing: boolean;
+  target_language: string | null;
+  translation_policy: ExistingTranslationPolicy | null;
   retry_limit: number;
   total: number;
   pending: number;

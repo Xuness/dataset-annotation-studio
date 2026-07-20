@@ -137,6 +137,36 @@ def test_non_openrouter_payload_ignores_openrouter_cache_strategy(tmp_path: Path
     assert payload["messages"][0] == {"role": "system", "content": "system"}
 
 
+def test_openai_compatible_text_only_payload_omits_image() -> None:
+    profile = ProviderProfile(
+        id="profile",
+        name="Compatible API",
+        provider_type=ProviderType.OPENAI_COMPATIBLE,
+        base_url="https://example.invalid/v1",
+        model="example/model",
+        temperature=0.2,
+        max_output_tokens=4096,
+        concurrency=2,
+        timeout_seconds=180,
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    request = MultimodalRequest(
+        image_path=None,
+        system_prompt="translate",
+        user_prompt="source text",
+        model=profile.model,
+        temperature=profile.temperature,
+        max_output_tokens=profile.max_output_tokens,
+        timeout_seconds=profile.timeout_seconds,
+    )
+
+    payload = _build_payload(profile, request)
+
+    assert payload["messages"][1]["content"] == [{"type": "text", "text": "source text"}]
+    assert "image_url" not in str(payload)
+
+
 def test_openrouter_catalog_parser_exposes_picker_metadata() -> None:
     model = _parse_openrouter_model(
         {

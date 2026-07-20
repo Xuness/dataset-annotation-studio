@@ -42,6 +42,18 @@ def build_payload(
     profile: ProviderProfile,
     request: MultimodalRequest,
 ) -> dict[str, object]:
+    user_content: list[dict[str, object]] = [{"type": "text", "text": request.user_prompt}]
+    if request.image_path is not None:
+        user_content.append(
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": image_mime_type(request.image_path),
+                    "data": encode_image_base64(request.image_path),
+                },
+            }
+        )
     payload: dict[str, object] = {
         "model": request.model,
         "max_tokens": request.max_output_tokens,
@@ -55,17 +67,7 @@ def build_payload(
         "messages": [
             {
                 "role": "user",
-                "content": [
-                    {"type": "text", "text": request.user_prompt},
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": image_mime_type(request.image_path),
-                            "data": encode_image_base64(request.image_path),
-                        },
-                    },
-                ],
+                "content": user_content,
             }
         ],
     }

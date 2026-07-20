@@ -32,10 +32,11 @@ flowchart LR
 - `modules/workspaces`：项目清单、路径解析、可携带身份和设置。
 - `modules/assets`：图片发现、增量索引、缩略图和元数据读取。
 - `modules/annotations`：原文保存、删除、历史以及轻量校验。
+- `modules/translations`：多语言译文旁车、源版本追踪、结构校验和翻译 Prompt 模板渲染。
 - `modules/prompts`：User Prompt 与选定 JSON 字段的纯函数组合。
 - `modules/presets`：全局 System Prompt / 模型连接配置；API 密钥通过 `SecretStore` 隔离。
 - `modules/providers`：统一 `ModelProvider` 协议、各供应商适配器，以及惰性共享的 Codex Runtime。
-- `modules/jobs`：任务创建、查询投影、原子认领、尝试记录、单图调用追踪和 Worker。
+- `modules/jobs`：标注/翻译任务创建、Prompt 与模型连接快照、查询投影、原子认领、尝试记录、单图调用追踪和 Worker。
 - `modules/preprocessing`：计划、图像渲染、恢复记录和撤销编排。
 - `modules/statistics`：只读派生统计；当前实现为标签频次分析器。
 - `api/routes`：HTTP 输入输出映射，不承载业务规则。

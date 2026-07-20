@@ -123,7 +123,7 @@ export function PreprocessPage() {
     const previewData = validPreview;
     if (!previewData || previewData.warning_count) return;
     const confirmed = await confirmDialog(
-      `对 ${previewData.changed_count} 张图片执行预处理？原文件会保存在当前项目的恢复区。${request.rename ? "同名 .txt / .json 也会一起重命名。" : ""}`,
+      `对 ${previewData.changed_count} 张图片执行预处理？原文件会保存在当前项目的恢复区。${request.rename ? "原标注、所有语言译文和 .json 也会一起重命名。" : ""}`,
       { title: "执行预处理", confirmLabel: "执行" },
     );
     if (!confirmed) return;

@@ -13,6 +13,9 @@ from dataset_studio.modules.presets.models import (
     SystemPreset,
     SystemPresetCreate,
     SystemPresetUpdate,
+    TranslationPromptPreset,
+    TranslationPromptPresetCreate,
+    TranslationPromptPresetUpdate,
 )
 from dataset_studio.modules.providers.catalog import search_provider_models
 from dataset_studio.modules.providers.models import ProviderModelSummary
@@ -39,6 +42,44 @@ def update_system_preset(preset_id: str, data: SystemPresetUpdate, container: Co
 @router.delete("/system/{preset_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_system_preset(preset_id: str, container: Container):
     container.presets.delete_system(preset_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/translation-prompts", response_model=list[TranslationPromptPreset])
+def list_translation_prompt_presets(container: Container):
+    return container.presets.list_translation_prompts()
+
+
+@router.post(
+    "/translation-prompts",
+    response_model=TranslationPromptPreset,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_translation_prompt_preset(
+    data: TranslationPromptPresetCreate,
+    container: Container,
+):
+    return container.presets.create_translation_prompt(data)
+
+
+@router.patch(
+    "/translation-prompts/{preset_id}",
+    response_model=TranslationPromptPreset,
+)
+def update_translation_prompt_preset(
+    preset_id: str,
+    data: TranslationPromptPresetUpdate,
+    container: Container,
+):
+    return container.presets.update_translation_prompt(preset_id, data)
+
+
+@router.delete(
+    "/translation-prompts/{preset_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_translation_prompt_preset(preset_id: str, container: Container):
+    container.presets.delete_translation_prompt(preset_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -43,6 +43,36 @@
   margin-bottom: 14px;
 }
 
+.job-kind-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.job-kind-switch button {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+
+.job-kind-switch button.is-active {
+  color: var(--accent-deep);
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgb(44 35 28 / 9%);
+}
+
 .job-prompt-source {
   display: grid;
   gap: 5px;

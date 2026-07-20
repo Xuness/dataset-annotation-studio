@@ -24,6 +24,7 @@ function useInvalidateAnnotation(projectId: string, assetId: string) {
     void queryClient.invalidateQueries({ queryKey: ["annotation", projectId, assetId] });
     void queryClient.invalidateQueries({ queryKey: ["annotation-history", projectId, assetId] });
     void queryClient.invalidateQueries({ queryKey: ["annotation-trace", projectId, assetId] });
+    void queryClient.invalidateQueries({ queryKey: ["translations", projectId, assetId] });
     void queryClient.invalidateQueries({ queryKey: ["assets", projectId] });
     void queryClient.invalidateQueries({ queryKey: ["workspaces", projectId] });
     void queryClient.invalidateQueries({ queryKey: ["statistics", projectId] });

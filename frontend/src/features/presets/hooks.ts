@@ -4,29 +4,42 @@ import {
   cancelCodexLogin,
   createProviderProfile,
   createSystemPreset,
+  createTranslationPromptPreset,
   deleteProviderProfile,
   deleteSystemPreset,
+  deleteTranslationPromptPreset,
   getCodexAccount,
   getCodexLoginStatus,
   listProviderProfiles,
   listSystemPresets,
+  listTranslationPromptPresets,
   searchProviderModels,
   startCodexLogin,
   updateProviderProfile,
   updateSystemPreset,
+  updateTranslationPromptPreset,
   type ProviderProfileInput,
   type ProviderModelSearchInput,
   type SystemPresetInput,
+  type TranslationPromptPresetInput,
 } from "./api";
 
 export const presetKeys = {
   system: ["presets", "system"] as const,
+  translationPrompts: ["presets", "translation-prompts"] as const,
   providers: ["presets", "providers"] as const,
   codexAccount: ["providers", "codex", "account"] as const,
 };
 
 export function useSystemPresets() {
   return useQuery({ queryKey: presetKeys.system, queryFn: listSystemPresets });
+}
+
+export function useTranslationPromptPresets() {
+  return useQuery({
+    queryKey: presetKeys.translationPrompts,
+    queryFn: listTranslationPromptPresets,
+  });
 }
 
 export function useCodexAccount(enabled: boolean) {
@@ -89,6 +102,27 @@ export function useSystemPresetMutations() {
       onSuccess: invalidate,
     }),
     remove: useMutation({ mutationFn: deleteSystemPreset, onSuccess: invalidate }),
+  };
+}
+
+export function useTranslationPromptPresetMutations() {
+  const queryClient = useQueryClient();
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: presetKeys.translationPrompts });
+  return {
+    create: useMutation({
+      mutationFn: createTranslationPromptPreset,
+      onSuccess: invalidate,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, input }: { id: string; input: Partial<TranslationPromptPresetInput> }) =>
+        updateTranslationPromptPreset(id, input),
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({
+      mutationFn: deleteTranslationPromptPreset,
+      onSuccess: invalidate,
+    }),
   };
 }
 

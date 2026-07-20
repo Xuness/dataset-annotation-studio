@@ -11,6 +11,7 @@ from PIL import Image, ImageOps
 from dataset_studio.core.files import file_sha256
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.preprocessing.models import OutputFormat, PreprocessRequest
+from dataset_studio.modules.translations.service import LANGUAGE_PATTERN
 
 _RENAME_FIELD_PATTERN = re.compile(r"\{(name|index)\}")
 _WINDOWS_RESERVED_NAMES = {
@@ -22,7 +23,6 @@ _WINDOWS_RESERVED_NAMES = {
     *(f"LPT{index}" for index in range(1, 10)),
 }
 _INVALID_FILENAME_CHARACTERS = frozenset('<>:"/\\|?*')
-_SIDECAR_SUFFIXES = (".txt", ".json")
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +41,7 @@ class PlanItem:
 
 def build_plan(database_path: Path, root: Path, request: PreprocessRequest) -> list[PlanItem]:
     rows = _select_assets(database_path, request.asset_ids)
+    claimed_annotations = _claimed_annotation_paths(database_path, root)
     if request.asset_ids:
         selected_ids = set(request.asset_ids)
         found_ids = {str(row["id"]) for row in rows}
@@ -79,13 +80,18 @@ def build_plan(database_path: Path, root: Path, request: PreprocessRequest) -> l
         if warning is None and source.resolve() != target.resolve() and target.exists():
             warning = f"目标文件已经存在：{after_relative}"
         if warning is None and request.rename is not None:
-            for suffix in _SIDECAR_SUFFIXES:
-                source_sidecar = source.with_suffix(suffix)
-                target_sidecar = target.with_suffix(suffix)
-                if (
-                    source_sidecar.as_posix() != target_sidecar.as_posix()
-                    and target_sidecar.exists()
-                    and not _same_file(source_sidecar, target_sidecar)
+            for source_sidecar, target_sidecar in _sidecar_pairs(
+                source,
+                target,
+                claimed_annotations,
+            ):
+                if source_sidecar.as_posix() != target_sidecar.as_posix() and (
+                    (target_sidecar.exists() and not _same_file(source_sidecar, target_sidecar))
+                    or (
+                        target_sidecar.suffix.lower() == ".txt"
+                        and _path_key(target_sidecar) in claimed_annotations
+                        and _path_key(target_sidecar) != _path_key(source_sidecar)
+                    )
                 ):
                     warning = f"目标同名伴随文件已经存在：{target_sidecar.relative_to(root)}"
                     break
@@ -229,3 +235,49 @@ def _same_file(first: Path, second: Path) -> bool:
         return first.samefile(second)
     except OSError:
         return False
+
+
+def _sidecar_pairs(
+    source: Path,
+    target: Path,
+    claimed_annotations: set[str],
+) -> list[tuple[Path, Path]]:
+    pairs = [
+        (source.with_suffix(".txt"), target.with_suffix(".txt")),
+        (source.with_suffix(".json"), target.with_suffix(".json")),
+    ]
+    prefix = f"{source.stem}."
+    if source.parent.is_dir():
+        for candidate in source.parent.glob(f"{source.stem}.*.txt"):
+            if _path_key(candidate) in claimed_annotations:
+                continue
+            language = candidate.name[len(prefix) : -len(".txt")]
+            if LANGUAGE_PATTERN.fullmatch(language):
+                pairs.append(
+                    (
+                        candidate,
+                        target.with_name(f"{target.stem}.{language}.txt"),
+                    )
+                )
+    return pairs
+
+
+def _claimed_annotation_paths(database_path: Path, root: Path) -> set[str]:
+    connection = connect(database_path)
+    try:
+        return {
+            _path_key(root / str(row["annotation_relative_path"]))
+            for row in connection.execute(
+                """
+                SELECT annotation_relative_path
+                FROM assets
+                WHERE is_present = 1
+                """
+            )
+        }
+    finally:
+        connection.close()
+
+
+def _path_key(path: Path) -> str:
+    return path.resolve().as_posix().casefold()
