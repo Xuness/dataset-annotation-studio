@@ -5,14 +5,15 @@ from types import SimpleNamespace
 import pytest
 from openai_codex import ApprovalMode, LocalImageInput, Sandbox, TextInput
 
-from dataset_studio.modules.presets.models import (
-    ProviderProfile,
-    ProviderRequestOptions,
+from dataset_studio.modules.providers.codex import CodexProvider
+from dataset_studio.modules.providers.codex_runtime import CodexRuntime
+from dataset_studio.modules.providers.config import (
+    CodexModelOptions,
+    ProviderExecutionProfile,
+    ProviderModelConfig,
     ProviderType,
     ReasoningEffort,
 )
-from dataset_studio.modules.providers.codex import CodexProvider
-from dataset_studio.modules.providers.codex_runtime import CodexRuntime
 from dataset_studio.modules.providers.models import MultimodalRequest
 
 
@@ -80,20 +81,20 @@ class FakeCodexRuntime:
         return requested_effort
 
 
-def _profile() -> ProviderProfile:
-    return ProviderProfile(
+def _profile() -> ProviderExecutionProfile:
+    return ProviderExecutionProfile(
         id="codex-profile",
         name="Codex",
         provider_type=ProviderType.CODEX,
         base_url="",
-        model="gpt-example",
-        temperature=0.2,
-        max_output_tokens=4096,
         concurrency=1,
-        timeout_seconds=30,
-        request_options=ProviderRequestOptions(reasoning_effort=ReasoningEffort.HIGH),
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
+        model=ProviderModelConfig(
+            model_id="gpt-example",
+            temperature=0.2,
+            max_output_tokens=4096,
+            timeout_seconds=30,
+            protocol_options=CodexModelOptions(reasoning_effort=ReasoningEffort.HIGH),
+        ),
     )
 
 
@@ -102,10 +103,6 @@ def _request(image_path: Path) -> MultimodalRequest:
         image_path=image_path,
         system_prompt="Return only the final annotation.",
         user_prompt="Annotate this image.",
-        model="gpt-example",
-        temperature=0.2,
-        max_output_tokens=4096,
-        timeout_seconds=30,
     )
 
 
@@ -149,10 +146,6 @@ async def test_codex_provider_accepts_text_only_request(tmp_path: Path) -> None:
         image_path=None,
         system_prompt=request.system_prompt,
         user_prompt=request.user_prompt,
-        model=request.model,
-        temperature=request.temperature,
-        max_output_tokens=request.max_output_tokens,
-        timeout_seconds=request.timeout_seconds,
     )
 
     response = await CodexProvider(runtime).complete(_profile(), None, request)

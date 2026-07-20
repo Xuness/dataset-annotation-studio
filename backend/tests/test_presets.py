@@ -4,17 +4,21 @@ import pytest
 from pydantic import ValidationError
 
 from dataset_studio.modules.presets.models import (
-    PromptCacheStrategy,
     ProviderProfileCreate,
     ProviderProfileUpdate,
-    ProviderRequestOptions,
-    ProviderType,
     SystemPresetCreate,
     TranslationPromptPresetCreate,
     TranslationPromptPresetUpdate,
 )
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.service import PresetService
+from dataset_studio.modules.providers.config import (
+    CodexModelOptions,
+    OpenAICompatibleModelOptions,
+    ProviderModelConfig,
+    ProviderType,
+    ReasoningEffort,
+)
 from dataset_studio.platform.global_store import initialize_global_database
 
 
@@ -45,7 +49,13 @@ def _provider(name: str, api_key: str) -> ProviderProfileCreate:
         name=name,
         provider_type=ProviderType.OPENAI_COMPATIBLE,
         base_url="https://example.invalid/v1",
-        model="example/model",
+        default_model_id="example/model",
+        models=[
+            ProviderModelConfig(
+                model_id="example/model",
+                protocol_options=OpenAICompatibleModelOptions(),
+            )
+        ],
         api_key=api_key,
     )
 
@@ -64,11 +74,20 @@ def test_provider_update_restores_secret_when_database_write_fails(
     with pytest.raises(RuntimeError, match="simulated database failure"):
         service.update_provider(
             profile.id,
-            ProviderProfileUpdate(model="changed/model", api_key="new-secret"),
+            ProviderProfileUpdate(
+                default_model_id="changed/model",
+                models=[
+                    ProviderModelConfig(
+                        model_id="changed/model",
+                        protocol_options=OpenAICompatibleModelOptions(),
+                    )
+                ],
+                api_key="new-secret",
+            ),
         )
 
     assert service.get_api_key(profile.id) == "old-secret"
-    assert service.get_provider(profile.id).model == "example/model"
+    assert service.get_provider(profile.id).default_model_id == "example/model"
 
 
 def test_duplicate_provider_update_does_not_replace_api_key(tmp_path: Path) -> None:
@@ -97,7 +116,7 @@ def test_empty_api_key_explicitly_clears_saved_secret(tmp_path: Path) -> None:
         service.get_api_key(profile.id)
 
 
-def test_provider_update_accepts_full_form_with_request_options(tmp_path: Path) -> None:
+def test_provider_update_accepts_full_form_with_model_config(tmp_path: Path) -> None:
     service, _, _ = _service(tmp_path)
     profile = service.create_provider(_provider("Profile", "secret"))
 
@@ -107,24 +126,27 @@ def test_provider_update_accepts_full_form_with_request_options(tmp_path: Path) 
             name=profile.name,
             provider_type=profile.provider_type,
             base_url=profile.base_url,
-            model=profile.model,
-            temperature=profile.temperature,
-            max_output_tokens=profile.max_output_tokens,
+            default_model_id=profile.default_model_id,
+            models=[
+                profile.models[0].model_copy(
+                    update={
+                        "top_p": 0.9,
+                        "seed": 42,
+                        "protocol_options": OpenAICompatibleModelOptions(
+                            reasoning_effort=ReasoningEffort.HIGH
+                        ),
+                    }
+                )
+            ],
             concurrency=12,
-            timeout_seconds=profile.timeout_seconds,
-            request_options=ProviderRequestOptions(
-                top_p=0.9,
-                seed=42,
-                prompt_cache_strategy=PromptCacheStrategy.EXPLICIT_SYSTEM,
-            ),
         ),
     )
 
     assert updated.concurrency == 12
-    assert updated.request_options == ProviderRequestOptions(
-        top_p=0.9,
-        seed=42,
-        prompt_cache_strategy=PromptCacheStrategy.EXPLICIT_SYSTEM,
+    assert updated.models[0].top_p == 0.9
+    assert updated.models[0].seed == 42
+    assert updated.models[0].protocol_options == OpenAICompatibleModelOptions(
+        reasoning_effort=ReasoningEffort.HIGH
     )
     assert service.get_api_key(profile.id) == "secret"
 
@@ -136,32 +158,73 @@ def test_provider_profile_stores_multiple_models_and_updates_default(tmp_path: P
             name="Multi-model provider",
             provider_type=ProviderType.OPENAI_COMPATIBLE,
             base_url="https://example.invalid/v1",
-            model="vision/default",
-            models=["vision/alternate", " vision/default ", "translation/fast"],
+            default_model_id="vision/default",
+            models=[
+                ProviderModelConfig(
+                    model_id="vision/default",
+                    temperature=0.1,
+                    max_output_tokens=2048,
+                    protocol_options=OpenAICompatibleModelOptions(
+                        reasoning_effort=ReasoningEffort.LOW
+                    ),
+                ),
+                ProviderModelConfig(
+                    model_id="vision/alternate",
+                    temperature=0.8,
+                    max_output_tokens=8192,
+                    protocol_options=OpenAICompatibleModelOptions(
+                        reasoning_effort=ReasoningEffort.HIGH
+                    ),
+                ),
+                ProviderModelConfig(
+                    model_id="translation/fast",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                ),
+            ],
             api_key="secret",
         )
     )
 
-    assert profile.model == "vision/default"
-    assert profile.models == [
+    assert profile.default_model_id == "vision/default"
+    assert [model.model_id for model in profile.models] == [
         "vision/default",
         "vision/alternate",
         "translation/fast",
     ]
+    assert profile.models[0].temperature == 0.1
+    assert profile.models[1].temperature == 0.8
+    assert profile.models[1].max_output_tokens == 8192
 
     replaced = service.update_provider(
         profile.id,
-        ProviderProfileUpdate(models=["translation/quality", "vision/new"]),
+        ProviderProfileUpdate(
+            models=[
+                ProviderModelConfig(
+                    model_id="translation/quality",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                ),
+                ProviderModelConfig(
+                    model_id="vision/new",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                ),
+            ]
+        ),
     )
-    assert replaced.model == "translation/quality"
-    assert replaced.models == ["translation/quality", "vision/new"]
+    assert replaced.default_model_id == "translation/quality"
+    assert [model.model_id for model in replaced.models] == [
+        "translation/quality",
+        "vision/new",
+    ]
 
     switched = service.update_provider(
         profile.id,
-        ProviderProfileUpdate(model="vision/new"),
+        ProviderProfileUpdate(default_model_id="vision/new"),
     )
-    assert switched.model == "vision/new"
-    assert switched.models == ["vision/new", "translation/quality"]
+    assert switched.default_model_id == "vision/new"
+    assert [model.model_id for model in switched.models] == [
+        "translation/quality",
+        "vision/new",
+    ]
     assert service.get_provider(profile.id).models == switched.models
 
 
@@ -175,11 +238,30 @@ def test_presets_reject_whitespace_only_required_text() -> None:
             name="Profile",
             provider_type=ProviderType.OPENAI_COMPATIBLE,
             base_url="https://example.invalid/v1",
-            model="   ",
+            default_model_id="   ",
+            models=[
+                ProviderModelConfig(
+                    model_id="valid",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                )
+            ],
             api_key="secret",
         )
     with pytest.raises(ValidationError):
         ProviderProfileUpdate(models=[])
+    with pytest.raises(ValidationError, match="协议"):
+        ProviderProfileCreate(
+            name="Mismatched",
+            provider_type=ProviderType.OPENAI_COMPATIBLE,
+            base_url="https://example.invalid/v1",
+            default_model_id="model",
+            models=[
+                ProviderModelConfig(
+                    model_id="model",
+                    protocol_options=CodexModelOptions(),
+                )
+            ],
+        )
 
 
 def test_translation_prompt_presets_include_editable_default_and_support_crud(
@@ -219,7 +301,13 @@ def test_codex_profile_uses_no_endpoint_or_project_secret(tmp_path: Path) -> Non
             name="Codex subscription",
             provider_type=ProviderType.CODEX,
             base_url="https://should-not-be-stored.invalid",
-            model="gpt-example",
+            default_model_id="gpt-example",
+            models=[
+                ProviderModelConfig(
+                    model_id="gpt-example",
+                    protocol_options=CodexModelOptions(),
+                )
+            ],
             concurrency=1,
         )
     )
@@ -235,7 +323,13 @@ def test_codex_profile_rejects_api_key() -> None:
         ProviderProfileCreate(
             name="Codex subscription",
             provider_type=ProviderType.CODEX,
-            model="gpt-example",
+            default_model_id="gpt-example",
+            models=[
+                ProviderModelConfig(
+                    model_id="gpt-example",
+                    protocol_options=CodexModelOptions(),
+                )
+            ],
             api_key="must-not-be-stored",
         )
 
@@ -246,7 +340,15 @@ def test_switching_api_profile_to_codex_removes_saved_secret(tmp_path: Path) -> 
 
     updated = service.update_provider(
         profile.id,
-        ProviderProfileUpdate(provider_type=ProviderType.CODEX),
+        ProviderProfileUpdate(
+            provider_type=ProviderType.CODEX,
+            models=[
+                ProviderModelConfig(
+                    model_id=profile.default_model_id,
+                    protocol_options=CodexModelOptions(),
+                )
+            ],
+        ),
     )
 
     assert updated.provider_type == ProviderType.CODEX

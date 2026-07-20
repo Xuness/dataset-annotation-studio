@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import httpx
 
-from dataset_studio.modules.presets.models import (
-    ProviderProfile,
+from dataset_studio.modules.providers.config import (
+    OpenCodeGoModelOptions,
+    ProviderExecutionProfile,
     ReasoningEffort,
 )
 from dataset_studio.modules.providers.media import encode_image_base64, image_mime_type
@@ -39,7 +40,7 @@ def reasoning_budget(
 
 def build_payload(
     spec: OpenCodeGoModelSpec,
-    profile: ProviderProfile,
+    profile: ProviderExecutionProfile,
     request: MultimodalRequest,
 ) -> dict[str, object]:
     user_content: list[dict[str, object]] = [{"type": "text", "text": request.user_prompt}]
@@ -55,8 +56,8 @@ def build_payload(
             }
         )
     payload: dict[str, object] = {
-        "model": request.model,
-        "max_tokens": request.max_output_tokens,
+        "model": profile.model_id,
+        "max_tokens": profile.model.max_output_tokens,
         "system": [
             {
                 "type": "text",
@@ -71,15 +72,18 @@ def build_payload(
             }
         ],
     }
+    options = profile.model.protocol_options
+    if not isinstance(options, OpenCodeGoModelOptions):
+        raise ProviderRequestError("OpenCode Go Messages 收到了其它协议的参数。")
     budget = reasoning_budget(
         spec,
-        profile.request_options.reasoning_effort,
-        request.max_output_tokens,
+        options.reasoning_effort,
+        profile.model.max_output_tokens,
     )
     if budget is not None:
         payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
-    elif spec.supports_temperature:
-        payload["temperature"] = request.temperature
+    elif spec.supports_temperature and profile.model.temperature is not None:
+        payload["temperature"] = profile.model.temperature
     return payload
 
 
@@ -120,7 +124,7 @@ def parse_response(raw: object, response_text: str) -> ProviderResponse:
 
 async def complete(
     spec: OpenCodeGoModelSpec,
-    profile: ProviderProfile,
+    profile: ProviderExecutionProfile,
     credential: str,
     request: MultimodalRequest,
 ) -> ProviderResponse:
@@ -131,7 +135,7 @@ async def complete(
         "Content-Type": "application/json",
     }
     try:
-        async with httpx.AsyncClient(timeout=request.timeout_seconds) as client:
+        async with httpx.AsyncClient(timeout=profile.model.timeout_seconds) as client:
             response = await client.post(
                 url,
                 headers=headers,

@@ -14,9 +14,17 @@ from dataset_studio.modules.jobs.execution_repository import JobExecutionReposit
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
 from dataset_studio.modules.jobs.models import JobItemStatus, JobKind
 from dataset_studio.modules.jobs.provider_call import JobStopped, complete_until_stopped
-from dataset_studio.modules.presets.models import ProviderProfile, ProviderType
+from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
 from dataset_studio.modules.prompts.composer import compose_user_prompt
 from dataset_studio.modules.providers.base import ModelProvider
+from dataset_studio.modules.providers.config import (
+    CodexModelOptions,
+    OpenAICompatibleModelOptions,
+    OpenCodeGoModelOptions,
+    OpenRouterModelOptions,
+    ProviderExecutionProfile,
+    ProviderType,
+)
 from dataset_studio.modules.providers.factory import create_provider
 from dataset_studio.modules.providers.models import (
     MultimodalRequest,
@@ -76,7 +84,7 @@ class AnnotationWorker:
             repository = JobExecutionRepository(paths.database)
             JobLifecycleRepository(paths.database).finalize_jobs()
             for job in repository.runnable_jobs():
-                profile = ProviderProfile.model_validate_json(str(job["provider_snapshot"]))
+                profile = load_provider_snapshot(str(job["provider_snapshot"]))
                 profile_running = sum(
                     active_profile == profile.id
                     for active_profile in self._active_profiles.values()
@@ -159,7 +167,7 @@ class AnnotationWorker:
             repository.finish_item(item_id, JobItemStatus.INTERRUPTED)
             return
 
-        profile = ProviderProfile.model_validate_json(str(job["provider_snapshot"]))
+        profile = load_provider_snapshot(str(job["provider_snapshot"]))
         try:
             credential = self._container.presets.get_provider_credential(profile)
         except ValueError as error:
@@ -208,10 +216,6 @@ class AnnotationWorker:
             image_path=image_path,
             system_prompt=str(system_snapshot["system_prompt"]),
             user_prompt=user_prompt,
-            model=profile.model,
-            temperature=profile.temperature,
-            max_output_tokens=profile.max_output_tokens,
-            timeout_seconds=profile.timeout_seconds,
         )
         provider = self._provider_factory(profile.provider_type)
         max_attempts = int(job["retry_limit"]) + 1
@@ -313,7 +317,7 @@ class AnnotationWorker:
                             expected_source_hash=source_hash,
                             provider_profile_id=profile.id,
                             provider_profile_name=profile.name,
-                            model=profile.model,
+                            model=profile.model_id,
                         )
                     else:
                         annotation_path = workspace_root / str(item["annotation_relative_path"])
@@ -445,7 +449,7 @@ class AnnotationWorker:
         job_id: str,
         asset_id: str,
         attempt_number: int,
-        profile: ProviderProfile,
+        profile: ProviderExecutionProfile,
         request: MultimodalRequest,
     ) -> str:
         path = runs_root / job_id / asset_id / f"attempt-{attempt_number}.json"
@@ -464,7 +468,7 @@ class AnnotationWorker:
         job_id: str,
         asset_id: str,
         attempt_number: int,
-        profile: ProviderProfile,
+        profile: ProviderExecutionProfile,
         request: MultimodalRequest,
         response: ProviderResponse,
     ) -> str:
@@ -493,7 +497,7 @@ class AnnotationWorker:
         job_id: str,
         asset_id: str,
         attempt_number: int,
-        profile: ProviderProfile,
+        profile: ProviderExecutionProfile,
         request: MultimodalRequest,
         error: ProviderRequestError,
     ) -> str:
@@ -511,10 +515,25 @@ class AnnotationWorker:
 
     @staticmethod
     def _request_snapshot(
-        profile: ProviderProfile,
+        profile: ProviderExecutionProfile,
         request: MultimodalRequest,
     ) -> dict[str, object]:
-        options = profile.request_options
+        model = profile.model
+        options = model.protocol_options
+        reasoning_effort = (
+            options.reasoning_effort.value
+            if isinstance(
+                options,
+                (
+                    OpenRouterModelOptions,
+                    OpenAICompatibleModelOptions,
+                    OpenCodeGoModelOptions,
+                    CodexModelOptions,
+                ),
+            )
+            and options.reasoning_effort
+            else None
+        )
         return {
             "system_prompt": request.system_prompt,
             "user_prompt": request.user_prompt,
@@ -522,18 +541,22 @@ class AnnotationWorker:
             "parameters": {
                 "provider_type": profile.provider_type.value,
                 "provider_profile_name": profile.name,
-                "model": request.model,
-                "temperature": request.temperature,
-                "max_output_tokens": request.max_output_tokens,
-                "timeout_seconds": request.timeout_seconds,
-                "top_p": options.top_p,
-                "seed": options.seed,
-                "service_tier": options.service_tier.value if options.service_tier else None,
-                "reasoning_effort": (
-                    options.reasoning_effort.value if options.reasoning_effort else None
+                "model": model.model_id,
+                "temperature": model.temperature,
+                "max_output_tokens": model.max_output_tokens,
+                "timeout_seconds": model.timeout_seconds,
+                "top_p": model.top_p,
+                "seed": model.seed,
+                "service_tier": (
+                    options.service_tier.value
+                    if isinstance(options, OpenRouterModelOptions) and options.service_tier
+                    else None
                 ),
+                "reasoning_effort": reasoning_effort,
                 "prompt_cache_strategy": (
                     options.prompt_cache_strategy.value if options.prompt_cache_strategy else None
-                ),
+                )
+                if isinstance(options, OpenRouterModelOptions)
+                else None,
             },
         }

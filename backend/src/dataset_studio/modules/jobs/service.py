@@ -19,6 +19,7 @@ from dataset_studio.modules.jobs.models import (
     JobScope,
     JobSummary,
 )
+from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
 from dataset_studio.modules.jobs.query_repository import JobQueryRepository
 from dataset_studio.modules.jobs.repository import JobCreationRepository
 from dataset_studio.modules.presets.models import TranslationPromptPreset
@@ -54,12 +55,10 @@ class JobService:
         paths, manifest = self._workspaces.get(project_id)
         provider_profile = self._presets.get_provider(request.provider_profile_id)
         self._presets.get_provider_credential(provider_profile)
-        selected_model = request.model.strip() if request.model else provider_profile.model
-        if selected_model not in provider_profile.models:
-            raise ValueError(
-                f"模型“{selected_model}”不在 API 配置“{provider_profile.name}”的模型列表中。"
-            )
-        provider_snapshot = provider_profile.model_copy(update={"model": selected_model})
+        provider_snapshot = self._presets.resolve_execution_profile(
+            provider_profile,
+            request.model_id,
+        )
 
         if request.kind == JobKind.TRANSLATION:
             language = self._translations.normalize_language(request.target_language)
@@ -311,7 +310,7 @@ class JobService:
             configuration = json.loads(str(job["configuration_snapshot"]))
             if not source_hash:
                 raise ValueError("这个译文响应缺少对应的源标注版本，无法安全采用。")
-            profile = json.loads(str(job["provider_snapshot"]))
+            profile = load_provider_snapshot(str(job["provider_snapshot"]))
             self._translations.save_generated(
                 project_id,
                 asset_id,
@@ -319,8 +318,8 @@ class JobService:
                 content,
                 expected_source_hash=source_hash,
                 provider_profile_id=str(job["provider_profile_id"]),
-                provider_profile_name=str(profile.get("name", "")) or None,
-                model=str(profile.get("model", "")) or None,
+                provider_profile_name=profile.name,
+                model=profile.model_id,
                 manually_accepted=True,
             )
         else:

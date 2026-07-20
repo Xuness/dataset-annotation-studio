@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 
-from dataset_studio.modules.presets.models import ProviderProfile
 from dataset_studio.modules.providers.base import ModelProvider
+from dataset_studio.modules.providers.config import ProviderExecutionProfile
 from dataset_studio.modules.providers.models import MultimodalRequest, ProviderResponse
 
 
@@ -14,7 +14,7 @@ class JobStopped(Exception):
 
 async def complete_until_stopped(
     provider: ModelProvider,
-    profile: ProviderProfile,
+    profile: ProviderExecutionProfile,
     credential: str | None,
     request: MultimodalRequest,
     is_stop_requested: Callable[[], bool],

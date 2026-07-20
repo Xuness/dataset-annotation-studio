@@ -7,8 +7,11 @@ from typing import Any
 
 from openai_codex import ApprovalMode, LocalImageInput, Sandbox, TextInput
 
-from dataset_studio.modules.presets.models import ProviderProfile
 from dataset_studio.modules.providers.codex_runtime import CodexRuntime
+from dataset_studio.modules.providers.config import (
+    CodexModelOptions,
+    ProviderExecutionProfile,
+)
 from dataset_studio.modules.providers.models import (
     MultimodalRequest,
     ProviderRequestError,
@@ -32,28 +35,29 @@ class CodexProvider:
 
     async def complete(
         self,
-        profile: ProviderProfile,
+        profile: ProviderExecutionProfile,
         _credential: str | None,
         request: MultimodalRequest,
     ) -> ProviderResponse:
         await self._runtime.require_chatgpt_account()
         client = await self._runtime.client()
+        options = profile.model.protocol_options
+        if not isinstance(options, CodexModelOptions):
+            raise ProviderRequestError("Codex Provider 收到了其它协议的模型参数。")
         requested_effort = (
-            profile.request_options.reasoning_effort.value
-            if profile.request_options.reasoning_effort is not None
-            else None
+            options.reasoning_effort.value if options.reasoning_effort is not None else None
         )
-        effort = await self._runtime.resolve_reasoning_effort(request.model, requested_effort)
+        effort = await self._runtime.resolve_reasoning_effort(profile.model_id, requested_effort)
         handle: Any | None = None
         try:
-            async with asyncio.timeout(request.timeout_seconds):
+            async with asyncio.timeout(profile.model.timeout_seconds):
                 thread = await client.thread_start(
                     approval_mode=ApprovalMode.deny_all,
                     config=_ANNOTATION_CONFIG,
                     cwd=str(self._runtime.working_directory()),
                     developer_instructions=request.system_prompt,
                     ephemeral=True,
-                    model=request.model,
+                    model=profile.model_id,
                     sandbox=Sandbox.read_only,
                 )
                 inputs = [TextInput(text=request.user_prompt)]
@@ -64,7 +68,7 @@ class CodexProvider:
         except TimeoutError as error:
             _interrupt_in_background(handle)
             raise ProviderRequestError(
-                f"Codex 请求超过 {request.timeout_seconds} 秒，已中断。"
+                f"Codex 请求超过 {profile.model.timeout_seconds} 秒，已中断。"
             ) from error
         except asyncio.CancelledError:
             _interrupt_in_background(handle)

@@ -4,8 +4,8 @@ import type {
   CodexLoginStart,
   CodexLoginStatus,
   ProviderModelSummary,
+  ProviderModelConfig,
   ProviderProfile,
-  ProviderRequestOptions,
   ProviderType,
   SystemPreset,
   TranslationPromptPreset,
@@ -25,14 +25,10 @@ export interface ProviderProfileInput {
   name: string;
   provider_type: ProviderType;
   base_url: string;
-  model: string;
-  models: string[];
+  default_model_id: string;
+  models: ProviderModelConfig[];
   api_key?: string;
-  temperature: number;
-  max_output_tokens: number;
   concurrency: number;
-  timeout_seconds: number;
-  request_options: ProviderRequestOptions;
 }
 
 export interface ProviderModelSearchInput {

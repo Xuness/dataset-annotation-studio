@@ -4,91 +4,97 @@ import httpx
 import pytest
 from PIL import Image
 
-from dataset_studio.modules.presets.models import (
+from dataset_studio.modules.providers import catalog as provider_catalog
+from dataset_studio.modules.providers.catalog import _parse_openrouter_model
+from dataset_studio.modules.providers.config import (
+    GeminiModelOptions,
+    OpenAICompatibleModelOptions,
+    OpenRouterModelOptions,
     PromptCacheStrategy,
-    ProviderProfile,
-    ProviderRequestOptions,
+    ProviderExecutionProfile,
+    ProviderModelConfig,
+    ProviderProtocolOptions,
     ProviderType,
     ReasoningEffort,
     ServiceTier,
 )
-from dataset_studio.modules.providers import catalog as provider_catalog
-from dataset_studio.modules.providers.catalog import _parse_openrouter_model
 from dataset_studio.modules.providers.gemini import _build_generation_config
 from dataset_studio.modules.providers.models import MultimodalRequest
 from dataset_studio.modules.providers.openai_compatible import _build_payload
 
 
+def _profile(
+    provider_type: ProviderType,
+    protocol_options: ProviderProtocolOptions,
+    *,
+    base_url: str,
+    temperature: float | None = 0.2,
+    max_output_tokens: int = 4096,
+    top_p: float | None = None,
+    seed: int | None = None,
+) -> ProviderExecutionProfile:
+    return ProviderExecutionProfile(
+        id="profile",
+        name="Provider",
+        provider_type=provider_type,
+        base_url=base_url,
+        concurrency=2,
+        model=ProviderModelConfig(
+            model_id="example/model",
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            timeout_seconds=180,
+            top_p=top_p,
+            seed=seed,
+            protocol_options=protocol_options,
+        ),
+    )
+
+
+def _request(image_path: Path | None, *, system_prompt: str = "system") -> MultimodalRequest:
+    return MultimodalRequest(
+        image_path=image_path,
+        system_prompt=system_prompt,
+        user_prompt="user",
+    )
+
+
 def test_openrouter_payload_includes_saved_advanced_options(tmp_path: Path) -> None:
     image_path = tmp_path / "sample.png"
     Image.new("RGB", (8, 8), "white").save(image_path)
-    profile = ProviderProfile(
-        id="profile",
-        name="OpenRouter",
-        provider_type=ProviderType.OPENROUTER,
-        base_url="https://openrouter.ai/api/v1",
-        model="example/model",
-        temperature=0.2,
-        max_output_tokens=4096,
-        concurrency=2,
-        timeout_seconds=180,
-        request_options=ProviderRequestOptions(
-            top_p=0.85,
-            seed=42,
+    profile = _profile(
+        ProviderType.OPENROUTER,
+        OpenRouterModelOptions(
             service_tier=ServiceTier.FLEX,
             reasoning_effort=ReasoningEffort.HIGH,
         ),
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    request = MultimodalRequest(
-        image_path=image_path,
-        system_prompt="system",
-        user_prompt="user",
-        model=profile.model,
-        temperature=profile.temperature,
-        max_output_tokens=profile.max_output_tokens,
-        timeout_seconds=profile.timeout_seconds,
+        base_url="https://openrouter.ai/api/v1",
+        top_p=0.85,
+        seed=42,
     )
 
-    payload = _build_payload(profile, request)
+    payload = _build_payload(profile, _request(image_path))
 
     assert payload["top_p"] == 0.85
     assert payload["seed"] == 42
     assert payload["service_tier"] == "flex"
     assert payload["reasoning"] == {"effort": "high"}
+    assert "reasoning_effort" not in payload
 
 
 def test_openrouter_payload_marks_system_prompt_as_cacheable(tmp_path: Path) -> None:
     image_path = tmp_path / "sample.png"
     Image.new("RGB", (8, 8), "white").save(image_path)
-    profile = ProviderProfile(
-        id="profile",
-        name="OpenRouter",
-        provider_type=ProviderType.OPENROUTER,
+    profile = _profile(
+        ProviderType.OPENROUTER,
+        OpenRouterModelOptions(prompt_cache_strategy=PromptCacheStrategy.EXPLICIT_SYSTEM),
         base_url="https://openrouter.ai/api/v1",
-        model="example/model",
-        temperature=0.2,
-        max_output_tokens=4096,
-        concurrency=2,
-        timeout_seconds=180,
-        request_options=ProviderRequestOptions(
-            prompt_cache_strategy=PromptCacheStrategy.EXPLICIT_SYSTEM
-        ),
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    request = MultimodalRequest(
-        image_path=image_path,
-        system_prompt="stable system prompt",
-        user_prompt="dynamic user prompt",
-        model=profile.model,
-        temperature=profile.temperature,
-        max_output_tokens=profile.max_output_tokens,
-        timeout_seconds=profile.timeout_seconds,
     )
 
-    payload = _build_payload(profile, request)
+    payload = _build_payload(
+        profile,
+        _request(image_path, system_prompt="stable system prompt"),
+    )
 
     assert payload["messages"][0] == {
         "role": "system",
@@ -100,68 +106,36 @@ def test_openrouter_payload_marks_system_prompt_as_cacheable(tmp_path: Path) -> 
             }
         ],
     }
-    assert payload["messages"][1]["content"][0] == {
-        "type": "text",
-        "text": "dynamic user prompt",
-    }
 
 
-def test_non_openrouter_payload_ignores_openrouter_cache_strategy(tmp_path: Path) -> None:
+def test_openai_compatible_payload_uses_its_own_reasoning_shape(tmp_path: Path) -> None:
     image_path = tmp_path / "sample.png"
     Image.new("RGB", (8, 8), "white").save(image_path)
-    profile = ProviderProfile(
-        id="profile",
-        name="Compatible API",
-        provider_type=ProviderType.OPENAI_COMPATIBLE,
+    profile = _profile(
+        ProviderType.OPENAI_COMPATIBLE,
+        OpenAICompatibleModelOptions(reasoning_effort=ReasoningEffort.HIGH),
         base_url="https://example.invalid/v1",
-        model="example/model",
-        temperature=0.2,
-        max_output_tokens=4096,
-        concurrency=2,
-        timeout_seconds=180,
-        request_options=ProviderRequestOptions(
-            prompt_cache_strategy=PromptCacheStrategy.EXPLICIT_SYSTEM
-        ),
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    request = MultimodalRequest(
-        image_path=image_path,
-        system_prompt="system",
-        user_prompt="user",
-        model=profile.model,
-        temperature=profile.temperature,
-        max_output_tokens=profile.max_output_tokens,
-        timeout_seconds=profile.timeout_seconds,
     )
 
-    payload = _build_payload(profile, request)
+    payload = _build_payload(profile, _request(image_path))
 
     assert payload["messages"][0] == {"role": "system", "content": "system"}
+    assert payload["reasoning_effort"] == "high"
+    assert "reasoning" not in payload
+    assert "service_tier" not in payload
+    assert "cache_control" not in str(payload)
 
 
 def test_openai_compatible_text_only_payload_omits_image() -> None:
-    profile = ProviderProfile(
-        id="profile",
-        name="Compatible API",
-        provider_type=ProviderType.OPENAI_COMPATIBLE,
+    profile = _profile(
+        ProviderType.OPENAI_COMPATIBLE,
+        OpenAICompatibleModelOptions(),
         base_url="https://example.invalid/v1",
-        model="example/model",
-        temperature=0.2,
-        max_output_tokens=4096,
-        concurrency=2,
-        timeout_seconds=180,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
     )
     request = MultimodalRequest(
         image_path=None,
         system_prompt="translate",
         user_prompt="source text",
-        model=profile.model,
-        temperature=profile.temperature,
-        max_output_tokens=profile.max_output_tokens,
-        timeout_seconds=profile.timeout_seconds,
     )
 
     payload = _build_payload(profile, request)
@@ -191,10 +165,11 @@ def test_openrouter_catalog_parser_exposes_picker_metadata() -> None:
     assert model.input_modalities == ["text", "image"]
     assert model.reasoning_efforts == ["high", "low"]
     assert model.prompt_price == "0.000001"
+    assert model.capabilities_known is True
 
 
 @pytest.mark.asyncio
-async def test_openrouter_catalog_search_does_not_filter_input_or_output_modalities(
+async def test_openrouter_catalog_search_does_not_filter_modalities(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured_params: dict[str, str] = {}
@@ -244,32 +219,68 @@ async def test_openrouter_catalog_search_does_not_filter_input_or_output_modalit
     ]
 
 
-def test_gemini_generation_config_maps_common_sampling_options(tmp_path: Path) -> None:
-    profile = ProviderProfile(
-        id="gemini",
-        name="Gemini",
-        provider_type=ProviderType.GEMINI,
-        base_url="https://generativelanguage.googleapis.com/v1beta",
-        model="gemini-example",
-        temperature=0.7,
-        max_output_tokens=2048,
-        concurrency=1,
-        timeout_seconds=180,
-        request_options=ProviderRequestOptions(top_p=0.9, seed=7),
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    request = MultimodalRequest(
-        image_path=tmp_path / "unused.png",
-        system_prompt="system",
-        user_prompt="user",
-        model=profile.model,
-        temperature=profile.temperature,
-        max_output_tokens=profile.max_output_tokens,
-        timeout_seconds=profile.timeout_seconds,
+@pytest.mark.asyncio
+async def test_openai_compatible_catalog_uses_standard_models_endpoint_and_filters_locally(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeAsyncClient:
+        def __init__(self, *, timeout: int) -> None:
+            assert timeout == 30
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args) -> None:
+            return None
+
+        async def get(self, url: str, *, headers):
+            captured.update(url=url, headers=headers)
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {"id": "vendor/text", "owned_by": "Vendor"},
+                        {"id": "vendor/Vision", "name": "Vision Pro"},
+                        {"id": "vendor/Vision", "name": "duplicate"},
+                    ]
+                },
+            )
+
+    monkeypatch.setattr(provider_catalog.httpx, "AsyncClient", FakeAsyncClient)
+
+    models = await provider_catalog._search_openai_compatible_models(
+        "https://compatible.example/v1/",
+        "secret",
+        "vision",
+        10,
     )
 
-    assert _build_generation_config(profile, request) == {
+    assert captured == {
+        "url": "https://compatible.example/v1/models",
+        "headers": {
+            "Accept": "application/json",
+            "Authorization": "Bearer secret",
+        },
+    }
+    assert [model.id for model in models] == ["vendor/Vision"]
+    assert models[0].capabilities_known is False
+    assert models[0].input_modalities == []
+
+
+def test_gemini_generation_config_maps_common_sampling_options(tmp_path: Path) -> None:
+    profile = _profile(
+        ProviderType.GEMINI,
+        GeminiModelOptions(),
+        base_url="https://generativelanguage.googleapis.com/v1beta",
+        temperature=0.7,
+        max_output_tokens=2048,
+        top_p=0.9,
+        seed=7,
+    )
+
+    assert _build_generation_config(profile, _request(tmp_path / "unused.png")) == {
         "temperature": 0.7,
         "maxOutputTokens": 2048,
         "topP": 0.9,

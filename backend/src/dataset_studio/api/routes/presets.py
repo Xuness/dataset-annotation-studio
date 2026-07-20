@@ -9,7 +9,6 @@ from dataset_studio.modules.presets.models import (
     ProviderProfile,
     ProviderProfileCreate,
     ProviderProfileUpdate,
-    ProviderType,
     SystemPreset,
     SystemPresetCreate,
     SystemPresetUpdate,
@@ -18,6 +17,7 @@ from dataset_studio.modules.presets.models import (
     TranslationPromptPresetUpdate,
 )
 from dataset_studio.modules.providers.catalog import search_provider_models
+from dataset_studio.modules.providers.config import ProviderType
 from dataset_studio.modules.providers.models import ProviderModelSummary
 
 router = APIRouter(prefix="/presets", tags=["presets"])

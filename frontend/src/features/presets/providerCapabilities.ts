@@ -4,12 +4,8 @@ export interface ProviderCapabilities {
   authMode: "api_key" | "codex_oauth";
   defaultBaseUrl: string;
   defaultConcurrency: number;
-  modelCatalog: "openrouter" | "opencode_go" | "codex" | null;
+  modelCatalog: "openrouter" | "openai_compatible" | "opencode_go" | "codex" | null;
   requiresBaseUrl: boolean;
-  supportsPromptCache: boolean;
-  supportsReasoningEffort: boolean;
-  supportsSamplingControls: boolean;
-  supportsServiceTier: boolean;
 }
 
 export const providerCapabilities: Record<ProviderType, ProviderCapabilities> = {
@@ -19,21 +15,13 @@ export const providerCapabilities: Record<ProviderType, ProviderCapabilities> = 
     defaultConcurrency: 4,
     modelCatalog: "openrouter",
     requiresBaseUrl: true,
-    supportsPromptCache: true,
-    supportsReasoningEffort: true,
-    supportsSamplingControls: true,
-    supportsServiceTier: true,
   },
   openai_compatible: {
     authMode: "api_key",
     defaultBaseUrl: "http://127.0.0.1:8000/v1",
     defaultConcurrency: 4,
-    modelCatalog: null,
+    modelCatalog: "openai_compatible",
     requiresBaseUrl: true,
-    supportsPromptCache: false,
-    supportsReasoningEffort: false,
-    supportsSamplingControls: true,
-    supportsServiceTier: false,
   },
   opencode_go: {
     authMode: "api_key",
@@ -41,10 +29,6 @@ export const providerCapabilities: Record<ProviderType, ProviderCapabilities> = 
     defaultConcurrency: 2,
     modelCatalog: "opencode_go",
     requiresBaseUrl: true,
-    supportsPromptCache: false,
-    supportsReasoningEffort: false,
-    supportsSamplingControls: false,
-    supportsServiceTier: false,
   },
   gemini: {
     authMode: "api_key",
@@ -52,10 +36,6 @@ export const providerCapabilities: Record<ProviderType, ProviderCapabilities> = 
     defaultConcurrency: 4,
     modelCatalog: null,
     requiresBaseUrl: true,
-    supportsPromptCache: false,
-    supportsReasoningEffort: false,
-    supportsSamplingControls: true,
-    supportsServiceTier: false,
   },
   codex: {
     authMode: "codex_oauth",
@@ -63,9 +43,5 @@ export const providerCapabilities: Record<ProviderType, ProviderCapabilities> = 
     defaultConcurrency: 1,
     modelCatalog: "codex",
     requiresBaseUrl: false,
-    supportsPromptCache: false,
-    supportsReasoningEffort: true,
-    supportsSamplingControls: false,
-    supportsServiceTier: false,
   },
 };

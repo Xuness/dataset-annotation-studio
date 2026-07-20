@@ -47,18 +47,25 @@ export function ProviderModelPicker({
     capabilities.modelCatalog === "codex" || Boolean(baseUrl.trim()),
   );
 
-  const isCodex = capabilities.modelCatalog === "codex";
+  const catalogDescription =
+    capabilities.modelCatalog === "codex"
+      ? "当前 ChatGPT 账号可用的 Codex 模型 · 包含纯文本与多模态模型"
+      : capabilities.modelCatalog === "openai_compatible"
+        ? "远端 OpenAI 兼容模型目录 · 未声明的能力不会被推测"
+        : "OpenRouter 完整模型目录 · 包含纯文本与多模态模型";
+  const searchPlaceholder =
+    capabilities.modelCatalog === "codex"
+      ? "搜索 Codex 模型名称或 ID…"
+      : capabilities.modelCatalog === "openai_compatible"
+        ? "搜索远端模型 ID 或名称…"
+        : "搜索模型，例如 Gemini、Claude、GPT…";
 
   return (
     <section className="model-picker form-field--wide" aria-label="模型目录">
       <header>
         <div>
           <strong>选择模型</strong>
-          <small>
-            {isCodex
-              ? "当前 ChatGPT 账号可用的 Codex 模型 · 包含纯文本与多模态模型"
-              : "OpenRouter 完整模型目录 · 包含纯文本与多模态模型"}
-          </small>
+          <small>{catalogDescription}</small>
         </div>
         <Button type="button" icon={<X size={13} />} onClick={onClose}>
           关闭
@@ -70,9 +77,7 @@ export function ProviderModelPicker({
           autoFocus
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={
-            isCodex ? "搜索 Codex 模型名称或 ID…" : "搜索模型，例如 Gemini、Claude、GPT…"
-          }
+          placeholder={searchPlaceholder}
         />
         <Button
           type="button"
@@ -115,6 +120,7 @@ export function ProviderModelPicker({
                   <small>输出 {formatPrice(model.completion_price)}</small>
                 ) : null}
                 {model.reasoning_efforts.length ? <small>支持推理强度</small> : null}
+                {!model.capabilities_known ? <small>参数能力未完整声明</small> : null}
               </span>
               {model.description ? <p>{model.description}</p> : null}
             </button>

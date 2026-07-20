@@ -11,6 +11,7 @@ from dataset_studio.modules.jobs.models import (
     JobItemStatus,
     JobSummary,
 )
+from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
 
 
 class JobQueryRepository:
@@ -191,7 +192,7 @@ class JobQueryRepository:
                     (row["id"],),
                 )
             }
-        provider = json.loads(str(row["provider_snapshot"]))
+        provider = load_provider_snapshot(str(row["provider_snapshot"]))
         system = json.loads(str(row["system_prompt_snapshot"]))
         configuration = json.loads(str(row["configuration_snapshot"]))
         kind = str(row["kind"])
@@ -202,8 +203,8 @@ class JobQueryRepository:
             system_preset_id=str(row["system_preset_id"]),
             system_preset_name=str(system.get("name", "未命名预设")),
             provider_profile_id=str(row["provider_profile_id"]),
-            provider_profile_name=str(provider.get("name", "未命名 API 配置")),
-            model=str(provider.get("model", "未知模型")),
+            provider_profile_name=provider.name,
+            model=provider.model_id,
             scope=str(row["scope"]),
             overwrite_existing=bool(row["overwrite_existing"]),
             target_language=(

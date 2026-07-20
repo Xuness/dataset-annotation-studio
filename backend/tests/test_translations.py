@@ -6,16 +6,24 @@ from PIL import Image
 from dataset_studio.core.config import Settings
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
+from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
+from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
 from dataset_studio.modules.jobs.models import (
     ExistingTranslationPolicy,
     JobCreateRequest,
+    JobItemStatus,
     JobKind,
     JobScope,
 )
 from dataset_studio.modules.jobs.service import JobService
-from dataset_studio.modules.presets.models import ProviderProfileCreate, ProviderType
+from dataset_studio.modules.presets.models import ProviderProfileCreate
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.service import PresetService
+from dataset_studio.modules.providers.config import (
+    OpenAICompatibleModelOptions,
+    ProviderModelConfig,
+    ProviderType,
+)
 from dataset_studio.modules.translations.models import TranslationStatus
 from dataset_studio.modules.translations.service import TranslationService
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
@@ -126,8 +134,17 @@ def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path:
             name="Translator",
             provider_type=ProviderType.OPENAI_COMPATIBLE,
             base_url="https://example.invalid/v1",
-            model="translation-model",
-            models=["translation-model", "translation-quality"],
+            default_model_id="translation-model",
+            models=[
+                ProviderModelConfig(
+                    model_id="translation-model",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                ),
+                ProviderModelConfig(
+                    model_id="translation-quality",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                ),
+            ],
             api_key="secret",
         )
     )
@@ -136,7 +153,7 @@ def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path:
         project_id,
         JobCreateRequest(
             provider_profile_id=provider.id,
-            model="translation-quality",
+            model_id="translation-quality",
             kind=JobKind.TRANSLATION,
             scope=JobScope.ALL,
             target_language="zh-CN",
@@ -149,6 +166,34 @@ def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path:
     assert missing_job.system_preset_name == "默认结构保留翻译"
     assert missing_job.model == "translation-quality"
     assert [item.asset_id for item in missing_job.items] == [by_name["missing.png"].id]
+
+    paths, _ = workspaces.get(project_id)
+    failed_item = missing_job.items[0]
+    source_hash = translations.read_source(project_id, failed_item.asset_id)[1]
+    execution = JobExecutionRepository(paths.database)
+    attempt_id, _ = execution.start_attempt(
+        failed_item.id,
+        source_annotation_hash=source_hash,
+    )
+    execution.finish_attempt(
+        attempt_id,
+        status="validation_failed",
+        response_content="<caption>broken",
+        error_message="simulated validation failure",
+    )
+    execution.finish_item(
+        failed_item.id,
+        JobItemStatus.FAILED,
+        error="simulated validation failure",
+        validation_status="failed",
+    )
+    JobLifecycleRepository(paths.database).finalize_jobs()
+
+    jobs.manually_accept(project_id, missing_job.id, failed_item.id)
+
+    accepted = translations.get(project_id, failed_item.asset_id, "zh-CN")
+    assert accepted.model == "translation-quality"
+    assert accepted.provider_profile_name == "Translator"
 
     annotations.save(project_id, by_name["current.png"].id, "<caption>changed</caption>")
     stale_job = jobs.create(

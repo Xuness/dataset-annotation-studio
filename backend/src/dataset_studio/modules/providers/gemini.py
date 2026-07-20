@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 
-from dataset_studio.modules.presets.models import ProviderProfile
+from dataset_studio.modules.providers.config import ProviderExecutionProfile
 from dataset_studio.modules.providers.media import encode_image_base64, image_mime_type
 from dataset_studio.modules.providers.models import (
     MultimodalRequest,
@@ -13,32 +13,33 @@ from dataset_studio.modules.providers.reasoning import extract_gemini_reasoning
 
 
 def _build_generation_config(
-    profile: ProviderProfile,
+    profile: ProviderExecutionProfile,
     request: MultimodalRequest,
 ) -> dict[str, object]:
+    model = profile.model
     config: dict[str, object] = {
-        "temperature": request.temperature,
-        "maxOutputTokens": request.max_output_tokens,
+        "maxOutputTokens": model.max_output_tokens,
     }
-    options = profile.request_options
-    if options.top_p is not None:
-        config["topP"] = options.top_p
-    if options.seed is not None:
-        config["seed"] = options.seed
+    if model.temperature is not None:
+        config["temperature"] = model.temperature
+    if model.top_p is not None:
+        config["topP"] = model.top_p
+    if model.seed is not None:
+        config["seed"] = model.seed
     return config
 
 
 class GeminiProvider:
     async def complete(
         self,
-        profile: ProviderProfile,
+        profile: ProviderExecutionProfile,
         credential: str | None,
         request: MultimodalRequest,
     ) -> ProviderResponse:
         if not credential:
             raise ProviderRequestError("当前 API 配置尚未保存 API Key。")
         base_url = profile.base_url.rstrip("/")
-        url = f"{base_url}/models/{request.model}:generateContent"
+        url = f"{base_url}/models/{profile.model_id}:generateContent"
         parts: list[dict[str, object]] = [{"text": request.user_prompt}]
         if request.image_path is not None:
             parts.append(
@@ -60,7 +61,7 @@ class GeminiProvider:
             "generationConfig": _build_generation_config(profile, request),
         }
         try:
-            async with httpx.AsyncClient(timeout=request.timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=profile.model.timeout_seconds) as client:
                 response = await client.post(url, params={"key": credential}, json=payload)
         except httpx.HTTPError as error:
             raise ProviderRequestError(f"Gemini 请求失败：{error}") from error

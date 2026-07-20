@@ -37,7 +37,7 @@ export function NewJobPanel({
   const actions = useJobActions(projectId);
   const [kind, setKind] = useState<JobKind>("annotation");
   const [providerProfileId, setProviderProfileId] = useState("");
-  const [providerModel, setProviderModel] = useState("");
+  const [providerModelId, setProviderModelId] = useState("");
   const [translationPromptPresetId, setTranslationPromptPresetId] = useState("");
   const [scope, setScope] = useState<"all" | "selected">("all");
   const [targetLanguage, setTargetLanguage] = useState("zh-CN");
@@ -60,13 +60,13 @@ export function NewJobPanel({
 
   useEffect(() => {
     if (!selectedProvider) {
-      if (providerModel) setProviderModel("");
+      if (providerModelId) setProviderModelId("");
       return;
     }
-    if (!selectedProvider.models.includes(providerModel)) {
-      setProviderModel(selectedProvider.model);
+    if (!selectedProvider.models.some((model) => model.model_id === providerModelId)) {
+      setProviderModelId(selectedProvider.default_model_id);
     }
-  }, [providerModel, selectedProvider]);
+  }, [providerModelId, selectedProvider]);
 
   useEffect(() => {
     const available = translationPromptPresets.data;
@@ -84,7 +84,7 @@ export function NewJobPanel({
     try {
       const job = await actions.create.mutateAsync({
         provider_profile_id: providerProfileId,
-        model: providerModel,
+        model_id: providerModelId,
         kind,
         scope,
         asset_ids: scope === "selected" ? checkedAssetIds : [],
@@ -120,7 +120,7 @@ export function NewJobPanel({
   const ready = Boolean(
     (kind === "translation" ? configuredTranslationPrompt : configuredSystemPreset) &&
     selectedProvider &&
-    selectedProvider.models.includes(providerModel) &&
+    selectedProvider.models.some((model) => model.model_id === providerModelId) &&
     (scope === "all" || checkedAssetIds.length > 0),
   );
 
@@ -218,19 +218,19 @@ export function NewJobPanel({
       <label className="form-field">
         <span>任务模型</span>
         <select
-          value={providerModel}
+          value={providerModelId}
           disabled={!selectedProvider}
-          onChange={(event) => setProviderModel(event.target.value)}
+          onChange={(event) => setProviderModelId(event.target.value)}
         >
           {!selectedProvider ? <option value="">请先选择模型连接</option> : null}
           {selectedProvider?.models.map((model) => (
-            <option key={model} value={model}>
-              {model}
-              {model === selectedProvider.model ? " · 默认" : ""}
+            <option key={model.model_id} value={model.model_id}>
+              {model.model_id}
+              {model.model_id === selectedProvider.default_model_id ? " · 默认" : ""}
             </option>
           ))}
         </select>
-        <small>本次任务会固定使用所选模型；之后修改连接或默认模型不会影响任务快照。</small>
+        <small>本次任务会固定模型及其参数；之后修改连接、默认模型或参数不会影响任务快照。</small>
       </label>
 
       {kind === "translation" ? (

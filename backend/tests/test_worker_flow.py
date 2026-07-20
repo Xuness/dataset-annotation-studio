@@ -32,6 +32,10 @@ from dataset_studio.modules.presets.models import (
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.providers.codex_runtime import CodexRuntime
+from dataset_studio.modules.providers.config import (
+    OpenAICompatibleModelOptions,
+    ProviderModelConfig,
+)
 from dataset_studio.modules.providers.models import ProviderResponse
 from dataset_studio.modules.statistics.service import StatisticsService
 from dataset_studio.modules.translations.service import TranslationService
@@ -125,8 +129,20 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
             name="Fake provider",
             provider_type=ProviderType.OPENAI_COMPATIBLE,
             base_url="https://example.invalid/v1",
-            model="fake-model",
-            models=["fake-model", "fake-model-alternate"],
+            default_model_id="fake-model",
+            models=[
+                ProviderModelConfig(
+                    model_id="fake-model",
+                    temperature=0.2,
+                    protocol_options=OpenAICompatibleModelOptions(),
+                ),
+                ProviderModelConfig(
+                    model_id="fake-model-alternate",
+                    temperature=0.8,
+                    max_output_tokens=8192,
+                    protocol_options=OpenAICompatibleModelOptions(),
+                ),
+            ],
             api_key="local-test-key",
             concurrency=1,
         )
@@ -135,13 +151,22 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
         workspace.project_id,
         JobCreateRequest(
             provider_profile_id=profile.id,
-            model="fake-model-alternate",
+            model_id="fake-model-alternate",
             scope=JobScope.ALL,
         ),
     )
     presets.update_provider(
         profile.id,
-        ProviderProfileUpdate(model="fake-model", models=["fake-model"]),
+        ProviderProfileUpdate(
+            default_model_id="fake-model",
+            models=[
+                ProviderModelConfig(
+                    model_id="fake-model",
+                    temperature=0.1,
+                    protocol_options=OpenAICompatibleModelOptions(),
+                )
+            ],
+        ),
     )
 
     provider = RecordingProvider()
@@ -177,6 +202,8 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
     assert payload["request"]["system_prompt"] == "Return one XML element."
     assert payload["request"]["user_prompt"] == "Describe the image.\n\nartist: Mori"
     assert payload["request"]["parameters"]["model"] == "fake-model-alternate"
+    assert payload["request"]["parameters"]["temperature"] == 0.8
+    assert payload["request"]["parameters"]["max_output_tokens"] == 8192
     assert payload["reasoning_content"] == "The scene contains a quiet garden."
     assert "local-test-key" not in payloads[0].read_text(encoding="utf-8")
 
@@ -209,7 +236,13 @@ async def test_worker_marks_item_failed_when_image_disappears(tmp_path: Path) ->
             name="Fake provider",
             provider_type=ProviderType.OPENAI_COMPATIBLE,
             base_url="https://example.invalid/v1",
-            model="fake-model",
+            default_model_id="fake-model",
+            models=[
+                ProviderModelConfig(
+                    model_id="fake-model",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                )
+            ],
             api_key="local-test-key",
             concurrency=1,
         )
@@ -262,7 +295,13 @@ async def test_worker_translates_annotation_without_sending_image(tmp_path: Path
             name="Fake translator",
             provider_type=ProviderType.OPENAI_COMPATIBLE,
             base_url="https://example.invalid/v1",
-            model="fake-translation-model",
+            default_model_id="fake-translation-model",
+            models=[
+                ProviderModelConfig(
+                    model_id="fake-translation-model",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                )
+            ],
             api_key="local-test-key",
             concurrency=1,
         )

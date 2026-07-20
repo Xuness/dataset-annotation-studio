@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
+from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
 from dataset_studio.modules.prompts.composer import compose_user_prompt
 from dataset_studio.modules.providers.reasoning import extract_reasoning_from_raw
 from dataset_studio.modules.workspaces.paths import WorkspacePaths
@@ -309,20 +310,36 @@ class AnnotationTraceService:
 
 
 def _request_parameters(provider_snapshot: dict[str, object]) -> dict[str, object]:
-    options = provider_snapshot.get("request_options")
-    options = options if isinstance(options, dict) else {}
+    try:
+        profile = load_provider_snapshot(provider_snapshot)
+    except (KeyError, TypeError, ValueError):
+        return {
+            "provider_type": _string(provider_snapshot.get("provider_type")) or "unknown",
+            "provider_profile_name": _string(provider_snapshot.get("name")) or "未命名 API 配置",
+            "model": _string(provider_snapshot.get("model")) or "unknown",
+            "temperature": _number(provider_snapshot.get("temperature")),
+            "max_output_tokens": _integer(provider_snapshot.get("max_output_tokens")),
+            "timeout_seconds": _integer(provider_snapshot.get("timeout_seconds")),
+            "top_p": None,
+            "seed": None,
+            "service_tier": None,
+            "reasoning_effort": None,
+            "prompt_cache_strategy": None,
+        }
+    model = profile.model
+    options = model.protocol_options
     return {
-        "provider_type": _string(provider_snapshot.get("provider_type")) or "unknown",
-        "provider_profile_name": _string(provider_snapshot.get("name")) or "未命名 API 配置",
-        "model": _string(provider_snapshot.get("model")) or "unknown",
-        "temperature": _number(provider_snapshot.get("temperature")),
-        "max_output_tokens": _integer(provider_snapshot.get("max_output_tokens")),
-        "timeout_seconds": _integer(provider_snapshot.get("timeout_seconds")),
-        "top_p": _number(options.get("top_p")),
-        "seed": _integer(options.get("seed")),
-        "service_tier": _string(options.get("service_tier")),
-        "reasoning_effort": _string(options.get("reasoning_effort")),
-        "prompt_cache_strategy": _string(options.get("prompt_cache_strategy")),
+        "provider_type": profile.provider_type.value,
+        "provider_profile_name": profile.name,
+        "model": model.model_id,
+        "temperature": model.temperature,
+        "max_output_tokens": model.max_output_tokens,
+        "timeout_seconds": model.timeout_seconds,
+        "top_p": model.top_p,
+        "seed": model.seed,
+        "service_tier": _enum_value(getattr(options, "service_tier", None)),
+        "reasoning_effort": _enum_value(getattr(options, "reasoning_effort", None)),
+        "prompt_cache_strategy": _enum_value(getattr(options, "prompt_cache_strategy", None)),
     }
 
 
@@ -348,6 +365,12 @@ def _json_list(value: object) -> list[object]:
     except json.JSONDecodeError:
         return []
     return parsed if isinstance(parsed, list) else []
+
+
+def _enum_value(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(getattr(value, "value", value))
 
 
 def _string(value: object) -> str | None:

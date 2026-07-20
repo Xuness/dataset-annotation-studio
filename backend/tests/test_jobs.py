@@ -17,11 +17,16 @@ from dataset_studio.modules.jobs.models import (
 from dataset_studio.modules.jobs.service import JobService
 from dataset_studio.modules.presets.models import (
     ProviderProfileCreate,
-    ProviderType,
     SystemPresetCreate,
 )
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.service import PresetService
+from dataset_studio.modules.providers.config import (
+    OpenAICompatibleModelOptions,
+    OpenRouterModelOptions,
+    ProviderModelConfig,
+    ProviderType,
+)
 from dataset_studio.modules.workspaces.models import WorkspaceSettingsUpdate
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -67,7 +72,13 @@ def _single_item_job(tmp_path: Path):
             name="Provider",
             provider_type=ProviderType.OPENAI_COMPATIBLE,
             base_url="https://example.invalid/v1",
-            model="example/model",
+            default_model_id="example/model",
+            models=[
+                ProviderModelConfig(
+                    model_id="example/model",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                )
+            ],
             api_key="secret",
         )
     )
@@ -135,8 +146,19 @@ def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -
             name="OpenRouter",
             provider_type=ProviderType.OPENROUTER,
             base_url="https://openrouter.ai/api/v1",
-            model="example/model",
-            models=["example/model", "example/alternate"],
+            default_model_id="example/model",
+            models=[
+                ProviderModelConfig(
+                    model_id="example/model",
+                    temperature=0.2,
+                    protocol_options=OpenRouterModelOptions(),
+                ),
+                ProviderModelConfig(
+                    model_id="example/alternate",
+                    temperature=0.8,
+                    protocol_options=OpenRouterModelOptions(),
+                ),
+            ],
             api_key="secret",
         )
     )
@@ -145,7 +167,7 @@ def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -
         workspace.project_id,
         JobCreateRequest(
             provider_profile_id=provider.id,
-            model="example/alternate",
+            model_id="example/alternate",
             scope=JobScope.ALL,
         ),
     )
@@ -165,7 +187,7 @@ def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -
             workspace.project_id,
             JobCreateRequest(
                 provider_profile_id=provider.id,
-                model="unknown/model",
+                model_id="unknown/model",
                 scope=JobScope.ALL,
             ),
         )
@@ -190,7 +212,13 @@ def test_job_creation_requires_project_system_preset(tmp_path: Path) -> None:
             name="Provider",
             provider_type=ProviderType.OPENAI_COMPATIBLE,
             base_url="https://example.invalid/v1",
-            model="example/model",
+            default_model_id="example/model",
+            models=[
+                ProviderModelConfig(
+                    model_id="example/model",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                )
+            ],
             api_key="secret",
         )
     )

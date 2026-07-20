@@ -12,13 +12,13 @@ from typing import Any
 
 from openai_codex import AsyncCodex
 
-from dataset_studio.modules.presets.models import ReasoningEffort
 from dataset_studio.modules.providers.codex_models import (
     CodexAccountStatus,
     CodexLoginStart,
     CodexLoginState,
     CodexLoginStatus,
 )
+from dataset_studio.modules.providers.config import ReasoningEffort
 from dataset_studio.modules.providers.models import ProviderModelSummary, ProviderRequestError
 
 _LOGIN_RETENTION_SECONDS = 15 * 60
@@ -217,6 +217,7 @@ class CodexRuntime:
                     input_modalities=modalities,
                     supported_parameters=["reasoning_effort"] if reasoning_efforts else [],
                     reasoning_efforts=reasoning_efforts,
+                    capabilities_known=True,
                 )
             )
             if len(models) >= limit:

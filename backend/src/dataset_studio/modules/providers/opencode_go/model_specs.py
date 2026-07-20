@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from dataset_studio.modules.presets.models import ReasoningEffort
+from dataset_studio.modules.providers.config import ReasoningEffort
 from dataset_studio.modules.providers.models import ProviderModelSummary
 
 
@@ -54,6 +54,7 @@ class OpenCodeGoModelSpec:
             reasoning_efforts=[effort.value for effort in self.reasoning_efforts],
             prompt_price=self.prompt_price,
             completion_price=self.completion_price,
+            capabilities_known=True,
         )
 
 

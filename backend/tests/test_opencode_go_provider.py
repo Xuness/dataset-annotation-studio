@@ -3,9 +3,10 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from dataset_studio.modules.presets.models import (
-    ProviderProfile,
-    ProviderRequestOptions,
+from dataset_studio.modules.providers.config import (
+    OpenCodeGoModelOptions,
+    ProviderExecutionProfile,
+    ProviderModelConfig,
     ProviderType,
     ReasoningEffort,
 )
@@ -38,34 +39,30 @@ def _profile(
     effort: ReasoningEffort | None = None,
     temperature: float = 0.2,
     max_output_tokens: int = 4096,
-) -> ProviderProfile:
-    return ProviderProfile(
+) -> ProviderExecutionProfile:
+    return ProviderExecutionProfile(
         id="opencode-go",
         name="OpenCode Go",
         provider_type=ProviderType.OPENCODE_GO,
         base_url="https://opencode.ai/zen/go/v1",
-        model=model,
-        temperature=temperature,
-        max_output_tokens=max_output_tokens,
         concurrency=2,
-        timeout_seconds=180,
-        request_options=ProviderRequestOptions(reasoning_effort=effort),
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
+        model=ProviderModelConfig(
+            model_id=model,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            timeout_seconds=180,
+            protocol_options=OpenCodeGoModelOptions(reasoning_effort=effort),
+        ),
     )
 
 
-def _request(tmp_path: Path, profile: ProviderProfile) -> MultimodalRequest:
+def _request(tmp_path: Path, profile: ProviderExecutionProfile) -> MultimodalRequest:
     image_path = tmp_path / "sample.png"
     Image.new("RGB", (8, 8), "white").save(image_path)
     return MultimodalRequest(
         image_path=image_path,
         system_prompt="stable system prompt",
         user_prompt="describe this image",
-        model=profile.model,
-        temperature=profile.temperature,
-        max_output_tokens=profile.max_output_tokens,
-        timeout_seconds=profile.timeout_seconds,
     )
 
 
@@ -88,7 +85,7 @@ def test_chat_payload_sends_native_reasoning_effort_without_cache_control(
 ) -> None:
     profile = _profile("grok-4.5", effort=ReasoningEffort.HIGH)
     request = _request(tmp_path, profile)
-    spec = get_model_spec(profile.model)
+    spec = get_model_spec(profile.model_id)
     assert spec is not None
 
     payload = build_chat_payload(spec, profile, request)
@@ -111,7 +108,7 @@ def test_chat_payload_omits_temperature_for_models_that_do_not_accept_it(
 ) -> None:
     profile = _profile("kimi-k2.7-code")
     request = _request(tmp_path, profile)
-    spec = get_model_spec(profile.model)
+    spec = get_model_spec(profile.model_id)
     assert spec is not None
 
     payload = build_chat_payload(spec, profile, request)
@@ -126,12 +123,8 @@ def test_opencode_go_payloads_support_text_only_requests(tmp_path: Path) -> None
         image_path=None,
         system_prompt=chat_request.system_prompt,
         user_prompt=chat_request.user_prompt,
-        model=chat_request.model,
-        temperature=chat_request.temperature,
-        max_output_tokens=chat_request.max_output_tokens,
-        timeout_seconds=chat_request.timeout_seconds,
     )
-    chat_spec = get_model_spec(chat_profile.model)
+    chat_spec = get_model_spec(chat_profile.model_id)
     assert chat_spec is not None
     chat_payload = build_chat_payload(chat_spec, chat_profile, chat_request)
     assert chat_payload["messages"][1]["content"] == [
@@ -139,7 +132,7 @@ def test_opencode_go_payloads_support_text_only_requests(tmp_path: Path) -> None
     ]
 
     messages_profile = _profile("qwen3.7-plus")
-    messages_spec = get_model_spec(messages_profile.model)
+    messages_spec = get_model_spec(messages_profile.model_id)
     assert messages_spec is not None
     messages_payload = build_messages_payload(
         messages_spec,
@@ -148,10 +141,6 @@ def test_opencode_go_payloads_support_text_only_requests(tmp_path: Path) -> None
             image_path=None,
             system_prompt="system",
             user_prompt="translate",
-            model=messages_profile.model,
-            temperature=messages_profile.temperature,
-            max_output_tokens=messages_profile.max_output_tokens,
-            timeout_seconds=messages_profile.timeout_seconds,
         ),
     )
     assert messages_payload["messages"][0]["content"] == [{"type": "text", "text": "translate"}]
@@ -192,7 +181,7 @@ def test_messages_payload_uses_system_cache_breakpoint_and_thinking_budget(
 ) -> None:
     profile = _profile("qwen3.7-plus", effort=ReasoningEffort.HIGH)
     request = _request(tmp_path, profile)
-    spec = get_model_spec(profile.model)
+    spec = get_model_spec(profile.model_id)
     assert spec is not None
 
     payload = build_messages_payload(spec, profile, request)
@@ -274,10 +263,6 @@ async def test_provider_allows_text_only_model_for_text_only_request(
         image_path=None,
         system_prompt="translate",
         user_prompt="source text",
-        model=profile.model,
-        temperature=profile.temperature,
-        max_output_tokens=profile.max_output_tokens,
-        timeout_seconds=profile.timeout_seconds,
     )
     captured: dict[str, object] = {}
 

@@ -256,7 +256,7 @@
 
 .model-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
 }
 
@@ -298,7 +298,7 @@
 .provider-model-list > div > div {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) 30px;
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
   align-items: center;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -311,11 +311,13 @@
   background: var(--accent-soft);
 }
 
-.provider-model-list__default {
+.provider-model-list > div > div.is-selected {
+  outline: 1px solid color-mix(in srgb, var(--accent) 58%, var(--line));
+}
+
+.provider-model-list__select {
   display: grid;
   min-width: 0;
-  grid-template-columns: 20px minmax(0, 1fr);
-  align-items: center;
   padding: 8px;
   color: inherit;
   text-align: left;
@@ -323,26 +325,27 @@
   cursor: pointer;
 }
 
-.provider-model-list__default code,
-.provider-model-list__default small {
+.provider-model-list__select code,
+.provider-model-list__select small {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.provider-model-list__default code {
+.provider-model-list__select code {
   color: var(--ink-soft);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: var(--text-xs);
 }
 
-.provider-model-list__default small {
+.provider-model-list__select small {
   margin-top: 3px;
   color: inherit;
   font-size: var(--text-2xs);
 }
 
+.provider-model-list__default,
 .provider-model-list__remove {
   display: grid;
   width: 26px;
@@ -352,6 +355,11 @@
   color: var(--muted);
   background: transparent;
   cursor: pointer;
+}
+
+.provider-model-list__default:hover {
+  color: var(--accent-deep);
+  background: var(--accent-soft);
 }
 
 .provider-model-list__remove:hover {
@@ -397,6 +405,49 @@
 
 .provider-option-note--error {
   color: var(--danger);
+}
+
+.provider-model-config {
+  overflow: hidden;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 88%, var(--paper));
+}
+
+.provider-model-config > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.provider-model-config > header span,
+.provider-model-config > header strong {
+  display: block;
+}
+
+.provider-model-config > header strong {
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: var(--text-sm);
+}
+
+.provider-model-config > header small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.provider-model-config__fields {
+  padding: 14px;
+}
+
+.provider-model-config > .provider-option-note {
+  margin: 0;
+  padding: 0 14px 14px;
 }
 
 .codex-connection {

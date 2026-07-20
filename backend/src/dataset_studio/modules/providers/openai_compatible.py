@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import httpx
 
-from dataset_studio.modules.presets.models import (
+from dataset_studio.modules.providers.config import (
+    OpenAICompatibleModelOptions,
+    OpenRouterModelOptions,
     PromptCacheStrategy,
-    ProviderProfile,
+    ProviderExecutionProfile,
     ProviderType,
 )
 from dataset_studio.modules.providers.media import image_data_url
@@ -87,11 +89,15 @@ def _parse_response(raw: object, response_text: str) -> ProviderResponse:
         raise ProviderRequestError("API 响应结构无法识别。", response_text=response_text) from error
 
 
-def _build_payload(profile: ProviderProfile, request: MultimodalRequest) -> dict[str, object]:
+def _build_payload(
+    profile: ProviderExecutionProfile,
+    request: MultimodalRequest,
+) -> dict[str, object]:
     system_content: object = request.system_prompt
-    options = profile.request_options
+    model = profile.model
+    options = model.protocol_options
     if (
-        profile.provider_type == ProviderType.OPENROUTER
+        isinstance(options, OpenRouterModelOptions)
         and options.prompt_cache_strategy == PromptCacheStrategy.EXPLICIT_SYSTEM
     ):
         system_content = [
@@ -112,7 +118,7 @@ def _build_payload(profile: ProviderProfile, request: MultimodalRequest) -> dict
         )
 
     payload: dict[str, object] = {
-        "model": request.model,
+        "model": model.model_id,
         "messages": [
             {"role": "system", "content": system_content},
             {
@@ -120,25 +126,28 @@ def _build_payload(profile: ProviderProfile, request: MultimodalRequest) -> dict
                 "content": user_content,
             },
         ],
-        "temperature": request.temperature,
-        "max_tokens": request.max_output_tokens,
+        "max_tokens": model.max_output_tokens,
     }
-    if options.top_p is not None:
-        payload["top_p"] = options.top_p
-    if options.seed is not None:
-        payload["seed"] = options.seed
-    if profile.provider_type == ProviderType.OPENROUTER:
+    if model.temperature is not None:
+        payload["temperature"] = model.temperature
+    if model.top_p is not None:
+        payload["top_p"] = model.top_p
+    if model.seed is not None:
+        payload["seed"] = model.seed
+    if isinstance(options, OpenRouterModelOptions):
         if options.service_tier is not None:
             payload["service_tier"] = options.service_tier.value
         if options.reasoning_effort is not None:
             payload["reasoning"] = {"effort": options.reasoning_effort.value}
+    elif isinstance(options, OpenAICompatibleModelOptions) and options.reasoning_effort is not None:
+        payload["reasoning_effort"] = options.reasoning_effort.value
     return payload
 
 
 class OpenAICompatibleProvider:
     async def complete(
         self,
-        profile: ProviderProfile,
+        profile: ProviderExecutionProfile,
         credential: str | None,
         request: MultimodalRequest,
     ) -> ProviderResponse:
@@ -159,7 +168,7 @@ class OpenAICompatibleProvider:
         payload = _build_payload(profile, request)
 
         try:
-            async with httpx.AsyncClient(timeout=request.timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=profile.model.timeout_seconds) as client:
                 response = await client.post(url, headers=headers, json=payload)
         except httpx.HTTPError as error:
             raise ProviderRequestError(f"API 请求失败：{error}") from error

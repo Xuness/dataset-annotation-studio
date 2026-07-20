@@ -49,7 +49,7 @@ class ExistingTranslationPolicy(StrEnum):
 
 class JobCreateRequest(BaseModel):
     provider_profile_id: str
-    model: str | None = Field(default=None, min_length=1, max_length=500)
+    model_id: str | None = Field(default=None, min_length=1, max_length=500)
     kind: JobKind = JobKind.ANNOTATION
     scope: JobScope = JobScope.ALL
     asset_ids: list[str] = Field(default_factory=list)
@@ -58,7 +58,7 @@ class JobCreateRequest(BaseModel):
     target_language: str = "zh-CN"
     translation_policy: ExistingTranslationPolicy = ExistingTranslationPolicy.SKIP
 
-    _validate_model = field_validator("model")(_require_non_blank)
+    _validate_model = field_validator("model_id")(_require_non_blank)
 
 
 class JobSummary(BaseModel):

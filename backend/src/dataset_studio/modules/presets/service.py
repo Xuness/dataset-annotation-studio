@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import json
 import sqlite3
 import uuid
+
+from pydantic import TypeAdapter
 
 from dataset_studio.core.errors import PresetNotFoundError
 from dataset_studio.core.time import utc_now_iso
@@ -10,8 +11,6 @@ from dataset_studio.modules.presets.models import (
     ProviderProfile,
     ProviderProfileCreate,
     ProviderProfileUpdate,
-    ProviderRequestOptions,
-    ProviderType,
     SystemPreset,
     SystemPresetCreate,
     SystemPresetUpdate,
@@ -21,6 +20,14 @@ from dataset_studio.modules.presets.models import (
 )
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.secrets import SecretStore
+from dataset_studio.modules.providers.config import (
+    ProviderExecutionProfile,
+    ProviderModelConfig,
+    ProviderProtocolOptions,
+    ProviderType,
+)
+
+_PROTOCOL_OPTIONS_ADAPTER = TypeAdapter(ProviderProtocolOptions)
 
 
 class PresetService:
@@ -130,13 +137,16 @@ class PresetService:
             raise PresetNotFoundError(f"找不到翻译 Prompt 预设：{preset_id}")
 
     def list_providers(self) -> list[ProviderProfile]:
-        return [self._provider_from_row(row) for row in self._repository.list_provider()]
+        return [
+            self._provider_from_rows(profile_row, model_rows)
+            for profile_row, model_rows in self._repository.list_provider()
+        ]
 
     def get_provider(self, profile_id: str) -> ProviderProfile:
-        row = self._repository.get_provider(profile_id)
-        if row is None:
+        rows = self._repository.get_provider(profile_id)
+        if rows is None:
             raise PresetNotFoundError(f"找不到 API 配置：{profile_id}")
-        return self._provider_from_row(row)
+        return self._provider_from_rows(*rows)
 
     def get_api_key(self, profile_id: str) -> str:
         profile = self.get_provider(profile_id)
@@ -145,7 +155,10 @@ class PresetService:
             raise ValueError("当前供应商不使用 API Key。")
         return credential
 
-    def get_provider_credential(self, profile: ProviderProfile) -> str | None:
+    def get_provider_credential(
+        self,
+        profile: ProviderProfile | ProviderExecutionProfile,
+    ) -> str | None:
         self.get_provider(profile.id)
         if not profile.provider_type.requires_api_key:
             return None
@@ -157,26 +170,25 @@ class PresetService:
     def create_provider(self, data: ProviderProfileCreate) -> ProviderProfile:
         now = utc_now_iso()
         profile_id = str(uuid.uuid4())
-        values = (
-            profile_id,
-            data.name.strip(),
-            data.provider_type.value,
-            data.base_url.rstrip("/") if data.provider_type.requires_base_url else "",
-            data.model.strip(),
-            json.dumps(data.models, ensure_ascii=False),
-            data.temperature,
-            data.max_output_tokens,
-            data.concurrency,
-            data.timeout_seconds,
-            data.request_options.model_dump_json(exclude_none=True),
-            now,
-            now,
+        profile = ProviderProfile(
+            id=profile_id,
+            name=data.name.strip(),
+            provider_type=data.provider_type,
+            base_url=data.base_url.rstrip("/") if data.provider_type.requires_base_url else "",
+            default_model_id=data.default_model_id,
+            models=data.models,
+            concurrency=data.concurrency,
+            created_at=now,
+            updated_at=now,
         )
         secret_key = self._secret_key(profile_id)
         if data.api_key:
             self._secrets.set(secret_key, data.api_key)
         try:
-            self._repository.insert_provider(values)
+            self._repository.insert_provider(
+                self._provider_insert_values(profile),
+                self._provider_model_values(profile),
+            )
         except BaseException as error:
             if data.api_key:
                 self._secrets.delete(secret_key)
@@ -188,10 +200,10 @@ class PresetService:
     def update_provider(self, profile_id: str, data: ProviderProfileUpdate) -> ProviderProfile:
         current = self.get_provider(profile_id)
         values = data.model_dump(exclude_none=True, exclude={"api_key"})
-        if "models" in values and "model" not in values:
-            values["model"] = values["models"][0]
-        elif "model" in values and "models" not in values:
-            values["models"] = [values["model"], *current.models]
+        if "models" in values and "default_model_id" not in values:
+            model_ids = [model["model_id"] for model in values["models"]]
+            if current.default_model_id not in model_ids:
+                values["default_model_id"] = model_ids[0]
         updated = ProviderProfile.model_validate({**current.model_dump(), **values})
         if not updated.provider_type.requires_base_url:
             updated = updated.model_copy(update={"base_url": ""})
@@ -214,6 +226,7 @@ class PresetService:
             self._repository.update_provider(
                 profile_id,
                 self._provider_values(updated, updated_at),
+                self._provider_model_values(updated),
             )
         except BaseException as error:
             if should_update_secret:
@@ -222,6 +235,29 @@ class PresetService:
                 raise ValueError(f"API 配置名称已存在：{updated.name}") from error
             raise
         return self.get_provider(profile_id)
+
+    @staticmethod
+    def resolve_execution_profile(
+        profile: ProviderProfile,
+        model_id: str | None = None,
+    ) -> ProviderExecutionProfile:
+        selected_model_id = (model_id or profile.default_model_id).strip()
+        selected = next(
+            (model for model in profile.models if model.model_id == selected_model_id),
+            None,
+        )
+        if selected is None:
+            raise ValueError(
+                f"模型“{selected_model_id}”不在 API 配置“{profile.name}”的模型列表中。"
+            )
+        return ProviderExecutionProfile(
+            id=profile.id,
+            name=profile.name,
+            provider_type=profile.provider_type,
+            base_url=profile.base_url,
+            concurrency=profile.concurrency,
+            model=selected,
+        )
 
     def delete_provider(self, profile_id: str) -> None:
         self.get_provider(profile_id)
@@ -237,21 +273,25 @@ class PresetService:
             self._restore_secret(secret_key, old_api_key)
             raise PresetNotFoundError(f"找不到 API 配置：{profile_id}")
 
-    def _provider_from_row(self, row) -> ProviderProfile:
+    def _provider_from_rows(self, row, model_rows) -> ProviderProfile:
         values = dict(row)
-        options_json = str(values.pop("request_options_json", "{}"))
-        models_json = str(values.pop("models_json", "[]"))
-        try:
-            values["request_options"] = ProviderRequestOptions.model_validate_json(options_json)
-        except ValueError:
-            values["request_options"] = ProviderRequestOptions()
-        try:
-            parsed_models = json.loads(models_json)
-            values["models"] = (
-                [str(model) for model in parsed_models] if isinstance(parsed_models, list) else []
+        models: list[ProviderModelConfig] = []
+        for model_row in model_rows:
+            model_values = dict(model_row)
+            models.append(
+                ProviderModelConfig(
+                    model_id=str(model_values["model_id"]),
+                    temperature=model_values["temperature"],
+                    max_output_tokens=int(model_values["max_output_tokens"]),
+                    timeout_seconds=int(model_values["timeout_seconds"]),
+                    top_p=model_values["top_p"],
+                    seed=model_values["seed"],
+                    protocol_options=_PROTOCOL_OPTIONS_ADAPTER.validate_json(
+                        str(model_values["protocol_options_json"])
+                    ),
+                )
             )
-        except (TypeError, ValueError):
-            values["models"] = []
+        values["models"] = models
         provider_type = ProviderType(str(values["provider_type"]))
         values["has_api_key"] = provider_type.requires_api_key and bool(
             self._secrets.get(self._secret_key(str(row["id"])))
@@ -263,20 +303,47 @@ class PresetService:
         return f"provider:{profile_id}"
 
     @staticmethod
+    def _provider_insert_values(profile: ProviderProfile) -> tuple[object, ...]:
+        return (
+            profile.id,
+            profile.name.strip(),
+            profile.provider_type.value,
+            profile.base_url.rstrip("/"),
+            profile.default_model_id,
+            profile.concurrency,
+            profile.created_at,
+            profile.updated_at,
+        )
+
+    @staticmethod
     def _provider_values(profile: ProviderProfile, updated_at: str) -> tuple[object, ...]:
         return (
             profile.name.strip(),
             profile.provider_type.value,
             profile.base_url.rstrip("/"),
-            profile.model.strip(),
-            json.dumps(profile.models, ensure_ascii=False),
-            profile.temperature,
-            profile.max_output_tokens,
+            profile.default_model_id,
             profile.concurrency,
-            profile.timeout_seconds,
-            profile.request_options.model_dump_json(exclude_none=True),
             updated_at,
         )
+
+    @staticmethod
+    def _provider_model_values(
+        profile: ProviderProfile,
+    ) -> list[tuple[object, ...]]:
+        return [
+            (
+                profile.id,
+                model.model_id,
+                position,
+                model.temperature,
+                model.max_output_tokens,
+                model.timeout_seconds,
+                model.top_p,
+                model.seed,
+                model.protocol_options.model_dump_json(exclude_none=True),
+            )
+            for position, model in enumerate(profile.models)
+        ]
 
     def _restore_secret(self, key: str, value: str | None) -> None:
         if value:

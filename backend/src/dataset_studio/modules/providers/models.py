@@ -11,10 +11,6 @@ class MultimodalRequest:
     image_path: Path | None
     system_prompt: str
     user_prompt: str
-    model: str
-    temperature: float
-    max_output_tokens: int
-    timeout_seconds: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +37,7 @@ class ProviderModelSummary(BaseModel):
     reasoning_efforts: list[str] = Field(default_factory=list)
     prompt_price: str | None = None
     completion_price: str | None = None
+    capabilities_known: bool = False
 
 
 class ProviderRequestError(Exception):

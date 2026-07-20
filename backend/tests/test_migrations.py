@@ -84,11 +84,19 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
 
     connection = connect(database)
     try:
-        row = connection.execute(
+        profile = connection.execute(
             """
-            SELECT request_options_json, models_json
+            SELECT default_model_id, concurrency
             FROM provider_profiles
             WHERE id = 'profile'
+            """
+        ).fetchone()
+        model = connection.execute(
+            """
+            SELECT model_id, position, temperature, max_output_tokens,
+                   timeout_seconds, top_p, seed, protocol_options_json
+            FROM provider_model_configs
+            WHERE provider_profile_id = 'profile'
             """
         ).fetchone()
         translation_prompt = connection.execute(
@@ -106,11 +114,107 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
         ]
     finally:
         connection.close()
-    assert row["request_options_json"] == "{}"
-    assert json.loads(row["models_json"]) == ["example/model"]
+    assert profile["default_model_id"] == "example/model"
+    assert profile["concurrency"] == 4
+    assert model["model_id"] == "example/model"
+    assert model["position"] == 0
+    assert model["temperature"] == 0.2
+    assert model["max_output_tokens"] == 4096
+    assert model["timeout_seconds"] == 180
+    assert model["top_p"] is None
+    assert model["seed"] is None
+    assert json.loads(model["protocol_options_json"]) == {
+        "provider_type": "openrouter",
+        "service_tier": None,
+        "reasoning_effort": None,
+        "prompt_cache_strategy": None,
+    }
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4]
+    assert versions == [1, 2, 3, 4, 5]
+
+
+def test_provider_model_config_migration_copies_shared_options_to_each_model(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "global.sqlite3"
+    migrate_database(database, GLOBAL_MIGRATIONS[:4])
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            INSERT INTO provider_profiles (
+                id, name, provider_type, base_url, model, models_json,
+                temperature, max_output_tokens, concurrency, timeout_seconds,
+                request_options_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "multi-model-profile",
+                "Legacy multi-model provider",
+                "openai_compatible",
+                "https://example.invalid/v1",
+                "model/default",
+                json.dumps(["model/default", "model/alternate"]),
+                0.65,
+                8192,
+                3,
+                240,
+                json.dumps(
+                    {
+                        "top_p": 0.9,
+                        "seed": 7,
+                        "reasoning_effort": "high",
+                    }
+                ),
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:00Z",
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    initialize_global_database(database)
+
+    connection = connect(database)
+    try:
+        profile = connection.execute(
+            """
+            SELECT default_model_id, concurrency
+            FROM provider_profiles
+            WHERE id = 'multi-model-profile'
+            """
+        ).fetchone()
+        models = connection.execute(
+            """
+            SELECT model_id, position, temperature, max_output_tokens,
+                   timeout_seconds, top_p, seed, protocol_options_json
+            FROM provider_model_configs
+            WHERE provider_profile_id = 'multi-model-profile'
+            ORDER BY position
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+
+    assert profile["default_model_id"] == "model/default"
+    assert profile["concurrency"] == 3
+    assert [row["model_id"] for row in models] == [
+        "model/default",
+        "model/alternate",
+    ]
+    for position, model in enumerate(models):
+        assert model["position"] == position
+        assert model["temperature"] == 0.65
+        assert model["max_output_tokens"] == 8192
+        assert model["timeout_seconds"] == 240
+        assert model["top_p"] == 0.9
+        assert model["seed"] == 7
+        assert json.loads(model["protocol_options_json"]) == {
+            "provider_type": "openai_compatible",
+            "reasoning_effort": "high",
+        }
 
 
 def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: Path) -> None:

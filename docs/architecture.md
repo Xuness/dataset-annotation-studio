@@ -34,8 +34,8 @@ flowchart LR
 - `modules/annotations`：原文保存、删除、历史以及轻量校验。
 - `modules/translations`：多语言译文旁车、源版本追踪、结构校验和翻译 Prompt 模板渲染。
 - `modules/prompts`：User Prompt 与选定 JSON 字段的纯函数组合。
-- `modules/presets`：全局 System Prompt / 模型连接配置；API 密钥通过 `SecretStore` 隔离。
-- `modules/providers`：统一 `ModelProvider` 协议、各供应商适配器，以及惰性共享的 Codex Runtime。
+- `modules/presets`：全局 System Prompt / 模型连接聚合的持久化；API 密钥通过 `SecretStore` 隔离。
+- `modules/providers`：供应商协议类型、单模型参数、统一 `ModelProvider` 协议、各供应商适配器，以及惰性共享的 Codex Runtime。
 - `modules/jobs`：标注/翻译任务创建、Prompt 与模型连接快照、查询投影、原子认领、尝试记录、单图调用追踪和 Worker。
 - `modules/preprocessing`：计划、图像渲染、恢复记录和撤销编排。
 - `modules/statistics`：只读派生统计；当前实现为标签频次分析器。
@@ -43,6 +43,24 @@ flowchart LR
 - `core`：原子文件、SQLite、迁移和时间等稳定基础能力。
 
 依赖方向是 `API / entrypoints -> modules -> core`。供应商代码不能反向进入任务仓储，页面也不能理解 OpenRouter 或 Gemini 的请求 JSON。
+
+## 模型连接与执行快照
+
+模型连接是一个聚合，不是一次请求模板：
+
+- 连接级字段只保存供应商协议、API 地址、凭据引用和连接总并发数。
+- `provider_model_configs` 子表按连接和模型 ID 保存温度、输出上限、超时、Top P、随机种子及协议专属参数。
+- 默认模型只负责新建任务时的初始选择，不共享或覆盖其它模型的参数。
+- 协议专属参数使用带 `provider_type` 判别字段的严格联合类型；OpenRouter、OpenAI 兼容、OpenCode Go、Gemini 与 Codex 不能互相携带无效字段。
+
+创建任务时，`PresetService` 把选中的单模型配置解析为版本化
+`ProviderExecutionProfile`。项目数据库只保存这份单模型执行快照，Worker 和供应商适配器均从快照读取请求参数，
+因此之后修改连接、默认模型或其它模型都不会改变已创建任务。旧任务快照由
+`modules/jobs/provider_snapshot.py` 在读取时兼容转换，不原地改写项目历史。
+
+OpenAI 兼容连接通过标准 `GET {base_url}/models` 拉取目录，并在本地按模型 ID、名称和描述搜索。
+标准目录通常不声明输入模态、参数或推理档位，界面会明确标记能力未知，且不会把缺失元数据解释为不支持。
+OpenRouter 目录仍使用其扩展元数据；两个协议各自由适配器映射推理参数，不共享供应商请求 JSON。
 
 ## 前端模块边界
 
