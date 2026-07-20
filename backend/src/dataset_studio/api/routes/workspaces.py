@@ -39,11 +39,13 @@ def update_workspace(project_id: str, update: WorkspaceSettingsUpdate, container
     if update.recursive_scan is None:
         return container.workspaces.update_settings(project_id, update)
     with container.preprocessing.guard_workspace(project_id, "settings-scan"):
+        container.exports.ensure_inactive(project_id)
         return container.workspaces.update_settings(project_id, update)
 
 
 @router.post("/{project_id}/scan", response_model=ScanResult)
 def scan_workspace(project_id: str, container: Container):
     with container.preprocessing.guard_workspace(project_id, "manual-scan"):
+        container.exports.ensure_inactive(project_id)
         _, scan = container.workspaces.rescan(project_id)
         return scan

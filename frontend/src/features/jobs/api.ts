@@ -59,6 +59,7 @@ export function getActiveJobs(): Promise<{
   annotation_job_count: number;
   translation_job_count: number;
   preprocessing_count: number;
+  export_count: number;
 }> {
   return apiRequest("/api/v1/jobs/active");
 }

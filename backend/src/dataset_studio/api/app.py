@@ -11,6 +11,7 @@ from dataset_studio.api.container import AppContainer
 from dataset_studio.api.routes import (
     annotations,
     assets,
+    exports,
     jobs,
     preprocessing,
     presets,
@@ -78,6 +79,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(jobs.router, prefix=api_prefix)
     app.include_router(jobs.global_router, prefix=api_prefix)
     app.include_router(preprocessing.router, prefix=api_prefix)
+    app.include_router(exports.router, prefix=api_prefix)
     app.include_router(statistics.router, prefix=api_prefix)
     return app
 

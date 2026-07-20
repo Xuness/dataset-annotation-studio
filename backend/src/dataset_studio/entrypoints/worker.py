@@ -6,6 +6,7 @@ import signal
 
 from dataset_studio.api.container import AppContainer
 from dataset_studio.core.config import settings
+from dataset_studio.modules.exports.worker import ExportWorker
 from dataset_studio.modules.jobs.worker import AnnotationWorker
 
 
@@ -19,11 +20,20 @@ async def run_worker() -> None:
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
     container = AppContainer.create(settings)
-    worker = AnnotationWorker(container)
+    annotation_worker = AnnotationWorker(container)
+    export_worker = ExportWorker(container)
+    worker_tasks = (
+        asyncio.create_task(annotation_worker.run(stopped)),
+        asyncio.create_task(export_worker.run(stopped)),
+    )
     try:
-        await worker.run(stopped)
+        await asyncio.gather(*worker_tasks)
     finally:
-        await container.aclose()
+        stopped.set()
+        try:
+            await asyncio.gather(*worker_tasks, return_exceptions=True)
+        finally:
+            await container.aclose()
 
 
 def main() -> None:

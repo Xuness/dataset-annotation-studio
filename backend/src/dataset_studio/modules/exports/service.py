@@ -1,0 +1,168 @@
+from __future__ import annotations
+
+import secrets
+import uuid
+from collections.abc import Callable
+
+from dataset_studio.core.errors import StudioError
+from dataset_studio.modules.exports.models import (
+    ExportCreateRequest,
+    ExportOperation,
+    ExportOperationStatus,
+    ExportPreview,
+    ExportRequest,
+)
+from dataset_studio.modules.exports.planner import build_plan, preview_token, to_preview
+from dataset_studio.modules.exports.repository import ExportRepository
+from dataset_studio.modules.workspaces.service import WorkspaceService
+
+
+class ExportNotFoundError(StudioError):
+    pass
+
+
+class ExportService:
+    def __init__(
+        self,
+        workspaces: WorkspaceService,
+        *,
+        has_active_jobs: Callable[[str], bool] | None = None,
+        has_active_preprocessing: Callable[[str], bool] | None = None,
+    ) -> None:
+        self._workspaces = workspaces
+        self._has_active_jobs = has_active_jobs or (lambda _project_id: False)
+        self._has_active_preprocessing = has_active_preprocessing or (lambda _project_id: False)
+
+    def set_activity_checks(
+        self,
+        *,
+        has_active_jobs: Callable[[str], bool],
+        has_active_preprocessing: Callable[[str], bool],
+    ) -> None:
+        self._has_active_jobs = has_active_jobs
+        self._has_active_preprocessing = has_active_preprocessing
+
+    def preview(self, project_id: str, request: ExportRequest) -> ExportPreview:
+        paths, _ = self._workspaces.get(project_id)
+        plan = build_plan(paths.database, paths.root, request)
+        return to_preview(request, plan)
+
+    def create(
+        self,
+        project_id: str,
+        execution: ExportCreateRequest,
+    ) -> ExportOperation:
+        self._ensure_can_start(project_id)
+        paths, _ = self._workspaces.get(project_id)
+        plan = build_plan(paths.database, paths.root, execution.request)
+        current_token = preview_token(execution.request, plan)
+        if not secrets.compare_digest(current_token, execution.preview_token):
+            raise ValueError("导出预览已失效；范围、源文件或目标目录发生了变化，请重新校验。")
+        item_blocking_issue = next(
+            (item.blocking_issue for item in plan.items if item.blocking_issue),
+            None,
+        )
+        if plan.blocking_issues or item_blocking_issue:
+            issue = plan.blocking_issues[0] if plan.blocking_issues else item_blocking_issue
+            raise ValueError(issue or "导出计划存在无法绕过的问题。")
+        warning_count = sum(item.warning_code is not None for item in plan.items)
+        if warning_count and not execution.allow_warnings:
+            raise ValueError(
+                f"导出范围中仍有 {warning_count} 个标注警告；请返回检查，或明确允许强制导出。"
+            )
+
+        operation_id = str(uuid.uuid4())
+        repository = ExportRepository(paths.database)
+        repository.create(
+            operation_id,
+            execution.request,
+            plan,
+            allow_warnings=execution.allow_warnings,
+        )
+        operation = repository.get(operation_id)
+        if operation is None:
+            raise RuntimeError("导出任务创建后无法读取。")
+        return operation
+
+    def list(self, project_id: str, *, limit: int = 100) -> list[ExportOperation]:
+        paths, _ = self._workspaces.get(project_id)
+        return ExportRepository(paths.database).list(limit=min(max(limit, 1), 500))
+
+    def get(self, project_id: str, operation_id: str) -> ExportOperation:
+        paths, _ = self._workspaces.get(project_id)
+        operation = ExportRepository(paths.database).get(operation_id)
+        if operation is None:
+            raise ExportNotFoundError(f"找不到导出任务：{operation_id}")
+        return operation
+
+    def stop(self, project_id: str, operation_id: str) -> ExportOperation:
+        paths, _ = self._workspaces.get(project_id)
+        repository = ExportRepository(paths.database)
+        if not repository.request_stop(operation_id):
+            raise ExportNotFoundError("导出任务不存在或已经结束。")
+        operation = repository.get(operation_id)
+        if operation is None:
+            raise ExportNotFoundError(f"找不到导出任务：{operation_id}")
+        return operation
+
+    def resume(self, project_id: str, operation_id: str) -> ExportOperation:
+        self._ensure_can_start(project_id)
+        paths, _ = self._workspaces.get(project_id)
+        repository = ExportRepository(paths.database)
+        if not repository.resume(operation_id):
+            raise ValueError("只有已停止或意外中断的导出任务可以继续。")
+        operation = repository.get(operation_id)
+        if operation is None:
+            raise ExportNotFoundError(f"找不到导出任务：{operation_id}")
+        return operation
+
+    def has_active(self, project_id: str) -> bool:
+        paths, _ = self._workspaces.get(project_id)
+        return ExportRepository(paths.database).active_count() > 0
+
+    def ensure_inactive(self, project_id: str) -> None:
+        if self.has_active(project_id):
+            raise ValueError("当前工作区正在导出数据，请先停止导出任务。")
+
+    def active_project_ids(self) -> set[str]:
+        projects: set[str] = set()
+        for workspace in self._workspaces.list_recent():
+            if not workspace.exists:
+                continue
+            paths, _ = self._workspaces.get(workspace.project_id)
+            if ExportRepository(paths.database).active_count():
+                projects.add(workspace.project_id)
+        return projects
+
+    def active_overview(self) -> tuple[int, int]:
+        count = 0
+        projects = self.active_project_ids()
+        for project_id in projects:
+            paths, _ = self._workspaces.get(project_id)
+            count += ExportRepository(paths.database).active_count()
+        return count, len(projects)
+
+    def stop_all_workspaces(self) -> int:
+        stopped = 0
+        for workspace in self._workspaces.list_recent():
+            if not workspace.exists:
+                continue
+            paths, _ = self._workspaces.get(workspace.project_id)
+            stopped += ExportRepository(paths.database).request_stop_all()
+        return stopped
+
+    def _ensure_can_start(self, project_id: str) -> None:
+        if self._has_active_preprocessing(project_id):
+            raise ValueError("当前工作区正在扫描或预处理图片，请等待操作完成。")
+        if self._has_active_jobs(project_id):
+            raise ValueError("当前工作区仍有标注或翻译任务运行，请先停止任务再导出。")
+        if self.has_active(project_id):
+            raise ValueError("当前项目已有导出任务正在进行。")
+
+    @staticmethod
+    def is_active_status(status: ExportOperationStatus) -> bool:
+        return status in {
+            ExportOperationStatus.QUEUED,
+            ExportOperationStatus.RUNNING,
+            ExportOperationStatus.STOPPING,
+        }

@@ -1,4 +1,4 @@
-import { Bot, Images, ListChecks, SlidersHorizontal } from "lucide-react";
+import { Bot, FolderOutput, Images, ListChecks, SlidersHorizontal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useUnsavedChangesGuard } from "../../../shared/desktop/useUnsavedChanges";
@@ -8,6 +8,7 @@ const items = [
   { id: "preprocess", icon: SlidersHorizontal, label: "预处理" },
   { id: "jobs", icon: Bot, label: "任务" },
   { id: "review", icon: ListChecks, label: "审核" },
+  { id: "export", icon: FolderOutput, label: "导出" },
 ];
 
 export function NavigationRail({
@@ -28,6 +29,7 @@ export function NavigationRail({
       if (id === "review") navigate(`/workspace/${projectId}/review`);
       if (id === "jobs") navigate(`/workspace/${projectId}/jobs`);
       if (id === "preprocess") navigate(`/workspace/${projectId}/preprocess`);
+      if (id === "export") navigate(`/workspace/${projectId}/export`);
     })();
   }
 

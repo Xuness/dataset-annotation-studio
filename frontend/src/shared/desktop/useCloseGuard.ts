@@ -46,13 +46,14 @@ export function useCloseGuard(): void {
             });
             return;
           }
-          const activeModelJobs = active.annotation_job_count + active.translation_job_count;
-          if (!activeModelJobs) {
+          const stoppableJobs =
+            active.annotation_job_count + active.translation_job_count + active.export_count;
+          if (!stoppableJobs) {
             await getCurrentWindow().destroy();
             return;
           }
           const accepted = await confirm(
-            `还有 ${activeModelJobs} 个标注或翻译任务尚未结束。关闭软件会停止所有请求并保留断点，仍要退出吗？`,
+            `还有 ${stoppableJobs} 个标注、翻译或导出任务尚未结束。关闭软件会安全停止任务并保留断点，仍要退出吗？`,
             { title: "停止任务并退出", kind: "warning" },
           );
           if (!accepted) return;
@@ -61,7 +62,12 @@ export function useCloseGuard(): void {
             for (let attempt = 0; attempt < 20; attempt += 1) {
               await new Promise((resolve) => window.setTimeout(resolve, 250));
               const remaining = await getActiveJobs();
-              if (!remaining.annotation_job_count && !remaining.translation_job_count) break;
+              if (
+                !remaining.annotation_job_count &&
+                !remaining.translation_job_count &&
+                !remaining.export_count
+              )
+                break;
             }
           } finally {
             await getCurrentWindow().destroy();

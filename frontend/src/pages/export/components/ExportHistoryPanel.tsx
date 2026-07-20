@@ -1,0 +1,113 @@
+import { FolderOpen, Pause, Play, Rows3 } from "lucide-react";
+
+import type { ExportOperation, ExportOperationStatus } from "../../../shared/api/types";
+import { Button } from "../../../shared/ui/Button";
+import { Spinner } from "../../../shared/ui/Spinner";
+
+const statusLabels: Record<ExportOperationStatus, string> = {
+  queued: "等待开始",
+  running: "正在导出",
+  stopping: "正在停止",
+  stopped: "已停止",
+  interrupted: "意外中断",
+  completed: "已完成",
+  failed: "失败",
+};
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+export function ExportHistoryPanel({
+  operations,
+  actionPending,
+  onStop,
+  onResume,
+  onOpenFolder,
+}: {
+  operations: ExportOperation[];
+  actionPending: boolean;
+  onStop: (operationId: string) => void;
+  onResume: (operationId: string) => void;
+  onOpenFolder: (path: string) => void;
+}) {
+  return (
+    <aside className="export-history">
+      <header>
+        <Rows3 size={17} />
+        <div>
+          <span className="eyebrow">Project task state</span>
+          <h2>导出进度</h2>
+        </div>
+      </header>
+      <p>进度和任务记录保存在当前项目的工作区数据库中，导出目录不写入清单。</p>
+
+      <div className="export-history__list">
+        {operations.map((operation) => {
+          const active = ["queued", "running", "stopping"].includes(operation.status);
+          const resumable = ["stopped", "interrupted"].includes(operation.status);
+          const progress = operation.total_items
+            ? Math.round((operation.completed_items / operation.total_items) * 100)
+            : 0;
+          return (
+            <article key={operation.id} className={active ? "is-active" : ""}>
+              <header>
+                <strong>{statusLabels[operation.status]}</strong>
+                <span>{progress}%</span>
+              </header>
+              <div className="export-progress-track" aria-label={`导出进度 ${progress}%`}>
+                <span style={{ width: `${progress}%` }} />
+              </div>
+              <p title={operation.destination_path}>{operation.destination_path}</p>
+              <small>
+                {operation.completed_items} / {operation.total_items} 张 ·{" "}
+                {formatBytes(operation.copied_bytes)} / {formatBytes(operation.total_bytes)}
+              </small>
+              {operation.current_relative_path ? (
+                <small title={operation.current_relative_path}>
+                  当前：{operation.current_relative_path}
+                </small>
+              ) : null}
+              {operation.warning_count ? (
+                <small>包含 {operation.warning_count} 个已确认警告</small>
+              ) : null}
+              {operation.error_message ? (
+                <p className="form-error">{operation.error_message}</p>
+              ) : null}
+              <div className="export-history__actions">
+                <Button
+                  icon={<FolderOpen size={13} />}
+                  disabled={actionPending}
+                  onClick={() => onOpenFolder(operation.destination_path)}
+                >
+                  打开目录
+                </Button>
+                {active ? (
+                  <Button
+                    icon={actionPending ? <Spinner /> : <Pause size={13} />}
+                    disabled={actionPending || operation.status === "stopping"}
+                    onClick={() => onStop(operation.id)}
+                  >
+                    停止
+                  </Button>
+                ) : null}
+                {resumable ? (
+                  <Button
+                    icon={actionPending ? <Spinner /> : <Play size={13} />}
+                    disabled={actionPending}
+                    onClick={() => onResume(operation.id)}
+                  >
+                    继续
+                  </Button>
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
+        {!operations.length ? <div className="export-history__empty">还没有导出记录。</div> : null}
+      </div>
+    </aside>
+  );
+}

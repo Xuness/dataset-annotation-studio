@@ -34,9 +34,11 @@ class PreprocessService:
         workspaces: WorkspaceService,
         *,
         has_active_jobs: Callable[[str], bool] | None = None,
+        has_active_exports: Callable[[str], bool] | None = None,
     ) -> None:
         self._workspaces = workspaces
         self._has_active_jobs = has_active_jobs or (lambda _project_id: False)
+        self._has_active_exports = has_active_exports or (lambda _project_id: False)
         self._scanner = AssetScanner()
         self._active_lock = threading.Lock()
         self._active_operations: dict[tuple[str, str], bool] = {}
@@ -490,6 +492,8 @@ class PreprocessService:
     def _ensure_no_active_jobs(self, project_id: str) -> None:
         if self._has_active_jobs(project_id):
             raise ValueError("当前工作区仍有标注或翻译任务运行，请先停止任务再修改图片文件。")
+        if self._has_active_exports(project_id):
+            raise ValueError("当前工作区正在导出数据，请先停止导出任务再修改图片文件。")
 
     @contextmanager
     def guard_workspace(self, project_id: str, operation_id: str):

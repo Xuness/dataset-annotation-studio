@@ -1,6 +1,7 @@
 import { ChevronLeft, FolderOpen, RefreshCw, Settings2, SquareActivity } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { useExportOperations } from "../../../features/exports/hooks";
 import { useJobs } from "../../../features/jobs/hooks";
 import { useUnsavedChangesGuard } from "../../../shared/desktop/useUnsavedChanges";
 import type { WorkspaceSummary } from "../../../shared/api/types";
@@ -11,14 +12,25 @@ import { Spinner } from "../../../shared/ui/Spinner";
 interface WorkspaceTopbarProps {
   workspace: WorkspaceSummary;
   rescanning: boolean;
+  rescanDisabled?: boolean;
   onRescan: () => void;
 }
 
-export function WorkspaceTopbar({ workspace, rescanning, onRescan }: WorkspaceTopbarProps) {
+export function WorkspaceTopbar({
+  workspace,
+  rescanning,
+  rescanDisabled = false,
+  onRescan,
+}: WorkspaceTopbarProps) {
   const navigate = useNavigate();
   const { confirmDiscard } = useUnsavedChangesGuard();
   const jobs = useJobs(workspace.project_id);
-  const activeJobCount = jobs.data?.length ?? 0;
+  const exports = useExportOperations(workspace.project_id);
+  const activeExportCount =
+    exports.data?.filter((operation) =>
+      ["queued", "running", "stopping"].includes(operation.status),
+    ).length ?? 0;
+  const activeJobCount = (jobs.data?.length ?? 0) + activeExportCount;
 
   function leaveTo(path: string) {
     void (async () => {
@@ -43,7 +55,7 @@ export function WorkspaceTopbar({ workspace, rescanning, onRescan }: WorkspaceTo
       <div className="workspace-topbar__actions">
         <span className="quiet-stat">
           <SquareActivity size={14} />
-          {jobs.isError
+          {jobs.isError || exports.isError
             ? "任务状态读取失败"
             : activeJobCount
               ? `${activeJobCount} 个任务运行中`
@@ -53,7 +65,7 @@ export function WorkspaceTopbar({ workspace, rescanning, onRescan }: WorkspaceTo
         <Button
           icon={rescanning ? <Spinner /> : <RefreshCw size={15} />}
           onClick={onRescan}
-          disabled={rescanning}
+          disabled={rescanning || rescanDisabled}
         >
           重新扫描
         </Button>

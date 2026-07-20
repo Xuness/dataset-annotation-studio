@@ -23,6 +23,11 @@ const PreprocessPage = lazy(() =>
     default: module.PreprocessPage,
   })),
 );
+const ExportPage = lazy(() =>
+  import("../pages/export/ExportPage").then((module) => ({
+    default: module.ExportPage,
+  })),
+);
 const PresetsPage = lazy(() =>
   import("../pages/presets/PresetsPage").then((module) => ({
     default: module.PresetsPage,
@@ -49,6 +54,7 @@ export function App() {
           <Route path="/workspace/:projectId/review" element={<WorkspacePage mode="review" />} />
           <Route path="/workspace/:projectId/jobs" element={<JobsPage />} />
           <Route path="/workspace/:projectId/preprocess" element={<PreprocessPage />} />
+          <Route path="/workspace/:projectId/export" element={<ExportPage />} />
           <Route path="/presets" element={<PresetsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

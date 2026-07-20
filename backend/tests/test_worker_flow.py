@@ -9,6 +9,7 @@ from dataset_studio.api.container import AppContainer
 from dataset_studio.core.config import Settings
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
+from dataset_studio.modules.exports.service import ExportService
 from dataset_studio.modules.jobs.models import (
     ExistingTranslationPolicy,
     JobCreateRequest,
@@ -98,6 +99,7 @@ def _runtime(tmp_path: Path):
         jobs=jobs,
         annotation_traces=AnnotationTraceService(workspaces, assets, annotations),
         preprocessing=PreprocessService(workspaces),
+        exports=ExportService(workspaces),
         statistics=StatisticsService(workspaces),
         codex=CodexRuntime(),
     )

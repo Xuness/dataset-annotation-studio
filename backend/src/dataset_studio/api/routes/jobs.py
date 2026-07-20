@@ -20,22 +20,27 @@ Container = Annotated[AppContainer, Depends(get_container)]
 def active_jobs(container: Container):
     jobs = container.jobs.active_overview()
     preprocessing_count, _ = container.preprocessing.active_overview()
+    export_count, _ = container.exports.active_overview()
     active_projects = (
         container.jobs.active_project_ids()
         | container.preprocessing.active_project_ids(preprocessing_only=True)
+        | container.exports.active_project_ids()
     )
     return ActiveJobsOverview(
-        count=jobs.count + preprocessing_count,
+        count=jobs.count + preprocessing_count + export_count,
         project_count=len(active_projects),
         annotation_job_count=jobs.annotation_job_count,
         translation_job_count=jobs.translation_job_count,
         preprocessing_count=preprocessing_count,
+        export_count=export_count,
     )
 
 
 @global_router.post("/stop-all")
 def stop_all_workspace_jobs(container: Container):
-    return {"stopped": container.jobs.stop_all_workspaces()}
+    return {
+        "stopped": (container.jobs.stop_all_workspaces() + container.exports.stop_all_workspaces())
+    }
 
 
 @router.get("", response_model=list[JobSummary])
@@ -57,6 +62,7 @@ def list_jobs(
 @router.post("", response_model=JobDetail)
 def create_job(project_id: str, request: JobCreateRequest, container: Container):
     with container.preprocessing.guard_workspace(project_id, "create-job"):
+        container.exports.ensure_inactive(project_id)
         return container.jobs.create(project_id, request, include_items=False)
 
 
@@ -92,18 +98,21 @@ def stop_job(project_id: str, job_id: str, container: Container):
 @router.post("/{job_id}/resume", response_model=JobDetail)
 def resume_job(project_id: str, job_id: str, container: Container):
     with container.preprocessing.guard_workspace(project_id, f"resume-job:{job_id}"):
+        container.exports.ensure_inactive(project_id)
         return container.jobs.resume(project_id, job_id, include_items=False)
 
 
 @router.post("/{job_id}/retry-failed", response_model=JobDetail)
 def retry_failed(project_id: str, job_id: str, container: Container):
     with container.preprocessing.guard_workspace(project_id, f"retry-job:{job_id}"):
+        container.exports.ensure_inactive(project_id)
         return container.jobs.retry_failed(project_id, job_id, include_items=False)
 
 
 @router.post("/{job_id}/items/{item_id}/accept", response_model=JobDetail)
 def manually_accept(project_id: str, job_id: str, item_id: str, container: Container):
     with container.preprocessing.guard_workspace(project_id, f"accept-item:{item_id}"):
+        container.exports.ensure_inactive(project_id)
         return container.jobs.manually_accept(
             project_id,
             job_id,

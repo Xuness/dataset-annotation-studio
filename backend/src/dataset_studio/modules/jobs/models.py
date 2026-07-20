@@ -125,3 +125,4 @@ class ActiveJobsOverview(BaseModel):
     annotation_job_count: int = 0
     translation_job_count: int = 0
     preprocessing_count: int = 0
+    export_count: int = 0
