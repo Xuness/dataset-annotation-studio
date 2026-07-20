@@ -67,11 +67,20 @@ Return only the translated annotation, with no explanation or code fence.',
 );
 """
 
-GLOBAL_SCHEMA_VERSION = 3
+PROVIDER_MODELS_MIGRATION = """
+ALTER TABLE provider_profiles
+ADD COLUMN models_json TEXT NOT NULL DEFAULT '[]';
+
+UPDATE provider_profiles
+SET models_json = json_array(model);
+"""
+
+GLOBAL_SCHEMA_VERSION = 4
 GLOBAL_MIGRATIONS = (
     Migration(1, "initial_global_schema", GLOBAL_SCHEMA),
     Migration(2, "provider_request_options", PROVIDER_REQUEST_OPTIONS_MIGRATION),
     Migration(3, "translation_prompt_presets", TRANSLATION_PROMPT_PRESETS_MIGRATION),
+    Migration(4, "provider_models", PROVIDER_MODELS_MIGRATION),
 )
 
 

@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _require_non_blank(value: str | None) -> str | None:
+    if value is not None and not value.strip():
+        raise ValueError("内容不能只包含空白字符。")
+    return value
 
 
 class JobStatus(StrEnum):
@@ -43,6 +49,7 @@ class ExistingTranslationPolicy(StrEnum):
 
 class JobCreateRequest(BaseModel):
     provider_profile_id: str
+    model: str | None = Field(default=None, min_length=1, max_length=500)
     kind: JobKind = JobKind.ANNOTATION
     scope: JobScope = JobScope.ALL
     asset_ids: list[str] = Field(default_factory=list)
@@ -50,6 +57,8 @@ class JobCreateRequest(BaseModel):
     translation_prompt_preset_id: str | None = None
     target_language: str = "zh-CN"
     translation_policy: ExistingTranslationPolicy = ExistingTranslationPolicy.SKIP
+
+    _validate_model = field_validator("model")(_require_non_blank)
 
 
 class JobSummary(BaseModel):
@@ -60,6 +69,7 @@ class JobSummary(BaseModel):
     system_preset_name: str
     provider_profile_id: str
     provider_profile_name: str
+    model: str
     scope: JobScope
     overwrite_existing: bool
     target_language: str | None = None

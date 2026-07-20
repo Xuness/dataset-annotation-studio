@@ -72,7 +72,7 @@ export function JobList({
                   : job.system_preset_name}
               </strong>
               <span>
-                {job.provider_profile_name}
+                {job.provider_profile_name} · {job.model}
                 {job.kind === "translation" ? ` · ${job.system_preset_name}` : ""}
               </span>
               <div className="job-card__progress">

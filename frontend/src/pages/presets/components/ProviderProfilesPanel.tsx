@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import { Cable, KeyRound, Save, Search, Trash2 } from "lucide-react";
+import { Cable, KeyRound, Plus, Save, Search, Star, Trash2, X } from "lucide-react";
 
 import type { ProviderProfileInput } from "../../../features/presets/api";
 import { useProviderProfileMutations, useProviderProfiles } from "../../../features/presets/hooks";
 import { providerCapabilities } from "../../../features/presets/providerCapabilities";
-import type { ProviderProfile, ProviderType } from "../../../shared/api/types";
+import type {
+  ProviderModelSummary,
+  ProviderProfile,
+  ProviderType,
+} from "../../../shared/api/types";
 import { useUnsavedChangesGuard, useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
@@ -23,6 +27,7 @@ const emptyForm: ProviderProfileForm = {
   provider_type: "openrouter" as ProviderType,
   base_url: providerCapabilities.openrouter.defaultBaseUrl,
   model: "",
+  models: [],
   api_key: "",
   temperature: 0.2,
   max_output_tokens: 4096,
@@ -43,6 +48,7 @@ function profileToForm(profile: ProviderProfile): ProviderProfileForm {
     provider_type: profile.provider_type,
     base_url: profile.base_url,
     model: profile.model,
+    models: profile.models,
     api_key: "",
     temperature: profile.temperature,
     max_output_tokens: profile.max_output_tokens,
@@ -61,11 +67,13 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [modelDraft, setModelDraft] = useState("");
 
   useEffect(() => {
     setForm(selected ? profileToForm(selected) : emptyForm);
     setError(null);
     setShowModelPicker(false);
+    setModelDraft("");
   }, [selected]);
 
   function setField<K extends keyof typeof form>(field: K, value: (typeof form)[K]) {
@@ -81,6 +89,7 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
         provider_type,
         base_url: nextCapabilities.defaultBaseUrl,
         model: "",
+        models: [],
         api_key: "",
         concurrency: nextCapabilities.defaultConcurrency,
         request_options: {
@@ -92,6 +101,51 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
         },
       };
     });
+  }
+
+  function addModel(modelId: string, summary?: ProviderModelSummary) {
+    const normalized = modelId.trim();
+    if (!normalized) return;
+    setForm((current) => {
+      if (current.models.includes(normalized) || current.models.length >= 100) return current;
+      const isFirst = current.models.length === 0;
+      return {
+        ...current,
+        model: isFirst ? normalized : current.model,
+        models: [...current.models, normalized],
+        max_output_tokens:
+          isFirst && summary?.max_output_tokens
+            ? Math.min(current.max_output_tokens, summary.max_output_tokens)
+            : current.max_output_tokens,
+        request_options:
+          isFirst &&
+          current.request_options.reasoning_effort &&
+          summary &&
+          !summary.reasoning_efforts.includes(current.request_options.reasoning_effort)
+            ? { ...current.request_options, reasoning_effort: null }
+            : current.request_options,
+      };
+    });
+    setModelDraft("");
+  }
+
+  function removeModel(modelId: string) {
+    setForm((current) => {
+      const models = current.models.filter((candidate) => candidate !== modelId);
+      return {
+        ...current,
+        model: current.model === modelId ? (models[0] ?? "") : current.model,
+        models,
+      };
+    });
+  }
+
+  function toggleCatalogModel(model: ProviderModelSummary) {
+    if (form.models.includes(model.id)) {
+      removeModel(model.id);
+    } else {
+      addModel(model.id, model);
+    }
   }
 
   async function save() {
@@ -156,6 +210,7 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
   const canSave = Boolean(
     form.name.trim() &&
     form.model.trim() &&
+    form.models.length &&
     (!capabilities.requiresBaseUrl || form.base_url.trim()),
   );
   const baseline = selected ? profileToForm(selected) : emptyForm;
@@ -186,7 +241,9 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
               <Cable size={15} />
               <span>
                 <strong>{profile.name}</strong>
-                <small>{profile.model}</small>
+                <small>
+                  {profile.models.length} 个模型 · 默认 {profile.model}
+                </small>
               </span>
               {profile.has_api_key ? <KeyRound size={12} /> : null}
             </button>
@@ -258,13 +315,30 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
             </label>
           ) : null}
           <div className="form-field form-field--wide">
-            <span>默认模型</span>
+            <span>添加模型</span>
             <div className="model-input-row">
               <input
-                value={form.model}
-                onChange={(event) => setField("model", event.target.value)}
-                placeholder="模型 ID"
+                value={modelDraft}
+                onChange={(event) => setModelDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  addModel(modelDraft);
+                }}
+                placeholder="输入模型 ID 后添加"
               />
+              <Button
+                type="button"
+                icon={<Plus size={13} />}
+                disabled={
+                  !modelDraft.trim() ||
+                  form.models.includes(modelDraft.trim()) ||
+                  form.models.length >= 100
+                }
+                onClick={() => addModel(modelDraft)}
+              >
+                添加
+              </Button>
               {capabilities.modelCatalog ? (
                 <Button
                   type="button"
@@ -275,6 +349,42 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
                 </Button>
               ) : null}
             </div>
+            <small className="provider-option-note">
+              默认模型会在创建任务时自动选中；温度、输出长度等生成参数由本连接内所有模型共享。
+            </small>
+          </div>
+          <div className="provider-model-list form-field--wide">
+            <header>
+              <span>已保存模型</span>
+              <small>{form.models.length} / 100</small>
+            </header>
+            <div>
+              {form.models.map((model) => (
+                <div key={model} className={form.model === model ? "is-default" : ""}>
+                  <button
+                    type="button"
+                    className="provider-model-list__default"
+                    aria-pressed={form.model === model}
+                    onClick={() => setField("model", model)}
+                  >
+                    <Star size={13} fill={form.model === model ? "currentColor" : "none"} />
+                    <span>
+                      <code>{model}</code>
+                      <small>{form.model === model ? "默认模型" : "设为默认"}</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="provider-model-list__remove"
+                    aria-label={`移除模型 ${model}`}
+                    onClick={() => removeModel(model)}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+              {!form.models.length ? <p>请至少添加一个模型。</p> : null}
+            </div>
           </div>
           {showModelPicker && capabilities.modelCatalog ? (
             capabilities.modelCatalog === "opencode_go" ? (
@@ -282,25 +392,8 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
                 baseUrl={form.base_url}
                 profileId={selected?.id}
                 apiKey={form.api_key}
-                selectedModel={form.model}
-                onSelect={(model) => {
-                  setForm((current) => ({
-                    ...current,
-                    model: model.id,
-                    max_output_tokens: model.max_output_tokens
-                      ? Math.min(current.max_output_tokens, model.max_output_tokens)
-                      : current.max_output_tokens,
-                    request_options: {
-                      ...current.request_options,
-                      reasoning_effort:
-                        current.request_options.reasoning_effort &&
-                        model.reasoning_efforts.includes(current.request_options.reasoning_effort)
-                          ? current.request_options.reasoning_effort
-                          : null,
-                    },
-                  }));
-                  setShowModelPicker(false);
-                }}
+                selectedModels={form.models}
+                onToggle={toggleCatalogModel}
                 onClose={() => setShowModelPicker(false)}
               />
             ) : (
@@ -309,11 +402,8 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
                 baseUrl={form.base_url}
                 profileId={selected?.id}
                 apiKey={form.api_key}
-                selectedModel={form.model}
-                onSelect={(model) => {
-                  setField("model", model.id);
-                  setShowModelPicker(false);
-                }}
+                selectedModels={form.models}
+                onToggle={toggleCatalogModel}
                 onClose={() => setShowModelPicker(false)}
               />
             )

@@ -61,7 +61,7 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
               : job.data.system_preset_name}
           </h2>
           <p>
-            {job.data.provider_profile_name}
+            {job.data.provider_profile_name} · {job.data.model}
             {job.data.kind === "translation" ? ` · ${job.data.system_preset_name}` : ""}
           </p>
         </div>

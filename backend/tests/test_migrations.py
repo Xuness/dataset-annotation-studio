@@ -1,3 +1,4 @@
+import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -84,7 +85,11 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     connection = connect(database)
     try:
         row = connection.execute(
-            "SELECT request_options_json FROM provider_profiles WHERE id = 'profile'"
+            """
+            SELECT request_options_json, models_json
+            FROM provider_profiles
+            WHERE id = 'profile'
+            """
         ).fetchone()
         translation_prompt = connection.execute(
             """
@@ -102,9 +107,10 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     finally:
         connection.close()
     assert row["request_options_json"] == "{}"
+    assert json.loads(row["models_json"]) == ["example/model"]
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3]
+    assert versions == [1, 2, 3, 4]
 
 
 def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: Path) -> None:

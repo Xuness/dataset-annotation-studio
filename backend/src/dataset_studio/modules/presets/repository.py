@@ -104,10 +104,10 @@ class PresetRepository:
             connection.execute(
                 """
                 INSERT INTO provider_profiles (
-                    id, name, provider_type, base_url, model, temperature,
+                    id, name, provider_type, base_url, model, models_json, temperature,
                     max_output_tokens, concurrency, timeout_seconds, request_options_json,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
             )
@@ -117,8 +117,8 @@ class PresetRepository:
             connection.execute(
                 """
                 UPDATE provider_profiles
-                SET name = ?, provider_type = ?, base_url = ?, model = ?, temperature = ?,
-                    max_output_tokens = ?, concurrency = ?, timeout_seconds = ?,
+                SET name = ?, provider_type = ?, base_url = ?, model = ?, models_json = ?,
+                    temperature = ?, max_output_tokens = ?, concurrency = ?, timeout_seconds = ?,
                     request_options_json = ?, updated_at = ?
                 WHERE id = ?
                 """,

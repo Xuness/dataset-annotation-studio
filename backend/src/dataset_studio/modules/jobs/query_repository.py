@@ -203,6 +203,7 @@ class JobQueryRepository:
             system_preset_name=str(system.get("name", "未命名预设")),
             provider_profile_id=str(row["provider_profile_id"]),
             provider_profile_name=str(provider.get("name", "未命名 API 配置")),
+            model=str(provider.get("model", "未知模型")),
             scope=str(row["scope"]),
             overwrite_existing=bool(row["overwrite_existing"]),
             target_language=(

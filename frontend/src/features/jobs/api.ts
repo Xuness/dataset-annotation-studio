@@ -8,6 +8,7 @@ import type {
 
 export interface CreateJobInput {
   provider_profile_id: string;
+  model: string;
   kind: JobKind;
   scope: "all" | "selected";
   asset_ids: string[];

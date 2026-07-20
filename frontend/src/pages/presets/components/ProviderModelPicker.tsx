@@ -12,8 +12,8 @@ interface ProviderModelPickerProps {
   baseUrl: string;
   profileId?: string;
   apiKey: string;
-  selectedModel: string;
-  onSelect: (model: ProviderModelSummary) => void;
+  selectedModels: string[];
+  onToggle: (model: ProviderModelSummary) => void;
   onClose: () => void;
 }
 
@@ -22,8 +22,8 @@ export function ProviderModelPicker({
   baseUrl,
   profileId,
   apiKey,
-  selectedModel,
-  onSelect,
+  selectedModels,
+  onToggle,
   onClose,
 }: ProviderModelPickerProps) {
   const [query, setQuery] = useState("");
@@ -56,8 +56,8 @@ export function ProviderModelPicker({
           <strong>选择多模态模型</strong>
           <small>
             {isCodex
-              ? "当前 ChatGPT 账号可用的 Codex 模型 · 图像输入 / 文本输出"
-              : "OpenRouter 模型目录 · 图像输入 / 文本输出"}
+              ? "当前 ChatGPT 账号可用的 Codex 模型 · 点击添加或移除"
+              : "OpenRouter 模型目录 · 点击添加或移除"}
           </small>
         </div>
         <Button type="button" icon={<X size={13} />} onClick={onClose}>
@@ -84,36 +84,39 @@ export function ProviderModelPicker({
         </Button>
       </div>
       <div className="model-picker__results">
-        {models.data?.map((model) => (
-          <button
-            type="button"
-            key={model.id}
-            className={selectedModel === model.id ? "is-selected" : ""}
-            onClick={() => onSelect(model)}
-          >
-            <span className="model-picker__title">
-              <strong>{model.name}</strong>
-              {selectedModel === model.id ? <Check size={14} /> : null}
-            </span>
-            <code>{model.id}</code>
-            <span className="model-picker__facts">
-              {model.context_length ? (
-                <small>{formatTokens(model.context_length)} 上下文</small>
-              ) : null}
-              {model.max_output_tokens ? (
-                <small>{formatTokens(model.max_output_tokens)} 最大输出</small>
-              ) : null}
-              {formatPrice(model.prompt_price) ? (
-                <small>输入 {formatPrice(model.prompt_price)}</small>
-              ) : null}
-              {formatPrice(model.completion_price) ? (
-                <small>输出 {formatPrice(model.completion_price)}</small>
-              ) : null}
-              {model.reasoning_efforts.length ? <small>支持推理强度</small> : null}
-            </span>
-            {model.description ? <p>{model.description}</p> : null}
-          </button>
-        ))}
+        {models.data?.map((model) => {
+          const selected = selectedModels.includes(model.id);
+          return (
+            <button
+              type="button"
+              key={model.id}
+              className={selected ? "is-selected" : ""}
+              onClick={() => onToggle(model)}
+            >
+              <span className="model-picker__title">
+                <strong>{model.name}</strong>
+                {selected ? <Check size={14} /> : null}
+              </span>
+              <code>{model.id}</code>
+              <span className="model-picker__facts">
+                {model.context_length ? (
+                  <small>{formatTokens(model.context_length)} 上下文</small>
+                ) : null}
+                {model.max_output_tokens ? (
+                  <small>{formatTokens(model.max_output_tokens)} 最大输出</small>
+                ) : null}
+                {formatPrice(model.prompt_price) ? (
+                  <small>输入 {formatPrice(model.prompt_price)}</small>
+                ) : null}
+                {formatPrice(model.completion_price) ? (
+                  <small>输出 {formatPrice(model.completion_price)}</small>
+                ) : null}
+                {model.reasoning_efforts.length ? <small>支持推理强度</small> : null}
+              </span>
+              {model.description ? <p>{model.description}</p> : null}
+            </button>
+          );
+        })}
         {models.isLoading ? <p className="model-picker__message">正在读取模型目录…</p> : null}
         {models.isError ? (
           <p className="model-picker__message model-picker__message--error">

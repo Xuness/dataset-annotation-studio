@@ -10,8 +10,8 @@ interface OpenCodeGoModelPickerProps {
   baseUrl: string;
   profileId?: string;
   apiKey: string;
-  selectedModel: string;
-  onSelect: (model: ProviderModelSummary) => void;
+  selectedModels: string[];
+  onToggle: (model: ProviderModelSummary) => void;
   onClose: () => void;
 }
 
@@ -19,8 +19,8 @@ export function OpenCodeGoModelPicker({
   baseUrl,
   profileId,
   apiKey,
-  selectedModel,
-  onSelect,
+  selectedModels,
+  onToggle,
   onClose,
 }: OpenCodeGoModelPickerProps) {
   const [query, setQuery] = useState("");
@@ -48,7 +48,7 @@ export function OpenCodeGoModelPicker({
       <header>
         <div>
           <strong>选择 OpenCode Go 多模态模型</strong>
-          <small>实时可用模型与本地协议规格的交集 · 不会对未知模型猜测传输协议</small>
+          <small>实时目录与本地协议规格的交集 · 点击添加或移除</small>
         </div>
         <Button type="button" icon={<X size={13} />} onClick={onClose}>
           关闭
@@ -74,16 +74,17 @@ export function OpenCodeGoModelPicker({
       <div className="model-picker__results">
         {models.data?.map((model) => {
           const explicitCache = model.supported_parameters.includes("explicit_prompt_cache");
+          const selected = selectedModels.includes(model.id);
           return (
             <button
               type="button"
               key={model.id}
-              className={selectedModel === model.id ? "is-selected" : ""}
-              onClick={() => onSelect(model)}
+              className={selected ? "is-selected" : ""}
+              onClick={() => onToggle(model)}
             >
               <span className="model-picker__title">
                 <strong>{model.name}</strong>
-                {selectedModel === model.id ? <Check size={14} /> : null}
+                {selected ? <Check size={14} /> : null}
               </span>
               <code>{model.id}</code>
               <span className="model-picker__facts">

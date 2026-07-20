@@ -63,6 +63,12 @@ export function OpenCodeGoOptionsFields({
     }
   }, [allowedEfforts, onRequestOptionsChange, requestOptions, spec]);
 
+  useEffect(() => {
+    if (spec?.max_output_tokens && maxOutputTokens > spec.max_output_tokens) {
+      onMaxOutputTokensChange(spec.max_output_tokens);
+    }
+  }, [maxOutputTokens, onMaxOutputTokensChange, spec]);
+
   const cacheDescription = spec?.supported_parameters.includes("explicit_prompt_cache")
     ? "Messages 通道会把稳定的 System Prompt 标记为 ephemeral 缓存断点；缓存写入与读取 Token 会分别记录。"
     : spec?.supported_parameters.includes("automatic_prompt_cache")

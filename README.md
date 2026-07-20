@@ -7,7 +7,7 @@
 - 递归或仅当前层扫描 PNG、JPG/JPEG、WebP
 - 缩略图浏览、筛选、批量选择与中央大图预览
 - 同名 JSON 字段选择、User Prompt 拼接、下一次请求预览与单图实际请求/推理/最终输出追踪
-- 全局 System Prompt 预设与独立模型连接预设
+- 全局 System Prompt、翻译 Prompt 与支持多模型和默认模型的供应商连接预设；标注、翻译任务可按次切换模型
 - OpenRouter、OpenAI 兼容接口、OpenCode Go 专用协议、Gemini 原生接口，以及复用 ChatGPT OAuth 的 Codex 适配层
 - 持久化批量任务、并发、停止、断点续跑、失败重试和人工采用
 - 模型原始响应直接写入同名 `.txt`，并保留每次脱敏请求快照与供应商响应

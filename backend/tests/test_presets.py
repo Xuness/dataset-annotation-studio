@@ -129,6 +129,42 @@ def test_provider_update_accepts_full_form_with_request_options(tmp_path: Path) 
     assert service.get_api_key(profile.id) == "secret"
 
 
+def test_provider_profile_stores_multiple_models_and_updates_default(tmp_path: Path) -> None:
+    service, _, _ = _service(tmp_path)
+    profile = service.create_provider(
+        ProviderProfileCreate(
+            name="Multi-model provider",
+            provider_type=ProviderType.OPENAI_COMPATIBLE,
+            base_url="https://example.invalid/v1",
+            model="vision/default",
+            models=["vision/alternate", " vision/default ", "translation/fast"],
+            api_key="secret",
+        )
+    )
+
+    assert profile.model == "vision/default"
+    assert profile.models == [
+        "vision/default",
+        "vision/alternate",
+        "translation/fast",
+    ]
+
+    replaced = service.update_provider(
+        profile.id,
+        ProviderProfileUpdate(models=["translation/quality", "vision/new"]),
+    )
+    assert replaced.model == "translation/quality"
+    assert replaced.models == ["translation/quality", "vision/new"]
+
+    switched = service.update_provider(
+        profile.id,
+        ProviderProfileUpdate(model="vision/new"),
+    )
+    assert switched.model == "vision/new"
+    assert switched.models == ["vision/new", "translation/quality"]
+    assert service.get_provider(profile.id).models == switched.models
+
+
 def test_presets_reject_whitespace_only_required_text() -> None:
     with pytest.raises(ValidationError):
         SystemPresetCreate(name="   ", system_prompt="prompt")
@@ -142,6 +178,8 @@ def test_presets_reject_whitespace_only_required_text() -> None:
             model="   ",
             api_key="secret",
         )
+    with pytest.raises(ValidationError):
+        ProviderProfileUpdate(models=[])
 
 
 def test_translation_prompt_presets_include_editable_default_and_support_crud(

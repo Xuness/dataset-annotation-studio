@@ -54,6 +54,12 @@ class JobService:
         paths, manifest = self._workspaces.get(project_id)
         provider_profile = self._presets.get_provider(request.provider_profile_id)
         self._presets.get_provider_credential(provider_profile)
+        selected_model = request.model.strip() if request.model else provider_profile.model
+        if selected_model not in provider_profile.models:
+            raise ValueError(
+                f"模型“{selected_model}”不在 API 配置“{provider_profile.name}”的模型列表中。"
+            )
+        provider_snapshot = provider_profile.model_copy(update={"model": selected_model})
 
         if request.kind == JobKind.TRANSLATION:
             language = self._translations.normalize_language(request.target_language)
@@ -130,7 +136,7 @@ class JobService:
             system_preset_id=system_preset_id,
             system_prompt_snapshot=system_prompt_snapshot,
             provider_profile_id=provider_profile.id,
-            provider_snapshot=provider_profile.model_dump_json(),
+            provider_snapshot=provider_snapshot.model_dump_json(),
             user_prompt_snapshot=user_prompt_snapshot,
             json_fields_snapshot=json_fields_snapshot,
             scope=request.scope.value,

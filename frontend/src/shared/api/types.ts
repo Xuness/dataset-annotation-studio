@@ -239,6 +239,7 @@ export interface ProviderProfile {
   provider_type: ProviderType;
   base_url: string;
   model: string;
+  models: string[];
   temperature: number;
   max_output_tokens: number;
   concurrency: number;
@@ -305,6 +306,7 @@ export interface JobSummary {
   system_preset_name: string;
   provider_profile_id: string;
   provider_profile_name: string;
+  model: string;
   scope: "all" | "selected";
   overwrite_existing: boolean;
   target_language: string | null;

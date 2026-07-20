@@ -127,6 +127,7 @@ def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path:
             provider_type=ProviderType.OPENAI_COMPATIBLE,
             base_url="https://example.invalid/v1",
             model="translation-model",
+            models=["translation-model", "translation-quality"],
             api_key="secret",
         )
     )
@@ -135,6 +136,7 @@ def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path:
         project_id,
         JobCreateRequest(
             provider_profile_id=provider.id,
+            model="translation-quality",
             kind=JobKind.TRANSLATION,
             scope=JobScope.ALL,
             target_language="zh-CN",
@@ -145,6 +147,7 @@ def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path:
     assert missing_job.target_language == "zh-CN"
     assert missing_job.system_preset_id == "default-translation-prompt"
     assert missing_job.system_preset_name == "默认结构保留翻译"
+    assert missing_job.model == "translation-quality"
     assert [item.asset_id for item in missing_job.items] == [by_name["missing.png"].id]
 
     annotations.save(project_id, by_name["current.png"].id, "<caption>changed</caption>")

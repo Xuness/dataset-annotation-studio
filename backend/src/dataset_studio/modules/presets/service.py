@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import uuid
 
@@ -162,6 +163,7 @@ class PresetService:
             data.provider_type.value,
             data.base_url.rstrip("/") if data.provider_type.requires_base_url else "",
             data.model.strip(),
+            json.dumps(data.models, ensure_ascii=False),
             data.temperature,
             data.max_output_tokens,
             data.concurrency,
@@ -186,6 +188,10 @@ class PresetService:
     def update_provider(self, profile_id: str, data: ProviderProfileUpdate) -> ProviderProfile:
         current = self.get_provider(profile_id)
         values = data.model_dump(exclude_none=True, exclude={"api_key"})
+        if "models" in values and "model" not in values:
+            values["model"] = values["models"][0]
+        elif "model" in values and "models" not in values:
+            values["models"] = [values["model"], *current.models]
         updated = ProviderProfile.model_validate({**current.model_dump(), **values})
         if not updated.provider_type.requires_base_url:
             updated = updated.model_copy(update={"base_url": ""})
@@ -234,10 +240,18 @@ class PresetService:
     def _provider_from_row(self, row) -> ProviderProfile:
         values = dict(row)
         options_json = str(values.pop("request_options_json", "{}"))
+        models_json = str(values.pop("models_json", "[]"))
         try:
             values["request_options"] = ProviderRequestOptions.model_validate_json(options_json)
         except ValueError:
             values["request_options"] = ProviderRequestOptions()
+        try:
+            parsed_models = json.loads(models_json)
+            values["models"] = (
+                [str(model) for model in parsed_models] if isinstance(parsed_models, list) else []
+            )
+        except (TypeError, ValueError):
+            values["models"] = []
         provider_type = ProviderType(str(values["provider_type"]))
         values["has_api_key"] = provider_type.requires_api_key and bool(
             self._secrets.get(self._secret_key(str(row["id"])))
@@ -255,6 +269,7 @@ class PresetService:
             profile.provider_type.value,
             profile.base_url.rstrip("/"),
             profile.model.strip(),
+            json.dumps(profile.models, ensure_ascii=False),
             profile.temperature,
             profile.max_output_tokens,
             profile.concurrency,

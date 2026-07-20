@@ -37,17 +37,36 @@ export function NewJobPanel({
   const actions = useJobActions(projectId);
   const [kind, setKind] = useState<JobKind>("annotation");
   const [providerProfileId, setProviderProfileId] = useState("");
+  const [providerModel, setProviderModel] = useState("");
   const [translationPromptPresetId, setTranslationPromptPresetId] = useState("");
   const [scope, setScope] = useState<"all" | "selected">("all");
   const [targetLanguage, setTargetLanguage] = useState("zh-CN");
   const [translationPolicy, setTranslationPolicy] = useState<ExistingTranslationPolicy>("skip");
   const [error, setError] = useState<string | null>(null);
+  const selectedProvider = providerProfiles.data?.find(
+    (profile) => profile.id === providerProfileId,
+  );
 
   useEffect(() => {
-    if (!providerProfileId && providerProfiles.data?.length) {
-      setProviderProfileId(providerProfiles.data[0].id);
+    const available = providerProfiles.data;
+    if (!available?.length) {
+      if (providerProfileId) setProviderProfileId("");
+      return;
+    }
+    if (!available.some((profile) => profile.id === providerProfileId)) {
+      setProviderProfileId(available[0].id);
     }
   }, [providerProfileId, providerProfiles.data]);
+
+  useEffect(() => {
+    if (!selectedProvider) {
+      if (providerModel) setProviderModel("");
+      return;
+    }
+    if (!selectedProvider.models.includes(providerModel)) {
+      setProviderModel(selectedProvider.model);
+    }
+  }, [providerModel, selectedProvider]);
 
   useEffect(() => {
     const available = translationPromptPresets.data;
@@ -65,6 +84,7 @@ export function NewJobPanel({
     try {
       const job = await actions.create.mutateAsync({
         provider_profile_id: providerProfileId,
+        model: providerModel,
         kind,
         scope,
         asset_ids: scope === "selected" ? checkedAssetIds : [],
@@ -99,7 +119,8 @@ export function NewJobPanel({
       : null;
   const ready = Boolean(
     (kind === "translation" ? configuredTranslationPrompt : configuredSystemPreset) &&
-    providerProfileId &&
+    selectedProvider &&
+    selectedProvider.models.includes(providerModel) &&
     (scope === "all" || checkedAssetIds.length > 0),
   );
 
@@ -189,10 +210,27 @@ export function NewJobPanel({
           {!providerProfiles.data?.length ? <option value="">尚未创建模型连接</option> : null}
           {providerProfiles.data?.map((profile) => (
             <option key={profile.id} value={profile.id}>
-              {profile.name} · {profile.model}
+              {profile.name} · {profile.models.length} 个模型
             </option>
           ))}
         </select>
+      </label>
+      <label className="form-field">
+        <span>任务模型</span>
+        <select
+          value={providerModel}
+          disabled={!selectedProvider}
+          onChange={(event) => setProviderModel(event.target.value)}
+        >
+          {!selectedProvider ? <option value="">请先选择模型连接</option> : null}
+          {selectedProvider?.models.map((model) => (
+            <option key={model} value={model}>
+              {model}
+              {model === selectedProvider.model ? " · 默认" : ""}
+            </option>
+          ))}
+        </select>
+        <small>本次任务会固定使用所选模型；之后修改连接或默认模型不会影响任务快照。</small>
       </label>
 
       {kind === "translation" ? (

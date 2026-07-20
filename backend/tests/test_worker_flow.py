@@ -23,6 +23,7 @@ from dataset_studio.modules.jobs.worker import AnnotationWorker
 from dataset_studio.modules.preprocessing.service import PreprocessService
 from dataset_studio.modules.presets.models import (
     ProviderProfileCreate,
+    ProviderProfileUpdate,
     ProviderType,
     SystemPresetCreate,
     TranslationPromptPresetCreate,
@@ -125,6 +126,7 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
             provider_type=ProviderType.OPENAI_COMPATIBLE,
             base_url="https://example.invalid/v1",
             model="fake-model",
+            models=["fake-model", "fake-model-alternate"],
             api_key="local-test-key",
             concurrency=1,
         )
@@ -133,8 +135,13 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
         workspace.project_id,
         JobCreateRequest(
             provider_profile_id=profile.id,
+            model="fake-model-alternate",
             scope=JobScope.ALL,
         ),
+    )
+    presets.update_provider(
+        profile.id,
+        ProviderProfileUpdate(model="fake-model", models=["fake-model"]),
     )
 
     provider = RecordingProvider()
@@ -169,7 +176,7 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
     assert payload["kind"] == "response"
     assert payload["request"]["system_prompt"] == "Return one XML element."
     assert payload["request"]["user_prompt"] == "Describe the image.\n\nartist: Mori"
-    assert payload["request"]["parameters"]["model"] == "fake-model"
+    assert payload["request"]["parameters"]["model"] == "fake-model-alternate"
     assert payload["reasoning_content"] == "The scene contains a quiet garden."
     assert "local-test-key" not in payloads[0].read_text(encoding="utf-8")
 

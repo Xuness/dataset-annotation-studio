@@ -26,6 +26,7 @@ export interface ProviderProfileInput {
   provider_type: ProviderType;
   base_url: string;
   model: string;
+  models: string[];
   api_key?: string;
   temperature: number;
   max_output_tokens: number;

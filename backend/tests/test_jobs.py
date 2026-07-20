@@ -136,6 +136,7 @@ def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -
             provider_type=ProviderType.OPENROUTER,
             base_url="https://openrouter.ai/api/v1",
             model="example/model",
+            models=["example/model", "example/alternate"],
             api_key="secret",
         )
     )
@@ -144,6 +145,7 @@ def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -
         workspace.project_id,
         JobCreateRequest(
             provider_profile_id=provider.id,
+            model="example/alternate",
             scope=JobScope.ALL,
         ),
     )
@@ -152,10 +154,21 @@ def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -
     assert job.items[0].relative_path == "pending.png"
     assert job.system_preset_name == "XML caption"
     assert job.provider_profile_name == "OpenRouter"
+    assert job.model == "example/alternate"
     assert [entry.id for entry in jobs.list(workspace.project_id, active_only=True)] == [job.id]
     assert jobs.active_overview().count == 1
     assert jobs.active_overview().project_count == 1
     assert jobs.stop_all_workspaces() == 1
+
+    with pytest.raises(ValueError, match=r"不在.*模型列表"):
+        jobs.create(
+            workspace.project_id,
+            JobCreateRequest(
+                provider_profile_id=provider.id,
+                model="unknown/model",
+                scope=JobScope.ALL,
+            ),
+        )
 
 
 def test_job_creation_requires_project_system_preset(tmp_path: Path) -> None:
