@@ -53,10 +53,11 @@ test("fullscreen shortcut accepts only an unmodified first F11 press", () => {
 test("version one appearance preferences migrate without losing the selected theme", () => {
   const preferences = normalizePreferences({ version: 1, themeId: "sea-fog" });
 
-  assert.equal(preferences.version, 2);
+  assert.equal(preferences.version, 3);
   assert.equal(preferences.themeId, "sea-fog");
   assert.equal(preferences.appearance.customBackground, null);
   assert.deepEqual(preferences.appearance.home, { opacity: null, blurPx: null });
+  assert.equal(preferences.appearance.transparentRegions.canvas, true);
 });
 
 test("fresh appearance preferences use the warm paper theme", () => {
@@ -83,6 +84,53 @@ test("appearance preferences clamp unsafe values and reject incomplete backgroun
   assert.equal(preferences.appearance.customBackground, null);
   assert.deepEqual(preferences.appearance.home, { opacity: 1, blurPx: 0 });
   assert.deepEqual(preferences.appearance.workspace, { opacity: null, blurPx: 32 });
+  assert.equal(preferences.appearance.transparentRegions.canvas, true);
+});
+
+test("version two appearance preferences keep scene overrides and gain region defaults", () => {
+  const preferences = normalizePreferences({
+    version: 2,
+    themeId: "silent-gallery",
+    appearance: {
+      customBackground: { path: "E:/background.webp", name: "background.webp" },
+      home: { opacity: 0.48, blurPx: 2 },
+      workspace: { opacity: 0.18, blurPx: 5 },
+    },
+  });
+
+  assert.equal(preferences.version, 3);
+  assert.equal(preferences.themeId, "silent-gallery");
+  assert.deepEqual(preferences.appearance.workspace, { opacity: 0.18, blurPx: 5 });
+  assert.equal(preferences.appearance.transparentRegions.canvas, true);
+  assert.equal(preferences.appearance.transparentRegions.navigation, false);
+});
+
+test("region transparency accepts only known boolean values", () => {
+  const defaults = createDefaultPreferences("warm-paper");
+  const preferences = normalizePreferences({
+    ...defaults,
+    appearance: {
+      ...defaults.appearance,
+      transparentRegions: {
+        canvas: false,
+        navigation: true,
+        "primary-sidebar": "yes",
+        content: true,
+        "secondary-sidebar": true,
+        chrome: false,
+        unknown: true,
+      },
+    },
+  });
+
+  assert.deepEqual(preferences.appearance.transparentRegions, {
+    canvas: false,
+    navigation: true,
+    "primary-sidebar": false,
+    content: true,
+    "secondary-sidebar": true,
+    chrome: false,
+  });
 });
 
 test("theme scene defaults remain active until a user override is stored", () => {

@@ -125,7 +125,7 @@ export function NewJobPanel({
   );
 
   return (
-    <aside className="new-job-panel">
+    <aside className="new-job-panel" data-surface-region="primary-sidebar">
       <header>
         <span className="new-job-icon">
           {kind === "annotation" ? <Bot size={18} /> : <Languages size={18} />}

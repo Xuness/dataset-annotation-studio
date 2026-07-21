@@ -34,7 +34,7 @@ export function JobList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <section className="job-list-panel">
+    <section className="job-list-panel" data-surface-region="content">
       <header>
         <span className="eyebrow">Run history</span>
         <strong>任务记录</strong>

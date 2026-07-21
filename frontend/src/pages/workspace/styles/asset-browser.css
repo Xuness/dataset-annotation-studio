@@ -107,7 +107,6 @@
   flex-wrap: wrap;
   gap: 5px;
   padding: 8px 0;
-  border-bottom: 1px solid var(--line);
 }
 
 .asset-filters button {
@@ -140,7 +139,7 @@
   align-items: center;
   gap: 7px;
   padding: 7px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--workspace-divider);
   color: var(--muted);
   font-size: var(--text-xs);
 }

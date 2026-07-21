@@ -188,7 +188,7 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
     translation.data.status === "conflict";
 
   return (
-    <section className="annotation-editor">
+    <section className="annotation-editor" data-surface-region="content">
       <header className="annotation-editor__header">
         <div className="annotation-editor__title">
           <FileText size={15} />

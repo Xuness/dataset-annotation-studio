@@ -52,7 +52,7 @@ export function InspectorPanel({ projectId, workspace, asset }: InspectorPanelPr
   }
 
   return (
-    <aside className="inspector-panel">
+    <aside className="inspector-panel" data-surface-region="secondary-sidebar">
       <div className="inspector-tabs">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button

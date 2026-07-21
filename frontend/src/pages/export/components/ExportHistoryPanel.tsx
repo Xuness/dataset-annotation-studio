@@ -29,7 +29,7 @@ export function ExportHistoryPanel({
   onOpenFolder: (path: string) => void;
 }) {
   return (
-    <aside className="export-history">
+    <aside className="export-history" data-surface-region="secondary-sidebar">
       <header>
         <Rows3 size={17} />
         <div>

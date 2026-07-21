@@ -297,7 +297,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         />
         <Suspense
           fallback={
-            <section className="annotation-editor">
+            <section className="annotation-editor" data-surface-region="content">
               <Spinner label="加载标注编辑器" />
             </section>
           }

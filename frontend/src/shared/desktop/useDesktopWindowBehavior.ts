@@ -28,6 +28,17 @@ export function useDesktopWindowBehavior(): void {
 
     const appWindow = getCurrentWindow();
     let togglingFullscreen = false;
+    let disposed = false;
+    let stopListeningForResize: (() => void) | undefined;
+
+    const syncFullscreenState = () => {
+      void appWindow
+        .isFullscreen()
+        .then((fullscreen) => {
+          if (!disposed) document.documentElement.dataset.desktopFullscreen = String(fullscreen);
+        })
+        .catch(() => undefined);
+    };
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isFullscreenShortcut(event)) return;
@@ -37,14 +48,27 @@ export function useDesktopWindowBehavior(): void {
       togglingFullscreen = true;
       void appWindow
         .isFullscreen()
-        .then((fullscreen) => appWindow.setFullscreen(!fullscreen))
+        .then(async (fullscreen) => {
+          const nextFullscreen = !fullscreen;
+          await appWindow.setFullscreen(nextFullscreen);
+          document.documentElement.dataset.desktopFullscreen = String(nextFullscreen);
+        })
         .catch(() => undefined)
         .finally(() => {
           togglingFullscreen = false;
         });
     };
 
+    syncFullscreenState();
+    void appWindow.onResized(syncFullscreenState).then((stopListening) => {
+      if (disposed) stopListening();
+      else stopListeningForResize = stopListening;
+    });
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      disposed = true;
+      stopListeningForResize?.();
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 }

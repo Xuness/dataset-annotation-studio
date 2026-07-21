@@ -21,7 +21,7 @@ export function PreprocessHistoryPanel({
 }) {
   const latestCompleted = operations.find((operation) => operation.status === "completed");
   return (
-    <aside className="preprocess-history">
+    <aside className="preprocess-history" data-surface-region="secondary-sidebar">
       <header>
         <ArchiveRestore size={16} />
         <div>

@@ -10,7 +10,7 @@
   display: flex;
   gap: 8px;
   padding: 5px 9px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--workspace-divider);
 }
 
 .inspector-tabs button {
@@ -46,7 +46,12 @@
 
 .inspector-section {
   padding: 16px 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+.inspector-section + .inspector-section {
+  background: linear-gradient(90deg, transparent, var(--workspace-divider), transparent) top
+    center / calc(100% - 28px) 1px no-repeat;
 }
 
 .inspector-section--grow {
@@ -147,12 +152,7 @@
   grid-template-columns: 56px minmax(0, 1fr);
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
   font-size: var(--text-xs);
-}
-
-.detail-list div:last-child {
-  border: 0;
 }
 
 .detail-list dt {

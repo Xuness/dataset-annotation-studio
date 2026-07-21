@@ -1,6 +1,6 @@
 import { DEFAULT_THEME_ID, getThemeDefinition, isThemeId, type ThemeId } from "./themes.ts";
 
-export const PREFERENCES_VERSION = 2 as const;
+export const PREFERENCES_VERSION = 3 as const;
 
 export const SCENE_LIMITS = {
   opacity: { min: 0, max: 1 },
@@ -8,6 +8,18 @@ export const SCENE_LIMITS = {
 } as const;
 
 export type SceneTarget = "home" | "workspace";
+
+export const WORKSPACE_SURFACE_REGIONS = [
+  "canvas",
+  "navigation",
+  "primary-sidebar",
+  "content",
+  "secondary-sidebar",
+  "chrome",
+] as const;
+
+export type WorkspaceSurfaceRegion = (typeof WORKSPACE_SURFACE_REGIONS)[number];
+export type WorkspaceSurfaceTransparency = Record<WorkspaceSurfaceRegion, boolean>;
 
 export interface CustomBackground {
   path: string;
@@ -23,6 +35,7 @@ export interface AppearancePreferences {
   customBackground: CustomBackground | null;
   home: SceneOverrides;
   workspace: SceneOverrides;
+  transparentRegions: WorkspaceSurfaceTransparency;
 }
 
 export interface AppPreferences {
@@ -47,6 +60,25 @@ function emptySceneOverrides(): SceneOverrides {
   return { opacity: null, blurPx: null };
 }
 
+export function createDefaultSurfaceTransparency(): WorkspaceSurfaceTransparency {
+  return {
+    canvas: true,
+    navigation: false,
+    "primary-sidebar": false,
+    content: false,
+    "secondary-sidebar": false,
+    chrome: false,
+  };
+}
+
+export function createUniformSurfaceTransparency(
+  transparent: boolean,
+): WorkspaceSurfaceTransparency {
+  return Object.fromEntries(
+    WORKSPACE_SURFACE_REGIONS.map((region) => [region, transparent]),
+  ) as WorkspaceSurfaceTransparency;
+}
+
 export function createDefaultPreferences(themeId: ThemeId = DEFAULT_THEME_ID): AppPreferences {
   return {
     version: PREFERENCES_VERSION,
@@ -55,6 +87,7 @@ export function createDefaultPreferences(themeId: ThemeId = DEFAULT_THEME_ID): A
       customBackground: null,
       home: emptySceneOverrides(),
       workspace: emptySceneOverrides(),
+      transparentRegions: createDefaultSurfaceTransparency(),
     },
   };
 }
@@ -87,14 +120,42 @@ function normalizeCustomBackground(value: unknown): CustomBackground | null {
   return path && name ? { path, name } : null;
 }
 
+function normalizeSurfaceTransparency(value: unknown): WorkspaceSurfaceTransparency {
+  const defaults = createDefaultSurfaceTransparency();
+  if (!isRecord(value)) return defaults;
+
+  return Object.fromEntries(
+    WORKSPACE_SURFACE_REGIONS.map((region) => [
+      region,
+      typeof value[region] === "boolean" ? value[region] : defaults[region],
+    ]),
+  ) as WorkspaceSurfaceTransparency;
+}
+
 export function normalizePreferences(value: unknown): AppPreferences {
   if (!isRecord(value)) return createDefaultPreferences();
 
   const themeId = isThemeId(value.themeId) ? value.themeId : DEFAULT_THEME_ID;
 
-  // Version 1 stored only the selected theme. Preserve it while adding the new
-  // appearance layer instead of resetting the user's existing choice.
+  // Version 1 stored only the selected theme. Preserve it while adding the
+  // current appearance layer instead of resetting the user's existing choice.
   if (value.version === 1) return createDefaultPreferences(themeId);
+
+  // Version 2 already had scene controls. Preserve those values and add the
+  // new region-material defaults, with the image canvas transparent by default.
+  if (value.version === 2 && isRecord(value.appearance)) {
+    return {
+      version: PREFERENCES_VERSION,
+      themeId,
+      appearance: {
+        customBackground: normalizeCustomBackground(value.appearance.customBackground),
+        home: normalizeSceneOverrides(value.appearance.home),
+        workspace: normalizeSceneOverrides(value.appearance.workspace),
+        transparentRegions: createDefaultSurfaceTransparency(),
+      },
+    };
+  }
+
   if (value.version !== PREFERENCES_VERSION || !isRecord(value.appearance)) {
     return createDefaultPreferences();
   }
@@ -106,6 +167,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
       customBackground: normalizeCustomBackground(value.appearance.customBackground),
       home: normalizeSceneOverrides(value.appearance.home),
       workspace: normalizeSceneOverrides(value.appearance.workspace),
+      transparentRegions: normalizeSurfaceTransparency(value.appearance.transparentRegions),
     },
   };
 }

@@ -3,12 +3,16 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { create } from "zustand";
 
 import {
+  createDefaultSurfaceTransparency,
+  createUniformSurfaceTransparency,
   normalizePreferences,
   resolveAppearance,
+  WORKSPACE_SURFACE_REGIONS,
   type AppPreferences,
   type CustomBackground,
   type SceneOverrides,
   type SceneTarget,
+  type WorkspaceSurfaceRegion,
 } from "./appearance";
 import type { ThemeId } from "./themes";
 
@@ -20,6 +24,9 @@ interface AppPreferencesState {
   setCustomBackground: (background: CustomBackground | null) => void;
   setSceneOverrides: (target: SceneTarget, update: Partial<SceneOverrides>) => void;
   resetSceneOverrides: (target: SceneTarget) => void;
+  setRegionTransparency: (region: WorkspaceSurfaceRegion, transparent: boolean) => void;
+  setAllRegionsTransparent: () => void;
+  resetRegionTransparency: () => void;
 }
 
 function readStoredPreferences(): AppPreferences {
@@ -85,6 +92,9 @@ export function applyPreferences(preferences: AppPreferences) {
     "--workspace-surface-opacity",
     `${Math.max(70, 98.5 - resolved.workspace.opacity * 28.5)}%`,
   );
+  root.dataset.transparentRegions = WORKSPACE_SURFACE_REGIONS.filter(
+    (region) => preferences.appearance.transparentRegions[region],
+  ).join(" ");
   root
     .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
     ?.setAttribute("content", resolved.theme.browserThemeColor);
@@ -130,6 +140,33 @@ export const useAppPreferences = create<AppPreferencesState>((set) => {
         appearance: {
           ...current.appearance,
           [target]: { opacity: null, blurPx: null },
+        },
+      })),
+    setRegionTransparency: (region, transparent) =>
+      commit((current) => ({
+        ...current,
+        appearance: {
+          ...current.appearance,
+          transparentRegions: {
+            ...current.appearance.transparentRegions,
+            [region]: transparent,
+          },
+        },
+      })),
+    setAllRegionsTransparent: () =>
+      commit((current) => ({
+        ...current,
+        appearance: {
+          ...current.appearance,
+          transparentRegions: createUniformSurfaceTransparency(true),
+        },
+      })),
+    resetRegionTransparency: () =>
+      commit((current) => ({
+        ...current,
+        appearance: {
+          ...current.appearance,
+          transparentRegions: createDefaultSurfaceTransparency(),
         },
       })),
   };

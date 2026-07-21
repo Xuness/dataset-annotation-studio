@@ -51,7 +51,7 @@ export function PreprocessSettingsPanel({
   const validRequest =
     (imageRenderingEnabled || form.renameEnabled) && validScope && validRename && validConcurrency;
   return (
-    <aside className="preprocess-settings">
+    <aside className="preprocess-settings" data-surface-region="primary-sidebar">
       <header>
         <span className="preprocess-icon">
           <ImageDown size={18} />

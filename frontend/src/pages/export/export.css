@@ -215,7 +215,7 @@
   justify-content: space-between;
   gap: 14px;
   padding: 17px 17px 13px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--workspace-divider);
 }
 
 .export-preview__summary {
@@ -238,7 +238,7 @@
   flex-wrap: wrap;
   gap: 6px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--workspace-divider);
   background: var(--surface-soft);
 }
 
@@ -264,7 +264,7 @@
   gap: 6px;
   min-height: 39px;
   padding: 6px 8px;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--workspace-divider) 72%, transparent);
   color: var(--ink-soft);
   font-size: var(--text-xs);
 }

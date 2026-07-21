@@ -125,7 +125,7 @@ export function ImageStage({ projectId, asset }: ImageStageProps) {
 
   if (!asset) {
     return (
-      <section className="image-stage image-stage--empty">
+      <section className="image-stage image-stage--empty" data-surface-region="canvas">
         <ImageIcon size={34} />
         <p>从左侧选择一张图片</p>
       </section>
@@ -143,7 +143,7 @@ export function ImageStage({ projectId, asset }: ImageStageProps) {
     .join(" ");
 
   return (
-    <section className="image-stage">
+    <section className="image-stage" data-surface-region="canvas">
       <header className="image-stage__header">
         <div>
           <strong>{asset.filename}</strong>
@@ -181,7 +181,6 @@ export function ImageStage({ projectId, asset }: ImageStageProps) {
         onPointerCancel={handlePanEnd}
         onDoubleClick={toggleFitOrActual}
       >
-        <div className="image-stage__checker" />
         <div className="image-stage__scroll-content">
           <img
             src={imageUrl(projectId, asset.id, asset.content_version)}

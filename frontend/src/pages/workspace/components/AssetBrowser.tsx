@@ -197,7 +197,7 @@ export function AssetBrowser({
   }
 
   return (
-    <aside className="asset-browser">
+    <aside className="asset-browser" data-surface-region="primary-sidebar">
       <div className="asset-browser__header">
         <div>
           <span className="eyebrow">{mode === "review" ? "Review Queue" : "Dataset"}</span>

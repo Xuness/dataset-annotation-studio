@@ -30,13 +30,17 @@
   --danger: #a25f58;
   --danger-soft: #f1dcda;
   --modal-backdrop: rgb(48 45 42 / 30%);
-  --checker-color: rgb(89 74 61 / 6%);
   --image-border: rgb(89 74 61 / 18%);
   --image-shadow: 0 15px 42px rgb(69 52 40 / 15%);
   --home-glow: rgb(221 178 139 / 25%);
   --home-text-shadow: 0 2px 24px rgb(69 52 40 / 12%);
   --shadow-soft: 0 8px 28px rgb(69 52 40 / 7%);
   --shadow-float: 0 20px 58px rgb(69 52 40 / 18%);
+  --desktop-titlebar-background: #e9e1d6;
+  --desktop-titlebar-line: rgb(97 84 73 / 18%);
+  --desktop-titlebar-ink: #665e57;
+  --desktop-titlebar-ink-strong: #302d2a;
+  --desktop-titlebar-control-hover: rgb(97 84 73 / 10%);
 
   /* The workbench is slightly denser than the landing page, but stays warm and low-glare. */
   --work-backdrop: #e9e1d6;
@@ -104,13 +108,17 @@
   --danger: #d36f74;
   --danger-soft: #2d171b;
   --modal-backdrop: rgb(0 4 7 / 74%);
-  --checker-color: rgb(154 177 190 / 6%);
   --image-border: rgb(199 215 225 / 14%);
   --image-shadow: 0 15px 42px rgb(0 0 0 / 52%);
   --home-glow: rgb(126 153 172 / 18%);
   --home-text-shadow: 0 2px 28px rgb(0 0 0 / 54%);
   --shadow-soft: 0 8px 28px rgb(0 0 0 / 22%);
   --shadow-float: 0 20px 58px rgb(0 0 0 / 52%);
+  --desktop-titlebar-background: #050607;
+  --desktop-titlebar-line: rgb(216 213 207 / 9%);
+  --desktop-titlebar-ink: #8f918d;
+  --desktop-titlebar-ink-strong: #d8d5cf;
+  --desktop-titlebar-control-hover: rgb(216 213 207 / 7%);
 
   /* Functional workspace palette: soot, old paper and one restrained blood-red signal. */
   --work-backdrop: #050607;
@@ -194,6 +202,11 @@
   --accent-deep: #d27b83;
   --accent-soft: #2a181e;
   --home-glow: rgb(111 156 178 / 21%);
+  --desktop-titlebar-background: #05090b;
+  --desktop-titlebar-line: rgb(213 215 211 / 9%);
+  --desktop-titlebar-ink: #899395;
+  --desktop-titlebar-ink-strong: #d5d7d3;
+  --desktop-titlebar-control-hover: rgb(213 215 211 / 7%);
 
   --work-backdrop: #05090b;
   --work-backdrop-elevated: #080d10;
@@ -254,7 +267,6 @@
   --danger-soft: var(--work-danger-soft);
   --progress-fill: var(--work-progress);
   --progress-track: var(--work-progress-soft);
-  --checker-color: rgb(220 220 214 / 1.1%);
   --image-border: rgb(214 214 208 / 12%);
   --image-shadow: 0 18px 48px rgb(0 0 0 / 62%);
 }

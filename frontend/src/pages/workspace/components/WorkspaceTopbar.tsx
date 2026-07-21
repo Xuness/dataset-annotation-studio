@@ -39,7 +39,7 @@ export function WorkspaceTopbar({
   }
 
   return (
-    <header className="workspace-topbar">
+    <header className="workspace-topbar" data-surface-region="chrome">
       <div className="workspace-topbar__identity">
         <button className="icon-button" onClick={() => leaveTo("/")} title="返回项目首页">
           <ChevronLeft size={17} />

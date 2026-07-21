@@ -56,7 +56,7 @@ export function NavigationRail({
   }
 
   return (
-    <nav className="navigation-rail" aria-label="工作区功能">
+    <nav className="navigation-rail" data-surface-region="navigation" aria-label="工作区功能">
       <div className="navigation-rail__destinations">
         {items.map(({ id, icon: Icon, label }) => (
           <button

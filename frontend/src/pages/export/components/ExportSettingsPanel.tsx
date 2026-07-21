@@ -41,7 +41,7 @@ export function ExportSettingsPanel({
   );
 
   return (
-    <aside className="export-settings">
+    <aside className="export-settings" data-surface-region="primary-sidebar">
       <header>
         <span className="export-icon">
           <PackageOpen size={18} />

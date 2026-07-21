@@ -14,7 +14,7 @@ const statusLabels: Record<string, string> = {
 
 export function ExportPreviewPanel({ preview }: { preview: ExportPreview | undefined }) {
   return (
-    <section className="export-preview workspace-scene-surface">
+    <section className="export-preview workspace-scene-surface" data-surface-region="content">
       <header>
         <div>
           <span className="eyebrow">Preflight validation</span>

@@ -2,9 +2,12 @@
 @import "./styles/image-stage.css";
 @import "./styles/annotation-editor.css";
 @import "./styles/inspector.css";
+@import "./styles/surface-materials.css";
 
 .workspace-page {
   --workspace-rail-width: 60px;
+  --workspace-divider: color-mix(in srgb, var(--line-strong) 36%, transparent);
+  --workspace-divider-strong: color-mix(in srgb, var(--line-strong) 54%, transparent);
 
   position: relative;
   isolation: isolate;
@@ -52,12 +55,7 @@
       circle at 72% 12%,
       color-mix(in srgb, var(--ink) 7%, transparent),
       transparent 28%
-    ),
-    radial-gradient(color-mix(in srgb, var(--ink) 13%, transparent) 0.42px, transparent 0.65px);
-  background-size:
-    auto,
-    auto,
-    5px 5px;
+    );
   mix-blend-mode: normal;
 }
 
@@ -96,7 +94,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 14px 0 10px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--workspace-divider-strong);
   background: color-mix(in srgb, var(--surface-sunken) 95%, transparent);
   backdrop-filter: blur(22px);
 }
@@ -213,8 +211,8 @@
   min-width: 0;
   min-height: 0;
   grid-template-columns: var(--workspace-rail-width) 278px minmax(380px, 1fr) 310px;
-  gap: 1px;
-  background: color-mix(in srgb, var(--line) 72%, transparent);
+  gap: 0;
+  background: transparent;
 }
 
 .workspace-body--assets {
@@ -230,7 +228,6 @@
   flex-direction: column;
   align-items: center;
   padding: 13px 5px 9px;
-  border-right: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
   background: color-mix(in srgb, var(--surface-sunken) 96%, transparent);
   backdrop-filter: blur(20px);
 }
@@ -247,7 +244,7 @@
 .navigation-rail__utility {
   margin-top: auto;
   padding-top: 9px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--workspace-divider);
 }
 
 .navigation-rail button {
@@ -312,7 +309,11 @@
     minmax(180px, var(--image-pane-ratio)) 5px
     minmax(140px, 1fr);
   gap: 0;
-  background: color-mix(in srgb, var(--line) 72%, transparent);
+  background: transparent;
+}
+
+.workspace-body > [data-surface-region] + [data-surface-region] {
+  border-left: 1px solid var(--workspace-divider-strong);
 }
 
 .pane-resize-handle {
@@ -320,15 +321,23 @@
   z-index: 4;
   min-width: 0;
   min-height: 0;
-  background: color-mix(in srgb, var(--line) 72%, transparent);
+  background: transparent;
   touch-action: none;
 }
 
+.pane-resize-handle::before,
 .pane-resize-handle::after {
   position: absolute;
   border-radius: 999px;
-  background: transparent;
   content: "";
+}
+
+.pane-resize-handle::before {
+  background: var(--workspace-divider-strong);
+}
+
+.pane-resize-handle::after {
+  background: transparent;
   transition: background var(--transition);
 }
 
@@ -349,6 +358,13 @@
   width: 2px;
 }
 
+.pane-resize-handle--vertical::before {
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 1px;
+}
+
 .pane-resize-handle--horizontal {
   cursor: row-resize;
 }
@@ -358,6 +374,13 @@
   bottom: 2px;
   left: 11px;
   height: 2px;
+}
+
+.pane-resize-handle--horizontal::before {
+  right: 0;
+  bottom: 2px;
+  left: 0;
+  height: 1px;
 }
 
 .interface-scale-control {
@@ -404,7 +427,7 @@
   align-items: center;
   gap: 18px;
   padding: 0 13px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--workspace-divider-strong);
   color: color-mix(in srgb, var(--faint) 82%, transparent);
   background: color-mix(in srgb, var(--app-backdrop) 97%, transparent);
   font-family: var(--font-mono);

@@ -18,7 +18,7 @@
   gap: 8px;
   justify-content: space-between;
   padding: 4px 8px 4px 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--workspace-divider);
   background: color-mix(in srgb, var(--surface) 97%, transparent);
 }
 
@@ -289,7 +289,7 @@
 .annotation-editor__footer {
   gap: 12px;
   padding: 0 10px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--workspace-divider);
   color: var(--muted);
   background: var(--surface);
   font-size: var(--text-2xs);

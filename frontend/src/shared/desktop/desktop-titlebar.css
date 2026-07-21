@@ -1,0 +1,137 @@
+.desktop-shell {
+  width: 100%;
+  height: 100%;
+}
+
+.desktop-shell--tauri {
+  display: grid;
+  grid-template-rows: 33px minmax(0, 1fr);
+  background: var(--desktop-titlebar-background);
+  transition: grid-template-rows var(--transition);
+}
+
+.desktop-shell__viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-shell:not(.desktop-shell--tauri) .desktop-shell__viewport {
+  height: 100%;
+}
+
+.desktop-titlebar {
+  position: relative;
+  z-index: 1000;
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  justify-content: space-between;
+  color: var(--desktop-titlebar-ink);
+  border-bottom: 1px solid var(--desktop-titlebar-line);
+  background: var(--desktop-titlebar-background);
+  user-select: none;
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background var(--transition),
+    opacity var(--transition);
+}
+
+.desktop-titlebar__drag-region {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 520;
+  letter-spacing: 0.025em;
+}
+
+.desktop-titlebar__mark {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--desktop-titlebar-ink) 32%, transparent);
+  border-radius: 2px;
+}
+
+.desktop-titlebar__mark::before,
+.desktop-titlebar__mark::after,
+.desktop-titlebar__mark i {
+  position: absolute;
+  content: "";
+}
+
+.desktop-titlebar__mark::before {
+  top: 3px;
+  left: 2px;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.desktop-titlebar__mark::after {
+  right: 2px;
+  bottom: 3px;
+  left: 2px;
+  height: 1px;
+  background: color-mix(in srgb, var(--desktop-titlebar-ink) 58%, transparent);
+  transform: rotate(-9deg);
+}
+
+.desktop-titlebar__mark i {
+  top: 2px;
+  right: 2px;
+  width: 4px;
+  height: 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 72%, transparent);
+  border-radius: 50%;
+}
+
+.desktop-titlebar__controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+}
+
+.desktop-titlebar__controls button {
+  display: grid;
+  width: 45px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  cursor: default;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.desktop-titlebar__controls button:hover {
+  color: var(--desktop-titlebar-ink-strong);
+  background: var(--desktop-titlebar-control-hover);
+}
+
+.desktop-titlebar__controls .desktop-titlebar__close:hover {
+  color: #fff;
+  background: #a83d43;
+}
+
+:root[data-desktop-fullscreen="true"] .desktop-shell--tauri {
+  grid-template-rows: 0 minmax(0, 1fr);
+}
+
+:root[data-desktop-fullscreen="true"] .desktop-titlebar {
+  overflow: hidden;
+  border-color: transparent;
+  opacity: 0;
+  pointer-events: none;
+}

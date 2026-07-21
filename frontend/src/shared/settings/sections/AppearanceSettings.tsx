@@ -10,8 +10,10 @@ import { useAppPreferences } from "../../theme/appPreferences";
 import {
   resolveAppearance,
   SCENE_LIMITS,
+  WORKSPACE_SURFACE_REGIONS,
   type SceneOverrides,
   type SceneTarget,
+  type WorkspaceSurfaceRegion,
 } from "../../theme/appearance";
 import { DEFAULT_THEME_ID, THEMES } from "../../theme/themes";
 import { Button } from "../../ui/Button";
@@ -27,6 +29,50 @@ interface SceneControlProps {
   onChange: (update: Partial<SceneOverrides>) => void;
   onReset: () => void;
 }
+
+const surfaceRegionOptions: ReadonlyArray<{
+  id: WorkspaceSurfaceRegion;
+  title: string;
+  scope: string;
+  description: string;
+}> = [
+  {
+    id: "canvas",
+    title: "图片画布",
+    scope: "素材 · 审核",
+    description: "移除网格与画布底色，让场景直接衬在图片背后。",
+  },
+  {
+    id: "navigation",
+    title: "功能导航",
+    scope: "全部工作页",
+    description: "让最左侧的页面入口栏透出工作区背景。",
+  },
+  {
+    id: "primary-sidebar",
+    title: "左侧功能栏",
+    scope: "列表 · 参数",
+    description: "覆盖素材列表、任务创建以及预处理和导出参数栏。",
+  },
+  {
+    id: "content",
+    title: "中央内容区",
+    scope: "编辑 · 预览",
+    description: "覆盖标注编辑器、任务列表和各种执行预览。",
+  },
+  {
+    id: "secondary-sidebar",
+    title: "右侧详情栏",
+    scope: "检查器 · 历史",
+    description: "覆盖素材检查器、任务详情和操作历史。",
+  },
+  {
+    id: "chrome",
+    title: "工作区框架",
+    scope: "顶栏 · 状态栏",
+    description: "让工作区顶栏和底部状态栏也融入场景。",
+  },
+];
 
 function SceneControl({
   target,
@@ -102,11 +148,18 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
   const setCustomBackground = useAppPreferences((state) => state.setCustomBackground);
   const setSceneOverrides = useAppPreferences((state) => state.setSceneOverrides);
   const resetSceneOverrides = useAppPreferences((state) => state.resetSceneOverrides);
+  const setRegionTransparency = useAppPreferences((state) => state.setRegionTransparency);
+  const setAllRegionsTransparent = useAppPreferences((state) => state.setAllRegionsTransparent);
+  const resetRegionTransparency = useAppPreferences((state) => state.resetRegionTransparency);
   const [backgroundPending, setBackgroundPending] = useState(false);
   const [backgroundError, setBackgroundError] = useState<string | null>(null);
   const resolved = resolveAppearance(preferences);
   const customBackground = preferences.appearance.customBackground;
   const backgroundSupported = supportsCustomBackgrounds();
+  const transparentRegions = preferences.appearance.transparentRegions;
+  const allRegionsTransparent = WORKSPACE_SURFACE_REGIONS.every(
+    (region) => transparentRegions[region],
+  );
 
   async function selectBackground() {
     setBackgroundError(null);
@@ -144,7 +197,7 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
         <div>
           <span className="eyebrow">Appearance</span>
           <h2>外观与主题</h2>
-          <p>主题负责色彩与基调；背景图片、可见度和虚化作为独立覆盖层保存。</p>
+          <p>主题负责色彩与基调；背景图片、显影参数和区域透光作为独立覆盖层保存。</p>
         </div>
         <button
           type="button"
@@ -234,6 +287,57 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
               onChange={(update) => setSceneOverrides("workspace", update)}
               onReset={() => resetSceneOverrides("workspace")}
             />
+          </div>
+        </section>
+
+        <section className="appearance-section">
+          <div className="appearance-section__heading">
+            <div>
+              <span className="eyebrow">Surface permeability</span>
+              <h3>区域透光</h3>
+            </div>
+            <small>大面积材质可独立开关</small>
+          </div>
+          <div className="surface-transparency">
+            <div className="surface-transparency__summary">
+              <div>
+                <strong>让背景穿过工作台</strong>
+                <p>
+                  只改变页面的大面积底板；输入框、告警和选中态仍保留必要遮罩，避免全透明时失去可读性。
+                </p>
+              </div>
+              <button
+                type="button"
+                className={allRegionsTransparent ? "is-active" : ""}
+                aria-pressed={allRegionsTransparent}
+                onClick={allRegionsTransparent ? resetRegionTransparency : setAllRegionsTransparent}
+              >
+                {allRegionsTransparent ? "恢复建议" : "全部透明"}
+              </button>
+            </div>
+            <div className="surface-transparency__grid">
+              {surfaceRegionOptions.map((option) => {
+                const transparent = transparentRegions[option.id];
+                return (
+                  <button
+                    type="button"
+                    key={option.id}
+                    className={`surface-transparency__option ${transparent ? "is-active" : ""}`}
+                    aria-pressed={transparent}
+                    onClick={() => setRegionTransparency(option.id, !transparent)}
+                  >
+                    <span className="surface-transparency__check" aria-hidden="true">
+                      {transparent ? <Check size={12} /> : null}
+                    </span>
+                    <span className="surface-transparency__copy">
+                      <strong>{option.title}</strong>
+                      <small>{option.description}</small>
+                    </span>
+                    <em>{option.scope}</em>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </section>
 

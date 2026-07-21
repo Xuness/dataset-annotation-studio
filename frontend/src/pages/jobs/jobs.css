@@ -209,7 +209,7 @@
 
 .job-list-panel > header {
   padding: 18px 14px 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--workspace-divider);
 }
 
 .job-list-panel > header strong {

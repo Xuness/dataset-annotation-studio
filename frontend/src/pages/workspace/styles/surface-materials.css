@@ -1,0 +1,44 @@
+[data-surface-region] {
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    backdrop-filter var(--transition);
+}
+
+:root[data-transparent-regions~="canvas"] .workspace-page [data-surface-region="canvas"],
+:root[data-transparent-regions~="navigation"] .workspace-page [data-surface-region="navigation"],
+:root[data-transparent-regions~="primary-sidebar"]
+  .workspace-page
+  [data-surface-region="primary-sidebar"],
+:root[data-transparent-regions~="content"] .workspace-page [data-surface-region="content"],
+:root[data-transparent-regions~="secondary-sidebar"]
+  .workspace-page
+  [data-surface-region="secondary-sidebar"],
+:root[data-transparent-regions~="chrome"] .workspace-page [data-surface-region="chrome"] {
+  background: transparent;
+  backdrop-filter: none;
+}
+
+:root[data-transparent-regions~="canvas"] .workspace-page .image-stage__header,
+:root[data-transparent-regions~="canvas"] .workspace-page .image-stage__canvas {
+  background: transparent;
+}
+
+:root[data-transparent-regions~="content"]
+  .workspace-page
+  [data-surface-region="content"].workspace-scene-surface::before,
+:root[data-transparent-regions~="secondary-sidebar"]
+  .workspace-page
+  [data-surface-region="secondary-sidebar"].workspace-scene-surface::before {
+  opacity: 0;
+}
+
+:root[data-transparent-regions~="content"] .workspace-page .annotation-editor__header,
+:root[data-transparent-regions~="content"] .workspace-page .annotation-editor__footer,
+:root[data-transparent-regions~="content"] .workspace-page .annotation-editor__history,
+:root[data-transparent-regions~="content"] .workspace-page .annotation-editor__body .cm-editor,
+:root[data-transparent-regions~="content"] .workspace-page .annotation-editor__body .cm-gutters,
+:root[data-transparent-regions~="content"] .workspace-page .annotation-editor__compare,
+:root[data-transparent-regions~="content"] .workspace-page .annotation-editor__compare > section {
+  background: transparent;
+}

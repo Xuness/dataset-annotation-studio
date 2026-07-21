@@ -22,7 +22,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 10px 0 13px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--workspace-divider);
   background: color-mix(in srgb, var(--surface) 97%, transparent);
 }
 
@@ -104,23 +104,6 @@
 .image-stage__canvas.is-panning {
   cursor: grabbing;
   user-select: none;
-}
-
-.image-stage__checker {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(45deg, var(--checker-color) 25%, transparent 25%),
-    linear-gradient(-45deg, var(--checker-color) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, var(--checker-color) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--checker-color) 75%);
-  background-position:
-    0 0,
-    0 10px,
-    10px -10px,
-    -10px 0;
-  background-size: 20px 20px;
 }
 
 .image-stage__scroll-content {

@@ -44,7 +44,9 @@ export function WorkspaceFrame({
         <NavigationRail projectId={projectId} active={active} />
         {children}
       </div>
-      <footer className="workspace-statusbar">{statusbar}</footer>
+      <footer className="workspace-statusbar" data-surface-region="chrome">
+        {statusbar}
+      </footer>
     </main>
   );
 }

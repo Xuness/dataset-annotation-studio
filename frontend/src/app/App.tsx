@@ -1,6 +1,8 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { isTauri } from "@tauri-apps/api/core";
 
+import { DesktopTitlebar } from "../shared/desktop/DesktopTitlebar";
 import { useClipboardHistoryBridge } from "../shared/desktop/useClipboardHistoryBridge";
 import { useDesktopWindowBehavior } from "../shared/desktop/useDesktopWindowBehavior";
 import { useApplyInterfaceScale } from "../shared/desktop/useInterfaceScale";
@@ -41,29 +43,34 @@ export function App() {
   useDesktopWindowBehavior();
   useCloseGuard();
   useApplyInterfaceScale();
+  const desktopRuntime = isTauri();
+
   return (
-    <>
-      <Suspense
-        fallback={
-          <div className="workspace-loading">
-            <Spinner />
-            <p>正在打开页面…</p>
-          </div>
-        }
-      >
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/workspace/:projectId" element={<WorkspacePage />} />
-          <Route path="/workspace/:projectId/review" element={<WorkspacePage mode="review" />} />
-          <Route path="/workspace/:projectId/jobs" element={<JobsPage />} />
-          <Route path="/workspace/:projectId/preprocess" element={<PreprocessPage />} />
-          <Route path="/workspace/:projectId/export" element={<ExportPage />} />
-          <Route path="/presets" element={<PresetsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
-      <SettingsCenter />
-      <DialogHost />
-    </>
+    <div className={`desktop-shell ${desktopRuntime ? "desktop-shell--tauri" : ""}`.trim()}>
+      <DesktopTitlebar />
+      <div className="desktop-shell__viewport">
+        <Suspense
+          fallback={
+            <div className="workspace-loading">
+              <Spinner />
+              <p>正在打开页面…</p>
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/workspace/:projectId" element={<WorkspacePage />} />
+            <Route path="/workspace/:projectId/review" element={<WorkspacePage mode="review" />} />
+            <Route path="/workspace/:projectId/jobs" element={<JobsPage />} />
+            <Route path="/workspace/:projectId/preprocess" element={<PreprocessPage />} />
+            <Route path="/workspace/:projectId/export" element={<ExportPage />} />
+            <Route path="/presets" element={<PresetsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+        <SettingsCenter />
+        <DialogHost />
+      </div>
+    </div>
   );
 }
