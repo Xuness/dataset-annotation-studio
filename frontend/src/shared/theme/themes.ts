@@ -22,6 +22,7 @@ export interface ThemeDefinition {
   name: string;
   englishName: string;
   description: string;
+  nativeWindowTheme: "light" | "dark";
   scene: ThemeSceneDefinition;
   swatches: readonly [string, string, string, string];
   browserThemeColor: string;
@@ -35,6 +36,7 @@ export const THEMES: readonly ThemeDefinition[] = [
     name: "暖纸手札",
     englishName: "Warm Paper",
     description: "回到项目最初的暖纸、陶土玫瑰与鼠尾草配色，让长时间整理与标注更柔和。",
+    nativeWindowTheme: "light",
     scene: {
       image: "/home/warm-paper-still-life.svg",
       previewPosition: "72% 48%",
@@ -61,13 +63,14 @@ export const THEMES: readonly ThemeDefinition[] = [
     name: "静默展厅",
     englishName: "Silent Gallery",
     description: "炭黑、铅灰与旧纸般的惨白，只留一道暗红信号，延续首页展厅的幽暗秩序。",
+    nativeWindowTheme: "dark",
     scene: {
       image: "/home/silent-gallery-hall.webp",
       previewPosition: "76% 46%",
       home: {
-        position: "88% 46%",
-        size: "auto 150%",
-        filter: "saturate(0.52) contrast(1.05) brightness(0.62)",
+        position: "center",
+        size: "cover",
+        filter: "saturate(0.42) contrast(1.07) brightness(0.52)",
         opacity: 0.78,
         blurPx: 0,
       },
@@ -87,12 +90,13 @@ export const THEMES: readonly ThemeDefinition[] = [
     name: "海雾档案",
     englishName: "Sea Fog Archive",
     description: "更冷、更潮湿的海雾蓝灰，让阴雨海岸退到工作区边缘，信息仍保持安静。",
+    nativeWindowTheme: "dark",
     scene: {
       image: "/home/silent-gallery-shore.webp",
       previewPosition: "62% 48%",
       home: {
-        position: "65% 48%",
-        size: "auto 150%",
+        position: "center",
+        size: "cover",
         filter: "saturate(0.46) contrast(1.08) brightness(0.58)",
         opacity: 0.78,
         blurPx: 0,

@@ -26,19 +26,18 @@
 
 .home-page::before {
   background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--app-backdrop) 97%, transparent) 0%,
-      color-mix(in srgb, var(--app-backdrop-elevated) 92%, transparent) 39%,
-      color-mix(in srgb, var(--app-backdrop-elevated) 34%, transparent) 68%,
-      transparent 82%
+    radial-gradient(
+      ellipse 56% 78% at 16% 43%,
+      color-mix(in srgb, var(--app-backdrop-elevated) 88%, transparent) 0%,
+      color-mix(in srgb, var(--app-backdrop) 66%, transparent) 43%,
+      transparent 78%
     ),
     linear-gradient(
       180deg,
       transparent 0%,
-      transparent 50%,
-      color-mix(in srgb, var(--app-backdrop) 84%, transparent) 73%,
-      var(--app-backdrop) 100%
+      transparent 62%,
+      color-mix(in srgb, var(--app-backdrop) 52%, transparent) 80%,
+      color-mix(in srgb, var(--app-backdrop) 94%, transparent) 100%
     );
 }
 
@@ -74,39 +73,29 @@
 }
 
 .home-gallery-scene::before {
-  inset: -7% -5% -3%;
+  inset: -2%;
   opacity: var(--home-scene-opacity);
+  background-color: var(--app-backdrop);
   background-image: var(--home-gallery-image);
   background-repeat: no-repeat;
   background-position: var(--home-gallery-position);
   background-size: var(--home-scene-size);
   filter: var(--home-scene-filter) blur(var(--home-scene-blur));
-  transform: scale(1.035);
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 44%,
-    rgb(0 0 0 / 45%) 61%,
-    transparent 78%
-  );
-  mask-image: linear-gradient(to bottom, #000 0%, #000 44%, rgb(0 0 0 / 45%) 61%, transparent 78%);
 }
 
 .home-gallery-scene::after {
   background:
     linear-gradient(
       90deg,
-      var(--app-backdrop-elevated) 0%,
-      color-mix(in srgb, var(--app-backdrop-elevated) 99%, transparent) 32%,
-      color-mix(in srgb, var(--app-backdrop-elevated) 84%, transparent) 49%,
-      color-mix(in srgb, var(--app-backdrop-elevated) 20%, transparent) 72%,
-      transparent 84%
+      color-mix(in srgb, var(--app-backdrop-elevated) 38%, transparent) 0%,
+      color-mix(in srgb, var(--app-backdrop-elevated) 18%, transparent) 38%,
+      transparent 66%
     ),
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--app-backdrop) 18%, transparent) 0%,
-      transparent 42%,
-      color-mix(in srgb, var(--app-backdrop) 96%, transparent) 82%
+      color-mix(in srgb, var(--app-backdrop) 12%, transparent) 0%,
+      transparent 58%,
+      color-mix(in srgb, var(--app-backdrop) 58%, transparent) 100%
     );
 }
 

@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { useClipboardHistoryBridge } from "../shared/desktop/useClipboardHistoryBridge";
+import { useDesktopWindowBehavior } from "../shared/desktop/useDesktopWindowBehavior";
 import { useApplyInterfaceScale } from "../shared/desktop/useInterfaceScale";
 import { SettingsCenter } from "../shared/settings/SettingsCenter";
 import { DialogHost } from "../shared/ui/DialogHost";
@@ -37,6 +38,7 @@ const PresetsPage = lazy(() =>
 
 export function App() {
   useClipboardHistoryBridge();
+  useDesktopWindowBehavior();
   useCloseGuard();
   useApplyInterfaceScale();
   return (

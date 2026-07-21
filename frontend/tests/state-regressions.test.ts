@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { providerCredentialCacheToken } from "../src/features/presets/queryKeys.ts";
 import { reconcilePersistedContent } from "../src/pages/workspace/components/annotationEditorState.ts";
+import { isFullscreenShortcut } from "../src/shared/desktop/useDesktopWindowBehavior.ts";
 import {
   createDefaultPreferences,
   normalizePreferences,
@@ -31,6 +32,22 @@ test("provider credential cache tokens distinguish non-empty keys without retain
   assert.notEqual(first, second);
   assert.equal(first.includes("secret-key-a"), false);
   assert.equal(second.includes("secret-key-b"), false);
+});
+
+test("fullscreen shortcut accepts only an unmodified first F11 press", () => {
+  const f11 = {
+    key: "F11",
+    repeat: false,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+  };
+
+  assert.equal(isFullscreenShortcut(f11), true);
+  assert.equal(isFullscreenShortcut({ ...f11, repeat: true }), false);
+  assert.equal(isFullscreenShortcut({ ...f11, ctrlKey: true }), false);
+  assert.equal(isFullscreenShortcut({ ...f11, key: "F10" }), false);
 });
 
 test("version one appearance preferences migrate without losing the selected theme", () => {

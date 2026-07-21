@@ -1,4 +1,5 @@
 import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { create } from "zustand";
 
 import {
@@ -59,7 +60,7 @@ export function applyPreferences(preferences: AppPreferences) {
     ? resolveImageUrl(customBackground.path)
     : resolved.theme.scene.image;
   const homePresentation = customBackground
-    ? { position: "center", size: "cover" }
+    ? { position: "center", size: "contain" }
     : resolved.theme.scene.home;
   const workspacePresentation = customBackground
     ? { position: "center", size: "cover" }
@@ -87,6 +88,12 @@ export function applyPreferences(preferences: AppPreferences) {
   root
     .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
     ?.setAttribute("content", resolved.theme.browserThemeColor);
+
+  if (isTauri()) {
+    void getCurrentWindow()
+      .setTheme(resolved.theme.nativeWindowTheme)
+      .catch(() => undefined);
+  }
 }
 
 const initialPreferences = readStoredPreferences();

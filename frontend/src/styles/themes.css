@@ -147,6 +147,31 @@
   --paper-deep: var(--surface-sunken);
 }
 
+:root[data-theme="silent-gallery"] {
+  /* Keep the landing page in the same soot-black family as its workbench. */
+  --app-backdrop: #050607;
+  --app-backdrop-elevated: #090a0b;
+  --surface-sunken: #070809;
+  --surface: #0c0e0f;
+  --surface-soft: #121415;
+  --surface-raised: #181a1b;
+  --canvas: #020303;
+  --editor-surface: #0a0c0d;
+  --editor-gutter: #070809;
+  --code-surface: #090b0c;
+  --ink: #d8d5cf;
+  --ink-soft: #aaa8a2;
+  --muted: #777976;
+  --faint: #4d5150;
+  --line: #1c1f20;
+  --line-strong: #343839;
+  --accent: #74232a;
+  --accent-strong: #57171d;
+  --accent-deep: #a4676c;
+  --accent-soft: #160c0e;
+  --home-glow: rgb(116 35 42 / 14%);
+}
+
 :root[data-theme="sea-fog"] {
   --app-backdrop: #03080d;
   --app-backdrop-elevated: #06121a;

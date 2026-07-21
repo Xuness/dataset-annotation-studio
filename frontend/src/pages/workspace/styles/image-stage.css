@@ -7,9 +7,12 @@
 }
 
 .image-stage--empty {
+  grid-template-rows: none;
+  grid-auto-rows: max-content;
   place-content: center;
   justify-items: center;
   gap: 9px;
+  padding-top: clamp(28px, 6vh, 64px);
   color: var(--muted);
   font-size: var(--text-sm);
 }
