@@ -1,6 +1,6 @@
 import { DEFAULT_THEME_ID, getThemeDefinition, isThemeId, type ThemeId } from "./themes.ts";
 
-export const PREFERENCES_VERSION = 5 as const;
+export const PREFERENCES_VERSION = 6 as const;
 
 export const SCENE_LIMITS = {
   opacity: { min: 0, max: 1 },
@@ -9,7 +9,8 @@ export const SCENE_LIMITS = {
 
 export type SceneTarget = "home" | "workspace";
 
-export const WORKSPACE_SURFACE_REGIONS = [
+export const APP_SURFACE_REGIONS = [
+  "desktop-titlebar",
   "canvas",
   "navigation",
   "primary-sidebar",
@@ -18,8 +19,8 @@ export const WORKSPACE_SURFACE_REGIONS = [
   "chrome",
 ] as const;
 
-export type WorkspaceSurfaceRegion = (typeof WORKSPACE_SURFACE_REGIONS)[number];
-export type WorkspaceSurfaceTransparency = Record<WorkspaceSurfaceRegion, boolean>;
+export type AppSurfaceRegion = (typeof APP_SURFACE_REGIONS)[number];
+export type AppSurfaceTransparency = Record<AppSurfaceRegion, boolean>;
 
 export interface CustomBackground {
   path: string;
@@ -35,7 +36,7 @@ export interface AppearancePreferences {
   customBackground: CustomBackground | null;
   home: SceneOverrides;
   workspace: SceneOverrides;
-  transparentRegions: WorkspaceSurfaceTransparency;
+  transparentRegions: AppSurfaceTransparency;
   immersiveMode: boolean;
 }
 
@@ -61,8 +62,9 @@ function emptySceneOverrides(): SceneOverrides {
   return { opacity: null, blurPx: null };
 }
 
-export function createDefaultSurfaceTransparency(): WorkspaceSurfaceTransparency {
+export function createDefaultSurfaceTransparency(): AppSurfaceTransparency {
   return {
+    "desktop-titlebar": false,
     canvas: true,
     navigation: false,
     "primary-sidebar": false,
@@ -72,12 +74,10 @@ export function createDefaultSurfaceTransparency(): WorkspaceSurfaceTransparency
   };
 }
 
-export function createUniformSurfaceTransparency(
-  transparent: boolean,
-): WorkspaceSurfaceTransparency {
+export function createUniformSurfaceTransparency(transparent: boolean): AppSurfaceTransparency {
   return Object.fromEntries(
-    WORKSPACE_SURFACE_REGIONS.map((region) => [region, transparent]),
-  ) as WorkspaceSurfaceTransparency;
+    APP_SURFACE_REGIONS.map((region) => [region, transparent]),
+  ) as AppSurfaceTransparency;
 }
 
 export function createDefaultPreferences(themeId: ThemeId = DEFAULT_THEME_ID): AppPreferences {
@@ -122,16 +122,16 @@ function normalizeCustomBackground(value: unknown): CustomBackground | null {
   return path && name ? { path, name } : null;
 }
 
-function normalizeSurfaceTransparency(value: unknown): WorkspaceSurfaceTransparency {
+function normalizeSurfaceTransparency(value: unknown): AppSurfaceTransparency {
   const defaults = createDefaultSurfaceTransparency();
   if (!isRecord(value)) return defaults;
 
   return Object.fromEntries(
-    WORKSPACE_SURFACE_REGIONS.map((region) => [
+    APP_SURFACE_REGIONS.map((region) => [
       region,
       typeof value[region] === "boolean" ? value[region] : defaults[region],
     ]),
-  ) as WorkspaceSurfaceTransparency;
+  ) as AppSurfaceTransparency;
 }
 
 export function normalizePreferences(value: unknown): AppPreferences {
@@ -162,7 +162,8 @@ export function normalizePreferences(value: unknown): AppPreferences {
   // Version 3 introduced per-region transparency. A short-lived development
   // build also wrote version 4 while prototyping the retired rain animation.
   // Preserve the useful appearance settings from both formats while adding
-  // immersive mode in its disabled state.
+  // immersive mode in its disabled state. Normalization also adds the desktop
+  // titlebar as an opaque region for backward compatibility.
   if ((value.version === 3 || value.version === 4) && isRecord(value.appearance)) {
     return {
       version: PREFERENCES_VERSION,
@@ -173,6 +174,22 @@ export function normalizePreferences(value: unknown): AppPreferences {
         workspace: normalizeSceneOverrides(value.appearance.workspace),
         transparentRegions: normalizeSurfaceTransparency(value.appearance.transparentRegions),
         immersiveMode: false,
+      },
+    };
+  }
+
+  // Version 5 introduced immersive mode. Preserve its state while adding the
+  // independently configurable desktop titlebar region.
+  if (value.version === 5 && isRecord(value.appearance)) {
+    return {
+      version: PREFERENCES_VERSION,
+      themeId,
+      appearance: {
+        customBackground: normalizeCustomBackground(value.appearance.customBackground),
+        home: normalizeSceneOverrides(value.appearance.home),
+        workspace: normalizeSceneOverrides(value.appearance.workspace),
+        transparentRegions: normalizeSurfaceTransparency(value.appearance.transparentRegions),
+        immersiveMode: value.appearance.immersiveMode === true,
       },
     };
   }
@@ -194,9 +211,9 @@ export function normalizePreferences(value: unknown): AppPreferences {
   };
 }
 
-export function resolveWorkspaceSurfaceTransparency(
+export function resolveSurfaceTransparency(
   appearance: AppearancePreferences,
-): WorkspaceSurfaceTransparency {
+): AppSurfaceTransparency {
   return appearance.immersiveMode
     ? createUniformSurfaceTransparency(true)
     : appearance.transparentRegions;

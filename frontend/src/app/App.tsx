@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { isTauri } from "@tauri-apps/api/core";
 
 import { DesktopTitlebar } from "../shared/desktop/DesktopTitlebar";
@@ -44,9 +44,14 @@ export function App() {
   useCloseGuard();
   useApplyInterfaceScale();
   const desktopRuntime = isTauri();
+  const location = useLocation();
+  const desktopSceneTarget = location.pathname === "/" ? "home" : "workspace";
 
   return (
-    <div className={`desktop-shell ${desktopRuntime ? "desktop-shell--tauri" : ""}`.trim()}>
+    <div
+      className={`desktop-shell ${desktopRuntime ? "desktop-shell--tauri" : ""}`.trim()}
+      data-scene-target={desktopSceneTarget}
+    >
       <DesktopTitlebar />
       <div className="desktop-shell__viewport">
         <Suspense

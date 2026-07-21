@@ -4,14 +4,76 @@
 }
 
 .desktop-shell--tauri {
+  --desktop-titlebar-scene-base: var(--work-backdrop);
+  --desktop-titlebar-scene-image: var(--workspace-scene-image);
+  --desktop-titlebar-scene-position: var(--workspace-scene-position);
+  --desktop-titlebar-scene-size: var(--workspace-scene-size);
+  --desktop-titlebar-scene-filter: var(--workspace-scene-filter);
+  --desktop-titlebar-scene-opacity: var(--workspace-scene-opacity);
+  --desktop-titlebar-scene-blur: var(--workspace-scene-blur);
+  --desktop-titlebar-scene-ink: var(--work-ink);
+
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-rows: 33px minmax(0, 1fr);
+  overflow: hidden;
   background: var(--desktop-titlebar-background);
-  transition: grid-template-rows var(--transition);
+  transition:
+    grid-template-rows var(--transition),
+    background var(--transition);
+}
+
+.desktop-shell--tauri[data-scene-target="home"] {
+  --desktop-titlebar-scene-base: var(--app-backdrop);
+  --desktop-titlebar-scene-image: var(--home-gallery-image);
+  --desktop-titlebar-scene-position: var(--home-gallery-position);
+  --desktop-titlebar-scene-size: var(--home-scene-size);
+  --desktop-titlebar-scene-filter: var(--home-scene-filter);
+  --desktop-titlebar-scene-opacity: var(--home-scene-opacity);
+  --desktop-titlebar-scene-blur: var(--home-scene-blur);
+  --desktop-titlebar-scene-ink: var(--ink);
+}
+
+.desktop-shell--tauri::before,
+.desktop-shell--tauri::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+
+.desktop-shell--tauri::before {
+  background-color: var(--desktop-titlebar-scene-base);
+  background-image: var(--desktop-titlebar-scene-image);
+  background-repeat: no-repeat;
+  background-position: var(--desktop-titlebar-scene-position);
+  background-size: var(--desktop-titlebar-scene-size);
+  filter: var(--desktop-titlebar-scene-filter) blur(var(--desktop-titlebar-scene-blur));
+  transform: scale(1.04);
+}
+
+.desktop-shell--tauri::after {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--desktop-titlebar-scene-base) 68%, transparent),
+      transparent 36%,
+      color-mix(in srgb, var(--desktop-titlebar-scene-base) 66%, transparent)
+    ),
+    radial-gradient(
+      circle at 72% 12%,
+      color-mix(in srgb, var(--desktop-titlebar-scene-ink) 7%, transparent),
+      transparent 28%
+    );
 }
 
 .desktop-shell__viewport {
   position: relative;
+  z-index: 1;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -28,9 +90,11 @@
   min-width: 0;
   align-items: stretch;
   justify-content: space-between;
+  overflow: hidden;
   color: var(--desktop-titlebar-ink);
   border-bottom: 1px solid var(--desktop-titlebar-line);
   background: var(--desktop-titlebar-background);
+  isolation: isolate;
   user-select: none;
   transition:
     color var(--transition),
@@ -39,8 +103,48 @@
     opacity var(--transition);
 }
 
+:root[data-transparent-regions~="desktop-titlebar"] .desktop-shell--tauri {
+  background: var(--desktop-titlebar-scene-base);
+}
+
+:root[data-transparent-regions~="desktop-titlebar"] .desktop-titlebar {
+  color: var(--desktop-titlebar-ink-strong);
+  border-bottom-color: color-mix(in srgb, var(--desktop-titlebar-ink) 16%, transparent);
+  background: transparent;
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--desktop-titlebar-background) 72%, transparent);
+}
+
+:root[data-transparent-regions~="desktop-titlebar"] .desktop-shell--tauri::before {
+  opacity: var(--desktop-titlebar-scene-opacity);
+}
+
+:root[data-transparent-regions~="desktop-titlebar"] .desktop-shell--tauri::after {
+  opacity: 1;
+}
+
+:root[data-transparent-regions~="desktop-titlebar"]
+  .desktop-shell--tauri[data-scene-target="workspace"]
+  .workspace-page {
+  background: transparent;
+}
+
+:root[data-transparent-regions~="desktop-titlebar"]
+  .desktop-shell--tauri[data-scene-target="workspace"]
+  .workspace-atmosphere::before,
+:root[data-transparent-regions~="desktop-titlebar"]
+  .desktop-shell--tauri[data-scene-target="workspace"]
+  .workspace-atmosphere::after {
+  opacity: 0;
+}
+
+:root[data-immersive-mode="true"] .desktop-titlebar {
+  border-bottom: 0;
+}
+
 .desktop-titlebar__drag-region {
   display: flex;
+  position: relative;
+  z-index: 2;
   min-width: 0;
   flex: 1 1 auto;
   align-items: center;
@@ -96,6 +200,8 @@
 }
 
 .desktop-titlebar__controls {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex: 0 0 auto;
   align-items: stretch;

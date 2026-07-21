@@ -717,6 +717,22 @@
     background var(--transition);
 }
 
+.surface-transparency__option--global {
+  min-height: 72px;
+  grid-column: 1 / -1;
+  grid-template-columns: 17px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.surface-transparency__option.surface-transparency__option--global > em {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
+  padding: 4px 7px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 54%, transparent);
+  border-radius: 999px;
+}
+
 .surface-transparency__option:hover {
   color: var(--ink-soft);
   background: color-mix(in srgb, var(--surface-soft) 68%, transparent);

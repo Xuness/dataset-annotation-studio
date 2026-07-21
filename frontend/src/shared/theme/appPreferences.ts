@@ -3,17 +3,17 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { create } from "zustand";
 
 import {
+  APP_SURFACE_REGIONS,
   createDefaultSurfaceTransparency,
   createUniformSurfaceTransparency,
   normalizePreferences,
   resolveAppearance,
-  resolveWorkspaceSurfaceTransparency,
-  WORKSPACE_SURFACE_REGIONS,
+  resolveSurfaceTransparency,
+  type AppSurfaceRegion,
   type AppPreferences,
   type CustomBackground,
   type SceneOverrides,
   type SceneTarget,
-  type WorkspaceSurfaceRegion,
 } from "./appearance";
 import type { ThemeId } from "./themes";
 
@@ -25,7 +25,7 @@ interface AppPreferencesState {
   setCustomBackground: (background: CustomBackground | null) => void;
   setSceneOverrides: (target: SceneTarget, update: Partial<SceneOverrides>) => void;
   resetSceneOverrides: (target: SceneTarget) => void;
-  setRegionTransparency: (region: WorkspaceSurfaceRegion, transparent: boolean) => void;
+  setRegionTransparency: (region: AppSurfaceRegion, transparent: boolean) => void;
   setAllRegionsTransparent: () => void;
   resetRegionTransparency: () => void;
   setImmersiveMode: (enabled: boolean) => void;
@@ -75,7 +75,7 @@ export function applyPreferences(preferences: AppPreferences) {
     ? { position: "center", size: "cover" }
     : resolved.theme.scene.workspace;
   const root = document.documentElement;
-  const surfaceTransparency = resolveWorkspaceSurfaceTransparency(preferences.appearance);
+  const surfaceTransparency = resolveSurfaceTransparency(preferences.appearance);
 
   root.dataset.theme = resolved.theme.id;
   root.dataset.themeMaterial = resolved.theme.material.id;
@@ -97,7 +97,7 @@ export function applyPreferences(preferences: AppPreferences) {
     "--workspace-surface-opacity",
     `${resolved.theme.material.workspaceSurfaceOpacity * 100}%`,
   );
-  root.dataset.transparentRegions = WORKSPACE_SURFACE_REGIONS.filter(
+  root.dataset.transparentRegions = APP_SURFACE_REGIONS.filter(
     (region) => surfaceTransparency[region],
   ).join(" ");
   root

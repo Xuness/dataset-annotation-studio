@@ -8,12 +8,12 @@ import {
 } from "../../desktop/customBackground";
 import { useAppPreferences } from "../../theme/appPreferences";
 import {
+  APP_SURFACE_REGIONS,
   resolveAppearance,
   SCENE_LIMITS,
-  WORKSPACE_SURFACE_REGIONS,
+  type AppSurfaceRegion,
   type SceneOverrides,
   type SceneTarget,
-  type WorkspaceSurfaceRegion,
 } from "../../theme/appearance";
 import { DEFAULT_THEME_ID, THEMES } from "../../theme/themes";
 import { Button } from "../../ui/Button";
@@ -31,11 +31,17 @@ interface SceneControlProps {
 }
 
 const surfaceRegionOptions: ReadonlyArray<{
-  id: WorkspaceSurfaceRegion;
+  id: AppSurfaceRegion;
   title: string;
   scope: string;
   description: string;
 }> = [
+  {
+    id: "desktop-titlebar",
+    title: "桌面标题栏",
+    scope: "整个应用",
+    description: "让最上方的 Dataset Studio 窗口栏透出当前页面使用的主题或自定义场景。",
+  },
   {
     id: "canvas",
     title: "图片画布",
@@ -159,9 +165,7 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
   const backgroundSupported = supportsCustomBackgrounds();
   const transparentRegions = preferences.appearance.transparentRegions;
   const immersiveMode = preferences.appearance.immersiveMode;
-  const allRegionsTransparent = WORKSPACE_SURFACE_REGIONS.every(
-    (region) => transparentRegions[region],
-  );
+  const allRegionsTransparent = APP_SURFACE_REGIONS.every((region) => transparentRegions[region]);
 
   async function selectBackground() {
     setBackgroundError(null);
@@ -278,7 +282,7 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
             <span className="immersive-mode-card__copy">
               <strong>让工作台完全沉入场景</strong>
               <small>
-                强制开启全部区域透光，并隐藏面板边界、栏位分隔和常驻拖拽线；输入控件与状态提示仍保留必要轮廓。
+                强制开启标题栏与全部工作区域透光，并隐藏面板边界、栏位分隔和常驻拖拽线；输入控件与状态提示仍保留必要轮廓。
               </small>
             </span>
             <span className="immersive-mode-card__state">
@@ -331,7 +335,7 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
           <div className="surface-transparency">
             <div className="surface-transparency__summary">
               <div>
-                <strong>让背景穿过工作台</strong>
+                <strong>让背景穿过窗口与工作台</strong>
                 <p>
                   只改变页面的大面积底板；输入框、告警和选中态仍保留必要遮罩，避免全透明时失去可读性。
                 </p>
@@ -353,7 +357,9 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
                   <button
                     type="button"
                     key={option.id}
-                    className={`surface-transparency__option ${transparent ? "is-active" : ""}`}
+                    className={`surface-transparency__option ${
+                      option.id === "desktop-titlebar" ? "surface-transparency__option--global" : ""
+                    } ${transparent ? "is-active" : ""}`}
                     aria-pressed={transparent}
                     disabled={immersiveMode}
                     onClick={() => setRegionTransparency(option.id, !transparent)}
