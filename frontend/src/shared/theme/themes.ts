@@ -1,7 +1,3 @@
-export const THEME_IDS = ["warm-paper", "silent-gallery", "sea-fog"] as const;
-
-export type ThemeId = (typeof THEME_IDS)[number];
-
 export interface ThemeSceneSurface {
   position: string;
   size: string;
@@ -17,26 +13,40 @@ export interface ThemeSceneDefinition {
   workspace: ThemeSceneSurface;
 }
 
-export interface ThemeDefinition {
-  id: ThemeId;
+export type ThemeMaterialId = "paper" | "glass";
+export type ThemeAtmosphereId = "none" | "rain";
+
+export interface ThemeMaterialDefinition {
+  id: ThemeMaterialId;
+  workspaceSurfaceOpacity: number;
+}
+
+interface ThemeDefinitionShape {
+  id: string;
   name: string;
   englishName: string;
   description: string;
   nativeWindowTheme: "light" | "dark";
+  material: ThemeMaterialDefinition;
+  atmosphere: ThemeAtmosphereId;
   scene: ThemeSceneDefinition;
   swatches: readonly [string, string, string, string];
   browserThemeColor: string;
 }
 
-export const DEFAULT_THEME_ID: ThemeId = "warm-paper";
+function defineThemes<const Themes extends readonly ThemeDefinitionShape[]>(themes: Themes) {
+  return themes;
+}
 
-export const THEMES: readonly ThemeDefinition[] = [
+export const THEMES = defineThemes([
   {
     id: "warm-paper",
     name: "暖纸手札",
     englishName: "Warm Paper",
     description: "回到项目最初的暖纸、陶土玫瑰与鼠尾草配色，让长时间整理与标注更柔和。",
     nativeWindowTheme: "light",
+    material: { id: "paper", workspaceSurfaceOpacity: 0.97 },
+    atmosphere: "none",
     scene: {
       image: "/home/warm-paper-still-life.svg",
       previewPosition: "72% 48%",
@@ -64,6 +74,8 @@ export const THEMES: readonly ThemeDefinition[] = [
     englishName: "Silent Gallery",
     description: "炭黑、铅灰与旧纸般的惨白，只留一道暗红信号，延续首页展厅的幽暗秩序。",
     nativeWindowTheme: "dark",
+    material: { id: "glass", workspaceSurfaceOpacity: 0.97 },
+    atmosphere: "none",
     scene: {
       image: "/home/silent-gallery-hall.webp",
       previewPosition: "76% 46%",
@@ -91,6 +103,8 @@ export const THEMES: readonly ThemeDefinition[] = [
     englishName: "Sea Fog Archive",
     description: "更冷、更潮湿的海雾蓝灰，让阴雨海岸退到工作区边缘，信息仍保持安静。",
     nativeWindowTheme: "dark",
+    material: { id: "glass", workspaceSurfaceOpacity: 0.965 },
+    atmosphere: "none",
     scene: {
       image: "/home/silent-gallery-shore.webp",
       previewPosition: "62% 48%",
@@ -112,12 +126,23 @@ export const THEMES: readonly ThemeDefinition[] = [
     swatches: ["#05090b", "#0b1113", "#d5d7d3", "#793039"],
     browserThemeColor: "#03080d",
   },
-] as const;
+] as const);
+
+export type ThemeDefinition = (typeof THEMES)[number];
+export type ThemeId = ThemeDefinition["id"];
+
+export const DEFAULT_THEME_ID = "silent-gallery" satisfies ThemeId;
+
+const defaultTheme: ThemeDefinition = (() => {
+  const theme = THEMES.find((candidate) => candidate.id === DEFAULT_THEME_ID);
+  if (!theme) throw new Error(`Default theme definition is missing: ${DEFAULT_THEME_ID}`);
+  return theme;
+})();
 
 export function isThemeId(value: unknown): value is ThemeId {
-  return typeof value === "string" && THEME_IDS.some((themeId) => themeId === value);
+  return typeof value === "string" && THEMES.some((theme) => theme.id === value);
 }
 
 export function getThemeDefinition(themeId: ThemeId): ThemeDefinition {
-  return THEMES.find((theme) => theme.id === themeId) ?? THEMES[0];
+  return THEMES.find((theme) => theme.id === themeId) ?? defaultTheme;
 }

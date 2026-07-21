@@ -1,0 +1,73 @@
+:root,
+:root[data-theme="silent-gallery"] {
+  color-scheme: dark;
+
+  /* Default palette: soot, old paper and one restrained blood-red signal. */
+  --app-backdrop: #050607;
+  --app-backdrop-elevated: #090a0b;
+  --surface-sunken: #070809;
+  --surface: #0c0e0f;
+  --surface-soft: #121415;
+  --surface-raised: #181a1b;
+  --canvas: #020303;
+  --editor-surface: #0a0c0d;
+  --editor-gutter: #070809;
+  --code-surface: #090b0c;
+  --ink: #d8d5cf;
+  --ink-soft: #aaa8a2;
+  --muted: #777976;
+  --faint: #4d5150;
+  --line: #1c1f20;
+  --line-strong: #343839;
+  --accent: #74232a;
+  --accent-strong: #57171d;
+  --accent-deep: #a4676c;
+  --accent-soft: #160c0e;
+  --sage: #83a696;
+  --sage-soft: #14251f;
+  --warning: #c39a63;
+  --warning-soft: #2b2117;
+  --danger: #d36f74;
+  --danger-soft: #2d171b;
+  --modal-backdrop: rgb(0 4 7 / 74%);
+  --image-border: rgb(199 215 225 / 14%);
+  --image-shadow: 0 15px 42px rgb(0 0 0 / 52%);
+  --home-glow: rgb(116 35 42 / 14%);
+  --home-text-shadow: 0 2px 28px rgb(0 0 0 / 54%);
+  --shadow-soft: 0 8px 28px rgb(0 0 0 / 22%);
+  --shadow-float: 0 20px 58px rgb(0 0 0 / 52%);
+  --desktop-titlebar-background: #050607;
+  --desktop-titlebar-line: rgb(216 213 207 / 9%);
+  --desktop-titlebar-ink: #8f918d;
+  --desktop-titlebar-ink-strong: #d8d5cf;
+  --desktop-titlebar-control-hover: rgb(216 213 207 / 7%);
+
+  --work-backdrop: #050607;
+  --work-backdrop-elevated: #090a0b;
+  --work-sunken: #070809;
+  --work-surface: #0c0e0f;
+  --work-surface-soft: #121415;
+  --work-surface-raised: #181a1b;
+  --work-canvas: #020303;
+  --work-editor: #0a0c0d;
+  --work-gutter: #070809;
+  --work-code: #090b0c;
+  --work-ink: #d8d5cf;
+  --work-ink-soft: #aaa8a2;
+  --work-muted: #777976;
+  --work-faint: #4d5150;
+  --work-line: #1c1f20;
+  --work-line-strong: #343839;
+  --work-accent: #74232a;
+  --work-accent-strong: #57171d;
+  --work-accent-text: #a4676c;
+  --work-accent-soft: #160c0e;
+  --work-sage: #7d8980;
+  --work-sage-soft: #111713;
+  --work-warning: #9b7c58;
+  --work-warning-soft: #1d1710;
+  --work-danger: #ad575d;
+  --work-danger-soft: #1e1012;
+  --work-progress: #707773;
+  --work-progress-soft: #1b1e1d;
+}

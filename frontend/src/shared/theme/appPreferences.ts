@@ -75,6 +75,8 @@ export function applyPreferences(preferences: AppPreferences) {
   const root = document.documentElement;
 
   root.dataset.theme = resolved.theme.id;
+  root.dataset.themeMaterial = resolved.theme.material.id;
+  root.dataset.themeAtmosphere = resolved.theme.atmosphere;
   root.dataset.backgroundSource = customBackground ? "custom" : "theme";
   root.style.setProperty("--home-gallery-image", cssUrl(sceneImage));
   root.style.setProperty("--home-gallery-position", homePresentation.position);
@@ -90,7 +92,7 @@ export function applyPreferences(preferences: AppPreferences) {
   root.style.setProperty("--workspace-scene-blur", `${resolved.workspace.blurPx}px`);
   root.style.setProperty(
     "--workspace-surface-opacity",
-    `${Math.max(70, 98.5 - resolved.workspace.opacity * 28.5)}%`,
+    `${resolved.theme.material.workspaceSurfaceOpacity * 100}%`,
   );
   root.dataset.transparentRegions = WORKSPACE_SURFACE_REGIONS.filter(
     (region) => preferences.appearance.transparentRegions[region],

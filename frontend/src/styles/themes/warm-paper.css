@@ -1,0 +1,73 @@
+:root[data-theme="warm-paper"] {
+  color-scheme: light;
+
+  /* The original Dataset Studio palette, refined into the current semantic layers. */
+  --app-backdrop: #f5f1ea;
+  --app-backdrop-elevated: #eee7dd;
+  --surface-sunken: #ece6dc;
+  --surface: #f7f3ed;
+  --surface-soft: #f0ebe3;
+  --surface-raised: #fffdfa;
+  --canvas: #e8e0d6;
+  --editor-surface: #fbf8f3;
+  --editor-gutter: #eee7de;
+  --code-surface: #ebe4da;
+  --ink: #302d2a;
+  --ink-soft: #5f5953;
+  --muted: #6f6760;
+  --faint: #aaa198;
+  --line: #ded7ce;
+  --line-strong: #cbbfb4;
+  --accent: #b77f73;
+  --accent-strong: #966459;
+  --accent-deep: #885a50;
+  --accent-soft: #eadbd4;
+  --sage: #788979;
+  --sage-soft: #e1e7df;
+  --warning: #a7784d;
+  --warning-soft: #eee1d1;
+  --danger: #a25f58;
+  --danger-soft: #f1dcda;
+  --modal-backdrop: rgb(48 45 42 / 30%);
+  --image-border: rgb(89 74 61 / 18%);
+  --image-shadow: 0 15px 42px rgb(69 52 40 / 15%);
+  --home-glow: rgb(221 178 139 / 25%);
+  --home-text-shadow: 0 2px 24px rgb(69 52 40 / 12%);
+  --shadow-soft: 0 8px 28px rgb(69 52 40 / 7%);
+  --shadow-float: 0 20px 58px rgb(69 52 40 / 18%);
+  --desktop-titlebar-background: #e9e1d6;
+  --desktop-titlebar-line: rgb(97 84 73 / 18%);
+  --desktop-titlebar-ink: #665e57;
+  --desktop-titlebar-ink-strong: #302d2a;
+  --desktop-titlebar-control-hover: rgb(97 84 73 / 10%);
+
+  /* The workbench is slightly denser than the landing page, but stays warm and low-glare. */
+  --work-backdrop: #e9e1d6;
+  --work-backdrop-elevated: #eee7dd;
+  --work-sunken: #e5ddd2;
+  --work-surface: #f4eee7;
+  --work-surface-soft: #ebe3d9;
+  --work-surface-raised: #fffaf4;
+  --work-canvas: #ded5ca;
+  --work-editor: #faf6f0;
+  --work-gutter: #eee6dc;
+  --work-code: #eae2d8;
+  --work-ink: #332f2b;
+  --work-ink-soft: #615a54;
+  --work-muted: #756c64;
+  --work-faint: #a79d94;
+  --work-line: #d8cec4;
+  --work-line-strong: #c4b7ab;
+  --work-accent: #ae756a;
+  --work-accent-strong: #8f5d54;
+  --work-accent-text: #82554d;
+  --work-accent-soft: #ead9d2;
+  --work-sage: #748476;
+  --work-sage-soft: #dfe6dc;
+  --work-warning: #9b7049;
+  --work-warning-soft: #eee0ce;
+  --work-danger: #9e5b55;
+  --work-danger-soft: #efdad7;
+  --work-progress: #8f766d;
+  --work-progress-soft: #ddd2c8;
+}

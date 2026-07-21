@@ -1,0 +1,57 @@
+:root {
+  /* Compatibility aliases while components migrate to semantic surface names. */
+  --paper: var(--app-backdrop);
+  --paper-deep: var(--surface-sunken);
+}
+
+:where(.workspace-page, .settings-center-backdrop) {
+  --app-backdrop: var(--work-backdrop);
+  --app-backdrop-elevated: var(--work-backdrop-elevated);
+  --surface-sunken: var(--work-sunken);
+  --surface: var(--work-surface);
+  --surface-soft: var(--work-surface-soft);
+  --surface-raised: var(--work-surface-raised);
+  --canvas: var(--work-canvas);
+  --editor-surface: var(--work-editor);
+  --editor-gutter: var(--work-gutter);
+  --code-surface: var(--work-code);
+  --ink: var(--work-ink);
+  --ink-soft: var(--work-ink-soft);
+  --muted: var(--work-muted);
+  --faint: var(--work-faint);
+  --line: var(--work-line);
+  --line-strong: var(--work-line-strong);
+  --accent: var(--work-accent);
+  --accent-strong: var(--work-accent-strong);
+  --accent-deep: var(--work-accent-text);
+  --accent-soft: var(--work-accent-soft);
+  --sage: var(--work-sage);
+  --sage-soft: var(--work-sage-soft);
+  --warning: var(--work-warning);
+  --warning-soft: var(--work-warning-soft);
+  --danger: var(--work-danger);
+  --danger-soft: var(--work-danger-soft);
+  --progress-fill: var(--work-progress);
+  --progress-track: var(--work-progress-soft);
+  --image-border: rgb(214 214 208 / 12%);
+  --image-shadow: 0 18px 48px rgb(0 0 0 / 62%);
+}
+
+.workspace-page {
+  --surface-sunken: color-mix(
+    in srgb,
+    var(--work-sunken) var(--workspace-surface-opacity),
+    transparent
+  );
+  --surface: color-mix(in srgb, var(--work-surface) var(--workspace-surface-opacity), transparent);
+  --surface-soft: color-mix(
+    in srgb,
+    var(--work-surface-soft) var(--workspace-surface-opacity),
+    transparent
+  );
+  --surface-raised: color-mix(
+    in srgb,
+    var(--work-surface-raised) var(--workspace-surface-opacity),
+    transparent
+  );
+}

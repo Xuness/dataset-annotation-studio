@@ -9,7 +9,11 @@ import {
   normalizePreferences,
   resolveAppearance,
 } from "../src/shared/theme/appearance.ts";
-import { DEFAULT_THEME_ID } from "../src/shared/theme/themes.ts";
+import {
+  DEFAULT_THEME_ID,
+  getThemeDefinition,
+  type ThemeId,
+} from "../src/shared/theme/themes.ts";
 
 test("save reconciliation preserves edits made while the request is pending", () => {
   assert.equal(
@@ -60,14 +64,20 @@ test("version one appearance preferences migrate without losing the selected the
   assert.equal(preferences.appearance.transparentRegions.canvas, true);
 });
 
-test("fresh appearance preferences use the warm paper theme", () => {
+test("fresh appearance preferences use the silent gallery theme", () => {
   const preferences = createDefaultPreferences();
   const resolved = resolveAppearance(preferences);
 
-  assert.equal(DEFAULT_THEME_ID, "warm-paper");
-  assert.equal(preferences.themeId, "warm-paper");
-  assert.equal(resolved.theme.id, "warm-paper");
-  assert.equal(resolved.home.opacity, 0.82);
+  assert.equal(DEFAULT_THEME_ID, "silent-gallery");
+  assert.equal(preferences.themeId, "silent-gallery");
+  assert.equal(resolved.theme.id, "silent-gallery");
+  assert.equal(resolved.home.opacity, 0.78);
+});
+
+test("theme lookup falls back to the configured default instead of registry order", () => {
+  const missingThemeId = "missing-theme" as ThemeId;
+
+  assert.equal(getThemeDefinition(missingThemeId).id, DEFAULT_THEME_ID);
 });
 
 test("appearance preferences clamp unsafe values and reject incomplete backgrounds", () => {
@@ -148,4 +158,20 @@ test("theme scene defaults remain active until a user override is stored", () =>
   assert.equal(resolvedDefaults.workspace.opacity, 0.065);
   assert.equal(resolvedDefaults.workspace.blurPx, 0);
   assert.deepEqual(resolvedCustomized.workspace, { opacity: 0.42, blurPx: 9 });
+});
+
+test("workspace material opacity is independent from scene visibility", () => {
+  const defaults = createDefaultPreferences("sea-fog");
+  const customized = normalizePreferences({
+    ...defaults,
+    appearance: {
+      ...defaults.appearance,
+      workspace: { opacity: 1, blurPx: null },
+    },
+  });
+
+  assert.equal(
+    resolveAppearance(defaults).theme.material.workspaceSurfaceOpacity,
+    resolveAppearance(customized).theme.material.workspaceSurfaceOpacity,
+  );
 });
