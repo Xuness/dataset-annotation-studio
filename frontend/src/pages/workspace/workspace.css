@@ -440,6 +440,16 @@
   margin-left: auto;
 }
 
+/* Fullscreen already uses the physical display edge as its frame. Keep the
+   status metadata available without drawing a second, window-like strip along
+   the bottom of the screen. */
+:root[data-desktop-fullscreen="true"] .workspace-page > .workspace-statusbar {
+  border-top-color: transparent;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
 .workspace-loading {
   display: grid;
   height: 100%;
