@@ -289,6 +289,7 @@
 .asset-row__copy > span {
   color: var(--muted);
   font-size: var(--text-xs);
+  text-shadow: var(--workspace-muted-text-shadow, none);
 }
 
 .asset-list__empty {

@@ -153,6 +153,7 @@
   margin-top: 3px;
   color: var(--faint);
   font-size: var(--text-2xs);
+  text-shadow: var(--workspace-muted-text-shadow, none);
 }
 
 .workspace-glyph {
@@ -428,10 +429,11 @@
   gap: 18px;
   padding: 0 13px;
   border-top: 1px solid var(--workspace-divider-strong);
-  color: color-mix(in srgb, var(--faint) 82%, transparent);
+  color: var(--workspace-meta-ink, color-mix(in srgb, var(--faint) 82%, transparent));
   background: color-mix(in srgb, var(--app-backdrop) 97%, transparent);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
+  text-shadow: var(--workspace-muted-text-shadow, none);
 }
 
 .workspace-statusbar__path {

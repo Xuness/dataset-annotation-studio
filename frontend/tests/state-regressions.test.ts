@@ -8,6 +8,7 @@ import {
   createDefaultPreferences,
   normalizePreferences,
   resolveAppearance,
+  resolveWorkspaceSurfaceTransparency,
 } from "../src/shared/theme/appearance.ts";
 import { DEFAULT_THEME_ID, getThemeDefinition, type ThemeId } from "../src/shared/theme/themes.ts";
 
@@ -53,7 +54,7 @@ test("fullscreen shortcut accepts only an unmodified first F11 press", () => {
 test("version one appearance preferences migrate without losing the selected theme", () => {
   const preferences = normalizePreferences({ version: 1, themeId: "sea-fog" });
 
-  assert.equal(preferences.version, 3);
+  assert.equal(preferences.version, 5);
   assert.equal(preferences.themeId, "sea-fog");
   assert.equal(preferences.appearance.customBackground, null);
   assert.deepEqual(preferences.appearance.home, { opacity: null, blurPx: null });
@@ -104,11 +105,37 @@ test("version two appearance preferences keep scene overrides and gain region de
     },
   });
 
-  assert.equal(preferences.version, 3);
+  assert.equal(preferences.version, 5);
   assert.equal(preferences.themeId, "silent-gallery");
   assert.deepEqual(preferences.appearance.workspace, { opacity: 0.18, blurPx: 5 });
   assert.equal(preferences.appearance.transparentRegions.canvas, true);
   assert.equal(preferences.appearance.transparentRegions.navigation, false);
+});
+
+test("version three appearance preferences keep transparency and gain disabled immersive mode", () => {
+  const preferences = normalizePreferences({
+    version: 3,
+    themeId: "silent-gallery",
+    appearance: {
+      customBackground: null,
+      home: { opacity: null, blurPx: null },
+      workspace: { opacity: 0.34, blurPx: 2 },
+      transparentRegions: {
+        canvas: true,
+        navigation: true,
+        "primary-sidebar": false,
+        content: true,
+        "secondary-sidebar": false,
+        chrome: false,
+      },
+    },
+  });
+
+  assert.equal(preferences.version, 5);
+  assert.equal(preferences.appearance.immersiveMode, false);
+  assert.equal(preferences.appearance.transparentRegions.navigation, true);
+  assert.equal(preferences.appearance.transparentRegions.content, true);
+  assert.deepEqual(preferences.appearance.workspace, { opacity: 0.34, blurPx: 2 });
 });
 
 test("retired version four preferences keep appearance settings without atmosphere motion", () => {
@@ -131,13 +158,14 @@ test("retired version four preferences keep appearance settings without atmosphe
     },
   });
 
-  assert.equal(preferences.version, 3);
+  assert.equal(preferences.version, 5);
   assert.equal(preferences.themeId, "sea-fog");
   assert.deepEqual(preferences.appearance.customBackground, {
     path: "E:/background.webp",
     name: "background.webp",
   });
   assert.equal(Object.hasOwn(preferences.appearance, "atmosphereMotion"), false);
+  assert.equal(preferences.appearance.immersiveMode, false);
   assert.equal(preferences.appearance.transparentRegions.canvas, false);
   assert.equal(preferences.appearance.transparentRegions.navigation, true);
   assert.deepEqual(preferences.appearance.workspace, { opacity: 0.28, blurPx: 4 });
@@ -149,6 +177,7 @@ test("region transparency accepts only known boolean values", () => {
     ...defaults,
     appearance: {
       ...defaults.appearance,
+      immersiveMode: "yes",
       transparentRegions: {
         canvas: false,
         navigation: true,
@@ -169,6 +198,28 @@ test("region transparency accepts only known boolean values", () => {
     "secondary-sidebar": true,
     chrome: false,
   });
+  assert.equal(preferences.appearance.immersiveMode, false);
+});
+
+test("immersive mode makes every workspace surface transparent without changing saved choices", () => {
+  const defaults = createDefaultPreferences("sea-fog");
+  const preferences = normalizePreferences({
+    ...defaults,
+    appearance: {
+      ...defaults.appearance,
+      immersiveMode: true,
+      transparentRegions: {
+        ...defaults.appearance.transparentRegions,
+        canvas: false,
+        navigation: false,
+      },
+    },
+  });
+  const resolved = resolveWorkspaceSurfaceTransparency(preferences.appearance);
+
+  assert.equal(preferences.appearance.transparentRegions.canvas, false);
+  assert.equal(preferences.appearance.transparentRegions.navigation, false);
+  assert.equal(Object.values(resolved).every(Boolean), true);
 });
 
 test("theme scene defaults remain active until a user override is stored", () => {

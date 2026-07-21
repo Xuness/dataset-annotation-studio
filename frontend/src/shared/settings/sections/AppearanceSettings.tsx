@@ -151,12 +151,14 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
   const setRegionTransparency = useAppPreferences((state) => state.setRegionTransparency);
   const setAllRegionsTransparent = useAppPreferences((state) => state.setAllRegionsTransparent);
   const resetRegionTransparency = useAppPreferences((state) => state.resetRegionTransparency);
+  const setImmersiveMode = useAppPreferences((state) => state.setImmersiveMode);
   const [backgroundPending, setBackgroundPending] = useState(false);
   const [backgroundError, setBackgroundError] = useState<string | null>(null);
   const resolved = resolveAppearance(preferences);
   const customBackground = preferences.appearance.customBackground;
   const backgroundSupported = supportsCustomBackgrounds();
   const transparentRegions = preferences.appearance.transparentRegions;
+  const immersiveMode = preferences.appearance.immersiveMode;
   const allRegionsTransparent = WORKSPACE_SURFACE_REGIONS.every(
     (region) => transparentRegions[region],
   );
@@ -261,6 +263,34 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
         <section className="appearance-section">
           <div className="appearance-section__heading">
             <div>
+              <span className="eyebrow">Immersive workspace</span>
+              <h3>沉浸模式</h3>
+            </div>
+            <small>关闭后恢复原有区域选择</small>
+          </div>
+          <button
+            type="button"
+            className={`immersive-mode-card ${immersiveMode ? "is-active" : ""}`}
+            aria-pressed={immersiveMode}
+            onClick={() => setImmersiveMode(!immersiveMode)}
+          >
+            <span className="immersive-mode-card__mark" aria-hidden="true" />
+            <span className="immersive-mode-card__copy">
+              <strong>让工作台完全沉入场景</strong>
+              <small>
+                强制开启全部区域透光，并隐藏面板边界、栏位分隔和常驻拖拽线；输入控件与状态提示仍保留必要轮廓。
+              </small>
+            </span>
+            <span className="immersive-mode-card__state">
+              <i aria-hidden="true" />
+              {immersiveMode ? "已开启" : "未开启"}
+            </span>
+          </button>
+        </section>
+
+        <section className="appearance-section">
+          <div className="appearance-section__heading">
+            <div>
               <span className="eyebrow">Scene clarity</span>
               <h3>场景显影</h3>
             </div>
@@ -308,22 +338,24 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
               </div>
               <button
                 type="button"
-                className={allRegionsTransparent ? "is-active" : ""}
-                aria-pressed={allRegionsTransparent}
+                className={immersiveMode || allRegionsTransparent ? "is-active" : ""}
+                aria-pressed={immersiveMode || allRegionsTransparent}
+                disabled={immersiveMode}
                 onClick={allRegionsTransparent ? resetRegionTransparency : setAllRegionsTransparent}
               >
-                {allRegionsTransparent ? "恢复建议" : "全部透明"}
+                {immersiveMode ? "由沉浸模式控制" : allRegionsTransparent ? "恢复建议" : "全部透明"}
               </button>
             </div>
-            <div className="surface-transparency__grid">
+            <div className={`surface-transparency__grid ${immersiveMode ? "is-managed" : ""}`}>
               {surfaceRegionOptions.map((option) => {
-                const transparent = transparentRegions[option.id];
+                const transparent = immersiveMode || transparentRegions[option.id];
                 return (
                   <button
                     type="button"
                     key={option.id}
                     className={`surface-transparency__option ${transparent ? "is-active" : ""}`}
                     aria-pressed={transparent}
+                    disabled={immersiveMode}
                     onClick={() => setRegionTransparency(option.id, !transparent)}
                   >
                     <span className="surface-transparency__check" aria-hidden="true">

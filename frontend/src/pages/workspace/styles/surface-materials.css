@@ -43,3 +43,20 @@
 :root[data-transparent-regions~="content"] .workspace-page .annotation-editor__compare > section {
   background: transparent;
 }
+
+/* Immersive mode is an appearance-level override: it keeps each saved region
+   preference intact while removing the persistent structure lines. Interactive
+   controls, focus states and status borders retain their necessary outlines. */
+:root[data-immersive-mode="true"] .workspace-page {
+  --workspace-divider: transparent;
+  --workspace-divider-strong: transparent;
+}
+
+:root[data-immersive-mode="true"] .workspace-page [data-surface-region] {
+  border-color: transparent;
+}
+
+:root[data-immersive-mode="true"] .workspace-page .annotation-editor__compare {
+  gap: 0;
+  background: transparent;
+}

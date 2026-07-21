@@ -7,6 +7,7 @@ import {
   createUniformSurfaceTransparency,
   normalizePreferences,
   resolveAppearance,
+  resolveWorkspaceSurfaceTransparency,
   WORKSPACE_SURFACE_REGIONS,
   type AppPreferences,
   type CustomBackground,
@@ -27,6 +28,7 @@ interface AppPreferencesState {
   setRegionTransparency: (region: WorkspaceSurfaceRegion, transparent: boolean) => void;
   setAllRegionsTransparent: () => void;
   resetRegionTransparency: () => void;
+  setImmersiveMode: (enabled: boolean) => void;
 }
 
 function readStoredPreferences(): AppPreferences {
@@ -73,9 +75,11 @@ export function applyPreferences(preferences: AppPreferences) {
     ? { position: "center", size: "cover" }
     : resolved.theme.scene.workspace;
   const root = document.documentElement;
+  const surfaceTransparency = resolveWorkspaceSurfaceTransparency(preferences.appearance);
 
   root.dataset.theme = resolved.theme.id;
   root.dataset.themeMaterial = resolved.theme.material.id;
+  root.dataset.immersiveMode = String(preferences.appearance.immersiveMode);
   root.dataset.backgroundSource = customBackground ? "custom" : "theme";
   root.style.setProperty("--home-gallery-image", cssUrl(sceneImage));
   root.style.setProperty("--home-gallery-position", homePresentation.position);
@@ -94,7 +98,7 @@ export function applyPreferences(preferences: AppPreferences) {
     `${resolved.theme.material.workspaceSurfaceOpacity * 100}%`,
   );
   root.dataset.transparentRegions = WORKSPACE_SURFACE_REGIONS.filter(
-    (region) => preferences.appearance.transparentRegions[region],
+    (region) => surfaceTransparency[region],
   ).join(" ");
   root
     .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
@@ -169,6 +173,11 @@ export const useAppPreferences = create<AppPreferencesState>((set) => {
           ...current.appearance,
           transparentRegions: createDefaultSurfaceTransparency(),
         },
+      })),
+    setImmersiveMode: (immersiveMode) =>
+      commit((current) => ({
+        ...current,
+        appearance: { ...current.appearance, immersiveMode },
       })),
   };
 });

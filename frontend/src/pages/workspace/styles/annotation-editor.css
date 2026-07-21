@@ -207,8 +207,14 @@
 
 .annotation-editor__body .cm-gutters {
   color: var(--faint);
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--workspace-divider);
   background: var(--editor-gutter);
+}
+
+.annotation-editor .annotation-editor__body .cm-placeholder {
+  color: var(--annotation-placeholder-ink, var(--muted));
+  opacity: var(--annotation-placeholder-opacity, 0.72);
+  text-shadow: var(--workspace-muted-text-shadow, none);
 }
 
 .annotation-editor__body .cm-activeLine,
@@ -252,7 +258,7 @@
   min-height: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
-  background: var(--line);
+  background: var(--workspace-divider);
 }
 
 .annotation-editor__compare > section {
@@ -270,7 +276,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 0 9px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--workspace-divider);
   font-size: var(--text-xs);
 }
 

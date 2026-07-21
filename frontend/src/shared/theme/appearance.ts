@@ -1,6 +1,6 @@
 import { DEFAULT_THEME_ID, getThemeDefinition, isThemeId, type ThemeId } from "./themes.ts";
 
-export const PREFERENCES_VERSION = 3 as const;
+export const PREFERENCES_VERSION = 5 as const;
 
 export const SCENE_LIMITS = {
   opacity: { min: 0, max: 1 },
@@ -36,6 +36,7 @@ export interface AppearancePreferences {
   home: SceneOverrides;
   workspace: SceneOverrides;
   transparentRegions: WorkspaceSurfaceTransparency;
+  immersiveMode: boolean;
 }
 
 export interface AppPreferences {
@@ -88,6 +89,7 @@ export function createDefaultPreferences(themeId: ThemeId = DEFAULT_THEME_ID): A
       home: emptySceneOverrides(),
       workspace: emptySceneOverrides(),
       transparentRegions: createDefaultSurfaceTransparency(),
+      immersiveMode: false,
     },
   };
 }
@@ -152,14 +154,16 @@ export function normalizePreferences(value: unknown): AppPreferences {
         home: normalizeSceneOverrides(value.appearance.home),
         workspace: normalizeSceneOverrides(value.appearance.workspace),
         transparentRegions: createDefaultSurfaceTransparency(),
+        immersiveMode: false,
       },
     };
   }
 
-  // A short-lived development build wrote version 4 while prototyping a rain
-  // animation. Preserve its real appearance settings while discarding that
-  // retired experiment instead of resetting the user's local preferences.
-  if (value.version === 4 && isRecord(value.appearance)) {
+  // Version 3 introduced per-region transparency. A short-lived development
+  // build also wrote version 4 while prototyping the retired rain animation.
+  // Preserve the useful appearance settings from both formats while adding
+  // immersive mode in its disabled state.
+  if ((value.version === 3 || value.version === 4) && isRecord(value.appearance)) {
     return {
       version: PREFERENCES_VERSION,
       themeId,
@@ -168,6 +172,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
         home: normalizeSceneOverrides(value.appearance.home),
         workspace: normalizeSceneOverrides(value.appearance.workspace),
         transparentRegions: normalizeSurfaceTransparency(value.appearance.transparentRegions),
+        immersiveMode: false,
       },
     };
   }
@@ -184,8 +189,17 @@ export function normalizePreferences(value: unknown): AppPreferences {
       home: normalizeSceneOverrides(value.appearance.home),
       workspace: normalizeSceneOverrides(value.appearance.workspace),
       transparentRegions: normalizeSurfaceTransparency(value.appearance.transparentRegions),
+      immersiveMode: value.appearance.immersiveMode === true,
     },
   };
+}
+
+export function resolveWorkspaceSurfaceTransparency(
+  appearance: AppearancePreferences,
+): WorkspaceSurfaceTransparency {
+  return appearance.immersiveMode
+    ? createUniformSurfaceTransparency(true)
+    : appearance.transparentRegions;
 }
 
 export function resolveAppearance(preferences: AppPreferences): ResolvedAppearance {

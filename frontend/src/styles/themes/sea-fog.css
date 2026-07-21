@@ -14,8 +14,8 @@
   --code-surface: #d6dfe3;
   --ink: #20262b;
   --ink-soft: #343b42;
-  --muted: #65727a;
-  --faint: #89969d;
+  --muted: #556168;
+  --faint: #616d74;
   --line: rgb(32 38 43 / 12%);
   --line-strong: rgb(32 38 43 / 22%);
   --accent: #9b5367;
@@ -53,8 +53,8 @@
   --work-code: #cbd5da;
   --work-ink: #20262b;
   --work-ink-soft: #343b42;
-  --work-muted: #65727a;
-  --work-faint: #89969d;
+  --work-muted: #4f5a61;
+  --work-faint: #616d74;
   --work-line: rgb(32 38 43 / 13%);
   --work-line-strong: rgb(32 38 43 / 23%);
   --work-accent: #9b5367;
@@ -77,4 +77,8 @@
   --glass-edge: rgb(32 38 43 / 12%);
   --glass-shadow: rgb(32 38 43 / 11%);
   --glass-specular: rgb(203 230 238 / 62%);
+  --annotation-placeholder-ink: #4f5a61;
+  --annotation-placeholder-opacity: 1;
+  --workspace-meta-ink: #556168;
+  --workspace-muted-text-shadow: 0 1px 1px rgb(233 237 240 / 46%), 0 0 4px rgb(233 237 240 / 28%);
 }
