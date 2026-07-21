@@ -1,4 +1,4 @@
-export const THEME_IDS = ["silent-gallery", "sea-fog"] as const;
+export const THEME_IDS = ["warm-paper", "silent-gallery", "sea-fog"] as const;
 
 export type ThemeId = (typeof THEME_IDS)[number];
 
@@ -27,9 +27,35 @@ export interface ThemeDefinition {
   browserThemeColor: string;
 }
 
-export const DEFAULT_THEME_ID: ThemeId = "silent-gallery";
+export const DEFAULT_THEME_ID: ThemeId = "warm-paper";
 
 export const THEMES: readonly ThemeDefinition[] = [
+  {
+    id: "warm-paper",
+    name: "暖纸手札",
+    englishName: "Warm Paper",
+    description: "回到项目最初的暖纸、陶土玫瑰与鼠尾草配色，让长时间整理与标注更柔和。",
+    scene: {
+      image: "/home/warm-paper-still-life.svg",
+      previewPosition: "72% 48%",
+      home: {
+        position: "center",
+        size: "cover",
+        filter: "saturate(0.88) contrast(0.98)",
+        opacity: 0.82,
+        blurPx: 0,
+      },
+      workspace: {
+        position: "72% 50%",
+        size: "cover",
+        filter: "saturate(0.76) contrast(0.96)",
+        opacity: 0.055,
+        blurPx: 0,
+      },
+    },
+    swatches: ["#f5f1ea", "#fbfaf7", "#302d2a", "#b77f73"],
+    browserThemeColor: "#f5f1ea",
+  },
   {
     id: "silent-gallery",
     name: "静默展厅",

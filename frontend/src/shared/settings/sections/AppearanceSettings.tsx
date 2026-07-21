@@ -13,7 +13,7 @@ import {
   type SceneOverrides,
   type SceneTarget,
 } from "../../theme/appearance";
-import { THEMES } from "../../theme/themes";
+import { DEFAULT_THEME_ID, THEMES } from "../../theme/themes";
 import { Button } from "../../ui/Button";
 import { Spinner } from "../../ui/Spinner";
 
@@ -251,6 +251,10 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
               const previewStyle = {
                 "--theme-preview-image": `url(${JSON.stringify(theme.scene.image)})`,
                 "--theme-preview-position": theme.scene.previewPosition,
+                "--theme-preview-backdrop": theme.swatches[0],
+                "--theme-preview-surface": theme.swatches[1],
+                "--theme-preview-ink": theme.swatches[2],
+                "--theme-preview-accent": theme.swatches[3],
               } as CSSProperties;
               return (
                 <button
@@ -275,6 +279,7 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
                   <span className="theme-preset-card__copy">
                     <span>
                       <strong>{theme.name}</strong>
+                      {theme.id === DEFAULT_THEME_ID ? <em>默认</em> : null}
                       <small>{theme.englishName}</small>
                     </span>
                     <span className="theme-preset-card__swatches" aria-hidden="true">

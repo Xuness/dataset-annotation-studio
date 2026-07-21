@@ -8,6 +8,7 @@ import {
   normalizePreferences,
   resolveAppearance,
 } from "../src/shared/theme/appearance.ts";
+import { DEFAULT_THEME_ID } from "../src/shared/theme/themes.ts";
 
 test("save reconciliation preserves edits made while the request is pending", () => {
   assert.equal(
@@ -39,6 +40,16 @@ test("version one appearance preferences migrate without losing the selected the
   assert.equal(preferences.themeId, "sea-fog");
   assert.equal(preferences.appearance.customBackground, null);
   assert.deepEqual(preferences.appearance.home, { opacity: null, blurPx: null });
+});
+
+test("fresh appearance preferences use the warm paper theme", () => {
+  const preferences = createDefaultPreferences();
+  const resolved = resolveAppearance(preferences);
+
+  assert.equal(DEFAULT_THEME_ID, "warm-paper");
+  assert.equal(preferences.themeId, "warm-paper");
+  assert.equal(resolved.theme.id, "warm-paper");
+  assert.equal(resolved.home.opacity, 0.82);
 });
 
 test("appearance preferences clamp unsafe values and reject incomplete backgrounds", () => {

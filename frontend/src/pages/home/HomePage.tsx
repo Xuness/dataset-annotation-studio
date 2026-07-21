@@ -6,6 +6,8 @@ import { useOpenWorkspace, useRecentWorkspaces } from "../../features/workspaces
 import { pickWorkspaceFolder } from "../../shared/desktop/pickFolder";
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 import { useAppStore } from "../../shared/store/appStore";
+import { useAppPreferences } from "../../shared/theme/appPreferences";
+import { getThemeDefinition } from "../../shared/theme/themes";
 import { alertDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
 import "./home.css";
@@ -28,6 +30,8 @@ export function HomePage() {
   const openMutation = useOpenWorkspace();
   const openSettings = useSettingsCenter((state) => state.open);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
+  const themeId = useAppPreferences((state) => state.preferences.themeId);
+  const theme = getThemeDefinition(themeId);
   const [message, setMessage] = useState<string | null>(null);
 
   async function chooseAndOpenWorkspace() {
@@ -85,7 +89,7 @@ export function HomePage() {
           <div className="home-hero__copy">
             <p className="home-hero__kicker">
               <span aria-hidden="true" />
-              Silent gallery · Local archive
+              {theme.englishName} · Local archive
             </p>
             <h1 id="home-title">让每一张图，在沉默中显影。</h1>
             <p className="home-hero__description">本地优先的图像数据集工作台</p>
@@ -157,7 +161,7 @@ export function HomePage() {
             </div>
           ) : (
             <div className="recent-placeholder">
-              <p>展厅尚空。打开一个图片文件夹，让第一组数据在这里显影。</p>
+              <p>档案尚空。打开一个图片文件夹，让第一组数据在这里显影。</p>
             </div>
           )}
         </section>

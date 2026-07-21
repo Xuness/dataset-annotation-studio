@@ -42,13 +42,18 @@
 
 .workspace-atmosphere::after {
   background:
-    linear-gradient(90deg, rgb(2 3 4 / 68%), transparent 36%, rgb(2 3 4 / 66%)),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--app-backdrop) 68%, transparent),
+      transparent 36%,
+      color-mix(in srgb, var(--app-backdrop) 66%, transparent)
+    ),
     radial-gradient(
       circle at 72% 12%,
       color-mix(in srgb, var(--ink) 7%, transparent),
       transparent 28%
     ),
-    radial-gradient(rgb(220 220 214 / 13%) 0.42px, transparent 0.65px);
+    radial-gradient(color-mix(in srgb, var(--ink) 13%, transparent) 0.42px, transparent 0.65px);
   background-size:
     auto,
     auto,
