@@ -67,7 +67,7 @@
 .form-field select:hover:not(:disabled),
 .form-field textarea:hover:not(:disabled) {
   border-color: var(--line-strong);
-  background-color: color-mix(in srgb, var(--surface-raised) 82%, white);
+  background-color: color-mix(in srgb, var(--surface-raised) 88%, var(--ink) 12%);
 }
 
 .form-field input:focus-visible,

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { useClipboardHistoryBridge } from "../shared/desktop/useClipboardHistoryBridge";
 import { useApplyInterfaceScale } from "../shared/desktop/useInterfaceScale";
+import { SettingsCenter } from "../shared/settings/SettingsCenter";
 import { DialogHost } from "../shared/ui/DialogHost";
 import { Spinner } from "../shared/ui/Spinner";
 import { useCloseGuard } from "./useCloseGuard";
@@ -59,6 +60,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      <SettingsCenter />
       <DialogHost />
     </>
   );

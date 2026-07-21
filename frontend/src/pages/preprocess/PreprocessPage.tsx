@@ -13,8 +13,7 @@ import { useAppStore } from "../../shared/store/appStore";
 import { confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
 import { Button } from "../../shared/ui/Button";
-import { NavigationRail } from "../workspace/components/NavigationRail";
-import { WorkspaceTopbar } from "../workspace/components/WorkspaceTopbar";
+import { WorkspaceFrame } from "../workspace/components/WorkspaceFrame";
 import "../workspace/workspace.css";
 import { PreprocessHistoryPanel } from "./components/PreprocessHistoryPanel";
 import { PreprocessPreviewPanel } from "./components/PreprocessPreviewPanel";
@@ -156,39 +155,40 @@ export function PreprocessPage() {
   }
 
   return (
-    <main className="workspace-page">
-      <WorkspaceTopbar
-        workspace={workspace.data}
-        rescanning={workspaceBusy}
-        onRescan={() => {
-          if (!filesChanging) void rescan.mutateAsync();
-        }}
+    <WorkspaceFrame
+      workspace={workspace.data}
+      projectId={projectId}
+      active="preprocess"
+      rescanning={workspaceBusy}
+      onRescan={() => {
+        if (!filesChanging) void rescan.mutateAsync();
+      }}
+      bodyClassName="preprocess-workspace-body"
+      statusbar={
+        <>
+          <span>当前仅展示预处理后的有效版本</span>
+          <span className="workspace-statusbar__path">恢复区：.annotation-workspace/recovery</span>
+        </>
+      }
+    >
+      <PreprocessSettingsPanel
+        form={form}
+        onChange={(update) => setForm((current) => ({ ...current, ...update }))}
+        assetCount={assets.data?.total ?? 0}
+        checkedCount={checkedAssetIds.length}
+        preview={validPreview}
+        previewPending={actions.preview.isPending || workspaceBusy}
+        executePending={workspaceBusy}
+        error={error}
+        onPreview={() => void preview()}
+        onExecute={() => void execute()}
       />
-      <div className="workspace-body preprocess-workspace-body">
-        <NavigationRail projectId={projectId} active="preprocess" />
-        <PreprocessSettingsPanel
-          form={form}
-          onChange={(update) => setForm((current) => ({ ...current, ...update }))}
-          assetCount={assets.data?.total ?? 0}
-          checkedCount={checkedAssetIds.length}
-          preview={validPreview}
-          previewPending={actions.preview.isPending || workspaceBusy}
-          executePending={workspaceBusy}
-          error={error}
-          onPreview={() => void preview()}
-          onExecute={() => void execute()}
-        />
-        <PreprocessPreviewPanel preview={validPreview} />
-        <PreprocessHistoryPanel
-          operations={operations.data ?? []}
-          undoPending={workspaceBusy}
-          onUndo={(id) => void undo(id)}
-        />
-      </div>
-      <footer className="workspace-statusbar">
-        <span>当前仅展示预处理后的有效版本</span>
-        <span className="workspace-statusbar__path">恢复区：.annotation-workspace/recovery</span>
-      </footer>
-    </main>
+      <PreprocessPreviewPanel preview={validPreview} />
+      <PreprocessHistoryPanel
+        operations={operations.data ?? []}
+        undoPending={workspaceBusy}
+        onUndo={(id) => void undo(id)}
+      />
+    </WorkspaceFrame>
   );
 }

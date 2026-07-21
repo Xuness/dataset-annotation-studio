@@ -1,5 +1,5 @@
 .jobs-workspace-body {
-  grid-template-columns: 52px 310px 330px minmax(380px, 1fr);
+  grid-template-columns: var(--workspace-rail-width) 310px 330px minmax(380px, 1fr);
 }
 
 .new-job-panel,
@@ -70,7 +70,7 @@
 .job-kind-switch button.is-active {
   color: var(--accent-deep);
   background: var(--surface);
-  box-shadow: 0 1px 4px rgb(44 35 28 / 9%);
+  box-shadow: var(--shadow-soft);
 }
 
 .job-prompt-source {
@@ -354,6 +354,6 @@
 
 @media (max-width: 1220px) {
   .jobs-workspace-body {
-    grid-template-columns: 50px 280px 285px minmax(360px, 1fr);
+    grid-template-columns: var(--workspace-rail-width) 280px 285px minmax(360px, 1fr);
   }
 }

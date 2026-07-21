@@ -1,5 +1,5 @@
 .preprocess-workspace-body {
-  grid-template-columns: 52px 310px minmax(460px, 1fr) 292px;
+  grid-template-columns: var(--workspace-rail-width) 310px minmax(460px, 1fr) 292px;
 }
 
 .preprocess-settings,
@@ -309,6 +309,6 @@
 
 @media (max-width: 1220px) {
   .preprocess-workspace-body {
-    grid-template-columns: 50px 280px minmax(420px, 1fr) 260px;
+    grid-template-columns: var(--workspace-rail-width) 280px minmax(420px, 1fr) 260px;
   }
 }

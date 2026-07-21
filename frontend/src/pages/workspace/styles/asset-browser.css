@@ -210,6 +210,16 @@
   cursor: pointer;
 }
 
+.asset-row::before {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+  width: 2px;
+  background: transparent;
+  content: "";
+}
+
 .asset-row:hover {
   background: var(--surface-soft);
 }
@@ -232,8 +242,13 @@
 }
 
 .asset-row.is-selected {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
-  background: color-mix(in srgb, var(--accent-soft) 76%, var(--surface));
+  border-color: color-mix(in srgb, var(--line-strong) 76%, var(--line));
+  background: color-mix(in srgb, var(--surface-raised) 82%, var(--accent-soft));
+}
+
+.asset-row.is-selected::before {
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 54%, transparent);
 }
 
 .asset-row img {
@@ -241,7 +256,7 @@
   height: 52px;
   border-radius: 6px;
   object-fit: cover;
-  background: var(--paper-deep);
+  background: var(--canvas);
 }
 
 .asset-row__copy {

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ArrowRight, Cable, RefreshCw } from "lucide-react";
+import { ArrowRight, Cable, RefreshCw, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useOpenWorkspace, useRecentWorkspaces } from "../../features/workspaces/hooks";
 import { pickWorkspaceFolder } from "../../shared/desktop/pickFolder";
+import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 import { useAppStore } from "../../shared/store/appStore";
 import { alertDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
@@ -25,6 +26,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const recent = useRecentWorkspaces();
   const openMutation = useOpenWorkspace();
+  const openSettings = useSettingsCenter((state) => state.open);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -70,6 +72,10 @@ export function HomePage() {
           <button type="button" onClick={() => navigate("/presets")}>
             <Cable size={14} aria-hidden="true" />
             <span>预设与连接</span>
+          </button>
+          <button type="button" onClick={() => openSettings("themes")}>
+            <Settings size={14} aria-hidden="true" />
+            <span>设置</span>
           </button>
         </nav>
       </header>

@@ -25,9 +25,8 @@ import { Spinner } from "../../shared/ui/Spinner";
 import { AssetBrowser } from "./components/AssetBrowser";
 import { ImageStage } from "./components/ImageStage";
 import { InspectorPanel } from "./components/InspectorPanel";
-import { NavigationRail } from "./components/NavigationRail";
 import { PaneResizeHandle } from "./components/PaneResizeHandle";
-import { WorkspaceTopbar } from "./components/WorkspaceTopbar";
+import { WorkspaceFrame } from "./components/WorkspaceFrame";
 import {
   clamp,
   DEFAULT_WORKSPACE_LAYOUT,
@@ -194,159 +193,156 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   }
 
   return (
-    <main className="workspace-page">
-      <WorkspaceTopbar
-        workspace={workspace.data}
-        rescanning={rescan.isPending}
-        onRescan={() => void rescan.mutateAsync()}
+    <WorkspaceFrame
+      bodyRef={workspaceBodyRef}
+      bodyClassName="workspace-body--assets"
+      bodyStyle={layoutStyle}
+      workspace={workspace.data}
+      projectId={projectId}
+      active={mode}
+      rescanning={rescan.isPending}
+      onRescan={() => void rescan.mutateAsync()}
+      statusbar={
+        <>
+          <span>
+            {mode === "review" ? "审核" : "素材"} · {assetResult?.total ?? 0} 张图片
+          </span>
+          <span>已标注 {workspace.data.annotated_count}</span>
+          <span>异常 {workspace.data.invalid_count}</span>
+          <span className="workspace-statusbar__path">
+            UTF-8 · 原文 .txt · 译文 .语言.txt · 标签结构校验
+          </span>
+        </>
+      }
+    >
+      <AssetBrowser
+        mode={mode}
+        projectId={projectId}
+        assets={assetItems}
+        total={assetResult?.total ?? workspace.data.asset_count}
+        selectedAssetId={selectedAssetId}
+        checkedAssetIds={checkedAssetIds}
+        search={search}
+        statusFilter={statusFilter}
+        statusCounts={assetResult?.status_counts ?? {}}
+        hasMore={Boolean(assets.hasNextPage)}
+        loading={assets.isLoading}
+        loadingMore={assets.isFetchingNextPage}
+        selectAllPending={matchingAssetIds.isFetching}
+        allMatchingSelected={allMatchingSelected}
+        error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
+        onLoadMore={loadMoreAssets}
+        recursive={workspace.data.settings.recursive_scan}
+        onSearchChange={setSearch}
+        onStatusChange={setStatusFilter}
+        onSelect={requestSelectAsset}
+        onSetChecked={setAssetsChecked}
+        onToggleAll={() => void toggleAllMatchingAssets()}
+        onRecursiveChange={(recursive_scan) => void updateWorkspace.mutateAsync({ recursive_scan })}
       />
-      <div
-        ref={workspaceBodyRef}
-        className="workspace-body workspace-body--assets"
-        style={layoutStyle}
-      >
-        <NavigationRail projectId={projectId} active={mode} />
-        <AssetBrowser
-          mode={mode}
-          projectId={projectId}
-          assets={assetItems}
-          total={assetResult?.total ?? workspace.data.asset_count}
-          selectedAssetId={selectedAssetId}
-          checkedAssetIds={checkedAssetIds}
-          search={search}
-          statusFilter={statusFilter}
-          statusCounts={assetResult?.status_counts ?? {}}
-          hasMore={Boolean(assets.hasNextPage)}
-          loading={assets.isLoading}
-          loadingMore={assets.isFetchingNextPage}
-          selectAllPending={matchingAssetIds.isFetching}
-          allMatchingSelected={allMatchingSelected}
-          error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
-          onLoadMore={loadMoreAssets}
-          recursive={workspace.data.settings.recursive_scan}
-          onSearchChange={setSearch}
-          onStatusChange={setStatusFilter}
-          onSelect={requestSelectAsset}
-          onSetChecked={setAssetsChecked}
-          onToggleAll={() => void toggleAllMatchingAssets()}
-          onRecursiveChange={(recursive_scan) =>
-            void updateWorkspace.mutateAsync({ recursive_scan })
-          }
-        />
-        <PaneResizeHandle
-          orientation="vertical"
-          label="调整素材列表宽度"
-          onResize={(delta) =>
-            setLayout((current) => {
-              const bodyWidth = workspaceBodyRef.current?.clientWidth ?? window.innerWidth;
-              const available =
-                bodyWidth -
-                WORKSPACE_LAYOUT_LIMITS.navigationWidth -
-                WORKSPACE_LAYOUT_LIMITS.resizeHandlesWidth -
-                WORKSPACE_LAYOUT_LIMITS.mediaPaneMin -
-                current.inspectorPaneWidth;
-              return {
-                ...current,
-                assetPaneWidth: clamp(
-                  current.assetPaneWidth + delta,
+      <PaneResizeHandle
+        orientation="vertical"
+        label="调整素材列表宽度"
+        onResize={(delta) =>
+          setLayout((current) => {
+            const bodyWidth = workspaceBodyRef.current?.clientWidth ?? window.innerWidth;
+            const available =
+              bodyWidth -
+              WORKSPACE_LAYOUT_LIMITS.navigationWidth -
+              WORKSPACE_LAYOUT_LIMITS.resizeHandlesWidth -
+              WORKSPACE_LAYOUT_LIMITS.mediaPaneMin -
+              current.inspectorPaneWidth;
+            return {
+              ...current,
+              assetPaneWidth: clamp(
+                current.assetPaneWidth + delta,
+                WORKSPACE_LAYOUT_LIMITS.assetPaneMin,
+                Math.max(
                   WORKSPACE_LAYOUT_LIMITS.assetPaneMin,
-                  Math.max(
-                    WORKSPACE_LAYOUT_LIMITS.assetPaneMin,
-                    Math.min(WORKSPACE_LAYOUT_LIMITS.assetPaneMax, available),
-                  ),
+                  Math.min(WORKSPACE_LAYOUT_LIMITS.assetPaneMax, available),
                 ),
-              };
-            })
-          }
-          onReset={() =>
-            setLayout((current) => ({
-              ...current,
-              assetPaneWidth: DEFAULT_WORKSPACE_LAYOUT.assetPaneWidth,
-            }))
-          }
-        />
-        <div className="media-column" ref={mediaColumnRef}>
-          <ImageStage projectId={projectId} asset={selectedAsset} />
-          <PaneResizeHandle
-            orientation="horizontal"
-            label="调整图片与标注区域高度"
-            onResize={(delta) => {
-              const height = mediaColumnRef.current?.clientHeight ?? 1;
-              setLayout((current) => ({
-                ...current,
-                imagePaneRatio: clamp(
-                  current.imagePaneRatio + (delta / height) * 100,
-                  WORKSPACE_LAYOUT_LIMITS.imagePaneMin,
-                  WORKSPACE_LAYOUT_LIMITS.imagePaneMax,
-                ),
-              }));
-            }}
-            onReset={() =>
-              setLayout((current) => ({
-                ...current,
-                imagePaneRatio: DEFAULT_WORKSPACE_LAYOUT.imagePaneRatio,
-              }))
-            }
-          />
-          <Suspense
-            fallback={
-              <section className="annotation-editor">
-                <Spinner label="加载标注编辑器" />
-              </section>
-            }
-          >
-            <AnnotationEditor
-              key={selectedAssetId ?? "no-asset"}
-              projectId={projectId}
-              assetId={selectedAssetId}
-              onDirtyChange={setEditorDirty}
-            />
-          </Suspense>
-        </div>
+              ),
+            };
+          })
+        }
+        onReset={() =>
+          setLayout((current) => ({
+            ...current,
+            assetPaneWidth: DEFAULT_WORKSPACE_LAYOUT.assetPaneWidth,
+          }))
+        }
+      />
+      <div className="media-column" ref={mediaColumnRef}>
+        <ImageStage projectId={projectId} asset={selectedAsset} />
         <PaneResizeHandle
-          orientation="vertical"
-          label="调整右侧面板宽度"
-          onResize={(delta) =>
-            setLayout((current) => {
-              const bodyWidth = workspaceBodyRef.current?.clientWidth ?? window.innerWidth;
-              const available =
-                bodyWidth -
-                WORKSPACE_LAYOUT_LIMITS.navigationWidth -
-                WORKSPACE_LAYOUT_LIMITS.resizeHandlesWidth -
-                WORKSPACE_LAYOUT_LIMITS.mediaPaneMin -
-                current.assetPaneWidth;
-              return {
-                ...current,
-                inspectorPaneWidth: clamp(
-                  current.inspectorPaneWidth - delta,
-                  WORKSPACE_LAYOUT_LIMITS.inspectorPaneMin,
-                  Math.max(
-                    WORKSPACE_LAYOUT_LIMITS.inspectorPaneMin,
-                    Math.min(WORKSPACE_LAYOUT_LIMITS.inspectorPaneMax, available),
-                  ),
-                ),
-              };
-            })
-          }
+          orientation="horizontal"
+          label="调整图片与标注区域高度"
+          onResize={(delta) => {
+            const height = mediaColumnRef.current?.clientHeight ?? 1;
+            setLayout((current) => ({
+              ...current,
+              imagePaneRatio: clamp(
+                current.imagePaneRatio + (delta / height) * 100,
+                WORKSPACE_LAYOUT_LIMITS.imagePaneMin,
+                WORKSPACE_LAYOUT_LIMITS.imagePaneMax,
+              ),
+            }));
+          }}
           onReset={() =>
             setLayout((current) => ({
               ...current,
-              inspectorPaneWidth: DEFAULT_WORKSPACE_LAYOUT.inspectorPaneWidth,
+              imagePaneRatio: DEFAULT_WORKSPACE_LAYOUT.imagePaneRatio,
             }))
           }
         />
-        <InspectorPanel projectId={projectId} workspace={workspace.data} asset={selectedAsset} />
+        <Suspense
+          fallback={
+            <section className="annotation-editor">
+              <Spinner label="加载标注编辑器" />
+            </section>
+          }
+        >
+          <AnnotationEditor
+            key={selectedAssetId ?? "no-asset"}
+            projectId={projectId}
+            assetId={selectedAssetId}
+            onDirtyChange={setEditorDirty}
+          />
+        </Suspense>
       </div>
-      <footer className="workspace-statusbar">
-        <span>
-          {mode === "review" ? "审核" : "素材"} · {assetResult?.total ?? 0} 张图片
-        </span>
-        <span>已标注 {workspace.data.annotated_count}</span>
-        <span>异常 {workspace.data.invalid_count}</span>
-        <span className="workspace-statusbar__path">
-          UTF-8 · 原文 .txt · 译文 .语言.txt · 标签结构校验
-        </span>
-      </footer>
-    </main>
+      <PaneResizeHandle
+        orientation="vertical"
+        label="调整右侧面板宽度"
+        onResize={(delta) =>
+          setLayout((current) => {
+            const bodyWidth = workspaceBodyRef.current?.clientWidth ?? window.innerWidth;
+            const available =
+              bodyWidth -
+              WORKSPACE_LAYOUT_LIMITS.navigationWidth -
+              WORKSPACE_LAYOUT_LIMITS.resizeHandlesWidth -
+              WORKSPACE_LAYOUT_LIMITS.mediaPaneMin -
+              current.assetPaneWidth;
+            return {
+              ...current,
+              inspectorPaneWidth: clamp(
+                current.inspectorPaneWidth - delta,
+                WORKSPACE_LAYOUT_LIMITS.inspectorPaneMin,
+                Math.max(
+                  WORKSPACE_LAYOUT_LIMITS.inspectorPaneMin,
+                  Math.min(WORKSPACE_LAYOUT_LIMITS.inspectorPaneMax, available),
+                ),
+              ),
+            };
+          })
+        }
+        onReset={() =>
+          setLayout((current) => ({
+            ...current,
+            inspectorPaneWidth: DEFAULT_WORKSPACE_LAYOUT.inspectorPaneWidth,
+          }))
+        }
+      />
+      <InspectorPanel projectId={projectId} workspace={workspace.data} asset={selectedAsset} />
+    </WorkspaceFrame>
   );
 }

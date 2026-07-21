@@ -7,8 +7,7 @@ import { useRescanWorkspace, useWorkspace } from "../../features/workspaces/hook
 import { useAppStore } from "../../shared/store/appStore";
 import { Spinner } from "../../shared/ui/Spinner";
 import { Button } from "../../shared/ui/Button";
-import { NavigationRail } from "../workspace/components/NavigationRail";
-import { WorkspaceTopbar } from "../workspace/components/WorkspaceTopbar";
+import { WorkspaceFrame } from "../workspace/components/WorkspaceFrame";
 import { JobDetailPanel } from "./components/JobDetailPanel";
 import { JobList } from "./components/JobList";
 import { NewJobPanel } from "./components/NewJobPanel";
@@ -50,39 +49,40 @@ export function JobsPage() {
     );
 
   return (
-    <main className="workspace-page">
-      <WorkspaceTopbar
+    <WorkspaceFrame
+      workspace={workspace.data}
+      projectId={projectId}
+      active="jobs"
+      rescanning={rescan.isPending}
+      onRescan={() => void rescan.mutateAsync()}
+      bodyClassName="jobs-workspace-body"
+      statusbar={
+        <>
+          <span>{activeJobs.data?.length ?? 0} 个运行中任务</span>
+          <span>{checkedAssetIds.length} 个工作台选中项</span>
+          <span className="workspace-statusbar__path">
+            关闭软件会停止所有任务 · 状态与响应永久保留
+          </span>
+        </>
+      }
+    >
+      <NewJobPanel
+        projectId={projectId}
         workspace={workspace.data}
-        rescanning={rescan.isPending}
-        onRescan={() => void rescan.mutateAsync()}
+        checkedAssetIds={checkedAssetIds}
+        onCreated={(job) => setSelectedJobId(job.id)}
       />
-      <div className="workspace-body jobs-workspace-body">
-        <NavigationRail projectId={projectId} active="jobs" />
-        <NewJobPanel
-          projectId={projectId}
-          workspace={workspace.data}
-          checkedAssetIds={checkedAssetIds}
-          onCreated={(job) => setSelectedJobId(job.id)}
-        />
-        <JobList
-          jobs={jobItems}
-          selectedId={selectedJobId}
-          hasMore={Boolean(jobs.hasNextPage)}
-          loading={jobs.isLoading}
-          loadingMore={jobs.isFetchingNextPage}
-          error={jobs.error instanceof Error ? jobs.error.message : null}
-          onLoadMore={() => void jobs.fetchNextPage()}
-          onSelect={setSelectedJobId}
-        />
-        <JobDetailPanel projectId={projectId} jobId={selectedJobId} />
-      </div>
-      <footer className="workspace-statusbar">
-        <span>{activeJobs.data?.length ?? 0} 个运行中任务</span>
-        <span>{checkedAssetIds.length} 个工作台选中项</span>
-        <span className="workspace-statusbar__path">
-          关闭软件会停止所有任务 · 状态与响应永久保留
-        </span>
-      </footer>
-    </main>
+      <JobList
+        jobs={jobItems}
+        selectedId={selectedJobId}
+        hasMore={Boolean(jobs.hasNextPage)}
+        loading={jobs.isLoading}
+        loadingMore={jobs.isFetchingNextPage}
+        error={jobs.error instanceof Error ? jobs.error.message : null}
+        onLoadMore={() => void jobs.fetchNextPage()}
+        onSelect={setSelectedJobId}
+      />
+      <JobDetailPanel projectId={projectId} jobId={selectedJobId} />
+    </WorkspaceFrame>
   );
 }

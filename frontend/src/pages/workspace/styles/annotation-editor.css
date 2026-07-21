@@ -77,7 +77,7 @@
 .annotation-view-tabs button.is-active {
   color: var(--accent-deep);
   background: var(--surface);
-  box-shadow: 0 1px 3px rgb(44 35 28 / 8%);
+  box-shadow: var(--shadow-soft);
 }
 
 .annotation-language-select {
@@ -130,7 +130,7 @@
   gap: 8px;
   padding: 10px;
   overflow: auto;
-  background: #fdfbf7;
+  background: var(--editor-surface);
 }
 
 .annotation-editor__history > p {
@@ -193,7 +193,7 @@
 
 .annotation-editor__body .cm-editor {
   color: var(--ink);
-  background: #fdfbf7;
+  background: var(--editor-surface);
   font-size: var(--annotation-font-size, 12px);
 }
 
@@ -205,12 +205,12 @@
 .annotation-editor__body .cm-gutters {
   color: var(--faint);
   border-right: 1px solid var(--line);
-  background: #f4f0e9;
+  background: var(--editor-gutter);
 }
 
 .annotation-editor__body .cm-activeLine,
 .annotation-editor__body .cm-activeLineGutter {
-  background: rgb(188 146 130 / 8%);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 .annotation-editor__body .cm-content {

@@ -1,5 +1,5 @@
 .export-workspace-body {
-  grid-template-columns: 52px 318px minmax(480px, 1fr) 310px;
+  grid-template-columns: var(--workspace-rail-width) 318px minmax(480px, 1fr) 310px;
 }
 
 .export-settings,
@@ -119,7 +119,7 @@
 
 .export-folder-picker:hover:not(:disabled) {
   border-color: var(--line-strong);
-  background: white;
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--ink) 12%);
 }
 
 .export-folder-picker:disabled {
@@ -422,6 +422,6 @@
 
 @media (max-width: 1220px) {
   .export-workspace-body {
-    grid-template-columns: 50px 286px minmax(430px, 1fr) 270px;
+    grid-template-columns: var(--workspace-rail-width) 286px minmax(430px, 1fr) 270px;
   }
 }

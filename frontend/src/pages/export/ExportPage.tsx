@@ -12,8 +12,7 @@ import { useAppStore } from "../../shared/store/appStore";
 import { Button } from "../../shared/ui/Button";
 import { alertDialog, confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
-import { NavigationRail } from "../workspace/components/NavigationRail";
-import { WorkspaceTopbar } from "../workspace/components/WorkspaceTopbar";
+import { WorkspaceFrame } from "../workspace/components/WorkspaceFrame";
 import "../workspace/workspace.css";
 import { ExportHistoryPanel } from "./components/ExportHistoryPanel";
 import { ExportPreviewPanel } from "./components/ExportPreviewPanel";
@@ -187,44 +186,45 @@ export function ExportPage() {
   }
 
   return (
-    <main className="workspace-page">
-      <WorkspaceTopbar
-        workspace={workspace.data}
-        rescanning={rescan.isPending}
-        rescanDisabled={activeExport}
-        onRescan={() => void rescan.mutateAsync()}
+    <WorkspaceFrame
+      workspace={workspace.data}
+      projectId={projectId}
+      active="export"
+      rescanning={rescan.isPending}
+      rescanDisabled={activeExport}
+      onRescan={() => void rescan.mutateAsync()}
+      bodyClassName="export-workspace-body"
+      statusbar={
+        <>
+          <span>扁平导出 · 原始图片与活动同名 TXT</span>
+          <span className="workspace-statusbar__path">
+            任务状态：.annotation-workspace/state.sqlite3
+          </span>
+        </>
+      }
+    >
+      <ExportSettingsPanel
+        form={form}
+        assetCount={assets.data?.total ?? workspace.data.asset_count}
+        checkedCount={checkedAssetIds.length}
+        preview={validPreview}
+        previewPending={actions.preview.isPending}
+        exportPending={actionPending}
+        activeExport={activeExport}
+        error={error}
+        onChange={(update) => setForm((current) => ({ ...current, ...update }))}
+        onChooseFolder={() => void chooseFolder()}
+        onPreview={() => void preview()}
+        onExport={() => void startExport()}
       />
-      <div className="workspace-body export-workspace-body">
-        <NavigationRail projectId={projectId} active="export" />
-        <ExportSettingsPanel
-          form={form}
-          assetCount={assets.data?.total ?? workspace.data.asset_count}
-          checkedCount={checkedAssetIds.length}
-          preview={validPreview}
-          previewPending={actions.preview.isPending}
-          exportPending={actionPending}
-          activeExport={activeExport}
-          error={error}
-          onChange={(update) => setForm((current) => ({ ...current, ...update }))}
-          onChooseFolder={() => void chooseFolder()}
-          onPreview={() => void preview()}
-          onExport={() => void startExport()}
-        />
-        <ExportPreviewPanel preview={validPreview} />
-        <ExportHistoryPanel
-          operations={operations.data ?? []}
-          actionPending={actionPending}
-          onStop={(id) => void stop(id)}
-          onResume={(id) => void resume(id)}
-          onOpenFolder={(path) => void openFolder(path)}
-        />
-      </div>
-      <footer className="workspace-statusbar">
-        <span>扁平导出 · 原始图片与活动同名 TXT</span>
-        <span className="workspace-statusbar__path">
-          任务状态：.annotation-workspace/state.sqlite3
-        </span>
-      </footer>
-    </main>
+      <ExportPreviewPanel preview={validPreview} />
+      <ExportHistoryPanel
+        operations={operations.data ?? []}
+        actionPending={actionPending}
+        onStop={(id) => void stop(id)}
+        onResume={(id) => void resume(id)}
+        onOpenFolder={(path) => void openFolder(path)}
+      />
+    </WorkspaceFrame>
   );
 }

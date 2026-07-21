@@ -81,7 +81,7 @@ select:focus-visible {
 
 .button:hover:not(:disabled) {
   border-color: var(--line-strong);
-  background: white;
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--ink) 12%);
 }
 
 .button:active:not(:disabled) {
@@ -94,14 +94,14 @@ select:focus-visible {
 }
 
 .button--primary {
-  color: #fffaf7;
+  color: #f7eef0;
   border-color: var(--accent);
   background: var(--accent);
 }
 
 .button--primary:hover:not(:disabled) {
-  border-color: var(--accent-deep);
-  background: var(--accent-deep);
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
 }
 
 .button--danger {
@@ -231,7 +231,7 @@ select:focus-visible {
 }
 
 .dialog-backdrop::backdrop {
-  background: rgb(48 45 42 / 30%);
+  background: var(--modal-backdrop);
   animation: dialog-fade 140ms ease;
 }
 

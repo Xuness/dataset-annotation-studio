@@ -19,7 +19,7 @@ export const WORKSPACE_LAYOUT_LIMITS = {
   inspectorPaneMax: 560,
   imagePaneMin: 35,
   imagePaneMax: 75,
-  navigationWidth: 52,
+  navigationWidth: 60,
   resizeHandlesWidth: 10,
   mediaPaneMin: 340,
 } as const;

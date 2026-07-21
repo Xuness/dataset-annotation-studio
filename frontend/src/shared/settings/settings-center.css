@@ -1,0 +1,313 @@
+.settings-center-backdrop {
+  width: min(820px, calc(100% - 64px));
+  max-width: none;
+  max-height: calc(100% - 64px);
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+}
+
+.settings-center-backdrop::backdrop {
+  background: var(--modal-backdrop);
+  backdrop-filter: blur(7px);
+  animation: dialog-fade 160ms ease;
+}
+
+.settings-center {
+  display: grid;
+  width: 100%;
+  min-height: 530px;
+  max-height: calc(100vh - 64px);
+  grid-template-columns: 190px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  animation: settings-center-enter 190ms cubic-bezier(0.2, 0.65, 0.3, 1);
+}
+
+.settings-center__sidebar {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: 18px 12px 14px;
+  border-right: 1px solid var(--line);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent-soft) 34%, transparent),
+      transparent 34%
+    ),
+    var(--surface-sunken);
+}
+
+.settings-center__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 7px 20px;
+}
+
+.settings-center__brand > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 62%, var(--line));
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+.settings-center__brand strong,
+.settings-center__brand small {
+  display: block;
+}
+
+.settings-center__brand strong {
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.settings-center__brand small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+}
+
+.settings-center__sidebar nav button {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  border-left: 2px solid transparent;
+  color: var(--muted);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.settings-center__sidebar nav button.is-active {
+  border-left-color: var(--accent);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+}
+
+.settings-center__sidebar > p {
+  margin: auto 7px 0;
+  color: var(--faint);
+  font-size: var(--text-2xs);
+  line-height: 1.7;
+}
+
+.settings-center__content {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--surface);
+}
+
+.settings-center__content > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 26px 28px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-center__content h2 {
+  margin: 7px 0 5px;
+  font-family: "STSong", "Songti SC", Georgia, serif;
+  font-size: 23px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+}
+
+.settings-center__content header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.settings-center__close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings-center__close:hover {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--surface-raised);
+}
+
+.theme-preset-grid {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 14px;
+  padding: 22px 28px;
+  overflow: auto;
+}
+
+.theme-preset-card {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 142px auto;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  text-align: left;
+  background: var(--surface-sunken);
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    transform var(--transition),
+    box-shadow var(--transition);
+}
+
+.theme-preset-card:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
+.theme-preset-card.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 76%, var(--line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.theme-preset-card__preview {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgb(2 7 11 / 96%) 0%, rgb(2 7 11 / 42%) 62%, transparent 100%),
+    var(--theme-preview-image) var(--theme-preview-position) / cover;
+}
+
+.theme-preset-card__preview::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 45%, rgb(2 7 11 / 88%) 100%);
+  content: "";
+}
+
+.theme-preset-card__frame {
+  position: absolute;
+  inset: 20px 18px;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 20px 1fr 48px;
+  grid-template-rows: 17px 1fr;
+  gap: 1px;
+  border: 1px solid rgb(218 228 234 / 22%);
+  background: rgb(3 9 14 / 88%);
+  box-shadow: 0 12px 25px rgb(0 0 0 / 38%);
+}
+
+.theme-preset-card__frame span:nth-child(1) {
+  grid-column: 1 / -1;
+  border-bottom: 1px solid rgb(218 228 234 / 13%);
+}
+
+.theme-preset-card__frame span:nth-child(2) {
+  border-right: 1px solid rgb(218 228 234 / 13%);
+}
+
+.theme-preset-card__frame span:nth-child(3) {
+  grid-column: 2 / -1;
+  background: rgb(12 22 30 / 78%);
+}
+
+.theme-preset-card__selected {
+  position: absolute;
+  right: 9px;
+  bottom: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  color: #f3e9ea;
+  background: color-mix(in srgb, var(--accent-strong) 88%, transparent);
+  font-size: var(--text-2xs);
+}
+
+.theme-preset-card__copy {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface-raised);
+}
+
+.theme-preset-card__copy > span:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.theme-preset-card__copy strong {
+  font-family: "Songti SC", Georgia, serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.theme-preset-card__copy small {
+  color: var(--faint);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.theme-preset-card__copy > span:last-child {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.65;
+}
+
+.theme-preset-card__swatches {
+  display: flex;
+  gap: 4px;
+}
+
+.theme-preset-card__swatches i {
+  width: 18px;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.settings-center__content > footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 11px 28px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  background: var(--surface-sunken);
+  font-size: var(--text-2xs);
+}
+
+@keyframes settings-center-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.988);
+  }
+}

@@ -4,7 +4,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter } from "react-router-dom";
 
 import { App } from "./app/App";
+import { initializeAppPreferences } from "./shared/theme/appPreferences";
 import "./styles/global.css";
+
+initializeAppPreferences();
 
 const queryClient = new QueryClient({
   defaultOptions: {

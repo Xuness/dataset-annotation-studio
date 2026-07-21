@@ -274,7 +274,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #f8f4ed;
+  background: var(--code-surface);
 }
 
 .prompt-message-card > header {
@@ -475,7 +475,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--ink-soft);
-  background: #f8f4ed;
+  background: var(--code-surface);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: var(--text-xs);
   line-height: 1.65;

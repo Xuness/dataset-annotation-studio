@@ -1,0 +1,78 @@
+:root,
+:root[data-theme="silent-gallery"] {
+  color-scheme: dark;
+
+  --app-backdrop: #02070b;
+  --app-backdrop-elevated: #061019;
+  --surface-sunken: #071018;
+  --surface: #0b151d;
+  --surface-soft: #101c25;
+  --surface-raised: #14212a;
+  --canvas: #03080d;
+  --editor-surface: #0a131a;
+  --editor-gutter: #071018;
+  --code-surface: #081119;
+  --ink: #dce3e7;
+  --ink-soft: #b1bec6;
+  --muted: #81919b;
+  --faint: #53636d;
+  --line: #1d2a33;
+  --line-strong: #33434e;
+  --accent: #8f2a32;
+  --accent-strong: #6f1d24;
+  --accent-deep: #c66a72;
+  --accent-soft: #261319;
+  --sage: #83a696;
+  --sage-soft: #14251f;
+  --warning: #c39a63;
+  --warning-soft: #2b2117;
+  --danger: #d36f74;
+  --danger-soft: #2d171b;
+  --modal-backdrop: rgb(0 4 7 / 74%);
+  --checker-color: rgb(154 177 190 / 6%);
+  --image-border: rgb(199 215 225 / 14%);
+  --image-shadow: 0 15px 42px rgb(0 0 0 / 52%);
+  --home-gallery-image: url("/home/silent-gallery-hall.webp");
+  --home-gallery-position: 88% 46%;
+  --home-scene-filter: saturate(0.52) contrast(1.05) brightness(0.62);
+  --home-glow: rgb(126 153 172 / 18%);
+  --workspace-scene-image: url("/home/silent-gallery-hall.webp");
+  --workspace-scene-position: 82% 42%;
+  --workspace-scene-opacity: 0.075;
+  --shadow-soft: 0 8px 28px rgb(0 0 0 / 22%);
+  --shadow-float: 0 20px 58px rgb(0 0 0 / 52%);
+
+  /* Compatibility aliases while components migrate to semantic surface names. */
+  --paper: var(--app-backdrop);
+  --paper-deep: var(--surface-sunken);
+}
+
+:root[data-theme="sea-fog"] {
+  --app-backdrop: #03080d;
+  --app-backdrop-elevated: #06121a;
+  --surface-sunken: #07131b;
+  --surface: #0b1821;
+  --surface-soft: #11212b;
+  --surface-raised: #172832;
+  --canvas: #03090e;
+  --editor-surface: #0a161e;
+  --editor-gutter: #07131b;
+  --code-surface: #08151d;
+  --ink: #d7e1e6;
+  --ink-soft: #aebdc5;
+  --muted: #7f929d;
+  --faint: #526873;
+  --line: #1c303b;
+  --line-strong: #35505d;
+  --accent: #99404a;
+  --accent-strong: #762c35;
+  --accent-deep: #d27b83;
+  --accent-soft: #2a181e;
+  --home-gallery-image: url("/home/silent-gallery-shore.webp");
+  --home-gallery-position: 65% 48%;
+  --home-scene-filter: saturate(0.46) contrast(1.08) brightness(0.58);
+  --home-glow: rgb(111 156 178 / 21%);
+  --workspace-scene-image: url("/home/silent-gallery-shore.webp");
+  --workspace-scene-position: 68% 55%;
+  --workspace-scene-opacity: 0.09;
+}

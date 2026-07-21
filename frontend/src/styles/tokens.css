@@ -1,31 +1,7 @@
 :root {
-  color-scheme: light;
   font-family: "Segoe UI Variable", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-
-  --paper: #f5f1ea;
-  --paper-deep: #ece6dc;
-  --surface: #fbfaf7;
-  --surface-soft: #f0ebe3;
-  --surface-raised: #fffdfa;
-  --ink: #302d2a;
-  --ink-soft: #5f5953;
-  --muted: #6f6760;
-  --faint: #b4aca4;
-  --line: #ded7ce;
-  --line-strong: #cfc5ba;
-  --accent: #b77f73;
-  --accent-deep: #966459;
-  --accent-soft: #eadbd4;
-  --sage: #788979;
-  --sage-soft: #e1e7df;
-  --warning: #a7784d;
-  --warning-soft: #eee1d1;
-  --danger: #a25f58;
-  --danger-soft: #f1dcda;
-  --shadow-soft: 0 8px 28px rgb(69 52 40 / 7%);
-  --shadow-float: 0 14px 38px rgb(69 52 40 / 12%);
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
