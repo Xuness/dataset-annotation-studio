@@ -1,11 +1,15 @@
 :root {
-  font-family: "Segoe UI Variable", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  --font-interface: "Segoe UI Variable", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  --font-display: "Bodoni 72", "Bodoni MT", Didot, "STSong", "Songti SC", SimSun, Georgia, serif;
+  --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+
+  font-family: var(--font-interface);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --transition: 160ms cubic-bezier(0.2, 0.65, 0.3, 1);
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --transition: 180ms cubic-bezier(0.2, 0.65, 0.3, 1);
 
   /* 字号梯度：--text-2xs 仅用于装饰性微文本，正文与控件不低于 --text-sm */
   --text-2xs: 10px;

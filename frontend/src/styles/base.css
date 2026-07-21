@@ -34,7 +34,7 @@ button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 72%, white);
+  outline: 2px solid color-mix(in srgb, var(--accent) 42%, var(--ink));
   outline-offset: 2px;
 }
 
@@ -72,7 +72,8 @@ select:focus-visible {
   background: var(--surface-raised);
   cursor: pointer;
   font-size: var(--text-md);
-  font-weight: 600;
+  font-weight: 560;
+  letter-spacing: 0.015em;
   transition:
     border-color var(--transition),
     background var(--transition),
@@ -94,14 +95,27 @@ select:focus-visible {
 }
 
 .button--primary {
-  color: #f7eef0;
-  border-color: var(--accent);
-  background: var(--accent);
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background:
+    linear-gradient(
+      100deg,
+      color-mix(in srgb, var(--accent-soft) 72%, transparent),
+      transparent 42%
+    ),
+    var(--surface-raised);
+  box-shadow: inset 2px 0 var(--accent);
 }
 
 .button--primary:hover:not(:disabled) {
-  border-color: var(--accent-strong);
-  background: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line-strong));
+  background:
+    linear-gradient(
+      100deg,
+      color-mix(in srgb, var(--accent-soft) 90%, transparent),
+      transparent 48%
+    ),
+    color-mix(in srgb, var(--surface-raised) 88%, var(--ink) 12%);
 }
 
 .button--danger {
@@ -134,9 +148,10 @@ select:focus-visible {
 
 .eyebrow {
   color: var(--muted);
+  font-family: var(--font-interface);
   font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-weight: 560;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
@@ -210,7 +225,7 @@ select:focus-visible {
 
 .placeholder-page h1 {
   margin: 12px 0;
-  font-family: "Songti SC", "Noto Serif SC", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 34px;
   font-weight: 500;
 }
@@ -247,7 +262,7 @@ select:focus-visible {
 
 .dialog h2 {
   margin: 0 0 10px;
-  font-family: Georgia, "Songti SC", serif;
+  font-family: var(--font-display);
   font-size: 16px;
   font-weight: 600;
 }

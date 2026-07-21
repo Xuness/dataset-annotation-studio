@@ -3,7 +3,7 @@
   min-width: 0;
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr) 26px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 97%, transparent);
 }
 
 .annotation-editor__header,
@@ -19,6 +19,7 @@
   justify-content: space-between;
   padding: 4px 8px 4px 12px;
   border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 97%, transparent);
 }
 
 .annotation-editor__title,
@@ -59,15 +60,16 @@
 .annotation-view-tabs {
   display: flex;
   height: 28px;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-soft);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .annotation-view-tabs button {
   padding: 0 9px;
-  border-radius: 4px;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
   color: var(--muted);
   background: transparent;
   cursor: pointer;
@@ -75,9 +77,10 @@
 }
 
 .annotation-view-tabs button.is-active {
-  color: var(--accent-deep);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-raised) 62%, transparent);
+  box-shadow: none;
 }
 
 .annotation-language-select {
@@ -210,12 +213,12 @@
 
 .annotation-editor__body .cm-activeLine,
 .annotation-editor__body .cm-activeLineGutter {
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  background: color-mix(in srgb, var(--ink) 3.5%, transparent);
 }
 
 .annotation-editor__body .cm-content {
   padding: 6px 0;
-  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-family: var(--font-mono);
   line-height: 1.65;
   overflow-wrap: anywhere;
 }

@@ -7,7 +7,7 @@
 .preprocess-history {
   min-width: 0;
   min-height: 0;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 97%, transparent);
 }
 
 .preprocess-settings {
@@ -25,21 +25,23 @@
 
 .preprocess-icon {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 30px;
+  height: 30px;
   place-items: center;
-  border-radius: 50%;
-  color: var(--accent-deep);
-  background: var(--accent-soft);
+  border-left: 1px solid var(--accent);
+  border-radius: 0;
+  color: var(--ink-soft);
+  background: transparent;
 }
 
 .preprocess-settings h2,
 .preprocess-preview h2,
 .preprocess-history h2 {
   margin: 4px 0 0;
-  font-family: Georgia, "Songti SC", serif;
+  font-family: var(--font-display);
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
+  letter-spacing: 0.045em;
 }
 
 .preprocess-option {
@@ -47,7 +49,7 @@
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: color-mix(in srgb, var(--surface-raised) 74%, transparent);
 }
 
 .option-toggle {
@@ -166,6 +168,13 @@
 .preprocess-preview {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface) 97%, transparent),
+      color-mix(in srgb, var(--surface) 92%, transparent)
+    ),
+    var(--workspace-scene-image) var(--workspace-scene-position) / auto 165% no-repeat;
 }
 
 .preprocess-preview > header {
@@ -223,7 +232,7 @@
 
 .preview-table > div.will-change {
   color: var(--ink-soft);
-  background: color-mix(in srgb, var(--accent-soft) 32%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 58%, transparent);
 }
 
 .preview-table > div.has-warning {
@@ -287,7 +296,7 @@
 }
 
 .preprocess-history article > header span {
-  color: var(--accent-deep);
+  color: var(--ink-soft);
   font-size: var(--text-2xs);
 }
 

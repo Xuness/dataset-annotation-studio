@@ -3,23 +3,24 @@
   min-width: 0;
   min-height: 0;
   grid-template-rows: auto auto auto auto minmax(0, 1fr);
-  padding: 0 9px;
-  background: var(--surface);
+  padding: 0 11px;
+  background: color-mix(in srgb, var(--surface) 97%, transparent);
 }
 
 .asset-browser__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 13px 2px 10px;
+  padding: 15px 2px 12px;
 }
 
 .asset-browser__header strong {
   display: block;
   margin-top: 3px;
-  font-family: Georgia, "Songti SC", serif;
-  font-size: 14px;
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
 }
 
 .switch-label {
@@ -81,7 +82,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--muted);
-  background: var(--surface-raised);
+  background: var(--surface-sunken);
 }
 
 .search-field:focus-within {
@@ -128,8 +129,9 @@
 }
 
 .asset-filters button.is-active {
-  color: var(--accent-deep);
-  background: var(--accent-soft);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-raised) 58%, transparent);
+  box-shadow: inset 0 -1px var(--accent);
 }
 
 .asset-selection-toolbar {
@@ -204,7 +206,7 @@
   gap: 9px;
   padding: 7px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 2px;
   text-align: left;
   background: transparent;
   cursor: pointer;
@@ -221,7 +223,7 @@
 }
 
 .asset-row:hover {
-  background: var(--surface-soft);
+  background: color-mix(in srgb, var(--surface-soft) 72%, transparent);
 }
 
 .asset-check {
@@ -242,19 +244,19 @@
 }
 
 .asset-row.is-selected {
-  border-color: color-mix(in srgb, var(--line-strong) 76%, var(--line));
-  background: color-mix(in srgb, var(--surface-raised) 82%, var(--accent-soft));
+  border-color: color-mix(in srgb, var(--line-strong) 68%, var(--line));
+  background: color-mix(in srgb, var(--surface-raised) 78%, transparent);
 }
 
 .asset-row.is-selected::before {
   background: var(--accent);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 54%, transparent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .asset-row img {
   width: 52px;
   height: 52px;
-  border-radius: 6px;
+  border-radius: 2px;
   object-fit: cover;
   background: var(--canvas);
 }

@@ -23,8 +23,8 @@
   grid-template-columns: 190px minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  background: var(--surface);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--surface) 98%, transparent);
   box-shadow: var(--shadow-float);
   animation: settings-center-enter 190ms cubic-bezier(0.2, 0.65, 0.3, 1);
 }
@@ -36,11 +36,7 @@
   padding: 18px 12px 14px;
   border-right: 1px solid var(--line);
   background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--accent-soft) 34%, transparent),
-      transparent 34%
-    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--ink) 2.5%, transparent), transparent 40%),
     var(--surface-sunken);
 }
 
@@ -56,9 +52,10 @@
   width: 30px;
   height: 30px;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--accent) 62%, var(--line));
-  color: var(--accent-deep);
-  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  border-left-color: var(--accent);
+  color: var(--ink-soft);
+  background: var(--surface-raised);
 }
 
 .settings-center__brand strong,
@@ -67,7 +64,7 @@
 }
 
 .settings-center__brand strong {
-  font-family: Georgia, "Songti SC", serif;
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 500;
 }
@@ -97,7 +94,7 @@
 .settings-center__sidebar nav button.is-active {
   border-left-color: var(--accent);
   color: var(--ink);
-  background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 62%, transparent);
 }
 
 .settings-center__sidebar > p {
@@ -126,10 +123,10 @@
 
 .settings-center__content h2 {
   margin: 7px 0 5px;
-  font-family: "STSong", "Songti SC", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 23px;
   font-weight: 400;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.075em;
 }
 
 .settings-center__content header p {
@@ -173,7 +170,7 @@
   grid-template-rows: 142px auto;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 2px;
   color: var(--ink);
   text-align: left;
   background: var(--surface-sunken);
@@ -190,8 +187,8 @@
 }
 
 .theme-preset-card.is-selected {
-  border-color: color-mix(in srgb, var(--accent) 76%, var(--line));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--line-strong);
+  box-shadow: inset 2px 0 var(--accent);
 }
 
 .theme-preset-card__preview {
@@ -199,14 +196,14 @@
   display: block;
   overflow: hidden;
   background:
-    linear-gradient(90deg, rgb(2 7 11 / 96%) 0%, rgb(2 7 11 / 42%) 62%, transparent 100%),
+    linear-gradient(90deg, rgb(3 4 5 / 96%) 0%, rgb(3 4 5 / 44%) 62%, transparent 100%),
     var(--theme-preview-image) var(--theme-preview-position) / cover;
 }
 
 .theme-preset-card__preview::after {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 45%, rgb(2 7 11 / 88%) 100%);
+  background: linear-gradient(180deg, transparent 45%, rgb(3 4 5 / 90%) 100%);
   content: "";
 }
 
@@ -218,23 +215,23 @@
   grid-template-columns: 20px 1fr 48px;
   grid-template-rows: 17px 1fr;
   gap: 1px;
-  border: 1px solid rgb(218 228 234 / 22%);
-  background: rgb(3 9 14 / 88%);
+  border: 1px solid rgb(218 216 210 / 18%);
+  background: rgb(5 6 7 / 91%);
   box-shadow: 0 12px 25px rgb(0 0 0 / 38%);
 }
 
 .theme-preset-card__frame span:nth-child(1) {
   grid-column: 1 / -1;
-  border-bottom: 1px solid rgb(218 228 234 / 13%);
+  border-bottom: 1px solid rgb(218 216 210 / 11%);
 }
 
 .theme-preset-card__frame span:nth-child(2) {
-  border-right: 1px solid rgb(218 228 234 / 13%);
+  border-right: 1px solid rgb(218 216 210 / 11%);
 }
 
 .theme-preset-card__frame span:nth-child(3) {
   grid-column: 2 / -1;
-  background: rgb(12 22 30 / 78%);
+  background: rgb(14 16 17 / 82%);
 }
 
 .theme-preset-card__selected {
@@ -265,7 +262,7 @@
 }
 
 .theme-preset-card__copy strong {
-  font-family: "Songti SC", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 14px;
   font-weight: 500;
 }
