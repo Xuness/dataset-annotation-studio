@@ -22,7 +22,7 @@ const STORAGE_KEY = "dataset-studio.preferences";
 interface AppPreferencesState {
   preferences: AppPreferences;
   setTheme: (themeId: ThemeId) => void;
-  setCustomBackground: (background: CustomBackground | null) => void;
+  setThemeCustomBackground: (themeId: ThemeId, background: CustomBackground | null) => void;
   setSceneOverrides: (target: SceneTarget, update: Partial<SceneOverrides>) => void;
   resetSceneOverrides: (target: SceneTarget) => void;
   setRegionTransparency: (region: AppSurfaceRegion, transparent: boolean) => void;
@@ -126,11 +126,17 @@ export const useAppPreferences = create<AppPreferencesState>((set) => {
   return {
     preferences: initialPreferences,
     setTheme: (themeId) => commit((current) => ({ ...current, themeId })),
-    setCustomBackground: (customBackground) =>
-      commit((current) => ({
-        ...current,
-        appearance: { ...current.appearance, customBackground },
-      })),
+    setThemeCustomBackground: (themeId, customBackground) =>
+      commit((current) => {
+        const customBackgrounds = { ...current.appearance.customBackgrounds };
+        if (customBackground) customBackgrounds[themeId] = customBackground;
+        else delete customBackgrounds[themeId];
+
+        return {
+          ...current,
+          appearance: { ...current.appearance, customBackgrounds },
+        };
+      }),
     setSceneOverrides: (target, update) =>
       commit((current) => ({
         ...current,

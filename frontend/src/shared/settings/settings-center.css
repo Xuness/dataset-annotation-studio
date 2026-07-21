@@ -265,8 +265,10 @@
 
 .theme-preset-card__copy > span:first-child {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 7px;
+  row-gap: 4px;
 }
 
 .theme-preset-card__copy strong {
@@ -276,6 +278,7 @@
 }
 
 .theme-preset-card__copy em {
+  flex: 0 0 auto;
   padding: 2px 5px;
   border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line));
   color: var(--accent-deep);
@@ -283,9 +286,11 @@
   font-size: 9px;
   font-style: normal;
   letter-spacing: 0.08em;
+  white-space: nowrap;
 }
 
 .theme-preset-card__copy small {
+  flex-basis: 100%;
   color: var(--faint);
   font-size: var(--text-2xs);
   letter-spacing: 0.08em;

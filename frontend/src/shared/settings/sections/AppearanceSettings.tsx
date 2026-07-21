@@ -173,7 +173,7 @@ function SceneControl({
 export function AppearanceSettings({ onClose }: { onClose: () => void }) {
   const preferences = useAppPreferences((state) => state.preferences);
   const setTheme = useAppPreferences((state) => state.setTheme);
-  const setCustomBackground = useAppPreferences((state) => state.setCustomBackground);
+  const setThemeCustomBackground = useAppPreferences((state) => state.setThemeCustomBackground);
   const setSceneOverrides = useAppPreferences((state) => state.setSceneOverrides);
   const resetSceneOverrides = useAppPreferences((state) => state.resetSceneOverrides);
   const setRegionTransparency = useAppPreferences((state) => state.setRegionTransparency);
@@ -183,7 +183,7 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
   const [backgroundPending, setBackgroundPending] = useState(false);
   const [backgroundError, setBackgroundError] = useState<string | null>(null);
   const resolved = resolveAppearance(preferences);
-  const customBackground = preferences.appearance.customBackground;
+  const customBackground = resolved.customBackground;
   const backgroundSupported = supportsCustomBackgrounds();
   const transparentRegions = preferences.appearance.transparentRegions;
   const immersiveMode = preferences.appearance.immersiveMode;
@@ -193,8 +193,11 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
     setBackgroundError(null);
     setBackgroundPending(true);
     try {
-      const selected = await chooseCustomBackground();
-      if (selected) setCustomBackground(selected);
+      const selected = await chooseCustomBackground(
+        resolved.theme.id,
+        customBackground?.path ?? null,
+      );
+      if (selected) setThemeCustomBackground(resolved.theme.id, selected);
     } catch (error) {
       setBackgroundError(error instanceof Error ? error.message : "无法保存自定义背景图片。");
     } finally {
@@ -203,11 +206,15 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
   }
 
   async function removeBackground() {
+    if (!customBackground) return;
+
+    const themeId = resolved.theme.id;
+    const backgroundPath = customBackground.path;
     setBackgroundError(null);
-    setCustomBackground(null);
+    setThemeCustomBackground(themeId, null);
     setBackgroundPending(true);
     try {
-      await clearCustomBackground();
+      await clearCustomBackground(themeId, backgroundPath);
     } catch (error) {
       setBackgroundError(
         error instanceof Error
@@ -242,7 +249,9 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
         <div>
           <span className="eyebrow">Appearance</span>
           <h2>外观与主题</h2>
-          <p>主题负责色彩与基调；背景图片、显影参数和区域透光作为独立覆盖层保存。</p>
+          <p>
+            主题负责色彩与基调；每个主题单独保存背景图片，显影参数和区域透光作为通用覆盖层保存。
+          </p>
         </div>
         <button
           type="button"
@@ -260,8 +269,8 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
         <section className="appearance-section appearance-background">
           <div className="appearance-section__heading">
             <div>
-              <span className="eyebrow">Personal scene</span>
-              <h3>自定义背景</h3>
+              <span className="eyebrow">Theme scene</span>
+              <h3>“{resolved.theme.name}”背景</h3>
             </div>
             <small>PNG · JPEG · WebP，最大 64 MB</small>
           </div>
@@ -271,11 +280,11 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
               <i>{customBackground ? "CUSTOM SCENE" : resolved.theme.englishName}</i>
             </div>
             <div className="appearance-background__copy">
-              <strong>{customBackground?.name ?? "使用主题自带场景"}</strong>
+              <strong>{customBackground?.name ?? `使用“${resolved.theme.name}”自带场景`}</strong>
               <p>
                 {customBackground
-                  ? "图片已复制到 Dataset Studio 的本地数据目录；移动或删除原图不会影响显示。"
-                  : "选择一张图片后，它会同时用于首页与主工作区；切换主题仍会保留这张图片。"}
+                  ? `图片仅用于“${resolved.theme.name}”，并已复制到本地数据目录；移动或删除原图不会影响显示。`
+                  : `选择后会同时用于“${resolved.theme.name}”的首页和主工作区；切换主题会显示各自的背景。`}
               </p>
               <div>
                 <Button
@@ -424,11 +433,14 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
               <span className="eyebrow">Theme registry</span>
               <h3>主题预设</h3>
             </div>
-            <small>主题切换不覆盖自定义背景参数</small>
+            <small>每个主题分别保存背景图片</small>
           </div>
           <div className="theme-preset-grid">
             {THEMES.map((theme) => {
               const selected = theme.id === preferences.themeId;
+              const hasCustomBackground = Boolean(
+                preferences.appearance.customBackgrounds[theme.id],
+              );
               const previewStyle = {
                 "--theme-preview-image": `url(${JSON.stringify(theme.scene.image)})`,
                 "--theme-preview-position": theme.scene.previewPosition,
@@ -461,6 +473,7 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
                     <span>
                       <strong>{theme.name}</strong>
                       {theme.id === DEFAULT_THEME_ID ? <em>默认</em> : null}
+                      {hasCustomBackground ? <em>自定义</em> : null}
                       <small>{theme.englishName}</small>
                     </span>
                     <span className="theme-preset-card__swatches" aria-hidden="true">
@@ -479,7 +492,11 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
 
       <footer>
         <span>外观设置仅保存在当前设备</span>
-        <span>{customBackground ? "正在使用自定义场景" : `当前主题 · ${resolved.theme.name}`}</span>
+        <span>
+          {customBackground
+            ? `${resolved.theme.name} · 自定义背景`
+            : `当前主题 · ${resolved.theme.name}`}
+        </span>
       </footer>
     </>
   );

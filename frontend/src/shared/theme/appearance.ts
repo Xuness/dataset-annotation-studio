@@ -1,6 +1,6 @@
 import { DEFAULT_THEME_ID, getThemeDefinition, isThemeId, type ThemeId } from "./themes.ts";
 
-export const PREFERENCES_VERSION = 8 as const;
+export const PREFERENCES_VERSION = 9 as const;
 
 export const SCENE_LIMITS = {
   opacity: { min: 0, max: 1 },
@@ -30,13 +30,15 @@ export interface CustomBackground {
   name: string;
 }
 
+export type ThemeCustomBackgrounds = Partial<Record<ThemeId, CustomBackground>>;
+
 export interface SceneOverrides {
   opacity: number | null;
   blurPx: number | null;
 }
 
 export interface AppearancePreferences {
-  customBackground: CustomBackground | null;
+  customBackgrounds: ThemeCustomBackgrounds;
   home: SceneOverrides;
   workspace: SceneOverrides;
   transparentRegions: AppSurfaceTransparency;
@@ -91,7 +93,7 @@ export function createDefaultPreferences(themeId: ThemeId = DEFAULT_THEME_ID): A
     version: PREFERENCES_VERSION,
     themeId,
     appearance: {
-      customBackground: null,
+      customBackgrounds: {},
       home: emptySceneOverrides(),
       workspace: emptySceneOverrides(),
       transparentRegions: createDefaultSurfaceTransparency(),
@@ -128,6 +130,23 @@ function normalizeCustomBackground(value: unknown): CustomBackground | null {
   return path && name ? { path, name } : null;
 }
 
+function normalizeThemeCustomBackgrounds(value: unknown): ThemeCustomBackgrounds {
+  if (!isRecord(value)) return {};
+
+  const backgrounds: ThemeCustomBackgrounds = {};
+  for (const [themeId, candidate] of Object.entries(value)) {
+    if (!isThemeId(themeId)) continue;
+    const background = normalizeCustomBackground(candidate);
+    if (background) backgrounds[themeId] = background;
+  }
+  return backgrounds;
+}
+
+function migrateLegacyCustomBackground(value: unknown, themeId: ThemeId): ThemeCustomBackgrounds {
+  const background = normalizeCustomBackground(value);
+  return background ? { [themeId]: background } : {};
+}
+
 function normalizeSurfaceTransparency(value: unknown): AppSurfaceTransparency {
   const defaults = createDefaultSurfaceTransparency();
   if (!isRecord(value)) return defaults;
@@ -142,10 +161,17 @@ function normalizeSurfaceTransparency(value: unknown): AppSurfaceTransparency {
 
 function normalizeAppearancePreferences(
   value: Record<string, unknown>,
-  options: { preserveRegions: boolean; preserveImmersiveMode: boolean },
+  options: {
+    themeId: ThemeId;
+    preserveRegions: boolean;
+    preserveImmersiveMode: boolean;
+    preserveThemeBackgrounds: boolean;
+  },
 ): AppearancePreferences {
   return {
-    customBackground: normalizeCustomBackground(value.customBackground),
+    customBackgrounds: options.preserveThemeBackgrounds
+      ? normalizeThemeCustomBackgrounds(value.customBackgrounds)
+      : migrateLegacyCustomBackground(value.customBackground, options.themeId),
     home: normalizeSceneOverrides(value.home),
     workspace: normalizeSceneOverrides(value.workspace),
     transparentRegions: options.preserveRegions
@@ -171,8 +197,10 @@ export function normalizePreferences(value: unknown): AppPreferences {
       version: PREFERENCES_VERSION,
       themeId,
       appearance: normalizeAppearancePreferences(value.appearance, {
+        themeId,
         preserveRegions: false,
         preserveImmersiveMode: false,
+        preserveThemeBackgrounds: false,
       }),
     };
   }
@@ -187,29 +215,46 @@ export function normalizePreferences(value: unknown): AppPreferences {
       version: PREFERENCES_VERSION,
       themeId,
       appearance: normalizeAppearancePreferences(value.appearance, {
+        themeId,
         preserveRegions: true,
         preserveImmersiveMode: false,
+        preserveThemeBackgrounds: false,
       }),
     };
   }
 
-  // Version 5 introduced immersive mode. Later versions only added optional
-  // surface keys, so the region normalizer can preserve known choices and add
-  // each missing surface with its backward-compatible default.
+  // Versions 5 through 8 added immersive mode and optional surface keys. Their
+  // single custom background belongs to whichever theme was active at upgrade
+  // time, preserving the visible scene without leaking it into other themes.
   const storedVersion = value.version;
   if (
     typeof storedVersion === "number" &&
     Number.isInteger(storedVersion) &&
     storedVersion >= 5 &&
-    storedVersion <= PREFERENCES_VERSION &&
+    storedVersion <= 8 &&
     isRecord(value.appearance)
   ) {
     return {
       version: PREFERENCES_VERSION,
       themeId,
       appearance: normalizeAppearancePreferences(value.appearance, {
+        themeId,
         preserveRegions: true,
         preserveImmersiveMode: true,
+        preserveThemeBackgrounds: false,
+      }),
+    };
+  }
+
+  if (storedVersion === PREFERENCES_VERSION && isRecord(value.appearance)) {
+    return {
+      version: PREFERENCES_VERSION,
+      themeId,
+      appearance: normalizeAppearancePreferences(value.appearance, {
+        themeId,
+        preserveRegions: true,
+        preserveImmersiveMode: true,
+        preserveThemeBackgrounds: true,
       }),
     };
   }
@@ -229,7 +274,7 @@ export function resolveAppearance(preferences: AppPreferences): ResolvedAppearan
   const theme = getThemeDefinition(preferences.themeId);
   return {
     theme,
-    customBackground: preferences.appearance.customBackground,
+    customBackground: preferences.appearance.customBackgrounds[theme.id] ?? null,
     home: {
       opacity: preferences.appearance.home.opacity ?? theme.scene.home.opacity,
       blurPx: preferences.appearance.home.blurPx ?? theme.scene.home.blurPx,
