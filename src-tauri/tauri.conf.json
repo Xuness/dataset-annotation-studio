@@ -24,7 +24,11 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:8765; img-src 'self' asset: http://asset.localhost http://127.0.0.1:8765 data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:8765; img-src 'self' asset: http://asset.localhost http://127.0.0.1:8765 data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPLOCALDATA/backgrounds/**"]
+      }
     }
   },
   "bundle": {

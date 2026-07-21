@@ -1,71 +1,135 @@
+import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
 import { create } from "zustand";
 
-import { DEFAULT_THEME_ID, getThemeDefinition, isThemeId, type ThemeId } from "./themes";
+import {
+  normalizePreferences,
+  resolveAppearance,
+  type AppPreferences,
+  type CustomBackground,
+  type SceneOverrides,
+  type SceneTarget,
+} from "./appearance";
+import type { ThemeId } from "./themes";
 
 const STORAGE_KEY = "dataset-studio.preferences";
-const PREFERENCES_VERSION = 1;
-
-interface PersistedPreferences {
-  version: typeof PREFERENCES_VERSION;
-  themeId: ThemeId;
-}
 
 interface AppPreferencesState {
-  themeId: ThemeId;
+  preferences: AppPreferences;
   setTheme: (themeId: ThemeId) => void;
+  setCustomBackground: (background: CustomBackground | null) => void;
+  setSceneOverrides: (target: SceneTarget, update: Partial<SceneOverrides>) => void;
+  resetSceneOverrides: (target: SceneTarget) => void;
 }
 
-const DEFAULT_PREFERENCES: PersistedPreferences = {
-  version: PREFERENCES_VERSION,
-  themeId: DEFAULT_THEME_ID,
-};
-
-function readStoredPreferences(): PersistedPreferences {
-  if (typeof window === "undefined") return DEFAULT_PREFERENCES;
+function readStoredPreferences(): AppPreferences {
+  if (typeof window === "undefined") return normalizePreferences(null);
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_PREFERENCES;
-    const value = JSON.parse(raw) as Partial<PersistedPreferences>;
-    if (value.version !== PREFERENCES_VERSION || !isThemeId(value.themeId)) {
-      return DEFAULT_PREFERENCES;
-    }
-    return { version: PREFERENCES_VERSION, themeId: value.themeId };
+    return raw ? normalizePreferences(JSON.parse(raw)) : normalizePreferences(null);
   } catch {
-    return DEFAULT_PREFERENCES;
+    return normalizePreferences(null);
   }
 }
 
-function persistPreferences(themeId: ThemeId) {
+function persistPreferences(preferences: AppPreferences) {
   if (typeof window === "undefined") return;
-  const preferences: PersistedPreferences = { version: PREFERENCES_VERSION, themeId };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
   } catch {
-    // Theme switching should remain available when browser storage is unavailable.
+    // Appearance changes should remain usable for this session when browser
+    // storage is unavailable or full.
   }
 }
 
-export function applyTheme(themeId: ThemeId) {
+function cssUrl(value: string): string {
+  return `url(${JSON.stringify(value)})`;
+}
+
+function resolveImageUrl(path: string): string {
+  return isTauri() ? convertFileSrc(path) : path;
+}
+
+export function applyPreferences(preferences: AppPreferences) {
   if (typeof document === "undefined") return;
-  const theme = getThemeDefinition(themeId);
-  document.documentElement.dataset.theme = theme.id;
-  document
+
+  const resolved = resolveAppearance(preferences);
+  const customBackground = resolved.customBackground;
+  const sceneImage = customBackground
+    ? resolveImageUrl(customBackground.path)
+    : resolved.theme.scene.image;
+  const homePresentation = customBackground
+    ? { position: "center", size: "cover" }
+    : resolved.theme.scene.home;
+  const workspacePresentation = customBackground
+    ? { position: "center", size: "cover" }
+    : resolved.theme.scene.workspace;
+  const root = document.documentElement;
+
+  root.dataset.theme = resolved.theme.id;
+  root.dataset.backgroundSource = customBackground ? "custom" : "theme";
+  root.style.setProperty("--home-gallery-image", cssUrl(sceneImage));
+  root.style.setProperty("--home-gallery-position", homePresentation.position);
+  root.style.setProperty("--home-scene-size", homePresentation.size);
+  root.style.setProperty("--home-scene-filter", resolved.theme.scene.home.filter);
+  root.style.setProperty("--home-scene-opacity", String(resolved.home.opacity));
+  root.style.setProperty("--home-scene-blur", `${resolved.home.blurPx}px`);
+  root.style.setProperty("--workspace-scene-image", cssUrl(sceneImage));
+  root.style.setProperty("--workspace-scene-position", workspacePresentation.position);
+  root.style.setProperty("--workspace-scene-size", workspacePresentation.size);
+  root.style.setProperty("--workspace-scene-filter", resolved.theme.scene.workspace.filter);
+  root.style.setProperty("--workspace-scene-opacity", String(resolved.workspace.opacity));
+  root.style.setProperty("--workspace-scene-blur", `${resolved.workspace.blurPx}px`);
+  root.style.setProperty(
+    "--workspace-surface-opacity",
+    `${Math.max(70, 98.5 - resolved.workspace.opacity * 28.5)}%`,
+  );
+  root
     .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-    ?.setAttribute("content", theme.browserThemeColor);
+    ?.setAttribute("content", resolved.theme.browserThemeColor);
 }
 
 const initialPreferences = readStoredPreferences();
 
-export const useAppPreferences = create<AppPreferencesState>((set) => ({
-  themeId: initialPreferences.themeId,
-  setTheme: (themeId) => {
-    persistPreferences(themeId);
-    applyTheme(themeId);
-    set({ themeId });
-  },
-}));
+export const useAppPreferences = create<AppPreferencesState>((set) => {
+  const commit = (update: (current: AppPreferences) => AppPreferences) => {
+    set((state) => {
+      const preferences = normalizePreferences(update(state.preferences));
+      persistPreferences(preferences);
+      applyPreferences(preferences);
+      return { preferences };
+    });
+  };
+
+  return {
+    preferences: initialPreferences,
+    setTheme: (themeId) => commit((current) => ({ ...current, themeId })),
+    setCustomBackground: (customBackground) =>
+      commit((current) => ({
+        ...current,
+        appearance: { ...current.appearance, customBackground },
+      })),
+    setSceneOverrides: (target, update) =>
+      commit((current) => ({
+        ...current,
+        appearance: {
+          ...current.appearance,
+          [target]: { ...current.appearance[target], ...update },
+        },
+      })),
+    resetSceneOverrides: (target) =>
+      commit((current) => ({
+        ...current,
+        appearance: {
+          ...current.appearance,
+          [target]: { opacity: null, blurPx: null },
+        },
+      })),
+  };
+});
 
 export function initializeAppPreferences() {
-  applyTheme(useAppPreferences.getState().themeId);
+  const preferences = useAppPreferences.getState().preferences;
+  persistPreferences(preferences);
+  applyPreferences(preferences);
 }

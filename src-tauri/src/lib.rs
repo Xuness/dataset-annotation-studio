@@ -6,6 +6,7 @@ use tauri::Manager;
 #[cfg(not(debug_assertions))]
 use tauri_plugin_shell::{process::CommandChild, ShellExt};
 
+mod background;
 mod clipboard;
 
 #[cfg(not(debug_assertions))]
@@ -36,7 +37,9 @@ fn terminate_service(child: CommandChild) {
 pub fn run() {
     let builder = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            clipboard::write_clipboard_text_with_history
+            clipboard::write_clipboard_text_with_history,
+            background::install_custom_background,
+            background::clear_custom_background
         ])
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())

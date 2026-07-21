@@ -2,13 +2,6 @@
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
   padding: 19px 20px 0;
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--surface) 97%, transparent),
-      color-mix(in srgb, var(--surface) 92%, transparent)
-    ),
-    var(--workspace-scene-image) var(--workspace-scene-position) / auto 165% no-repeat;
 }
 
 .job-detail-panel--empty {

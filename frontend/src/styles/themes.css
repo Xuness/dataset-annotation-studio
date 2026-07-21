@@ -32,13 +32,7 @@
   --checker-color: rgb(154 177 190 / 6%);
   --image-border: rgb(199 215 225 / 14%);
   --image-shadow: 0 15px 42px rgb(0 0 0 / 52%);
-  --home-gallery-image: url("/home/silent-gallery-hall.webp");
-  --home-gallery-position: 88% 46%;
-  --home-scene-filter: saturate(0.52) contrast(1.05) brightness(0.62);
   --home-glow: rgb(126 153 172 / 18%);
-  --workspace-scene-image: url("/home/silent-gallery-hall.webp");
-  --workspace-scene-position: 100% 48%;
-  --workspace-scene-opacity: 0.055;
   --shadow-soft: 0 8px 28px rgb(0 0 0 / 22%);
   --shadow-float: 0 20px 58px rgb(0 0 0 / 52%);
 
@@ -98,13 +92,7 @@
   --accent-strong: #762c35;
   --accent-deep: #d27b83;
   --accent-soft: #2a181e;
-  --home-gallery-image: url("/home/silent-gallery-shore.webp");
-  --home-gallery-position: 65% 48%;
-  --home-scene-filter: saturate(0.46) contrast(1.08) brightness(0.58);
   --home-glow: rgb(111 156 178 / 21%);
-  --workspace-scene-image: url("/home/silent-gallery-shore.webp");
-  --workspace-scene-position: 100% 52%;
-  --workspace-scene-opacity: 0.065;
 
   --work-backdrop: #05090b;
   --work-backdrop-elevated: #080d10;
@@ -168,4 +156,23 @@
   --checker-color: rgb(220 220 214 / 1.1%);
   --image-border: rgb(214 214 208 / 12%);
   --image-shadow: 0 18px 48px rgb(0 0 0 / 62%);
+}
+
+.workspace-page {
+  --surface-sunken: color-mix(
+    in srgb,
+    var(--work-sunken) var(--workspace-surface-opacity),
+    transparent
+  );
+  --surface: color-mix(in srgb, var(--work-surface) var(--workspace-surface-opacity), transparent);
+  --surface-soft: color-mix(
+    in srgb,
+    var(--work-surface-soft) var(--workspace-surface-opacity),
+    transparent
+  );
+  --surface-raised: color-mix(
+    in srgb,
+    var(--work-surface-raised) var(--workspace-surface-opacity),
+    transparent
+  );
 }

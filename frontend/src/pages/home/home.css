@@ -72,12 +72,12 @@
 
 .home-gallery-scene::before {
   inset: -7% -5% -3%;
-  opacity: 0.78;
+  opacity: var(--home-scene-opacity);
   background-image: var(--home-gallery-image);
   background-repeat: no-repeat;
   background-position: var(--home-gallery-position);
-  background-size: auto 150%;
-  filter: var(--home-scene-filter);
+  background-size: var(--home-scene-size);
+  filter: var(--home-scene-filter) blur(var(--home-scene-blur));
   transform: scale(1.035);
   -webkit-mask-image: linear-gradient(
     to bottom,

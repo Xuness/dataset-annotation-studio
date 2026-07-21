@@ -4,7 +4,7 @@ import type { PreprocessPreview } from "../../../shared/api/types";
 
 export function PreprocessPreviewPanel({ preview }: { preview: PreprocessPreview | undefined }) {
   return (
-    <section className="preprocess-preview">
+    <section className="preprocess-preview workspace-scene-surface">
       <header>
         <div>
           <span className="eyebrow">Dry run</span>

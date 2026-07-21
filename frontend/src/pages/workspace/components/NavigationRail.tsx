@@ -73,7 +73,7 @@ export function NavigationRail({
         ))}
       </div>
       <div className="navigation-rail__utility">
-        <button type="button" title="设置" onClick={() => openSettings("themes")}>
+        <button type="button" title="设置" onClick={() => openSettings("appearance")}>
           <Settings size={18} aria-hidden="true" />
           <span>设置</span>
         </button>

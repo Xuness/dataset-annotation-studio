@@ -168,13 +168,6 @@
 .preprocess-preview {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--surface) 97%, transparent),
-      color-mix(in srgb, var(--surface) 92%, transparent)
-    ),
-    var(--workspace-scene-image) var(--workspace-scene-position) / auto 165% no-repeat;
 }
 
 .preprocess-preview > header {

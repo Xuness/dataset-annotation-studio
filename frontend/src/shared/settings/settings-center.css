@@ -1,7 +1,7 @@
 .settings-center-backdrop {
-  width: min(820px, calc(100% - 64px));
+  width: min(960px, calc(100% - 48px));
   max-width: none;
-  max-height: calc(100% - 64px);
+  max-height: calc(100% - 48px);
   padding: 0;
   overflow: visible;
   border: 0;
@@ -18,9 +18,10 @@
 .settings-center {
   display: grid;
   width: 100%;
-  min-height: 530px;
-  max-height: calc(100vh - 64px);
-  grid-template-columns: 190px minmax(0, 1fr);
+  height: min(820px, calc(100vh - 48px));
+  min-height: min(620px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  grid-template-columns: 198px minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--line-strong);
   border-radius: 2px;
@@ -117,7 +118,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  padding: 26px 28px 20px;
+  padding: 24px 28px 19px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -160,14 +161,12 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
   gap: 14px;
-  padding: 22px 28px;
-  overflow: auto;
 }
 
 .theme-preset-card {
   display: grid;
   min-width: 0;
-  grid-template-rows: 142px auto;
+  grid-template-rows: 112px auto;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 2px;
@@ -209,7 +208,7 @@
 
 .theme-preset-card__frame {
   position: absolute;
-  inset: 20px 18px;
+  inset: 16px 18px;
   z-index: 1;
   display: grid;
   grid-template-columns: 20px 1fr 48px;
@@ -250,8 +249,8 @@
 
 .theme-preset-card__copy {
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  gap: 9px;
+  padding: 13px 14px;
   background: var(--surface-raised);
 }
 
@@ -300,6 +299,313 @@
   color: var(--faint);
   background: var(--surface-sunken);
   font-size: var(--text-2xs);
+}
+
+.appearance-settings {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 17px;
+  padding: 20px 28px 24px;
+  overflow: auto;
+}
+
+.appearance-section {
+  display: grid;
+  gap: 13px;
+  padding-bottom: 17px;
+  border-bottom: 1px solid var(--line);
+}
+
+.appearance-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.appearance-section__heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.appearance-section__heading h3 {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.055em;
+}
+
+.appearance-section__heading > small {
+  color: var(--faint);
+  font-size: var(--text-2xs);
+}
+
+.appearance-background__body {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.84fr) minmax(270px, 1.16fr);
+  min-height: 142px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+}
+
+.appearance-background__preview,
+.scene-control__preview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--app-backdrop);
+}
+
+.appearance-background__preview > span,
+.scene-control__preview > span {
+  position: absolute;
+  inset: -9px;
+  z-index: -1;
+  background-image: var(--home-gallery-image);
+  background-repeat: no-repeat;
+  background-position: var(--home-gallery-position);
+  background-size: var(--home-scene-size);
+  filter: var(--home-scene-filter) blur(var(--home-scene-blur));
+}
+
+:root[data-background-source="theme"] .appearance-background__preview > span {
+  background-position: 100% 48%;
+  background-size: auto 220%;
+}
+
+.appearance-background__preview::after,
+.scene-control__preview::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(90deg, rgb(3 4 5 / 76%), transparent 68%),
+    linear-gradient(180deg, transparent 42%, rgb(3 4 5 / 84%));
+  content: "";
+}
+
+.appearance-background__preview i,
+.scene-control__preview i {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  z-index: 1;
+  color: rgb(226 224 218 / 58%);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 0.15em;
+}
+
+.appearance-background__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 17px 19px;
+  border-left: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-raised) 74%, transparent);
+}
+
+.appearance-background__copy > strong {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appearance-background__copy > p {
+  margin: 7px 0 13px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.65;
+}
+
+.appearance-background__copy > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.appearance-background__copy .button {
+  min-height: 31px;
+  padding-inline: 11px;
+  font-size: var(--text-xs);
+}
+
+.appearance-background__hint,
+.appearance-background__copy > .form-error {
+  display: block;
+  margin-top: 9px;
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+}
+
+.appearance-background__hint {
+  color: var(--faint);
+}
+
+.scene-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scene-control {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 104px minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto;
+  column-gap: 14px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+}
+
+.scene-control__preview {
+  grid-row: 1 / -1;
+  min-height: 126px;
+  border-right: 1px solid var(--line);
+}
+
+.scene-control--home .scene-control__preview > span {
+  opacity: var(--home-scene-opacity);
+}
+
+.scene-control--workspace .scene-control__preview > span {
+  opacity: var(--workspace-scene-opacity);
+  background-image: var(--workspace-scene-image);
+  background-position: var(--workspace-scene-position);
+  background-size: var(--workspace-scene-size);
+  filter: var(--workspace-scene-filter) blur(var(--workspace-scene-blur));
+}
+
+.scene-control__heading {
+  display: flex;
+  min-width: 0;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scene-control__heading strong,
+.scene-control__heading small {
+  display: block;
+}
+
+.scene-control__heading strong {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.scene-control__heading small {
+  margin-top: 2px;
+  color: var(--faint);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scene-control__heading button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--text-2xs);
+}
+
+.scene-control__heading button:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.scene-control__heading button:disabled {
+  cursor: default;
+  opacity: 0.28;
+}
+
+.scene-control > p {
+  margin: 7px 0 9px;
+  color: var(--faint);
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+}
+
+.scene-control > label {
+  display: grid;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.scene-control > label > span {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.scene-control output {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.scene-control input[type="range"] {
+  --range-progress: 0%;
+
+  appearance: none;
+  width: 100%;
+  height: 15px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.scene-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0 var(--range-progress),
+    var(--line-strong) var(--range-progress) 100%
+  );
+}
+
+.scene-control input[type="range"]::-webkit-slider-thumb {
+  width: 11px;
+  height: 11px;
+  margin-top: -4px;
+  appearance: none;
+  border: 1px solid var(--accent-deep);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.scene-control input[type="range"]:focus-visible {
+  outline: 0;
+}
+
+.scene-control input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--surface-sunken) 72%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--accent-deep) 75%, transparent);
+}
+
+@media (max-width: 1120px) {
+  .scene-control {
+    grid-template-columns: 82px minmax(0, 1fr);
+    column-gap: 11px;
+  }
 }
 
 @keyframes settings-center-enter {

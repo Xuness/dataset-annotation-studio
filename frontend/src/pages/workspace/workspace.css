@@ -35,8 +35,8 @@
   background-image: var(--workspace-scene-image);
   background-repeat: no-repeat;
   background-position: var(--workspace-scene-position);
-  background-size: auto 165%;
-  filter: grayscale(0.48) saturate(0.32) contrast(1.08) brightness(0.5);
+  background-size: var(--workspace-scene-size);
+  filter: var(--workspace-scene-filter) blur(var(--workspace-scene-blur));
   transform: scale(1.04);
 }
 
@@ -54,6 +54,33 @@
     auto,
     5px 5px;
   mix-blend-mode: normal;
+}
+
+.workspace-scene-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.workspace-scene-surface::before {
+  position: absolute;
+  inset: -24px;
+  z-index: 0;
+  opacity: clamp(0, var(--workspace-scene-opacity), 0.42);
+  background-image: var(--workspace-scene-image);
+  background-repeat: no-repeat;
+  background-position: var(--workspace-scene-position);
+  background-size: var(--workspace-scene-size);
+  content: "";
+  filter: var(--workspace-scene-filter) blur(var(--workspace-scene-blur));
+  pointer-events: none;
+  transform: scale(1.035);
+}
+
+.workspace-scene-surface > * {
+  position: relative;
+  z-index: 1;
 }
 
 .workspace-topbar {

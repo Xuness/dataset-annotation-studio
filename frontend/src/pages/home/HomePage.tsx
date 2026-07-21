@@ -73,7 +73,7 @@ export function HomePage() {
             <Cable size={14} aria-hidden="true" />
             <span>预设与连接</span>
           </button>
-          <button type="button" onClick={() => openSettings("themes")}>
+          <button type="button" onClick={() => openSettings("appearance")}>
             <Settings size={14} aria-hidden="true" />
             <span>设置</span>
           </button>

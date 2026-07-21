@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type SettingsSection = "themes";
+export type SettingsSection = "appearance";
 
 interface SettingsCenterState {
   isOpen: boolean;
@@ -11,7 +11,7 @@ interface SettingsCenterState {
 
 export const useSettingsCenter = create<SettingsCenterState>((set) => ({
   isOpen: false,
-  section: "themes",
-  open: (section = "themes") => set({ isOpen: true, section }),
+  section: "appearance",
+  open: (section = "appearance") => set({ isOpen: true, section }),
   close: () => set({ isOpen: false }),
 }));

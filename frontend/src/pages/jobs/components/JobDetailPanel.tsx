@@ -27,20 +27,20 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
 
   if (!jobId)
     return (
-      <section className="job-detail-panel job-detail-panel--empty">
+      <section className="job-detail-panel job-detail-panel--empty workspace-scene-surface">
         <p>选择一项任务查看详情。</p>
       </section>
     );
   if (job.isError && !job.data)
     return (
-      <section className="job-detail-panel job-detail-panel--empty">
+      <section className="job-detail-panel job-detail-panel--empty workspace-scene-surface">
         <FileWarning size={20} />
         <p>{job.error instanceof Error ? job.error.message : "读取任务详情失败。"}</p>
       </section>
     );
   if (!job.data)
     return (
-      <section className="job-detail-panel job-detail-panel--empty">
+      <section className="job-detail-panel job-detail-panel--empty workspace-scene-surface">
         <Spinner />
       </section>
     );
@@ -51,7 +51,7 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
   const failedItems = job.data.items.filter((item) => item.status === "failed");
 
   return (
-    <section className="job-detail-panel">
+    <section className="job-detail-panel workspace-scene-surface">
       <header>
         <div>
           <span className="eyebrow">Task detail</span>
