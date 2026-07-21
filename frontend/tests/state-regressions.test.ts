@@ -54,7 +54,7 @@ test("fullscreen shortcut accepts only an unmodified first F11 press", () => {
 test("version one appearance preferences migrate without losing the selected theme", () => {
   const preferences = normalizePreferences({ version: 1, themeId: "sea-fog" });
 
-  assert.equal(preferences.version, 6);
+  assert.equal(preferences.version, 8);
   assert.equal(preferences.themeId, "sea-fog");
   assert.equal(preferences.appearance.customBackground, null);
   assert.deepEqual(preferences.appearance.home, { opacity: null, blurPx: null });
@@ -105,7 +105,7 @@ test("version two appearance preferences keep scene overrides and gain region de
     },
   });
 
-  assert.equal(preferences.version, 6);
+  assert.equal(preferences.version, 8);
   assert.equal(preferences.themeId, "silent-gallery");
   assert.deepEqual(preferences.appearance.workspace, { opacity: 0.18, blurPx: 5 });
   assert.equal(preferences.appearance.transparentRegions.canvas, true);
@@ -131,9 +131,10 @@ test("version three appearance preferences keep transparency and gain disabled i
     },
   });
 
-  assert.equal(preferences.version, 6);
+  assert.equal(preferences.version, 8);
   assert.equal(preferences.appearance.immersiveMode, false);
   assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], false);
+  assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
   assert.equal(preferences.appearance.transparentRegions.navigation, true);
   assert.equal(preferences.appearance.transparentRegions.content, true);
   assert.deepEqual(preferences.appearance.workspace, { opacity: 0.34, blurPx: 2 });
@@ -159,7 +160,7 @@ test("retired version four preferences keep appearance settings without atmosphe
     },
   });
 
-  assert.equal(preferences.version, 6);
+  assert.equal(preferences.version, 8);
   assert.equal(preferences.themeId, "sea-fog");
   assert.deepEqual(preferences.appearance.customBackground, {
     path: "E:/background.webp",
@@ -168,6 +169,7 @@ test("retired version four preferences keep appearance settings without atmosphe
   assert.equal(Object.hasOwn(preferences.appearance, "atmosphereMotion"), false);
   assert.equal(preferences.appearance.immersiveMode, false);
   assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], false);
+  assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
   assert.equal(preferences.appearance.transparentRegions.canvas, false);
   assert.equal(preferences.appearance.transparentRegions.navigation, true);
   assert.deepEqual(preferences.appearance.workspace, { opacity: 0.28, blurPx: 4 });
@@ -193,11 +195,72 @@ test("version five preferences preserve immersive mode and gain titlebar transpa
     },
   });
 
-  assert.equal(preferences.version, 6);
+  assert.equal(preferences.version, 8);
   assert.equal(preferences.appearance.immersiveMode, true);
   assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], false);
+  assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
   assert.equal(preferences.appearance.transparentRegions.navigation, true);
   assert.deepEqual(preferences.appearance.workspace, { opacity: 0.38, blurPx: 3 });
+});
+
+test("version six preferences preserve titlebar and immersive choices and gain home navigation transparency", () => {
+  const preferences = normalizePreferences({
+    version: 6,
+    themeId: "silent-gallery",
+    appearance: {
+      customBackground: { path: "E:/background.webp", name: "background.webp" },
+      home: { opacity: 0.7, blurPx: 1 },
+      workspace: { opacity: 0.24, blurPx: 6 },
+      immersiveMode: true,
+      transparentRegions: {
+        "desktop-titlebar": true,
+        canvas: true,
+        navigation: false,
+        "primary-sidebar": true,
+        content: false,
+        "secondary-sidebar": true,
+        chrome: false,
+      },
+    },
+  });
+
+  assert.equal(preferences.version, 8);
+  assert.equal(preferences.appearance.immersiveMode, true);
+  assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], true);
+  assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
+  assert.equal(preferences.appearance.transparentRegions["primary-sidebar"], true);
+  assert.deepEqual(preferences.appearance.home, { opacity: 0.7, blurPx: 1 });
+});
+
+test("version seven preferences preserve home chrome and gain home content transparency", () => {
+  const preferences = normalizePreferences({
+    version: 7,
+    themeId: "sea-fog",
+    appearance: {
+      customBackground: null,
+      home: { opacity: 0.82, blurPx: 3 },
+      workspace: { opacity: 0.36, blurPx: 2 },
+      immersiveMode: false,
+      transparentRegions: {
+        "desktop-titlebar": true,
+        "home-topbar": true,
+        canvas: false,
+        navigation: true,
+        "primary-sidebar": false,
+        content: true,
+        "secondary-sidebar": false,
+        chrome: true,
+      },
+    },
+  });
+
+  assert.equal(preferences.version, 8);
+  assert.equal(preferences.appearance.immersiveMode, false);
+  assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], true);
+  assert.equal(preferences.appearance.transparentRegions["home-topbar"], true);
+  assert.equal(preferences.appearance.transparentRegions["home-entry"], false);
+  assert.equal(preferences.appearance.transparentRegions["home-recents"], false);
+  assert.deepEqual(preferences.appearance.home, { opacity: 0.82, blurPx: 3 });
 });
 
 test("region transparency accepts only known boolean values", () => {
@@ -209,6 +272,9 @@ test("region transparency accepts only known boolean values", () => {
       immersiveMode: "yes",
       transparentRegions: {
         "desktop-titlebar": "yes",
+        "home-topbar": "yes",
+        "home-entry": "yes",
+        "home-recents": true,
         canvas: false,
         navigation: true,
         "primary-sidebar": "yes",
@@ -222,6 +288,9 @@ test("region transparency accepts only known boolean values", () => {
 
   assert.deepEqual(preferences.appearance.transparentRegions, {
     "desktop-titlebar": false,
+    "home-topbar": false,
+    "home-entry": false,
+    "home-recents": true,
     canvas: false,
     navigation: true,
     "primary-sidebar": false,

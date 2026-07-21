@@ -1,6 +1,6 @@
 import { DEFAULT_THEME_ID, getThemeDefinition, isThemeId, type ThemeId } from "./themes.ts";
 
-export const PREFERENCES_VERSION = 6 as const;
+export const PREFERENCES_VERSION = 8 as const;
 
 export const SCENE_LIMITS = {
   opacity: { min: 0, max: 1 },
@@ -11,6 +11,9 @@ export type SceneTarget = "home" | "workspace";
 
 export const APP_SURFACE_REGIONS = [
   "desktop-titlebar",
+  "home-topbar",
+  "home-entry",
+  "home-recents",
   "canvas",
   "navigation",
   "primary-sidebar",
@@ -65,6 +68,9 @@ function emptySceneOverrides(): SceneOverrides {
 export function createDefaultSurfaceTransparency(): AppSurfaceTransparency {
   return {
     "desktop-titlebar": false,
+    "home-topbar": false,
+    "home-entry": false,
+    "home-recents": false,
     canvas: true,
     navigation: false,
     "primary-sidebar": false,
@@ -134,6 +140,21 @@ function normalizeSurfaceTransparency(value: unknown): AppSurfaceTransparency {
   ) as AppSurfaceTransparency;
 }
 
+function normalizeAppearancePreferences(
+  value: Record<string, unknown>,
+  options: { preserveRegions: boolean; preserveImmersiveMode: boolean },
+): AppearancePreferences {
+  return {
+    customBackground: normalizeCustomBackground(value.customBackground),
+    home: normalizeSceneOverrides(value.home),
+    workspace: normalizeSceneOverrides(value.workspace),
+    transparentRegions: options.preserveRegions
+      ? normalizeSurfaceTransparency(value.transparentRegions)
+      : createDefaultSurfaceTransparency(),
+    immersiveMode: options.preserveImmersiveMode && value.immersiveMode === true,
+  };
+}
+
 export function normalizePreferences(value: unknown): AppPreferences {
   if (!isRecord(value)) return createDefaultPreferences();
 
@@ -149,13 +170,10 @@ export function normalizePreferences(value: unknown): AppPreferences {
     return {
       version: PREFERENCES_VERSION,
       themeId,
-      appearance: {
-        customBackground: normalizeCustomBackground(value.appearance.customBackground),
-        home: normalizeSceneOverrides(value.appearance.home),
-        workspace: normalizeSceneOverrides(value.appearance.workspace),
-        transparentRegions: createDefaultSurfaceTransparency(),
-        immersiveMode: false,
-      },
+      appearance: normalizeAppearancePreferences(value.appearance, {
+        preserveRegions: false,
+        preserveImmersiveMode: false,
+      }),
     };
   }
 
@@ -168,47 +186,35 @@ export function normalizePreferences(value: unknown): AppPreferences {
     return {
       version: PREFERENCES_VERSION,
       themeId,
-      appearance: {
-        customBackground: normalizeCustomBackground(value.appearance.customBackground),
-        home: normalizeSceneOverrides(value.appearance.home),
-        workspace: normalizeSceneOverrides(value.appearance.workspace),
-        transparentRegions: normalizeSurfaceTransparency(value.appearance.transparentRegions),
-        immersiveMode: false,
-      },
+      appearance: normalizeAppearancePreferences(value.appearance, {
+        preserveRegions: true,
+        preserveImmersiveMode: false,
+      }),
     };
   }
 
-  // Version 5 introduced immersive mode. Preserve its state while adding the
-  // independently configurable desktop titlebar region.
-  if (value.version === 5 && isRecord(value.appearance)) {
+  // Version 5 introduced immersive mode. Later versions only added optional
+  // surface keys, so the region normalizer can preserve known choices and add
+  // each missing surface with its backward-compatible default.
+  const storedVersion = value.version;
+  if (
+    typeof storedVersion === "number" &&
+    Number.isInteger(storedVersion) &&
+    storedVersion >= 5 &&
+    storedVersion <= PREFERENCES_VERSION &&
+    isRecord(value.appearance)
+  ) {
     return {
       version: PREFERENCES_VERSION,
       themeId,
-      appearance: {
-        customBackground: normalizeCustomBackground(value.appearance.customBackground),
-        home: normalizeSceneOverrides(value.appearance.home),
-        workspace: normalizeSceneOverrides(value.appearance.workspace),
-        transparentRegions: normalizeSurfaceTransparency(value.appearance.transparentRegions),
-        immersiveMode: value.appearance.immersiveMode === true,
-      },
+      appearance: normalizeAppearancePreferences(value.appearance, {
+        preserveRegions: true,
+        preserveImmersiveMode: true,
+      }),
     };
   }
 
-  if (value.version !== PREFERENCES_VERSION || !isRecord(value.appearance)) {
-    return createDefaultPreferences();
-  }
-
-  return {
-    version: PREFERENCES_VERSION,
-    themeId,
-    appearance: {
-      customBackground: normalizeCustomBackground(value.appearance.customBackground),
-      home: normalizeSceneOverrides(value.appearance.home),
-      workspace: normalizeSceneOverrides(value.appearance.workspace),
-      transparentRegions: normalizeSurfaceTransparency(value.appearance.transparentRegions),
-      immersiveMode: value.appearance.immersiveMode === true,
-    },
-  };
+  return createDefaultPreferences();
 }
 
 export function resolveSurfaceTransparency(

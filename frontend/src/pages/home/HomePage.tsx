@@ -70,7 +70,7 @@ export function HomePage() {
     <main className="home-page">
       <div className="home-gallery-scene" aria-hidden="true" />
 
-      <header className="home-topbar">
+      <header className="home-topbar" data-surface-region="home-topbar">
         <strong className="home-brand">Dataset Studio</strong>
         <nav className="home-navigation" aria-label="首页导航">
           <button type="button" onClick={() => navigate("/presets")}>
@@ -96,6 +96,7 @@ export function HomePage() {
             <button
               type="button"
               className="home-entry"
+              data-surface-region="home-entry"
               onClick={() => void chooseAndOpenWorkspace()}
               disabled={openMutation.isPending}
             >
@@ -117,11 +118,14 @@ export function HomePage() {
           </div>
 
           {recent.isLoading ? (
-            <div className="recent-placeholder">
+            <div className="recent-placeholder" data-surface-region="home-recents">
               <Spinner label="读取最近项目" />
             </div>
           ) : recent.isError ? (
-            <div className="recent-placeholder recent-placeholder--error">
+            <div
+              className="recent-placeholder recent-placeholder--error"
+              data-surface-region="home-recents"
+            >
               <p>后端服务尚未准备好。</p>
               <button type="button" onClick={() => void recent.refetch()}>
                 重新连接
@@ -133,6 +137,7 @@ export function HomePage() {
                 <button
                   type="button"
                   className={`recent-card ${workspace.exists ? "" : "recent-card--missing"}`}
+                  data-surface-region="home-recents"
                   key={workspace.project_id}
                   title={workspace.root_path}
                   onClick={() => enterWorkspace(workspace.project_id, workspace.exists)}
@@ -160,7 +165,7 @@ export function HomePage() {
               ))}
             </div>
           ) : (
-            <div className="recent-placeholder">
+            <div className="recent-placeholder" data-surface-region="home-recents">
               <p>档案尚空。打开一个图片文件夹，让第一组数据在这里显影。</p>
             </div>
           )}

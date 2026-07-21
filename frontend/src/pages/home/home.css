@@ -22,6 +22,7 @@
   z-index: -1;
   pointer-events: none;
   content: "";
+  transition: opacity var(--transition);
 }
 
 .home-page::before {
@@ -63,6 +64,11 @@
   z-index: -2;
   overflow: hidden;
   pointer-events: none;
+  transition: opacity var(--transition);
+}
+
+:root[data-transparent-regions~="home-topbar"] .home-page .home-gallery-scene {
+  inset-block-start: 0;
 }
 
 .home-gallery-scene::before,
@@ -110,6 +116,21 @@
   border-bottom: 1px solid color-mix(in srgb, var(--ink-soft) 13%, transparent);
   background: color-mix(in srgb, var(--app-backdrop) 72%, transparent);
   backdrop-filter: blur(18px);
+  transition:
+    border-color var(--transition),
+    background var(--transition),
+    backdrop-filter var(--transition),
+    box-shadow var(--transition);
+}
+
+:root[data-transparent-regions~="home-topbar"] .home-page .home-topbar {
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+:root[data-immersive-mode="true"] .home-page .home-topbar {
+  border-bottom-color: transparent;
 }
 
 .home-brand {
@@ -231,7 +252,9 @@
   transition:
     color 220ms ease,
     border-color 220ms ease,
-    background 220ms ease;
+    background 220ms ease,
+    backdrop-filter 220ms ease,
+    box-shadow 220ms ease;
 }
 
 .home-entry::before {
@@ -368,6 +391,8 @@
   transition:
     background 220ms ease,
     border-color 220ms ease,
+    backdrop-filter 220ms ease,
+    box-shadow 220ms ease,
     transform 220ms ease;
 }
 
@@ -457,6 +482,24 @@
   font-family: "STSong", "Songti SC", SimSun, serif;
   font-size: 12px;
   letter-spacing: 0.08em;
+  transition:
+    background 220ms ease,
+    border-color 220ms ease,
+    backdrop-filter 220ms ease,
+    box-shadow 220ms ease;
+}
+
+:root[data-transparent-regions~="home-entry"] .home-page [data-surface-region="home-entry"],
+:root[data-transparent-regions~="home-recents"] .home-page [data-surface-region="home-recents"] {
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+:root[data-immersive-mode="true"]
+  .home-page
+  :where([data-surface-region="home-entry"], [data-surface-region="home-recents"]) {
+  border-color: transparent;
 }
 
 .recent-placeholder--error {

@@ -35,12 +35,33 @@ const surfaceRegionOptions: ReadonlyArray<{
   title: string;
   scope: string;
   description: string;
+  wide?: boolean;
 }> = [
   {
     id: "desktop-titlebar",
     title: "桌面标题栏",
     scope: "整个应用",
     description: "让最上方的 Dataset Studio 窗口栏透出当前页面使用的主题或自定义场景。",
+    wide: true,
+  },
+  {
+    id: "home-topbar",
+    title: "首页导航栏",
+    scope: "首页",
+    description: "让显示预设与连接、设置的顶部栏透出首页迎宾场景。",
+    wide: true,
+  },
+  {
+    id: "home-entry",
+    title: "首页入口按钮",
+    scope: "打开数据集",
+    description: "移除打开数据集入口的玻璃底板，让按钮直接悬浮在迎宾场景上。",
+  },
+  {
+    id: "home-recents",
+    title: "最近项目卡片",
+    scope: "最近项目",
+    description: "让三张最近项目卡片以及加载、空状态区域透出首页背景。",
   },
   {
     id: "canvas",
@@ -282,7 +303,7 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
             <span className="immersive-mode-card__copy">
               <strong>让工作台完全沉入场景</strong>
               <small>
-                强制开启标题栏与全部工作区域透光，并隐藏面板边界、栏位分隔和常驻拖拽线；输入控件与状态提示仍保留必要轮廓。
+                强制开启标题栏、首页卡片与全部工作区域透光，并隐藏面板边界、栏位分隔和常驻拖拽线；输入控件与状态提示仍保留必要轮廓。
               </small>
             </span>
             <span className="immersive-mode-card__state">
@@ -330,14 +351,14 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
               <span className="eyebrow">Surface permeability</span>
               <h3>区域透光</h3>
             </div>
-            <small>大面积材质可独立开关</small>
+            <small>界面材质可独立开关</small>
           </div>
           <div className="surface-transparency">
             <div className="surface-transparency__summary">
               <div>
-                <strong>让背景穿过窗口与工作台</strong>
+                <strong>让背景穿过窗口与界面底板</strong>
                 <p>
-                  只改变页面的大面积底板；输入框、告警和选中态仍保留必要遮罩，避免全透明时失去可读性。
+                  只改变列出的栏位与卡片底板；输入框、告警和选中态仍保留必要遮罩，避免全透明时失去可读性。
                 </p>
               </div>
               <button
@@ -358,7 +379,7 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
                     type="button"
                     key={option.id}
                     className={`surface-transparency__option ${
-                      option.id === "desktop-titlebar" ? "surface-transparency__option--global" : ""
+                      option.wide ? "surface-transparency__option--wide" : ""
                     } ${transparent ? "is-active" : ""}`}
                     aria-pressed={transparent}
                     disabled={immersiveMode}

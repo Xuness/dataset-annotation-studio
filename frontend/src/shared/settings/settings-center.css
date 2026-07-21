@@ -717,14 +717,14 @@
     background var(--transition);
 }
 
-.surface-transparency__option--global {
+.surface-transparency__option--wide {
   min-height: 72px;
   grid-column: 1 / -1;
   grid-template-columns: 17px minmax(0, 1fr) auto;
   align-items: center;
 }
 
-.surface-transparency__option.surface-transparency__option--global > em {
+.surface-transparency__option.surface-transparency__option--wide > em {
   grid-column: 3;
   grid-row: 1;
   align-self: center;

@@ -128,6 +128,28 @@
   background: transparent;
 }
 
+/* The desktop titlebar and the active page must look through the same scene
+   instance. Home normally owns its backdrop so the web build remains
+   self-contained; once the Tauri titlebar becomes transparent, the shell owns
+   that backdrop and the page-level copy is faded out to prevent a seam. */
+:root[data-transparent-regions~="desktop-titlebar"]
+  .desktop-shell--tauri[data-scene-target="home"]
+  .home-page {
+  background: transparent;
+}
+
+:root[data-transparent-regions~="desktop-titlebar"]
+  .desktop-shell--tauri[data-scene-target="home"]
+  .home-page::before,
+:root[data-transparent-regions~="desktop-titlebar"]
+  .desktop-shell--tauri[data-scene-target="home"]
+  .home-page::after,
+:root[data-transparent-regions~="desktop-titlebar"]
+  .desktop-shell--tauri[data-scene-target="home"]
+  .home-gallery-scene {
+  opacity: 0;
+}
+
 :root[data-transparent-regions~="desktop-titlebar"]
   .desktop-shell--tauri[data-scene-target="workspace"]
   .workspace-atmosphere::before,
