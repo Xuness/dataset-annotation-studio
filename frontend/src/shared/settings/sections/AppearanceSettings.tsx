@@ -17,6 +17,7 @@ import {
 } from "../../theme/appearance";
 import { DEFAULT_THEME_ID, THEMES } from "../../theme/themes";
 import { Button } from "../../ui/Button";
+import { confirmDialog } from "../../ui/dialogs";
 import { Spinner } from "../../ui/Spinner";
 
 interface SceneControlProps {
@@ -218,6 +219,23 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
     }
   }
 
+  async function toggleRegionTransparency(region: AppSurfaceRegion, title: string) {
+    if (immersiveMode) {
+      const exitImmersiveMode = await confirmDialog(
+        `当前处于沉浸模式，区域透光由沉浸模式统一控制。请先退出沉浸模式，再修改“${title}”。`,
+        {
+          title: "沉浸模式正在生效",
+          confirmLabel: "退出沉浸模式",
+          cancelLabel: "暂不退出",
+        },
+      );
+      if (exitImmersiveMode) setImmersiveMode(false);
+      return;
+    }
+
+    setRegionTransparency(region, !transparentRegions[region]);
+  }
+
   return (
     <>
       <header>
@@ -382,8 +400,8 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
                       option.wide ? "surface-transparency__option--wide" : ""
                     } ${transparent ? "is-active" : ""}`}
                     aria-pressed={transparent}
-                    disabled={immersiveMode}
-                    onClick={() => setRegionTransparency(option.id, !transparent)}
+                    aria-disabled={immersiveMode}
+                    onClick={() => void toggleRegionTransparency(option.id, option.title)}
                   >
                     <span className="surface-transparency__check" aria-hidden="true">
                       {transparent ? <Check size={12} /> : null}

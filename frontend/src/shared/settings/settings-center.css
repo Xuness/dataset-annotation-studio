@@ -745,15 +745,12 @@
   box-shadow: inset 2px 0 var(--accent);
 }
 
-.surface-transparency__option:disabled {
-  cursor: default;
+.surface-transparency__grid.is-managed .surface-transparency__option {
   opacity: 0.88;
 }
 
-.surface-transparency__option:disabled:hover {
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--line-strong) 64%, transparent);
-  background: color-mix(in srgb, var(--surface-raised) 62%, transparent);
+.surface-transparency__grid.is-managed .surface-transparency__option:hover {
+  opacity: 1;
 }
 
 .surface-transparency__check {
