@@ -1,0 +1,84 @@
+:root[data-theme-material="wet-glass"]
+  :where(.home-topbar, .home-entry, .recent-card, .recent-placeholder) {
+  border-color: color-mix(in srgb, var(--glass-edge) 88%, transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation))
+    brightness(var(--glass-brightness));
+  box-shadow:
+    inset 0 1px var(--glass-highlight),
+    inset 1px 0 color-mix(in srgb, var(--glass-specular) 48%, transparent),
+    0 12px 34px color-mix(in srgb, var(--glass-shadow) 68%, transparent);
+}
+
+:root[data-theme-material="wet-glass"] .home-topbar {
+  background: color-mix(in srgb, var(--app-backdrop) 62%, transparent);
+}
+
+:root[data-theme-material="wet-glass"] :where(.home-entry, .recent-card, .recent-placeholder) {
+  background: color-mix(in srgb, var(--surface-raised) 48%, transparent);
+}
+
+:root[data-theme-material="wet-glass"] .workspace-page [data-surface-region] {
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation))
+    brightness(var(--glass-brightness));
+  box-shadow:
+    inset 0 1px var(--glass-highlight),
+    inset 1px 0 color-mix(in srgb, var(--glass-specular) 38%, transparent),
+    inset 0 -1px color-mix(in srgb, var(--glass-edge) 58%, transparent);
+}
+
+:root[data-theme-material="wet-glass"] .workspace-topbar,
+:root[data-theme-material="wet-glass"] .workspace-statusbar {
+  background: color-mix(in srgb, var(--surface-sunken) 72%, transparent);
+}
+
+:root[data-theme-material="wet-glass"] .settings-center-backdrop {
+  --surface-sunken: color-mix(in srgb, var(--work-sunken) 78%, transparent);
+  --surface: color-mix(in srgb, var(--work-surface) 84%, transparent);
+  --surface-soft: color-mix(in srgb, var(--work-surface-soft) 82%, transparent);
+  --surface-raised: color-mix(in srgb, var(--work-surface-raised) 88%, transparent);
+  --canvas: color-mix(in srgb, var(--work-canvas) 76%, transparent);
+  --editor-surface: color-mix(in srgb, var(--work-editor) 88%, transparent);
+  --editor-gutter: color-mix(in srgb, var(--work-gutter) 84%, transparent);
+  --code-surface: color-mix(in srgb, var(--work-code) 84%, transparent);
+}
+
+:root[data-theme-material="wet-glass"] .settings-center {
+  border-color: color-mix(in srgb, var(--glass-edge) 92%, transparent);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  backdrop-filter: blur(24px) saturate(var(--glass-saturation)) brightness(var(--glass-brightness));
+  box-shadow:
+    inset 0 1px var(--glass-highlight),
+    inset 1px 0 color-mix(in srgb, var(--glass-specular) 52%, transparent),
+    var(--shadow-float);
+}
+
+:root[data-theme-material="wet-glass"] .presets-page {
+  --paper: var(--work-backdrop);
+  --surface-sunken: color-mix(in srgb, var(--work-sunken) 76%, transparent);
+  --surface: color-mix(in srgb, var(--work-surface) 82%, transparent);
+  --surface-soft: color-mix(in srgb, var(--work-surface-soft) 80%, transparent);
+  --surface-raised: color-mix(in srgb, var(--work-surface-raised) 86%, transparent);
+
+  background:
+    radial-gradient(
+      circle at 74% 18%,
+      color-mix(in srgb, var(--glass-specular) 26%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(145deg, var(--work-backdrop-elevated), var(--work-backdrop));
+}
+
+:root[data-theme-material="wet-glass"] :where(.presets-topbar, .presets-navigation, .preset-list) {
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  box-shadow: inset 0 1px color-mix(in srgb, var(--glass-highlight) 72%, transparent);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  :root[data-theme-material="wet-glass"] .workspace-page {
+    --workspace-surface-opacity: 92%;
+  }
+
+  :root[data-theme-material="wet-glass"] .settings-center {
+    background: var(--work-surface);
+  }
+}

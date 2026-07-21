@@ -13,8 +13,7 @@ export interface ThemeSceneDefinition {
   workspace: ThemeSceneSurface;
 }
 
-export type ThemeMaterialId = "paper" | "glass";
-export type ThemeAtmosphereId = "none" | "rain";
+export type ThemeMaterialId = "paper" | "glass" | "wet-glass";
 
 export interface ThemeMaterialDefinition {
   id: ThemeMaterialId;
@@ -28,7 +27,6 @@ interface ThemeDefinitionShape {
   description: string;
   nativeWindowTheme: "light" | "dark";
   material: ThemeMaterialDefinition;
-  atmosphere: ThemeAtmosphereId;
   scene: ThemeSceneDefinition;
   swatches: readonly [string, string, string, string];
   browserThemeColor: string;
@@ -46,7 +44,6 @@ export const THEMES = defineThemes([
     description: "回到项目最初的暖纸、陶土玫瑰与鼠尾草配色，让长时间整理与标注更柔和。",
     nativeWindowTheme: "light",
     material: { id: "paper", workspaceSurfaceOpacity: 0.97 },
-    atmosphere: "none",
     scene: {
       image: "/home/warm-paper-still-life.svg",
       previewPosition: "72% 48%",
@@ -75,7 +72,6 @@ export const THEMES = defineThemes([
     description: "炭黑、铅灰与旧纸般的惨白，只留一道暗红信号，延续首页展厅的幽暗秩序。",
     nativeWindowTheme: "dark",
     material: { id: "glass", workspaceSurfaceOpacity: 0.97 },
-    atmosphere: "none",
     scene: {
       image: "/home/silent-gallery-hall.webp",
       previewPosition: "76% 46%",
@@ -99,32 +95,31 @@ export const THEMES = defineThemes([
   },
   {
     id: "sea-fog",
-    name: "海雾档案",
-    englishName: "Sea Fog Archive",
-    description: "更冷、更潮湿的海雾蓝灰，让阴雨海岸退到工作区边缘，信息仍保持安静。",
-    nativeWindowTheme: "dark",
-    material: { id: "glass", workspaceSurfaceOpacity: 0.965 },
-    atmosphere: "none",
+    name: "雨白哥特",
+    englishName: "Rainveil Gothic",
+    description: "雾白天光、湿石与冷绿植被沉入雾幕，只让哥特墨色和旧玫瑰留下微弱信号。",
+    nativeWindowTheme: "light",
+    material: { id: "wet-glass", workspaceSurfaceOpacity: 0.74 },
     scene: {
-      image: "/home/silent-gallery-shore.webp",
-      previewPosition: "62% 48%",
+      image: "/home/rainveil-gothic-example.png",
+      previewPosition: "63% 50%",
       home: {
-        position: "center",
-        size: "cover",
-        filter: "saturate(0.46) contrast(1.08) brightness(0.58)",
-        opacity: 0.78,
+        position: "63% 50%",
+        size: "auto 168%",
+        filter: "saturate(0.42) contrast(0.82) brightness(1.16)",
+        opacity: 0.62,
         blurPx: 0,
       },
       workspace: {
-        position: "100% 52%",
-        size: "auto 165%",
-        filter: "grayscale(0.48) saturate(0.32) contrast(1.08) brightness(0.5)",
-        opacity: 0.065,
+        position: "66% 50%",
+        size: "auto 168%",
+        filter: "grayscale(0.28) saturate(0.42) contrast(0.82) brightness(1.12)",
+        opacity: 0.32,
         blurPx: 0,
       },
     },
-    swatches: ["#05090b", "#0b1113", "#d5d7d3", "#793039"],
-    browserThemeColor: "#03080d",
+    swatches: ["#e9edf0", "#aebbc3", "#20262b", "#9b5367"],
+    browserThemeColor: "#ccd5db",
   },
 ] as const);
 

@@ -9,11 +9,7 @@ import {
   normalizePreferences,
   resolveAppearance,
 } from "../src/shared/theme/appearance.ts";
-import {
-  DEFAULT_THEME_ID,
-  getThemeDefinition,
-  type ThemeId,
-} from "../src/shared/theme/themes.ts";
+import { DEFAULT_THEME_ID, getThemeDefinition, type ThemeId } from "../src/shared/theme/themes.ts";
 
 test("save reconciliation preserves edits made while the request is pending", () => {
   assert.equal(
@@ -115,6 +111,38 @@ test("version two appearance preferences keep scene overrides and gain region de
   assert.equal(preferences.appearance.transparentRegions.navigation, false);
 });
 
+test("retired version four preferences keep appearance settings without atmosphere motion", () => {
+  const preferences = normalizePreferences({
+    version: 4,
+    themeId: "sea-fog",
+    appearance: {
+      customBackground: { path: "E:/background.webp", name: "background.webp" },
+      atmosphereMotion: false,
+      home: { opacity: 0.55, blurPx: 1 },
+      workspace: { opacity: 0.28, blurPx: 4 },
+      transparentRegions: {
+        canvas: false,
+        navigation: true,
+        "primary-sidebar": true,
+        content: false,
+        "secondary-sidebar": false,
+        chrome: true,
+      },
+    },
+  });
+
+  assert.equal(preferences.version, 3);
+  assert.equal(preferences.themeId, "sea-fog");
+  assert.deepEqual(preferences.appearance.customBackground, {
+    path: "E:/background.webp",
+    name: "background.webp",
+  });
+  assert.equal(Object.hasOwn(preferences.appearance, "atmosphereMotion"), false);
+  assert.equal(preferences.appearance.transparentRegions.canvas, false);
+  assert.equal(preferences.appearance.transparentRegions.navigation, true);
+  assert.deepEqual(preferences.appearance.workspace, { opacity: 0.28, blurPx: 4 });
+});
+
 test("region transparency accepts only known boolean values", () => {
   const defaults = createDefaultPreferences("warm-paper");
   const preferences = normalizePreferences({
@@ -155,7 +183,12 @@ test("theme scene defaults remain active until a user override is stored", () =>
   });
   const resolvedCustomized = resolveAppearance(customized);
 
-  assert.equal(resolvedDefaults.workspace.opacity, 0.065);
+  assert.equal(resolvedDefaults.theme.name, "雨白哥特");
+  assert.equal(resolvedDefaults.theme.nativeWindowTheme, "light");
+  assert.equal(resolvedDefaults.theme.material.id, "wet-glass");
+  assert.equal(resolvedDefaults.theme.material.workspaceSurfaceOpacity, 0.74);
+  assert.equal(resolvedDefaults.theme.scene.image, "/home/rainveil-gothic-example.png");
+  assert.equal(resolvedDefaults.workspace.opacity, 0.32);
   assert.equal(resolvedDefaults.workspace.blurPx, 0);
   assert.deepEqual(resolvedCustomized.workspace, { opacity: 0.42, blurPx: 9 });
 });

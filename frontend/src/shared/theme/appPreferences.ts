@@ -76,7 +76,6 @@ export function applyPreferences(preferences: AppPreferences) {
 
   root.dataset.theme = resolved.theme.id;
   root.dataset.themeMaterial = resolved.theme.material.id;
-  root.dataset.themeAtmosphere = resolved.theme.atmosphere;
   root.dataset.backgroundSource = customBackground ? "custom" : "theme";
   root.style.setProperty("--home-gallery-image", cssUrl(sceneImage));
   root.style.setProperty("--home-gallery-position", homePresentation.position);

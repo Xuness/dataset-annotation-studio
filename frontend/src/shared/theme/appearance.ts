@@ -156,6 +156,22 @@ export function normalizePreferences(value: unknown): AppPreferences {
     };
   }
 
+  // A short-lived development build wrote version 4 while prototyping a rain
+  // animation. Preserve its real appearance settings while discarding that
+  // retired experiment instead of resetting the user's local preferences.
+  if (value.version === 4 && isRecord(value.appearance)) {
+    return {
+      version: PREFERENCES_VERSION,
+      themeId,
+      appearance: {
+        customBackground: normalizeCustomBackground(value.appearance.customBackground),
+        home: normalizeSceneOverrides(value.appearance.home),
+        workspace: normalizeSceneOverrides(value.appearance.workspace),
+        transparentRegions: normalizeSurfaceTransparency(value.appearance.transparentRegions),
+      },
+    };
+  }
+
   if (value.version !== PREFERENCES_VERSION || !isRecord(value.appearance)) {
     return createDefaultPreferences();
   }
