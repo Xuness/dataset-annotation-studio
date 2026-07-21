@@ -387,6 +387,13 @@
   background-repeat: no-repeat;
   background-position: var(--home-gallery-position);
   background-size: var(--home-scene-size);
+}
+
+.appearance-background__preview > span {
+  filter: var(--home-scene-filter);
+}
+
+.scene-control__preview > span {
   filter: var(--home-scene-filter) blur(var(--home-scene-blur));
 }
 
