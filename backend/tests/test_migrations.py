@@ -272,6 +272,10 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
             entry["name"]: entry
             for entry in connection.execute("PRAGMA table_info('job_attempts')").fetchall()
         }
+        preprocess_item_columns = {
+            entry["name"]: entry
+            for entry in connection.execute("PRAGMA table_info('preprocess_items')").fetchall()
+        }
         tables = {
             entry["name"]
             for entry in connection.execute(
@@ -281,7 +285,7 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
     finally:
         connection.close()
     assert row["image_metadata_version"] == 1
-    assert versions == [1, 2, 3, 4, 5, 6]
+    assert versions == [1, 2, 3, 4, 5, 6, 7]
     assert "idx_job_items_asset_updated" in indexes
     assert {
         "cache_read_tokens",
@@ -291,6 +295,8 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
     assert attempt_columns["cache_read_tokens"]["notnull"] == 0
     assert "source_annotation_hash" in attempt_columns
     assert {"export_operations", "export_items"}.issubset(tables)
+    assert preprocess_item_columns["phase"]["notnull"] == 1
+    assert preprocess_item_columns["phase"]["dflt_value"] == "'committed'"
 
 
 def test_workspace_migration_is_safe_when_api_and_worker_start_together(tmp_path: Path) -> None:
@@ -317,7 +323,7 @@ def test_workspace_migration_is_safe_when_api_and_worker_start_together(tmp_path
         ]
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6]
+    assert versions == [1, 2, 3, 4, 5, 6, 7]
 
 
 def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None:
@@ -352,7 +358,7 @@ def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None
         ]
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6]
+    assert versions == [1, 2, 3, 4, 5, 6, 7]
 
 
 def test_recent_workspace_list_applies_missing_migrations_before_summary(
@@ -390,4 +396,4 @@ def test_recent_workspace_list_applies_missing_migrations_before_summary(
     finally:
         connection.close()
     assert [summary.project_id for summary in summaries] == [manifest.project_id]
-    assert versions == [1, 2, 3, 4, 5, 6]
+    assert versions == [1, 2, 3, 4, 5, 6, 7]

@@ -65,7 +65,7 @@ export function WorkspaceTopbar({
         <Button
           icon={rescanning ? <Spinner /> : <RefreshCw size={15} />}
           onClick={onRescan}
-          disabled={rescanning || rescanDisabled}
+          disabled={rescanning || rescanDisabled || activeJobCount > 0}
         >
           重新扫描
         </Button>

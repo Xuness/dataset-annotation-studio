@@ -15,12 +15,14 @@ from dataset_studio.modules.preprocessing.models import (
     OutputFormat,
     PreprocessExecuteRequest,
     PreprocessExecutionOptions,
+    PreprocessItemPhase,
     PreprocessPreview,
     PreprocessRequest,
     RenameOptions,
     ResizeAlgorithm,
     ResizeOptions,
 )
+from dataset_studio.modules.preprocessing.repository import PreprocessRepository
 from dataset_studio.modules.preprocessing.service import PreprocessService
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -814,6 +816,51 @@ def test_workspace_file_operations_are_mutually_exclusive(tmp_path: Path) -> Non
             _execute(preprocessing, summary.project_id, request, preview)
 
     assert not preprocessing.is_project_active(summary.project_id)
+
+
+def test_interrupted_preprocessing_is_recovered_from_persisted_journal(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspaces, assets, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    source = project / "sample.png"
+    Image.new("RGB", (128, 64), "white").save(source)
+    (project / "sample.txt").write_text("<caption>original</caption>", encoding="utf-8")
+    original_bytes = source.read_bytes()
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(
+        convert=ConvertOptions(format=OutputFormat.WEBP),
+        rename=RenameOptions(template="renamed_{name}"),
+    )
+    preview = preprocessing.preview(summary.project_id, request)
+    original_set_phase = PreprocessRepository.set_item_phase
+
+    def exit_after_file_commit(repository, item_id: str, phase: str) -> None:
+        if phase == PreprocessItemPhase.COMMITTED.value:
+            raise SystemExit("simulated process exit")
+        original_set_phase(repository, item_id, phase)
+
+    monkeypatch.setattr(PreprocessRepository, "set_item_phase", exit_after_file_commit)
+    with pytest.raises(SystemExit, match="simulated process exit"):
+        _execute(preprocessing, summary.project_id, request, preview)
+    assert not source.exists()
+    assert (project / "renamed_sample.webp").is_file()
+    assert not (project / "sample.txt").exists()
+    assert (project / "renamed_sample.txt").is_file()
+
+    monkeypatch.setattr(PreprocessRepository, "set_item_phase", original_set_phase)
+    assert preprocessing.recover_orphaned() == 1
+
+    assert source.read_bytes() == original_bytes
+    assert not (project / "renamed_sample.webp").exists()
+    assert (project / "sample.txt").read_text(encoding="utf-8") == "<caption>original</caption>"
+    assert not (project / "renamed_sample.txt").exists()
+    assert assets.list_assets(summary.project_id).items[0].relative_path == "sample.png"
+    operation = preprocessing.list_operations(summary.project_id)[0]
+    assert operation.status == "failed"
+    assert operation.error_message == "上次预处理在运行期间中断；原文件已自动恢复。"
 
 
 def test_preprocessing_refuses_to_run_while_annotation_job_is_active(tmp_path: Path) -> None:

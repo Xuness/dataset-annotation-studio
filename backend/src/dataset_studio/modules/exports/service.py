@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 
 from dataset_studio.core.errors import StudioError
 from dataset_studio.modules.exports.models import (
@@ -122,6 +123,15 @@ class ExportService:
 
     def ensure_inactive(self, project_id: str) -> None:
         if self.has_active(project_id):
+            raise ValueError("当前工作区正在导出数据，请先停止导出任务。")
+
+    @staticmethod
+    def has_active_database(database_path: Path) -> bool:
+        return ExportRepository(database_path).active_count() > 0
+
+    @classmethod
+    def ensure_database_inactive(cls, database_path: Path) -> None:
+        if cls.has_active_database(database_path):
             raise ValueError("当前工作区正在导出数据，请先停止导出任务。")
 
     def active_project_ids(self) -> set[str]:

@@ -106,6 +106,23 @@ class JobLifecycleRepository:
             for job in running_jobs:
                 connection.execute(
                     """
+                    UPDATE job_attempts
+                    SET status = 'interrupted',
+                        error_message = COALESCE(
+                            error_message,
+                            '应用在请求完成前退出，已中断本次尝试。'
+                        ),
+                        finished_at = ?
+                    WHERE status = 'running'
+                      AND job_item_id IN (
+                          SELECT id FROM job_items
+                          WHERE job_id = ? AND status = 'running'
+                      )
+                    """,
+                    (now, job["id"]),
+                )
+                connection.execute(
+                    """
                     UPDATE job_items SET status = 'interrupted', updated_at = ?
                     WHERE job_id = ? AND status = 'running'
                     """,

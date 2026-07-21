@@ -1,6 +1,7 @@
 import { FolderOpen, Pause, Play, Rows3 } from "lucide-react";
 
 import type { ExportOperation, ExportOperationStatus } from "../../../shared/api/types";
+import { formatBytes } from "../../../shared/format/bytes";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 
@@ -13,12 +14,6 @@ const statusLabels: Record<ExportOperationStatus, string> = {
   completed: "已完成",
   failed: "失败",
 };
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
 
 export function ExportHistoryPanel({
   operations,
@@ -63,7 +58,8 @@ export function ExportHistoryPanel({
               <p title={operation.destination_path}>{operation.destination_path}</p>
               <small>
                 {operation.completed_items} / {operation.total_items} 张 ·{" "}
-                {formatBytes(operation.copied_bytes)} / {formatBytes(operation.total_bytes)}
+                {formatBytes(operation.copied_bytes, "KB")} /
+                {formatBytes(operation.total_bytes, "KB")}
               </small>
               {operation.current_relative_path ? (
                 <small title={operation.current_relative_path}>

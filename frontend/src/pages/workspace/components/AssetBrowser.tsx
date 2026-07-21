@@ -4,6 +4,7 @@ import { CheckCircle2, CircleAlert, FileQuestion, Search } from "lucide-react";
 
 import { thumbnailUrl } from "../../../features/assets/api";
 import type { AssetFilterStatus, AssetSummary } from "../../../shared/api/types";
+import { formatBytes } from "../../../shared/format/bytes";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { StatusDot } from "../../../shared/ui/StatusDot";
 
@@ -45,14 +46,10 @@ const reviewFilters: Array<{ value: StatusFilter; label: string; icon: typeof Ch
   { value: "needs_review", label: "全部异常", icon: CircleAlert },
   { value: "failed", label: "生成失败", icon: CircleAlert },
   { value: "invalid", label: "标签异常", icon: CircleAlert },
+  { value: "encoding_error", label: "编码异常", icon: CircleAlert },
   { value: "empty", label: "空文件", icon: FileQuestion },
   { value: "unchecked", label: "未校验", icon: FileQuestion },
 ];
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 export function AssetBrowser({
   mode = "assets",
@@ -319,7 +316,7 @@ export function AssetBrowser({
                   <span className="asset-row__copy">
                     <strong title={asset.filename}>{asset.filename}</strong>
                     <small>
-                      {asset.width} × {asset.height} · {formatBytes(asset.byte_size)}
+                      {asset.width} × {asset.height} · {formatBytes(asset.byte_size, "KB")}
                     </small>
                     <span title={asset.relative_path}>{asset.relative_path}</span>
                   </span>

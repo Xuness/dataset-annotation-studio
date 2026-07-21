@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -13,7 +22,6 @@ import { useAppStore } from "../../shared/store/appStore";
 import { Button } from "../../shared/ui/Button";
 import { alertDialog, confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
-import { AnnotationEditor } from "./components/AnnotationEditor";
 import { AssetBrowser } from "./components/AssetBrowser";
 import { ImageStage } from "./components/ImageStage";
 import { InspectorPanel } from "./components/InspectorPanel";
@@ -28,6 +36,12 @@ import {
   WORKSPACE_LAYOUT_LIMITS,
 } from "./hooks/useWorkspaceLayout";
 import "./workspace.css";
+
+const AnnotationEditor = lazy(() =>
+  import("./components/AnnotationEditor").then((module) => ({
+    default: module.AnnotationEditor,
+  })),
+);
 
 interface WorkspacePageProps {
   mode?: "assets" | "review";
@@ -169,7 +183,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     );
   }
 
-  if (workspace.isError || !workspace.data) {
+  if (!workspace.data) {
     return (
       <div className="workspace-loading workspace-loading--error">
         <AlertCircle size={28} />
@@ -274,12 +288,20 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
               }))
             }
           />
-          <AnnotationEditor
-            key={selectedAssetId ?? "no-asset"}
-            projectId={projectId}
-            assetId={selectedAssetId}
-            onDirtyChange={setEditorDirty}
-          />
+          <Suspense
+            fallback={
+              <section className="annotation-editor">
+                <Spinner label="加载标注编辑器" />
+              </section>
+            }
+          >
+            <AnnotationEditor
+              key={selectedAssetId ?? "no-asset"}
+              projectId={projectId}
+              assetId={selectedAssetId}
+              onDirtyChange={setEditorDirty}
+            />
+          </Suspense>
         </div>
         <PaneResizeHandle
           orientation="vertical"

@@ -6,6 +6,7 @@ const LABELS: Record<DisplayStatus, string> = {
   missing: "未标注",
   valid: "结构闭合",
   invalid: "结构异常",
+  encoding_error: "编码异常",
   empty: "空标注",
   unchecked: "未校验",
   manually_accepted: "人工确认",

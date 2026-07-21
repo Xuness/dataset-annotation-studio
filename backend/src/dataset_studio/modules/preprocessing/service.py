@@ -17,12 +17,17 @@ from dataset_studio.modules.preprocessing.executor import PreparedItem, Preproce
 from dataset_studio.modules.preprocessing.image_pipeline import sha256
 from dataset_studio.modules.preprocessing.models import (
     PreprocessExecuteRequest,
+    PreprocessItemPhase,
     PreprocessOperation,
     PreprocessPreview,
     PreprocessPreviewItem,
     PreprocessRequest,
 )
 from dataset_studio.modules.preprocessing.planner import PlanItem, build_plan, preview_token
+from dataset_studio.modules.preprocessing.recovery import (
+    PreprocessRecoveryCoordinator,
+    RecoveryFileOperations,
+)
 from dataset_studio.modules.preprocessing.repository import PreprocessRepository
 from dataset_studio.modules.translations.service import LANGUAGE_PATTERN
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -40,6 +45,16 @@ class PreprocessService:
         self._has_active_jobs = has_active_jobs or (lambda _project_id: False)
         self._has_active_exports = has_active_exports or (lambda _project_id: False)
         self._scanner = AssetScanner()
+        self._recovery = PreprocessRecoveryCoordinator(
+            workspaces,
+            self._scanner,
+            RecoveryFileOperations(
+                same_file=self._same_file,
+                claimed_annotation_paths=self._claimed_annotation_paths,
+                sidecar_paths=self._sidecar_paths,
+                update_asset=self._update_asset,
+            ),
+        )
         self._active_lock = threading.Lock()
         self._active_operations: dict[tuple[str, str], bool] = {}
 
@@ -95,15 +110,23 @@ class PreprocessService:
                     execution=execution.execution,
                 ) as preparer:
                     for prepared in preparer:
-                        self._commit_prepared_item(paths, prepared)
-                        completed.append((prepared.plan, prepared.recovery_path))
-                        self._record_item(
+                        item_id = self._record_item(
                             repository,
                             paths.root,
                             operation_id,
                             prepared.plan,
                             prepared.recovery_path,
                             prepared.after_hash,
+                        )
+                        repository.set_item_phase(
+                            item_id,
+                            PreprocessItemPhase.COMMITTING.value,
+                        )
+                        self._commit_prepared_item(paths, prepared)
+                        completed.append((prepared.plan, prepared.recovery_path))
+                        repository.set_item_phase(
+                            item_id,
+                            PreprocessItemPhase.COMMITTED.value,
                         )
                 repository.complete(operation_id)
                 self._scanner.scan(paths, manifest)
@@ -135,6 +158,9 @@ class PreprocessService:
     def list_operations(self, project_id: str) -> list[PreprocessOperation]:
         paths, _ = self._workspaces.get(project_id)
         return PreprocessRepository(paths.database).list()
+
+    def recover_orphaned(self) -> int:
+        return self._recovery.recover_orphaned()
 
     def undo(self, project_id: str, operation_id: str) -> PreprocessOperation:
         paths, manifest = self._workspaces.get(project_id)
@@ -278,11 +304,12 @@ class PreprocessService:
             raise
 
     @staticmethod
-    def _record_item(repository, root, operation_id, item, recovery, after_hash) -> None:
+    def _record_item(repository, root, operation_id, item, recovery, after_hash) -> str:
+        item_id = str(uuid.uuid4())
         repository.add_item(
             operation_id,
             (
-                str(uuid.uuid4()),
+                item_id,
                 operation_id,
                 item.asset_id,
                 item.before_relative_path,
@@ -294,8 +321,10 @@ class PreprocessService:
                 item.after_width,
                 item.after_height,
                 recovery.relative_to(root).as_posix(),
+                PreprocessItemPhase.PREPARED.value,
             ),
         )
+        return item_id
 
     @staticmethod
     def _verify_undo(root: Path, database_path: Path, items) -> None:
@@ -488,6 +517,30 @@ class PreprocessService:
 
     def is_project_active(self, project_id: str) -> bool:
         return project_id in self.active_project_ids()
+
+    def ensure_persisted_inactive(self, project_id: str) -> None:
+        paths, _ = self._workspaces.get(project_id)
+        self.ensure_database_inactive(paths.database)
+
+    @staticmethod
+    def has_active_database(database_path: Path) -> bool:
+        connection = connect(database_path)
+        try:
+            active = connection.execute(
+                """
+                SELECT 1 FROM preprocess_operations
+                WHERE status IN ('running', 'recovering')
+                LIMIT 1
+                """
+            ).fetchone()
+        finally:
+            connection.close()
+        return active is not None
+
+    @classmethod
+    def ensure_database_inactive(cls, database_path: Path) -> None:
+        if cls.has_active_database(database_path):
+            raise ValueError("当前工作区存在尚未结束或尚未恢复的图片预处理，请稍后重试。")
 
     def _ensure_no_active_jobs(self, project_id: str) -> None:
         if self._has_active_jobs(project_id):

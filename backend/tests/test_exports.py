@@ -58,7 +58,7 @@ def _run_export(workspaces: WorkspaceService, project_id: str, operation_id: str
 def test_export_flattens_files_and_force_preserves_annotation_bytes(
     tmp_path: Path,
 ) -> None:
-    workspaces, _, _, exports = _services(tmp_path)
+    workspaces, assets, _, exports = _services(tmp_path)
     project = tmp_path / "数据集"
     _write_image(project / "a" / "valid.png", "red")
     _write_image(project / "b" / "missing.webp", "green")
@@ -85,6 +85,12 @@ def test_export_flattens_files_and_force_preserves_annotation_bytes(
     assert preview.encoding_error_count == 1
     assert preview.warning_count == 4
     assert preview.blocking_issue_count == 0
+    encoded_asset = next(
+        item
+        for item in assets.list_assets(workspace.project_id).items
+        if item.filename == "encoded.png"
+    )
+    assert encoded_asset.annotation_status.value == "encoding_error"
     with pytest.raises(ValueError, match="明确允许强制导出"):
         exports.create(
             workspace.project_id,

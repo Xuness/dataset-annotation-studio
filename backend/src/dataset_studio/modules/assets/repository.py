@@ -41,7 +41,7 @@ UNRESOLVED_GENERATION_FAILURE_SQL = f"""
 )
 """
 
-REVIEW_ANNOTATION_STATUSES = ("invalid", "empty", "unchecked")
+REVIEW_ANNOTATION_STATUSES = ("invalid", "encoding_error", "empty", "unchecked")
 
 
 class AssetRepository:
@@ -56,14 +56,41 @@ class AssetRepository:
         finally:
             connection.close()
 
-    def replace_scan(self, records: list[AssetRecord], present_ids: set[str]) -> tuple[int, int]:
+    def replace_scan(
+        self,
+        records: list[AssetRecord],
+        present_ids: set[str],
+        annotation_baseline: dict[str, tuple[str, int | None]] | None = None,
+    ) -> tuple[int, int]:
+        annotation_baseline = annotation_baseline or {}
         with transaction(self._database_path) as connection:
+            before_rows = connection.execute(
+                """
+                SELECT id, relative_path, is_present, annotation_status, annotation_modified_ns
+                FROM assets
+                """
+            ).fetchall()
             before = {
                 str(row["id"]): (str(row["relative_path"]), int(row["is_present"]))
-                for row in connection.execute("SELECT id, relative_path, is_present FROM assets")
+                for row in before_rows
+            }
+            current_annotation_state = {
+                str(row["id"]): (
+                    str(row["annotation_status"]),
+                    int(row["annotation_modified_ns"])
+                    if row["annotation_modified_ns"] is not None
+                    else None,
+                )
+                for row in before_rows
             }
             connection.execute("UPDATE assets SET is_present = 0")
             for record in records:
+                scanned_status = record.annotation_status
+                scanned_modified_ns = record.annotation_modified_ns
+                current_state = current_annotation_state.get(record.id)
+                baseline_state = annotation_baseline.get(record.id)
+                if current_state is not None and current_state != baseline_state:
+                    scanned_status, scanned_modified_ns = current_state
                 connection.execute(
                     """
                     INSERT INTO assets (
@@ -103,8 +130,8 @@ class AssetRepository:
                         record.width,
                         record.height,
                         record.annotation_relative_path,
-                        record.annotation_status,
-                        record.annotation_modified_ns,
+                        scanned_status,
+                        scanned_modified_ns,
                         record.metadata_relative_path,
                         record.image_metadata_version,
                         record.created_at,
@@ -244,7 +271,7 @@ class AssetRepository:
                     SUM(CASE WHEN annotation_status != 'missing' THEN 1 ELSE 0 END) AS annotated,
                     SUM(
                         CASE
-                            WHEN annotation_status IN ('invalid', 'empty')
+                            WHEN annotation_status IN ('invalid', 'encoding_error', 'empty')
                                  OR {UNRESOLVED_GENERATION_FAILURE_SQL}
                             THEN 1 ELSE 0
                         END

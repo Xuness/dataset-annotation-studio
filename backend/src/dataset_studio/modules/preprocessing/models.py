@@ -17,6 +17,12 @@ class ResizeAlgorithm(StrEnum):
     ANIME_LOW_HALO = "anime_low_halo"
 
 
+class PreprocessItemPhase(StrEnum):
+    PREPARED = "prepared"
+    COMMITTING = "committing"
+    COMMITTED = "committed"
+
+
 class ResizeOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

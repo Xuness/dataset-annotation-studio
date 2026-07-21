@@ -5,7 +5,10 @@ from PIL import Image
 
 from dataset_studio.core.config import Settings
 from dataset_studio.modules.annotations.service import AnnotationService
+from dataset_studio.modules.annotations.text import AnnotationEncodingError
+from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.assets.service import AssetService
+from dataset_studio.modules.translations.service import TranslationService
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
 from dataset_studio.platform.global_store import initialize_global_database
@@ -69,6 +72,55 @@ def test_annotation_save_delete_and_history(tmp_path: Path) -> None:
         "deleted_snapshot",
         "manual_edit",
     ]
+
+
+def test_scan_preserves_annotation_written_after_scan_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    summary, _ = workspaces.open(str(project))
+    asset = assets.list_assets(summary.project_id).items[0]
+    original_replace_scan = AssetRepository.replace_scan
+    interleaved = False
+
+    def replace_after_concurrent_save(repository, records, present_ids, annotation_baseline=None):
+        nonlocal interleaved
+        if not interleaved:
+            interleaved = True
+            annotations.save(summary.project_id, asset.id, "<caption>new</caption>")
+        return original_replace_scan(repository, records, present_ids, annotation_baseline)
+
+    monkeypatch.setattr(AssetRepository, "replace_scan", replace_after_concurrent_save)
+    workspaces.rescan(summary.project_id)
+
+    current = assets.list_assets(summary.project_id).items[0]
+    assert current.annotation_status.value == "valid"
+    assert (project / "image.txt").read_text(encoding="utf-8") == "<caption>new</caption>"
+
+
+def test_invalid_utf8_annotation_is_visible_and_not_used_for_translation(tmp_path: Path) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    translations = TranslationService(workspaces)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    (project / "image.txt").write_bytes(b"plain-text-\xff")
+
+    summary, _ = workspaces.open(str(project))
+    asset = assets.list_assets(summary.project_id).items[0]
+    document = annotations.get(summary.project_id, asset.id)
+
+    assert asset.annotation_status.value == "encoding_error"
+    assert document.status.value == "encoding_error"
+    assert document.validation is not None
+    assert document.validation.issues[0].code == "invalid_encoding"
+    translation = translations.get(summary.project_id, asset.id, "zh-CN")
+    assert translation.status.value == "source_invalid"
+    assert translation.issue == "源标注不是有效的 UTF-8，修复编码后才能生成译文。"
+    with pytest.raises(AnnotationEncodingError, match="UTF-8"):
+        translations.read_source(summary.project_id, asset.id)
 
 
 def test_workspace_scan_skips_broken_images_and_reports_them(tmp_path: Path) -> None:

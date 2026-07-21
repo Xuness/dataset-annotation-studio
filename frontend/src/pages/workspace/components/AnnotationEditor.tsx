@@ -16,6 +16,7 @@ import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { StatusDot } from "../../../shared/ui/StatusDot";
+import { reconcilePersistedContent } from "./annotationEditorState";
 
 interface AnnotationEditorProps {
   projectId: string;
@@ -39,6 +40,7 @@ const TRANSLATION_STATUS_LABELS = {
   stale: "译文已过期",
   untracked: "外部译文",
   source_missing: "缺少源标注",
+  source_invalid: "源标注编码异常",
   conflict: "文件名冲突",
 } as const;
 
@@ -123,10 +125,11 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
 
   async function handleSaveClick() {
     if (!assetId) return;
+    const submittedContent = content;
     setActionError(null);
     try {
-      const result = await save.mutateAsync(content);
-      setContent(result.content);
+      const result = await save.mutateAsync(submittedContent);
+      setContent((current) => reconcilePersistedContent(current, submittedContent, result.content));
       setSavedContent(result.content);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : "保存标注失败。");
@@ -141,10 +144,11 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
       confirmLabel: "删除",
     });
     if (!confirmed) return;
+    const contentBeforeDelete = content;
     setActionError(null);
     try {
       await remove.mutateAsync();
-      setContent("");
+      setContent((current) => reconcilePersistedContent(current, contentBeforeDelete, ""));
       setSavedContent("");
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : "删除标注失败。");
@@ -180,6 +184,7 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
   const translationUnavailable =
     !translation.data?.exists ||
     translation.data.status === "source_missing" ||
+    translation.data.status === "source_invalid" ||
     translation.data.status === "conflict";
 
   return (

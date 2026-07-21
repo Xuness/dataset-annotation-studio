@@ -112,8 +112,7 @@ def _verify_recorded_migration(
 ) -> None:
     if recorded != (migration.name, migration.checksum):
         raise RuntimeError(
-            f"数据库迁移 {migration.version} ({migration.name}) 校验失败；"
-            "请勿修改已发布的迁移。"
+            f"数据库迁移 {migration.version} ({migration.name}) 校验失败；请勿修改已发布的迁移。"
         )
 
 

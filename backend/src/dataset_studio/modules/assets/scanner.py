@@ -9,7 +9,7 @@ from PIL import Image, ImageOps
 from dataset_studio.core.files import file_sha256
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.annotations.models import AnnotationStatus
-from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
+from dataset_studio.modules.annotations.text import read_annotation_text
 from dataset_studio.modules.assets.models import SUPPORTED_IMAGE_SUFFIXES, AssetRecord
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.workspaces.models import ScanIssue, ScanResult, WorkspaceManifest
@@ -29,6 +29,15 @@ class AssetScanner:
         started = time.perf_counter()
         repository = AssetRepository(paths.database)
         existing_by_path = repository.load_all_records()
+        annotation_baseline = {
+            str(row["id"]): (
+                str(row["annotation_status"]),
+                int(row["annotation_modified_ns"])
+                if row["annotation_modified_ns"] is not None
+                else None,
+            )
+            for row in existing_by_path.values()
+        }
         existing_by_casefold: dict[str, list[object]] = {}
         unmatched_by_hash: dict[str, list[object]] = {}
         for row in existing_by_path.values():
@@ -67,7 +76,7 @@ class AssetScanner:
             present_ids.add(record.id)
             updated += int(was_updated)
 
-        added, missing = repository.replace_scan(records, present_ids)
+        added, missing = repository.replace_scan(records, present_ids, annotation_baseline)
         return ScanResult(
             scanned_files=scanned_files,
             indexed_assets=len(records),
@@ -221,6 +230,5 @@ class AssetScanner:
             and int(existing["annotation_modified_ns"]) == modified_ns
         ):
             return AnnotationStatus.MANUALLY_ACCEPTED.value, modified_ns
-        content = annotation_path.read_text(encoding="utf-8", errors="replace")
-        validation = validate_tag_balance(content)
+        _, validation = read_annotation_text(annotation_path)
         return validation.status.value, modified_ns

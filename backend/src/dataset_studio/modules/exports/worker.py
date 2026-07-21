@@ -9,15 +9,20 @@ import tempfile
 import threading
 from contextlib import suppress
 from pathlib import Path
+from typing import Protocol
 
-from dataset_studio.api.container import AppContainer
 from dataset_studio.core.files import file_sha256
 from dataset_studio.modules.exports.models import ExportOperation
 from dataset_studio.modules.exports.repository import ExportRepository
+from dataset_studio.modules.workspaces.service import WorkspaceService
 
 LOGGER = logging.getLogger("dataset_studio.export_worker")
 COPY_CHUNK_SIZE = 1024 * 1024
 STOP_CHECK_INTERVAL_CHUNKS = 8
+
+
+class ExportWorkerContainer(Protocol):
+    workspaces: WorkspaceService
 
 
 class ExportStopped(Exception):
@@ -29,7 +34,7 @@ class ExportInterrupted(Exception):
 
 
 class ExportWorker:
-    def __init__(self, container: AppContainer) -> None:
+    def __init__(self, container: ExportWorkerContainer) -> None:
         self._container = container
         self._shutdown = threading.Event()
 

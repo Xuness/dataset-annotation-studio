@@ -2,10 +2,10 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { useClipboardHistoryBridge } from "../shared/desktop/useClipboardHistoryBridge";
-import { useCloseGuard } from "../shared/desktop/useCloseGuard";
 import { useApplyInterfaceScale } from "../shared/desktop/useInterfaceScale";
 import { DialogHost } from "../shared/ui/DialogHost";
 import { Spinner } from "../shared/ui/Spinner";
+import { useCloseGuard } from "./useCloseGuard";
 
 const HomePage = lazy(() =>
   import("../pages/home/HomePage").then((module) => ({ default: module.HomePage })),

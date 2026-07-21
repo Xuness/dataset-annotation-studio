@@ -15,6 +15,7 @@ from dataset_studio.modules.annotations.models import (
     ValidationResult,
 )
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
+from dataset_studio.modules.annotations.text import read_annotation_text
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
@@ -34,11 +35,11 @@ class AnnotationService:
                 exists=False,
                 status=AnnotationStatus.MISSING,
             )
-        content = annotation_path.read_text(encoding="utf-8", errors="replace")
-        validation = validate_tag_balance(content)
+        content, validation = read_annotation_text(annotation_path)
         status = validation.status
         if (
-            str(asset["annotation_status"]) == AnnotationStatus.MANUALLY_ACCEPTED.value
+            status != AnnotationStatus.ENCODING_ERROR
+            and str(asset["annotation_status"]) == AnnotationStatus.MANUALLY_ACCEPTED.value
             and asset["annotation_modified_ns"] is not None
             and int(asset["annotation_modified_ns"]) == annotation_path.stat().st_mtime_ns
         ):
@@ -125,21 +126,22 @@ class AnnotationService:
         annotation_path = self._annotation_path(paths.root, asset)
         tombstone: Path | None = None
         previous: str | None = None
+        previous_validation: ValidationResult | None = None
         if annotation_path.is_file():
-            previous = annotation_path.read_text(encoding="utf-8", errors="replace")
+            previous, previous_validation = read_annotation_text(annotation_path)
             tombstone = annotation_path.with_name(
                 f".{annotation_path.name}.{uuid.uuid4().hex}.deleted"
             )
             os.replace(annotation_path, tombstone)
         try:
             with transaction(paths.database) as connection:
-                if previous is not None:
+                if previous is not None and previous_validation is not None:
                     self._insert_revision(
                         connection,
                         asset_id,
                         previous,
                         source="deleted_snapshot",
-                        validation=validate_tag_balance(previous),
+                        validation=previous_validation,
                     )
                 self._update_annotation_status(
                     connection,

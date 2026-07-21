@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import threading
 import uuid
+from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 
 from dataset_studio.core.config import Settings
@@ -35,7 +37,12 @@ class WorkspaceService:
         self._initialized_databases: set[Path] = set()
         self._database_init_lock = threading.Lock()
 
-    def open(self, raw_path: str) -> tuple[WorkspaceSummary, ScanResult]:
+    def open(
+        self,
+        raw_path: str,
+        *,
+        scan_guard: Callable[[str, Path], AbstractContextManager[bool | None]] | None = None,
+    ) -> tuple[WorkspaceSummary, ScanResult]:
         root = Path(raw_path).expanduser().resolve()
         if not root.is_dir():
             raise WorkspaceNotFoundError(f"文件夹不存在：{root}")
@@ -44,10 +51,30 @@ class WorkspaceService:
         paths.ensure_directories()
         manifest = self._load_or_create_manifest(paths)
         self._ensure_database(paths.database)
-        scan_result = self._scanner.scan(paths, manifest)
+        guard = scan_guard(manifest.project_id, paths.database) if scan_guard else nullcontext()
+        with guard as should_scan:
+            scan_result = (
+                self._scanner.scan(paths, manifest)
+                if should_scan is not False
+                else self._cached_scan_result(paths.database)
+            )
         opened_at = utc_now_iso()
         self._registry.upsert(manifest, root, opened_at)
         return self._summary(paths, manifest, opened_at), scan_result
+
+    @staticmethod
+    def _cached_scan_result(database_path: Path) -> ScanResult:
+        total, _, _ = AssetRepository(database_path).count_summary()
+        return ScanResult(
+            scanned_files=0,
+            indexed_assets=total,
+            added=0,
+            updated=0,
+            missing=0,
+            failed=0,
+            issues=[],
+            duration_ms=0,
+        )
 
     def list_recent(self) -> list[WorkspaceSummary]:
         summaries: list[WorkspaceSummary] = []

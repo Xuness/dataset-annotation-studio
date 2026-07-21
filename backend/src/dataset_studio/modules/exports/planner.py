@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.annotations.models import AnnotationStatus
-from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
+from dataset_studio.modules.annotations.text import decode_annotation_bytes
 from dataset_studio.modules.exports.models import (
     ExportPreview,
     ExportPreviewItem,
@@ -314,9 +314,8 @@ def _annotation_snapshot(annotation: Path, root: Path, row):
         )
 
     digest = hashlib.sha256(content).hexdigest()
-    try:
-        text = content.decode("utf-8")
-    except UnicodeDecodeError:
+    _, validation = decode_annotation_bytes(content)
+    if validation.status == AnnotationStatus.ENCODING_ERROR:
         return (
             True,
             digest,
@@ -328,7 +327,6 @@ def _annotation_snapshot(annotation: Path, root: Path, row):
             None,
         )
 
-    validation = validate_tag_balance(text)
     stored_status = str(row["annotation_status"])
     stored_modified_ns = (
         int(row["annotation_modified_ns"]) if row["annotation_modified_ns"] is not None else None

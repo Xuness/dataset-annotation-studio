@@ -1,6 +1,7 @@
 import { CheckCircle2, FileWarning, ScanSearch } from "lucide-react";
 
 import type { ExportPreview } from "../../../shared/api/types";
+import { formatBytes } from "../../../shared/format/bytes";
 
 const statusLabels: Record<string, string> = {
   valid: "校验通过",
@@ -10,13 +11,6 @@ const statusLabels: Record<string, string> = {
   invalid: "结构异常",
   encoding_error: "编码异常",
 };
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
 
 export function ExportPreviewPanel({ preview }: { preview: ExportPreview | undefined }) {
   return (

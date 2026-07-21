@@ -233,7 +233,15 @@ CREATE INDEX idx_export_items_operation_status
 ON export_items(operation_id, status, position);
 """
 
-WORKSPACE_SCHEMA_VERSION = 6
+PREPROCESS_RECOVERY_JOURNAL_MIGRATION = """
+ALTER TABLE preprocess_items
+ADD COLUMN phase TEXT NOT NULL DEFAULT 'committed';
+
+CREATE INDEX idx_preprocess_items_operation_phase
+ON preprocess_items(operation_id, phase);
+"""
+
+WORKSPACE_SCHEMA_VERSION = 7
 WORKSPACE_MIGRATIONS = (
     Migration(1, "initial_workspace_schema", WORKSPACE_SCHEMA),
     Migration(2, "image_metadata_version", IMAGE_METADATA_VERSION_MIGRATION),
@@ -241,6 +249,7 @@ WORKSPACE_MIGRATIONS = (
     Migration(4, "job_attempt_usage_details", JOB_ATTEMPT_USAGE_DETAILS_MIGRATION),
     Migration(5, "translation_jobs", TRANSLATION_JOBS_MIGRATION),
     Migration(6, "export_operations", EXPORT_OPERATIONS_MIGRATION),
+    Migration(7, "preprocess_recovery_journal", PREPROCESS_RECOVERY_JOURNAL_MIGRATION),
 )
 
 

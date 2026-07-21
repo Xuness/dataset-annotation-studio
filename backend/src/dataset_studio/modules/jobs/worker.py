@@ -6,17 +6,22 @@ import logging
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
+from typing import Protocol
 
-from dataset_studio.api.container import AppContainer
 from dataset_studio.core.files import atomic_write_text
+from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
+from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
 from dataset_studio.modules.jobs.models import JobItemStatus, JobKind
 from dataset_studio.modules.jobs.provider_call import JobStopped, complete_until_stopped
 from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
+from dataset_studio.modules.preprocessing.service import PreprocessService
+from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.prompts.composer import compose_user_prompt
 from dataset_studio.modules.providers.base import ModelProvider
+from dataset_studio.modules.providers.codex_runtime import CodexRuntime
 from dataset_studio.modules.providers.config import (
     CodexModelOptions,
     OpenAICompatibleModelOptions,
@@ -32,16 +37,30 @@ from dataset_studio.modules.providers.models import (
     ProviderResponse,
 )
 from dataset_studio.modules.translations.prompt import translation_user_prompt
-from dataset_studio.modules.translations.service import TranslationSourceChangedError
+from dataset_studio.modules.translations.service import (
+    TranslationService,
+    TranslationSourceChangedError,
+)
 from dataset_studio.modules.translations.validation import validate_translation_structure
+from dataset_studio.modules.workspaces.service import WorkspaceService
 
 LOGGER = logging.getLogger("dataset_studio.worker")
+
+
+class AnnotationWorkerContainer(Protocol):
+    workspaces: WorkspaceService
+    presets: PresetService
+    translations: TranslationService
+    assets: AssetService
+    annotations: AnnotationService
+    preprocessing: PreprocessService
+    codex: CodexRuntime
 
 
 class AnnotationWorker:
     def __init__(
         self,
-        container: AppContainer,
+        container: AnnotationWorkerContainer,
         provider_factory: Callable[[ProviderType], ModelProvider] | None = None,
     ) -> None:
         self._container = container
@@ -52,6 +71,12 @@ class AnnotationWorker:
         self._active_profiles: dict[asyncio.Task[None], str] = {}
 
     async def run(self, stopped: asyncio.Event) -> None:
+        recovered_preprocessing = self._container.preprocessing.recover_orphaned()
+        if recovered_preprocessing:
+            LOGGER.info(
+                "Recovered %s interrupted preprocessing operation(s).",
+                recovered_preprocessing,
+            )
         self._recover_orphaned_jobs()
         LOGGER.info("Task worker is ready.")
         while not stopped.is_set():

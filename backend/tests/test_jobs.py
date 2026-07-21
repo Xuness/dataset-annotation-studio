@@ -1,9 +1,12 @@
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from PIL import Image
 
+from dataset_studio.api.app import create_app
 from dataset_studio.core.config import Settings
+from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
@@ -116,6 +119,45 @@ def _fail_item(
     )
     JobLifecycleRepository(database).finalize_jobs()
     return attempt_number
+
+
+def test_orphan_recovery_finishes_running_attempt(tmp_path: Path) -> None:
+    _, _, job, database, _ = _single_item_job(tmp_path)
+    execution = JobExecutionRepository(database)
+    claimed = execution.claim_items(job.id, 1)
+    assert len(claimed) == 1
+    attempt_id, _ = execution.start_attempt(str(claimed[0]["id"]))
+
+    assert JobLifecycleRepository(database).recover_orphaned() == 1
+
+    connection = connect(database)
+    try:
+        attempt = connection.execute(
+            "SELECT status, error_message, finished_at FROM job_attempts WHERE id = ?",
+            (attempt_id,),
+        ).fetchone()
+    finally:
+        connection.close()
+    assert attempt["status"] == "interrupted"
+    assert "应用在请求完成前退出" in attempt["error_message"]
+    assert attempt["finished_at"] is not None
+
+
+def test_scan_api_refuses_to_run_while_job_is_active(tmp_path: Path) -> None:
+    _, project_id, _, _, _ = _single_item_job(tmp_path)
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+
+    with TestClient(create_app(settings)) as client:
+        opened = client.post(
+            "/api/v1/workspaces/open",
+            json={"path": str(tmp_path / "dataset")},
+        )
+        response = client.post(f"/api/v1/workspaces/{project_id}/scan")
+
+    assert opened.status_code == 200
+    assert opened.json()["scan"]["scanned_files"] == 0
+    assert response.status_code == 400
+    assert "任务运行" in response.json()["detail"]
 
 
 def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -> None:

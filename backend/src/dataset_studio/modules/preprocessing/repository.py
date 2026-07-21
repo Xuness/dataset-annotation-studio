@@ -31,8 +31,8 @@ class PreprocessRepository:
                     id, operation_id, asset_id, before_relative_path,
                     after_relative_path, before_hash, after_hash,
                     before_width, before_height, after_width, after_height,
-                    recovery_relative_path
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    recovery_relative_path, phase
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
             )
@@ -44,6 +44,39 @@ class PreprocessRepository:
                 """,
                 (operation_id,),
             )
+
+    def set_item_phase(self, item_id: str, phase: str) -> None:
+        with transaction(self._database_path) as connection:
+            cursor = connection.execute(
+                "UPDATE preprocess_items SET phase = ? WHERE id = ?",
+                (phase, item_id),
+            )
+            if cursor.rowcount != 1:
+                raise RuntimeError(f"预处理恢复日志条目丢失：{item_id}")
+
+    def claim_orphaned(self) -> list[str]:
+        with transaction(self._database_path) as connection:
+            rows = connection.execute(
+                """
+                SELECT id FROM preprocess_operations
+                WHERE status IN ('running', 'recovering')
+                ORDER BY created_at
+                """
+            ).fetchall()
+            operation_ids = [str(row["id"]) for row in rows]
+            if operation_ids:
+                connection.executemany(
+                    """
+                    UPDATE preprocess_operations
+                    SET status = 'recovering', error_message = ?
+                    WHERE id = ?
+                    """,
+                    [
+                        ("检测到上次运行中断，正在自动恢复原文件。", operation_id)
+                        for operation_id in operation_ids
+                    ],
+                )
+            return operation_ids
 
     def complete(self, operation_id: str) -> None:
         with transaction(self._database_path) as connection:

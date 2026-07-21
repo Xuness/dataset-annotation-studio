@@ -23,6 +23,7 @@ import {
   type SystemPresetInput,
   type TranslationPromptPresetInput,
 } from "./api";
+import { providerCredentialCacheToken } from "./queryKeys";
 
 export const presetKeys = {
   system: ["presets", "system"] as const,
@@ -80,7 +81,7 @@ export function useProviderModelSearch(input: ProviderModelSearchInput, enabled:
       input.provider_type,
       input.base_url,
       input.query,
-      Boolean(input.api_key),
+      providerCredentialCacheToken(input.api_key),
     ],
     queryFn: () => searchProviderModels(input),
     enabled,
@@ -128,7 +129,11 @@ export function useTranslationPromptPresetMutations() {
 
 export function useProviderProfileMutations() {
   const queryClient = useQueryClient();
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: presetKeys.providers });
+  const invalidate = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: presetKeys.providers }),
+      queryClient.invalidateQueries({ queryKey: ["presets", "provider-models"] }),
+    ]);
   return {
     create: useMutation({ mutationFn: createProviderProfile, onSuccess: invalidate }),
     update: useMutation({

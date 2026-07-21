@@ -215,6 +215,19 @@ class JobService:
         paths, _ = self._workspaces.get(project_id)
         return JobLifecycleRepository(paths.database).active_count() > 0
 
+    def ensure_inactive(self, project_id: str) -> None:
+        if self.has_active(project_id):
+            raise ValueError("当前工作区仍有标注或翻译任务运行，请先停止任务再重新扫描。")
+
+    @staticmethod
+    def has_active_database(database_path: Path) -> bool:
+        return JobLifecycleRepository(database_path).active_count() > 0
+
+    @classmethod
+    def ensure_database_inactive(cls, database_path: Path) -> None:
+        if cls.has_active_database(database_path):
+            raise ValueError("当前工作区仍有标注或翻译任务运行，请先停止任务再重新扫描。")
+
     def active_overview(self) -> ActiveJobsOverview:
         count = 0
         annotation_count = 0
@@ -400,26 +413,34 @@ class JobService:
 
         connection = connect(database_path)
         try:
-            parameters: list[object] = []
-            selected_clause = ""
-            if unique_ids:
-                placeholders = ",".join("?" for _ in unique_ids)
-                selected_clause = f"AND a.id IN ({placeholders})"
-                parameters.extend(unique_ids)
-            rows = connection.execute(
-                f"""
-                SELECT a.id, a.relative_path, a.annotation_relative_path,
-                       t.source_annotation_hash
-                FROM assets a
-                LEFT JOIN annotation_translations t
-                  ON t.asset_id = a.id AND t.language = ?
-                WHERE a.is_present = 1
-                  AND a.annotation_status != 'missing'
-                  {selected_clause}
-                ORDER BY a.relative_path COLLATE NOCASE
-                """,
-                [language, *parameters],
-            ).fetchall()
+            rows = []
+            batches = (
+                [unique_ids[start : start + 500] for start in range(0, len(unique_ids), 500)]
+                if unique_ids
+                else [[]]
+            )
+            for batch in batches:
+                selected_clause = ""
+                if batch:
+                    placeholders = ",".join("?" for _ in batch)
+                    selected_clause = f"AND a.id IN ({placeholders})"
+                rows.extend(
+                    connection.execute(
+                        f"""
+                        SELECT a.id, a.relative_path, a.annotation_relative_path,
+                               t.source_annotation_hash
+                        FROM assets a
+                        LEFT JOIN annotation_translations t
+                          ON t.asset_id = a.id AND t.language = ?
+                        WHERE a.is_present = 1
+                          AND a.annotation_status NOT IN ('missing', 'encoding_error')
+                          {selected_clause}
+                        ORDER BY a.relative_path COLLATE NOCASE
+                        """,
+                        [language, *batch],
+                    ).fetchall()
+                )
+            rows.sort(key=lambda row: str(row["relative_path"]).casefold())
             annotation_owners = {
                 str(owner["annotation_relative_path"]).casefold(): str(owner["id"])
                 for owner in connection.execute(

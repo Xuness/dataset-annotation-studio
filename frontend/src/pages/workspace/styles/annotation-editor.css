@@ -112,6 +112,7 @@
 }
 
 .translation-status--source_missing,
+.translation-status--source_invalid,
 .translation-status--conflict {
   color: var(--danger);
   background: var(--danger-soft);

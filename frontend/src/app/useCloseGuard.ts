@@ -1,9 +1,9 @@
 import { useEffect } from "react";
-import { confirm, message } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { confirm, message } from "@tauri-apps/plugin-dialog";
 
-import { getActiveJobs, stopAllWorkspaceJobs } from "../../features/jobs/api";
-import { useAppStore } from "../store/appStore";
+import { getActiveJobs, stopAllWorkspaceJobs } from "../features/jobs/api";
+import { useAppStore } from "../shared/store/appStore";
 
 function isTauriRuntime(): boolean {
   return "__TAURI_INTERNALS__" in window;

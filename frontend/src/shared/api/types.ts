@@ -1,5 +1,5 @@
 export type AnnotationStatus =
-  "missing" | "valid" | "invalid" | "empty" | "unchecked" | "manually_accepted";
+  "missing" | "valid" | "invalid" | "encoding_error" | "empty" | "unchecked" | "manually_accepted";
 
 export type AssetFilterStatus = AnnotationStatus | "failed" | "needs_review";
 
@@ -102,7 +102,7 @@ export interface AnnotationRevision {
 }
 
 export type TranslationStatus =
-  "missing" | "current" | "stale" | "untracked" | "source_missing" | "conflict";
+  "missing" | "current" | "stale" | "untracked" | "source_missing" | "source_invalid" | "conflict";
 
 export interface TranslationDocument {
   asset_id: string;

@@ -9,6 +9,7 @@ class AnnotationStatus(StrEnum):
     MISSING = "missing"
     VALID = "valid"
     INVALID = "invalid"
+    ENCODING_ERROR = "encoding_error"
     EMPTY = "empty"
     UNCHECKED = "unchecked"
     MANUALLY_ACCEPTED = "manually_accepted"

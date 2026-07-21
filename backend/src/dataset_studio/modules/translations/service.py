@@ -10,6 +10,10 @@ from dataset_studio.core.errors import AssetNotFoundError
 from dataset_studio.core.files import atomic_copy_file, atomic_write_text
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
+from dataset_studio.modules.annotations.text import (
+    AnnotationEncodingError,
+    read_annotation_text_strict,
+)
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.translations.models import (
     TranslationDocument,
@@ -50,7 +54,12 @@ class TranslationService:
         annotation_path = self._annotation_path(paths.root, asset)
         translation_path = self._translation_path(annotation_path, language)
         relative_path = translation_path.relative_to(paths.root).as_posix()
-        source = self.read_source(project_id, asset_id)
+        source_invalid = False
+        try:
+            source = self.read_source(project_id, asset_id)
+        except AnnotationEncodingError:
+            source = None
+            source_invalid = True
         row = self._record(paths.database, asset_id, language)
         conflict = self._annotation_path_conflict(
             paths.database,
@@ -61,6 +70,8 @@ class TranslationService:
 
         if conflict:
             status = TranslationStatus.CONFLICT
+        elif source_invalid:
+            status = TranslationStatus.SOURCE_INVALID
         elif not source:
             status = TranslationStatus.SOURCE_MISSING
         elif not exists:
@@ -83,7 +94,7 @@ class TranslationService:
                 translation_path.read_text(encoding="utf-8", errors="replace") if exists else ""
             ),
             status=status,
-            source_exists=source is not None,
+            source_exists=annotation_path.is_file(),
             source_hash=str(row["source_annotation_hash"]) if row else None,
             current_source_hash=source[1] if source else None,
             validation_status=str(row["validation_status"]) if row else None,
@@ -97,7 +108,11 @@ class TranslationService:
             modified_at=str(translation_path.stat().st_mtime_ns) if exists else None,
             updated_at=str(row["updated_at"]) if row else None,
             issue=(
-                "目标译文路径同时是另一张图片的活动标注，已拒绝把它当作译文。" if conflict else None
+                "目标译文路径同时是另一张图片的活动标注，已拒绝把它当作译文。"
+                if conflict
+                else "源标注不是有效的 UTF-8，修复编码后才能生成译文。"
+                if source_invalid
+                else None
             ),
         )
 
@@ -107,7 +122,7 @@ class TranslationService:
         annotation_path = self._annotation_path(paths.root, asset)
         if not annotation_path.is_file():
             return None
-        content = annotation_path.read_text(encoding="utf-8", errors="replace")
+        content = read_annotation_text_strict(annotation_path)
         return content, self.content_hash(content)
 
     def save_generated(
