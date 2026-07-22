@@ -3,6 +3,7 @@ import { create } from "zustand";
 import {
   createDefaultSurfaceTransparency,
   createDefaultHomeContent,
+  createEmptyThemeSceneOverrides,
   createUniformSurfaceTransparency,
   normalizePreferences,
   type AppSurfaceRegion,
@@ -21,8 +22,12 @@ interface AppPreferencesState {
   preferences: AppPreferences;
   setTheme: (themeId: ThemeId) => void;
   setThemeCustomBackground: (themeId: ThemeId, background: CustomBackground | null) => void;
-  setSceneOverrides: (target: SceneTarget, update: Partial<SceneOverrides>) => void;
-  resetSceneOverrides: (target: SceneTarget) => void;
+  setThemeSceneOverrides: (
+    themeId: ThemeId,
+    target: SceneTarget,
+    update: Partial<SceneOverrides>,
+  ) => void;
+  resetThemeSceneOverrides: (themeId: ThemeId, target: SceneTarget) => void;
   setRegionTransparency: (region: AppSurfaceRegion, transparent: boolean) => void;
   setAllRegionsTransparent: () => void;
   resetRegionTransparency: () => void;
@@ -78,22 +83,34 @@ export const useAppPreferences = create<AppPreferencesState>((set) => {
           appearance: { ...current.appearance, customBackgrounds },
         };
       }),
-    setSceneOverrides: (target, update) =>
-      commit((current) => ({
-        ...current,
-        appearance: {
-          ...current.appearance,
-          [target]: { ...current.appearance[target], ...update },
-        },
-      })),
-    resetSceneOverrides: (target) =>
-      commit((current) => ({
-        ...current,
-        appearance: {
-          ...current.appearance,
+    setThemeSceneOverrides: (themeId, target, update) =>
+      commit((current) => {
+        const sceneOverrides = { ...current.appearance.sceneOverrides };
+        const themeScene = sceneOverrides[themeId] ?? createEmptyThemeSceneOverrides();
+        sceneOverrides[themeId] = {
+          ...themeScene,
+          [target]: { ...themeScene[target], ...update },
+        };
+
+        return {
+          ...current,
+          appearance: { ...current.appearance, sceneOverrides },
+        };
+      }),
+    resetThemeSceneOverrides: (themeId, target) =>
+      commit((current) => {
+        const sceneOverrides = { ...current.appearance.sceneOverrides };
+        const themeScene = sceneOverrides[themeId] ?? createEmptyThemeSceneOverrides();
+        sceneOverrides[themeId] = {
+          ...themeScene,
           [target]: { opacity: null, blurPx: null },
-        },
-      })),
+        };
+
+        return {
+          ...current,
+          appearance: { ...current.appearance, sceneOverrides },
+        };
+      }),
     setRegionTransparency: (region, transparent) =>
       commit((current) => ({
         ...current,

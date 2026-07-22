@@ -7,6 +7,8 @@ import {
   createDefaultHomeContent,
   createDefaultPreferences,
   createDefaultSurfaceTransparency,
+  createEmptySceneOverrides,
+  createEmptyThemeSceneOverrides,
   type AppPreferences,
   type AppSurfaceTransparency,
   type AppearancePreferences,
@@ -14,11 +16,9 @@ import {
   type HomeContentPreferences,
   type SceneOverrides,
   type ThemeCustomBackgrounds,
+  type ThemeSceneOverrides,
+  type ThemeSceneOverridesByTheme,
 } from "./appearanceModel.ts";
-
-function emptySceneOverrides(): SceneOverrides {
-  return { opacity: null, blurPx: null };
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -31,11 +31,45 @@ function normalizeNumber(value: unknown, min: number, max: number): number | nul
 }
 
 function normalizeSceneOverrides(value: unknown): SceneOverrides {
-  if (!isRecord(value)) return emptySceneOverrides();
+  if (!isRecord(value)) return createEmptySceneOverrides();
   return {
     opacity: normalizeNumber(value.opacity, SCENE_LIMITS.opacity.min, SCENE_LIMITS.opacity.max),
     blurPx: normalizeNumber(value.blurPx, SCENE_LIMITS.blurPx.min, SCENE_LIMITS.blurPx.max),
   };
+}
+
+function hasSceneOverrides(value: ThemeSceneOverrides): boolean {
+  return [value.home, value.workspace].some(
+    (target) => target.opacity !== null || target.blurPx !== null,
+  );
+}
+
+function normalizeThemeScene(value: unknown): ThemeSceneOverrides {
+  if (!isRecord(value)) return createEmptyThemeSceneOverrides();
+  return {
+    home: normalizeSceneOverrides(value.home),
+    workspace: normalizeSceneOverrides(value.workspace),
+  };
+}
+
+function normalizeThemeSceneOverrides(value: unknown): ThemeSceneOverridesByTheme {
+  if (!isRecord(value)) return {};
+
+  const scenes: ThemeSceneOverridesByTheme = {};
+  for (const [themeId, candidate] of Object.entries(value)) {
+    if (!isThemeId(themeId)) continue;
+    const scene = normalizeThemeScene(candidate);
+    if (hasSceneOverrides(scene)) scenes[themeId] = scene;
+  }
+  return scenes;
+}
+
+function migrateLegacySceneOverrides(
+  value: Record<string, unknown>,
+  themeId: ThemeId,
+): ThemeSceneOverridesByTheme {
+  const scene = normalizeThemeScene(value);
+  return hasSceneOverrides(scene) ? { [themeId]: scene } : {};
 }
 
 function normalizeCustomBackground(value: unknown): CustomBackground | null {
@@ -116,14 +150,16 @@ function normalizeAppearancePreferences(
     preserveRegions: boolean;
     preserveImmersiveMode: boolean;
     preserveThemeBackgrounds: boolean;
+    preserveThemeSceneOverrides: boolean;
   },
 ): AppearancePreferences {
   return {
     customBackgrounds: options.preserveThemeBackgrounds
       ? normalizeThemeCustomBackgrounds(value.customBackgrounds)
       : migrateLegacyCustomBackground(value.customBackground, options.themeId),
-    home: normalizeSceneOverrides(value.home),
-    workspace: normalizeSceneOverrides(value.workspace),
+    sceneOverrides: options.preserveThemeSceneOverrides
+      ? normalizeThemeSceneOverrides(value.sceneOverrides)
+      : migrateLegacySceneOverrides(value, options.themeId),
     transparentRegions: options.preserveRegions
       ? normalizeSurfaceTransparency(value.transparentRegions)
       : createDefaultSurfaceTransparency(),
@@ -151,6 +187,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
         preserveRegions: false,
         preserveImmersiveMode: false,
         preserveThemeBackgrounds: false,
+        preserveThemeSceneOverrides: false,
       }),
       homeContent: createDefaultHomeContent(),
     };
@@ -170,6 +207,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
         preserveRegions: true,
         preserveImmersiveMode: false,
         preserveThemeBackgrounds: false,
+        preserveThemeSceneOverrides: false,
       }),
       homeContent: createDefaultHomeContent(),
     };
@@ -194,6 +232,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
         preserveRegions: true,
         preserveImmersiveMode: true,
         preserveThemeBackgrounds: false,
+        preserveThemeSceneOverrides: false,
       }),
       homeContent: createDefaultHomeContent(),
     };
@@ -210,8 +249,26 @@ export function normalizePreferences(value: unknown): AppPreferences {
         preserveRegions: true,
         preserveImmersiveMode: true,
         preserveThemeBackgrounds: true,
+        preserveThemeSceneOverrides: false,
       }),
       homeContent: createDefaultHomeContent(),
+    };
+  }
+
+  // Version 10 added editable homepage copy. Its scene sliders were still
+  // global, so assign those values only to the theme active during upgrade.
+  if (storedVersion === 10 && isRecord(value.appearance)) {
+    return {
+      version: PREFERENCES_VERSION,
+      themeId,
+      appearance: normalizeAppearancePreferences(value.appearance, {
+        themeId,
+        preserveRegions: true,
+        preserveImmersiveMode: true,
+        preserveThemeBackgrounds: true,
+        preserveThemeSceneOverrides: false,
+      }),
+      homeContent: normalizeHomeContent(value.homeContent),
     };
   }
 
@@ -224,6 +281,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
         preserveRegions: true,
         preserveImmersiveMode: true,
         preserveThemeBackgrounds: true,
+        preserveThemeSceneOverrides: true,
       }),
       homeContent: normalizeHomeContent(value.homeContent),
     };

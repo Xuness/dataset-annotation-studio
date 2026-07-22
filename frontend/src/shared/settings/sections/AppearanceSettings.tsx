@@ -17,7 +17,7 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
       <SettingsSectionHeader
         eyebrow="Appearance"
         title="外观与主题"
-        description="主题负责色彩与基调；每个主题单独保存背景图片，首页文案、显影参数和区域透光作为设备级偏好保存。"
+        description="主题负责色彩与基调；每个主题单独保存背景图片与显影参数，首页文案和区域透光作为设备级通用偏好保存。"
         onClose={onClose}
       />
 

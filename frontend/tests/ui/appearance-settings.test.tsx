@@ -27,14 +27,55 @@ describe("appearance settings", () => {
     expect(useAppPreferences.getState().preferences.themeId).toBe("warm-paper");
   });
 
-  test("updates scene visibility and immersive mode through the rendered controls", async () => {
+  test("stores scene visibility independently for each theme", async () => {
     const user = userEvent.setup();
     render(<AppearanceSettings onClose={() => undefined} />);
 
     fireEvent.change(screen.getByRole("slider", { name: "首页背景可见度" }), {
       target: { value: "47" },
     });
-    expect(useAppPreferences.getState().preferences.appearance.home.opacity).toBe(0.47);
+    expect(
+      useAppPreferences.getState().preferences.appearance.sceneOverrides["silent-gallery"]?.home
+        .opacity,
+    ).toBe(0.47);
+
+    await user.click(screen.getByRole("button", { name: /暖纸手札/ }));
+    expect((screen.getByRole("slider", { name: "首页背景可见度" }) as HTMLInputElement).value).toBe(
+      "82",
+    );
+    fireEvent.change(screen.getByRole("slider", { name: "首页背景可见度" }), {
+      target: { value: "64" },
+    });
+
+    await user.click(screen.getByRole("button", { name: /静默展厅/ }));
+    expect((screen.getByRole("slider", { name: "首页背景可见度" }) as HTMLInputElement).value).toBe(
+      "47",
+    );
+    expect(
+      useAppPreferences.getState().preferences.appearance.sceneOverrides["warm-paper"]?.home
+        .opacity,
+    ).toBe(0.64);
+
+    await user.click(screen.getAllByRole("button", { name: "重置" })[0]);
+    expect((screen.getByRole("slider", { name: "首页背景可见度" }) as HTMLInputElement).value).toBe(
+      "78",
+    );
+    expect(
+      useAppPreferences.getState().preferences.appearance.sceneOverrides["silent-gallery"],
+    ).toBeUndefined();
+    expect(
+      useAppPreferences.getState().preferences.appearance.sceneOverrides["warm-paper"]?.home
+        .opacity,
+    ).toBe(0.64);
+    expect(
+      JSON.parse(window.localStorage.getItem("dataset-studio.preferences") ?? "null").appearance
+        .sceneOverrides["warm-paper"].home.opacity,
+    ).toBe(0.64);
+  });
+
+  test("updates immersive mode through the rendered controls", async () => {
+    const user = userEvent.setup();
+    render(<AppearanceSettings onClose={() => undefined} />);
 
     await user.click(screen.getByRole("button", { name: /让工作台完全沉入场景/ }));
 

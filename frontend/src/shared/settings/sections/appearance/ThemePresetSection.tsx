@@ -15,12 +15,14 @@ export function ThemePresetSection() {
           <span className="eyebrow">Theme registry</span>
           <h3>主题预设</h3>
         </div>
-        <small>每个主题分别保存背景图片</small>
+        <small>每个主题分别保存背景与场景显影</small>
       </div>
       <div className="theme-preset-grid">
         {THEMES.map((theme) => {
           const selected = theme.id === preferences.themeId;
           const hasCustomBackground = Boolean(preferences.appearance.customBackgrounds[theme.id]);
+          const hasSceneOverrides = Boolean(preferences.appearance.sceneOverrides[theme.id]);
+          const customized = hasCustomBackground || hasSceneOverrides;
           const previewStyle = {
             "--theme-preview-image": `url(${JSON.stringify(theme.scene.image)})`,
             "--theme-preview-position": theme.scene.previewPosition,
@@ -53,7 +55,7 @@ export function ThemePresetSection() {
                 <span>
                   <strong>{theme.name}</strong>
                   {theme.id === DEFAULT_THEME_ID ? <em>默认</em> : null}
-                  {hasCustomBackground ? <em>自定义</em> : null}
+                  {customized ? <em>自定义</em> : null}
                   <small>{theme.englishName}</small>
                 </span>
                 <span className="theme-preset-card__swatches" aria-hidden="true">

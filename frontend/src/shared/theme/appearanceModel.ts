@@ -1,6 +1,6 @@
 import { DEFAULT_THEME_ID, getThemeDefinition, type ThemeId } from "./themes.ts";
 
-export const PREFERENCES_VERSION = 10 as const;
+export const PREFERENCES_VERSION = 11 as const;
 
 export const DEFAULT_HOME_CONTENT = {
   headline: "让每一张图，在沉默中显影。",
@@ -47,10 +47,16 @@ export interface SceneOverrides {
   blurPx: number | null;
 }
 
-export interface AppearancePreferences {
-  customBackgrounds: ThemeCustomBackgrounds;
+export interface ThemeSceneOverrides {
   home: SceneOverrides;
   workspace: SceneOverrides;
+}
+
+export type ThemeSceneOverridesByTheme = Partial<Record<ThemeId, ThemeSceneOverrides>>;
+
+export interface AppearancePreferences {
+  customBackgrounds: ThemeCustomBackgrounds;
+  sceneOverrides: ThemeSceneOverridesByTheme;
   transparentRegions: AppSurfaceTransparency;
   immersiveMode: boolean;
 }
@@ -79,8 +85,22 @@ export interface ResolvedAppearance {
   workspace: ResolvedSceneAppearance;
 }
 
-function emptySceneOverrides(): SceneOverrides {
+export function createEmptySceneOverrides(): SceneOverrides {
   return { opacity: null, blurPx: null };
+}
+
+export function createEmptyThemeSceneOverrides(): ThemeSceneOverrides {
+  return {
+    home: createEmptySceneOverrides(),
+    workspace: createEmptySceneOverrides(),
+  };
+}
+
+export function getThemeSceneOverrides(
+  appearance: AppearancePreferences,
+  themeId: ThemeId,
+): ThemeSceneOverrides {
+  return appearance.sceneOverrides[themeId] ?? createEmptyThemeSceneOverrides();
 }
 
 export function createDefaultHomeContent(): HomeContentPreferences {
@@ -114,8 +134,7 @@ export function createDefaultPreferences(themeId: ThemeId = DEFAULT_THEME_ID): A
     themeId,
     appearance: {
       customBackgrounds: {},
-      home: emptySceneOverrides(),
-      workspace: emptySceneOverrides(),
+      sceneOverrides: {},
       transparentRegions: createDefaultSurfaceTransparency(),
       immersiveMode: false,
     },
@@ -133,16 +152,17 @@ export function resolveSurfaceTransparency(
 
 export function resolveAppearance(preferences: AppPreferences): ResolvedAppearance {
   const theme = getThemeDefinition(preferences.themeId);
+  const sceneOverrides = getThemeSceneOverrides(preferences.appearance, theme.id);
   return {
     theme,
     customBackground: preferences.appearance.customBackgrounds[theme.id] ?? null,
     home: {
-      opacity: preferences.appearance.home.opacity ?? theme.scene.home.opacity,
-      blurPx: preferences.appearance.home.blurPx ?? theme.scene.home.blurPx,
+      opacity: sceneOverrides.home.opacity ?? theme.scene.home.opacity,
+      blurPx: sceneOverrides.home.blurPx ?? theme.scene.home.blurPx,
     },
     workspace: {
-      opacity: preferences.appearance.workspace.opacity ?? theme.scene.workspace.opacity,
-      blurPx: preferences.appearance.workspace.blurPx ?? theme.scene.workspace.blurPx,
+      opacity: sceneOverrides.workspace.opacity ?? theme.scene.workspace.opacity,
+      blurPx: sceneOverrides.workspace.blurPx ?? theme.scene.workspace.blurPx,
     },
   };
 }

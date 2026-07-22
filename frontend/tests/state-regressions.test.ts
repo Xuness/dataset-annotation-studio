@@ -11,7 +11,9 @@ import {
 import {
   DEFAULT_HOME_CONTENT,
   HOME_CONTENT_LIMITS,
+  PREFERENCES_VERSION,
   createDefaultPreferences,
+  getThemeSceneOverrides,
   normalizePreferences,
   resolveAppearance,
   resolveSurfaceTransparency,
@@ -124,10 +126,10 @@ test("desktop capabilities allow opening verified local folders", () => {
 test("version one appearance preferences migrate without losing the selected theme", () => {
   const preferences = normalizePreferences({ version: 1, themeId: "sea-fog" });
 
-  assert.equal(preferences.version, 10);
+  assert.equal(preferences.version, PREFERENCES_VERSION);
   assert.equal(preferences.themeId, "sea-fog");
   assert.deepEqual(preferences.appearance.customBackgrounds, {});
-  assert.deepEqual(preferences.appearance.home, { opacity: null, blurPx: null });
+  assert.deepEqual(preferences.appearance.sceneOverrides, {});
   assert.equal(preferences.appearance.transparentRegions.canvas, true);
   assert.deepEqual(preferences.homeContent, DEFAULT_HOME_CONTENT);
 });
@@ -160,8 +162,10 @@ test("appearance preferences clamp unsafe values and reject incomplete backgroun
   });
 
   assert.deepEqual(preferences.appearance.customBackgrounds, {});
-  assert.deepEqual(preferences.appearance.home, { opacity: 1, blurPx: 0 });
-  assert.deepEqual(preferences.appearance.workspace, { opacity: null, blurPx: 32 });
+  assert.deepEqual(preferences.appearance.sceneOverrides["silent-gallery"], {
+    home: { opacity: 1, blurPx: 0 },
+    workspace: { opacity: null, blurPx: 32 },
+  });
   assert.equal(preferences.appearance.transparentRegions.canvas, true);
 });
 
@@ -176,13 +180,16 @@ test("version two appearance preferences keep scene overrides and gain region de
     },
   });
 
-  assert.equal(preferences.version, 10);
+  assert.equal(preferences.version, PREFERENCES_VERSION);
   assert.equal(preferences.themeId, "silent-gallery");
   assert.deepEqual(preferences.appearance.customBackgrounds["silent-gallery"], {
     path: "E:/background.webp",
     name: "background.webp",
   });
-  assert.deepEqual(preferences.appearance.workspace, { opacity: 0.18, blurPx: 5 });
+  assert.deepEqual(preferences.appearance.sceneOverrides["silent-gallery"]?.workspace, {
+    opacity: 0.18,
+    blurPx: 5,
+  });
   assert.equal(preferences.appearance.transparentRegions.canvas, true);
   assert.equal(preferences.appearance.transparentRegions.navigation, false);
 });
@@ -206,13 +213,16 @@ test("version three appearance preferences keep transparency and gain disabled i
     },
   });
 
-  assert.equal(preferences.version, 10);
+  assert.equal(preferences.version, PREFERENCES_VERSION);
   assert.equal(preferences.appearance.immersiveMode, false);
   assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], false);
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
   assert.equal(preferences.appearance.transparentRegions.navigation, true);
   assert.equal(preferences.appearance.transparentRegions.content, true);
-  assert.deepEqual(preferences.appearance.workspace, { opacity: 0.34, blurPx: 2 });
+  assert.deepEqual(preferences.appearance.sceneOverrides["silent-gallery"]?.workspace, {
+    opacity: 0.34,
+    blurPx: 2,
+  });
 });
 
 test("retired version four preferences keep appearance settings without atmosphere motion", () => {
@@ -235,7 +245,7 @@ test("retired version four preferences keep appearance settings without atmosphe
     },
   });
 
-  assert.equal(preferences.version, 10);
+  assert.equal(preferences.version, PREFERENCES_VERSION);
   assert.equal(preferences.themeId, "sea-fog");
   assert.deepEqual(preferences.appearance.customBackgrounds["sea-fog"], {
     path: "E:/background.webp",
@@ -247,7 +257,10 @@ test("retired version four preferences keep appearance settings without atmosphe
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
   assert.equal(preferences.appearance.transparentRegions.canvas, false);
   assert.equal(preferences.appearance.transparentRegions.navigation, true);
-  assert.deepEqual(preferences.appearance.workspace, { opacity: 0.28, blurPx: 4 });
+  assert.deepEqual(preferences.appearance.sceneOverrides["sea-fog"]?.workspace, {
+    opacity: 0.28,
+    blurPx: 4,
+  });
 });
 
 test("version five preferences preserve immersive mode and gain titlebar transparency", () => {
@@ -270,12 +283,15 @@ test("version five preferences preserve immersive mode and gain titlebar transpa
     },
   });
 
-  assert.equal(preferences.version, 10);
+  assert.equal(preferences.version, PREFERENCES_VERSION);
   assert.equal(preferences.appearance.immersiveMode, true);
   assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], false);
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
   assert.equal(preferences.appearance.transparentRegions.navigation, true);
-  assert.deepEqual(preferences.appearance.workspace, { opacity: 0.38, blurPx: 3 });
+  assert.deepEqual(preferences.appearance.sceneOverrides["sea-fog"]?.workspace, {
+    opacity: 0.38,
+    blurPx: 3,
+  });
 });
 
 test("version six preferences preserve titlebar and immersive choices and gain home navigation transparency", () => {
@@ -299,7 +315,7 @@ test("version six preferences preserve titlebar and immersive choices and gain h
     },
   });
 
-  assert.equal(preferences.version, 10);
+  assert.equal(preferences.version, PREFERENCES_VERSION);
   assert.equal(preferences.appearance.immersiveMode, true);
   assert.deepEqual(preferences.appearance.customBackgrounds["silent-gallery"], {
     path: "E:/background.webp",
@@ -308,7 +324,10 @@ test("version six preferences preserve titlebar and immersive choices and gain h
   assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], true);
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
   assert.equal(preferences.appearance.transparentRegions["primary-sidebar"], true);
-  assert.deepEqual(preferences.appearance.home, { opacity: 0.7, blurPx: 1 });
+  assert.deepEqual(preferences.appearance.sceneOverrides["silent-gallery"]?.home, {
+    opacity: 0.7,
+    blurPx: 1,
+  });
 });
 
 test("version seven preferences preserve home chrome and gain home content transparency", () => {
@@ -333,13 +352,16 @@ test("version seven preferences preserve home chrome and gain home content trans
     },
   });
 
-  assert.equal(preferences.version, 10);
+  assert.equal(preferences.version, PREFERENCES_VERSION);
   assert.equal(preferences.appearance.immersiveMode, false);
   assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], true);
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], true);
   assert.equal(preferences.appearance.transparentRegions["home-entry"], false);
   assert.equal(preferences.appearance.transparentRegions["home-recents"], false);
-  assert.deepEqual(preferences.appearance.home, { opacity: 0.82, blurPx: 3 });
+  assert.deepEqual(preferences.appearance.sceneOverrides["sea-fog"]?.home, {
+    opacity: 0.82,
+    blurPx: 3,
+  });
 });
 
 test("version eight custom background migrates only to the active theme", () => {
@@ -355,7 +377,7 @@ test("version eight custom background migrates only to the active theme", () => 
     },
   });
 
-  assert.equal(preferences.version, 10);
+  assert.equal(preferences.version, PREFERENCES_VERSION);
   assert.deepEqual(preferences.appearance.customBackgrounds, {
     "sea-fog": { path: "E:/legacy.webp", name: "legacy.webp" },
   });
@@ -393,6 +415,81 @@ test("version nine keeps independent backgrounds and gains default homepage copy
   );
   assert.equal(resolveAppearance({ ...preferences, themeId: "sea-fog" }).customBackground, null);
   assert.deepEqual(preferences.homeContent, DEFAULT_HOME_CONTENT);
+});
+
+test("version ten scene overrides migrate only to the active theme", () => {
+  const defaults = createDefaultPreferences("sea-fog");
+  const preferences = normalizePreferences({
+    version: 10,
+    themeId: "sea-fog",
+    appearance: {
+      customBackgrounds: {},
+      home: { opacity: 0.71, blurPx: 2 },
+      workspace: { opacity: 0.37, blurPx: 5 },
+      transparentRegions: defaults.appearance.transparentRegions,
+      immersiveMode: false,
+    },
+    homeContent: { headline: "雾中档案", description: "只留给当前主题" },
+  });
+
+  assert.deepEqual(preferences.appearance.sceneOverrides, {
+    "sea-fog": {
+      home: { opacity: 0.71, blurPx: 2 },
+      workspace: { opacity: 0.37, blurPx: 5 },
+    },
+  });
+  assert.deepEqual(getThemeSceneOverrides(preferences.appearance, "silent-gallery"), {
+    home: { opacity: null, blurPx: null },
+    workspace: { opacity: null, blurPx: null },
+  });
+  assert.deepEqual(preferences.homeContent, {
+    headline: "雾中档案",
+    description: "只留给当前主题",
+  });
+});
+
+test("current preferences keep scene overrides independent for each known theme", () => {
+  const defaults = createDefaultPreferences("silent-gallery");
+  const preferences = normalizePreferences({
+    ...defaults,
+    appearance: {
+      ...defaults.appearance,
+      sceneOverrides: {
+        "silent-gallery": {
+          home: { opacity: 0.47, blurPx: 3 },
+          workspace: { opacity: 0.16, blurPx: 5 },
+        },
+        "warm-paper": {
+          home: { opacity: 0.91, blurPx: null },
+          workspace: { opacity: -1, blurPx: 80 },
+        },
+        unknown: {
+          home: { opacity: 0.2, blurPx: 2 },
+          workspace: { opacity: 0.2, blurPx: 2 },
+        },
+      },
+    },
+  });
+
+  assert.deepEqual(preferences.appearance.sceneOverrides, {
+    "silent-gallery": {
+      home: { opacity: 0.47, blurPx: 3 },
+      workspace: { opacity: 0.16, blurPx: 5 },
+    },
+    "warm-paper": {
+      home: { opacity: 0.91, blurPx: null },
+      workspace: { opacity: 0, blurPx: 32 },
+    },
+  });
+  assert.deepEqual(resolveAppearance(preferences).home, { opacity: 0.47, blurPx: 3 });
+  assert.deepEqual(resolveAppearance({ ...preferences, themeId: "warm-paper" }).workspace, {
+    opacity: 0,
+    blurPx: 32,
+  });
+  assert.deepEqual(resolveAppearance({ ...preferences, themeId: "sea-fog" }).workspace, {
+    opacity: 0.32,
+    blurPx: 0,
+  });
 });
 
 test("current preferences normalize editable homepage copy", () => {
@@ -490,7 +587,12 @@ test("theme scene defaults remain active until a user override is stored", () =>
     ...defaults,
     appearance: {
       ...defaults.appearance,
-      workspace: { opacity: 0.42, blurPx: 9 },
+      sceneOverrides: {
+        "sea-fog": {
+          home: { opacity: null, blurPx: null },
+          workspace: { opacity: 0.42, blurPx: 9 },
+        },
+      },
     },
   });
   const resolvedCustomized = resolveAppearance(customized);
@@ -511,7 +613,12 @@ test("workspace material opacity is independent from scene visibility", () => {
     ...defaults,
     appearance: {
       ...defaults.appearance,
-      workspace: { opacity: 1, blurPx: null },
+      sceneOverrides: {
+        "sea-fog": {
+          home: { opacity: null, blurPx: null },
+          workspace: { opacity: 1, blurPx: null },
+        },
+      },
     },
   });
 

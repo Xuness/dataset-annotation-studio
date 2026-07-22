@@ -3,6 +3,7 @@ import { RotateCcw } from "lucide-react";
 
 import { useAppPreferences } from "../../../theme/appPreferences";
 import {
+  getThemeSceneOverrides,
   resolveAppearance,
   SCENE_LIMITS,
   type SceneOverrides,
@@ -90,9 +91,10 @@ function SceneControl({
 
 export function SceneClaritySection() {
   const preferences = useAppPreferences((state) => state.preferences);
-  const setSceneOverrides = useAppPreferences((state) => state.setSceneOverrides);
-  const resetSceneOverrides = useAppPreferences((state) => state.resetSceneOverrides);
+  const setThemeSceneOverrides = useAppPreferences((state) => state.setThemeSceneOverrides);
+  const resetThemeSceneOverrides = useAppPreferences((state) => state.resetThemeSceneOverrides);
   const resolved = resolveAppearance(preferences);
+  const overrides = getThemeSceneOverrides(preferences.appearance, resolved.theme.id);
 
   return (
     <section className="appearance-section">
@@ -101,7 +103,7 @@ export function SceneClaritySection() {
           <span className="eyebrow">Scene clarity</span>
           <h3>场景显影</h3>
         </div>
-        <small>调整会即时预览并自动保存</small>
+        <small>仅作用于“{resolved.theme.name}”，调整会即时预览并自动保存</small>
       </div>
       <div className="scene-control-grid">
         <SceneControl
@@ -110,9 +112,9 @@ export function SceneClaritySection() {
           englishTitle="Landing hall"
           description="控制迎宾场景的显影强度；较低数值会让文案和项目入口更安静。"
           values={resolved.home}
-          overrides={preferences.appearance.home}
-          onChange={(update) => setSceneOverrides("home", update)}
-          onReset={() => resetSceneOverrides("home")}
+          overrides={overrides.home}
+          onChange={(update) => setThemeSceneOverrides(resolved.theme.id, "home", update)}
+          onReset={() => resetThemeSceneOverrides(resolved.theme.id, "home")}
         />
         <SceneControl
           target="workspace"
@@ -120,9 +122,9 @@ export function SceneClaritySection() {
           englishTitle="Working archive"
           description="控制工作台底层场景，并同步降低面板遮蔽；高数值会更明显地显露背景。"
           values={resolved.workspace}
-          overrides={preferences.appearance.workspace}
-          onChange={(update) => setSceneOverrides("workspace", update)}
-          onReset={() => resetSceneOverrides("workspace")}
+          overrides={overrides.workspace}
+          onChange={(update) => setThemeSceneOverrides(resolved.theme.id, "workspace", update)}
+          onReset={() => resetThemeSceneOverrides(resolved.theme.id, "workspace")}
         />
       </div>
     </section>
