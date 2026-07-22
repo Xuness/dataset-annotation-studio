@@ -28,6 +28,15 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
         }
         assert (tmp_path / "app-data" / "logs").is_dir()
 
+        taggers = client.get("/api/v1/taggers")
+        assert taggers.status_code == 200
+        assert taggers.json()["model_root"] == str(
+            (tmp_path / "app-data" / "models" / "taggers").resolve()
+        )
+        assert taggers.json()["installations"] == []
+        assert taggers.json()["profiles"] == []
+        assert [item["id"] for item in taggers.json()["supported_adapters"]] == ["cl_tagger_v2"]
+
         opened = client.post("/api/v1/workspaces/open", json={"path": str(project)})
         assert opened.status_code == 200
         project_id = opened.json()["workspace"]["project_id"]

@@ -1,5 +1,5 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
-import { BadgeInfo, Cable, Palette, type LucideIcon } from "lucide-react";
+import { BadgeInfo, Cable, Palette, Tags, type LucideIcon } from "lucide-react";
 
 import {
   type SettingsSection,
@@ -19,6 +19,11 @@ const PresetSettings = lazy(async () => {
 const AboutSettings = lazy(async () => {
   const module = await import("./sections/AboutSettings");
   return { default: module.AboutSettings };
+});
+
+const TaggerSettings = lazy(async () => {
+  const module = await import("./sections/TaggerSettings");
+  return { default: module.TaggerSettings };
 });
 
 type SettingsSectionComponent = LazyExoticComponent<ComponentType<{ onClose: () => void }>>;
@@ -45,6 +50,13 @@ const sectionDefinitions = {
     icon: Cable,
     component: PresetSettings,
     sidebarNote: "Prompt 与模型连接作为全局资源复用；API Key 保存在系统凭据库。",
+  },
+  taggers: {
+    id: "taggers",
+    label: "本地打标器",
+    icon: Tags,
+    component: TaggerSettings,
+    sidebarNote: "模型文件集中保存在本机模型库，所有数据集项目可以共享。",
   },
   about: {
     id: "about",

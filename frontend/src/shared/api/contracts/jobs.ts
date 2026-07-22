@@ -11,16 +11,20 @@ export type JobItemStatus =
   "pending" | "running" | "succeeded" | "failed" | "interrupted" | "skipped" | "manually_accepted";
 
 export type JobKind = "annotation" | "translation";
+export type ExecutionBackend = "provider" | "local_tagger";
 export type ExistingTranslationPolicy = "skip" | "stale" | "overwrite";
 
 export interface JobSummary {
   id: string;
   status: JobStatus;
   kind: JobKind;
-  system_preset_id: string;
-  system_preset_name: string;
-  provider_profile_id: string;
-  provider_profile_name: string;
+  execution_backend: ExecutionBackend;
+  execution_profile_id: string;
+  execution_profile_name: string;
+  system_preset_id: string | null;
+  system_preset_name: string | null;
+  provider_profile_id: string | null;
+  provider_profile_name: string | null;
   model: string;
   scope: "all" | "selected";
   overwrite_existing: boolean;

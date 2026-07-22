@@ -4,14 +4,17 @@ import json
 from pathlib import Path
 
 from dataset_studio.core.sqlite import connect
+from dataset_studio.modules.jobs.execution_snapshot import load_execution_snapshot
 from dataset_studio.modules.jobs.models import (
+    ExecutionBackend,
     JobAttempt,
     JobDetail,
     JobItemDetail,
     JobItemStatus,
     JobSummary,
 )
-from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
+from dataset_studio.modules.providers.config import ProviderExecutionProfile
+from dataset_studio.modules.taggers.models import TaggerExecutionProfile
 
 
 class JobQueryRepository:
@@ -192,19 +195,42 @@ class JobQueryRepository:
                     (row["id"],),
                 )
             }
-        provider = load_provider_snapshot(str(row["provider_snapshot"]))
+        backend = ExecutionBackend(str(row["execution_backend"] or "provider"))
+        execution = load_execution_snapshot(
+            backend,
+            row["execution_snapshot"],
+            legacy_provider_snapshot=str(row["provider_snapshot"]),
+        )
         system = json.loads(str(row["system_prompt_snapshot"]))
         configuration = json.loads(str(row["configuration_snapshot"]))
         kind = str(row["kind"])
+        if isinstance(execution, TaggerExecutionProfile):
+            execution_profile_name = execution.name
+            model = execution.model_label
+            system_preset_id = None
+            system_preset_name = None
+            provider_profile_id = None
+            provider_profile_name = None
+        else:
+            assert isinstance(execution, ProviderExecutionProfile)
+            execution_profile_name = execution.name
+            model = execution.model_id
+            system_preset_id = str(row["system_preset_id"])
+            system_preset_name = str(system.get("name", "未命名预设"))
+            provider_profile_id = str(row["provider_profile_id"])
+            provider_profile_name = execution.name
         return JobSummary(
             id=str(row["id"]),
             status=str(row["status"]),
             kind=kind,
-            system_preset_id=str(row["system_preset_id"]),
-            system_preset_name=str(system.get("name", "未命名预设")),
-            provider_profile_id=str(row["provider_profile_id"]),
-            provider_profile_name=provider.name,
-            model=provider.model_id,
+            execution_backend=backend,
+            execution_profile_id=str(row["execution_profile_id"] or execution.id),
+            execution_profile_name=execution_profile_name,
+            system_preset_id=system_preset_id,
+            system_preset_name=system_preset_name,
+            provider_profile_id=provider_profile_id,
+            provider_profile_name=provider_profile_name,
+            model=model,
             scope=str(row["scope"]),
             overwrite_existing=bool(row["overwrite_existing"]),
             target_language=(

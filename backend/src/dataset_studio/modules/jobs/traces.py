@@ -12,11 +12,13 @@ from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
 from dataset_studio.modules.prompts.composer import compose_user_prompt
 from dataset_studio.modules.providers.reasoning import extract_reasoning_from_raw
+from dataset_studio.modules.taggers.models import TaggerExecutionProfile
 from dataset_studio.modules.workspaces.paths import WorkspacePaths
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
 class TraceRequestParameters(BaseModel):
+    execution_backend: str = "provider"
     provider_type: str
     provider_profile_name: str
     model: str
@@ -28,6 +30,12 @@ class TraceRequestParameters(BaseModel):
     service_tier: str | None = None
     reasoning_effort: str | None = None
     prompt_cache_strategy: str | None = None
+    adapter_id: str | None = None
+    installation_id: str | None = None
+    model_version: str | None = None
+    threshold: float | None = None
+    categories: list[str] | None = None
+    device: str | None = None
 
 
 class TraceRequest(BaseModel):
@@ -129,6 +137,8 @@ class AnnotationTraceService:
                     j.user_prompt_snapshot,
                     j.json_fields_snapshot,
                     j.provider_snapshot,
+                    j.execution_backend,
+                    j.execution_snapshot,
                     ji.id AS item_id,
                     ji.status AS item_status,
                     ji.asset_id,
@@ -192,11 +202,16 @@ class AnnotationTraceService:
         metadata: object,
     ) -> AssetAnnotationTrace:
         artifact = self._load_artifact(paths, row)
-        provider_snapshot = _json_object(row.get("provider_snapshot"))
+        execution_backend = _string(row.get("execution_backend")) or "provider"
+        snapshot = _json_object(
+            row.get("execution_snapshot")
+            if execution_backend == "local_tagger"
+            else row.get("provider_snapshot")
+        )
         request_payload = artifact.get("request")
         recorded_request = request_payload if isinstance(request_payload, dict) else None
 
-        parameters = _request_parameters(provider_snapshot)
+        parameters = _request_parameters(execution_backend, snapshot)
         if recorded_request is not None:
             recorded_parameters = recorded_request.get("parameters")
             if isinstance(recorded_parameters, dict):
@@ -309,17 +324,49 @@ class AnnotationTraceService:
         return {}
 
 
-def _request_parameters(provider_snapshot: dict[str, object]) -> dict[str, object]:
+def _request_parameters(
+    execution_backend: str,
+    snapshot: dict[str, object],
+) -> dict[str, object]:
+    if execution_backend == "local_tagger":
+        try:
+            profile = TaggerExecutionProfile.model_validate(snapshot)
+        except (TypeError, ValueError):
+            return {
+                "execution_backend": "local_tagger",
+                "provider_type": "local_tagger",
+                "provider_profile_name": _string(snapshot.get("name")) or "本地打标配置",
+                "model": _string(snapshot.get("installation_name")) or "unknown",
+                "adapter_id": _string(snapshot.get("adapter_id")),
+                "installation_id": _string(snapshot.get("installation_id")),
+                "model_version": _string(snapshot.get("model_version")),
+                "threshold": _number(snapshot.get("threshold")),
+                "categories": _string_list(snapshot.get("categories")),
+                "device": _string(snapshot.get("device")),
+            }
+        return {
+            "execution_backend": "local_tagger",
+            "provider_type": "local_tagger",
+            "provider_profile_name": profile.name,
+            "model": profile.model_label,
+            "adapter_id": profile.adapter_id,
+            "installation_id": profile.installation_id,
+            "model_version": profile.model_version,
+            "threshold": profile.threshold,
+            "categories": profile.categories,
+            "device": profile.device.value,
+        }
     try:
-        profile = load_provider_snapshot(provider_snapshot)
+        profile = load_provider_snapshot(snapshot)
     except (KeyError, TypeError, ValueError):
         return {
-            "provider_type": _string(provider_snapshot.get("provider_type")) or "unknown",
-            "provider_profile_name": _string(provider_snapshot.get("name")) or "未命名 API 配置",
-            "model": _string(provider_snapshot.get("model")) or "unknown",
-            "temperature": _number(provider_snapshot.get("temperature")),
-            "max_output_tokens": _integer(provider_snapshot.get("max_output_tokens")),
-            "timeout_seconds": _integer(provider_snapshot.get("timeout_seconds")),
+            "execution_backend": "provider",
+            "provider_type": _string(snapshot.get("provider_type")) or "unknown",
+            "provider_profile_name": _string(snapshot.get("name")) or "未命名 API 配置",
+            "model": _string(snapshot.get("model")) or "unknown",
+            "temperature": _number(snapshot.get("temperature")),
+            "max_output_tokens": _integer(snapshot.get("max_output_tokens")),
+            "timeout_seconds": _integer(snapshot.get("timeout_seconds")),
             "top_p": None,
             "seed": None,
             "service_tier": None,
@@ -329,6 +376,7 @@ def _request_parameters(provider_snapshot: dict[str, object]) -> dict[str, objec
     model = profile.model
     options = model.protocol_options
     return {
+        "execution_backend": "provider",
         "provider_type": profile.provider_type.value,
         "provider_profile_name": profile.name,
         "model": model.model_id,
@@ -365,6 +413,12 @@ def _json_list(value: object) -> list[object]:
     except json.JSONDecodeError:
         return []
     return parsed if isinstance(parsed, list) else []
+
+
+def _string_list(value: object) -> list[str] | None:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return None
+    return [str(item) for item in value]
 
 
 def _enum_value(value: object) -> str | None:

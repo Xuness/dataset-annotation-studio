@@ -241,7 +241,26 @@ CREATE INDEX idx_preprocess_items_operation_phase
 ON preprocess_items(operation_id, phase);
 """
 
-WORKSPACE_SCHEMA_VERSION = 7
+JOB_EXECUTION_BACKEND_MIGRATION = """
+ALTER TABLE jobs
+ADD COLUMN execution_backend TEXT NOT NULL DEFAULT 'provider'
+    CHECK (execution_backend IN ('provider', 'local_tagger'));
+
+ALTER TABLE jobs
+ADD COLUMN execution_profile_id TEXT;
+
+ALTER TABLE jobs
+ADD COLUMN execution_snapshot TEXT;
+
+UPDATE jobs
+SET execution_profile_id = provider_profile_id,
+    execution_snapshot = provider_snapshot;
+
+CREATE INDEX idx_jobs_execution_profile
+ON jobs(execution_backend, execution_profile_id, status);
+"""
+
+WORKSPACE_SCHEMA_VERSION = 8
 WORKSPACE_MIGRATIONS = (
     Migration(1, "initial_workspace_schema", WORKSPACE_SCHEMA),
     Migration(2, "image_metadata_version", IMAGE_METADATA_VERSION_MIGRATION),
@@ -250,6 +269,7 @@ WORKSPACE_MIGRATIONS = (
     Migration(5, "translation_jobs", TRANSLATION_JOBS_MIGRATION),
     Migration(6, "export_operations", EXPORT_OPERATIONS_MIGRATION),
     Migration(7, "preprocess_recovery_journal", PREPROCESS_RECOVERY_JOURNAL_MIGRATION),
+    Migration(8, "job_execution_backend", JOB_EXECUTION_BACKEND_MIGRATION),
 )
 
 

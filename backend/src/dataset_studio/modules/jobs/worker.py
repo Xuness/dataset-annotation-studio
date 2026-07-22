@@ -13,10 +13,11 @@ from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
+from dataset_studio.modules.jobs.execution_snapshot import load_execution_snapshot
+from dataset_studio.modules.jobs.executors.local_tagger import LocalTaggerJobExecutor
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
-from dataset_studio.modules.jobs.models import JobItemStatus, JobKind
+from dataset_studio.modules.jobs.models import ExecutionBackend, JobItemStatus, JobKind
 from dataset_studio.modules.jobs.provider_call import JobStopped, complete_until_stopped
-from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
 from dataset_studio.modules.preprocessing.service import PreprocessService
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.prompts.composer import compose_user_prompt
@@ -36,6 +37,8 @@ from dataset_studio.modules.providers.models import (
     ProviderRequestError,
     ProviderResponse,
 )
+from dataset_studio.modules.taggers.models import TaggerExecutionProfile
+from dataset_studio.modules.taggers.runtime import TaggerRuntime
 from dataset_studio.modules.translations.prompt import translation_user_prompt
 from dataset_studio.modules.translations.service import (
     TranslationService,
@@ -55,6 +58,7 @@ class AnnotationWorkerContainer(Protocol):
     annotations: AnnotationService
     preprocessing: PreprocessService
     codex: CodexRuntime
+    tagger_runtime: TaggerRuntime
 
 
 class AnnotationWorker:
@@ -69,6 +73,7 @@ class AnnotationWorker:
         )
         self._active: set[asyncio.Task[None]] = set()
         self._active_profiles: dict[asyncio.Task[None], str] = {}
+        self._local_tagger_executor = LocalTaggerJobExecutor(container)
 
     async def run(self, stopped: asyncio.Event) -> None:
         recovered_preprocessing = self._container.preprocessing.recover_orphaned()
@@ -81,6 +86,7 @@ class AnnotationWorker:
         LOGGER.info("Task worker is ready.")
         while not stopped.is_set():
             self._reap_finished_tasks()
+            self._container.tagger_runtime.prune_missing_installations()
             self._schedule_available_items()
             with suppress(TimeoutError):
                 await asyncio.wait_for(stopped.wait(), timeout=0.5)
@@ -109,9 +115,15 @@ class AnnotationWorker:
             repository = JobExecutionRepository(paths.database)
             JobLifecycleRepository(paths.database).finalize_jobs()
             for job in repository.runnable_jobs():
-                profile = load_provider_snapshot(str(job["provider_snapshot"]))
+                backend = ExecutionBackend(str(job.get("execution_backend") or "provider"))
+                profile = load_execution_snapshot(
+                    backend,
+                    job.get("execution_snapshot"),
+                    legacy_provider_snapshot=str(job["provider_snapshot"]),
+                )
+                active_key = f"{backend.value}:{profile.id}"
                 profile_running = sum(
-                    active_profile == profile.id
+                    active_profile == active_key
                     for active_profile in self._active_profiles.values()
                 )
                 available = profile.concurrency - profile_running
@@ -127,7 +139,7 @@ class AnnotationWorker:
                         )
                     )
                     self._active.add(task)
-                    self._active_profiles[task] = profile.id
+                    self._active_profiles[task] = active_key
 
     def _reap_finished_tasks(self) -> None:
         finished = {task for task in self._active if task.done()}
@@ -192,7 +204,24 @@ class AnnotationWorker:
             repository.finish_item(item_id, JobItemStatus.INTERRUPTED)
             return
 
-        profile = load_provider_snapshot(str(job["provider_snapshot"]))
+        backend = ExecutionBackend(str(job.get("execution_backend") or "provider"))
+        execution_profile = load_execution_snapshot(
+            backend,
+            job.get("execution_snapshot"),
+            legacy_provider_snapshot=str(job["provider_snapshot"]),
+        )
+        if isinstance(execution_profile, TaggerExecutionProfile):
+            await self._local_tagger_executor.process(
+                project_id,
+                workspace_root,
+                runs_root,
+                job,
+                item,
+                repository,
+                execution_profile,
+            )
+            return
+        profile = execution_profile
         try:
             credential = self._container.presets.get_provider_credential(profile)
         except ValueError as error:

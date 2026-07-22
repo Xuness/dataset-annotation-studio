@@ -50,6 +50,7 @@ export interface PromptPreview {
 }
 
 export interface AnnotationTraceRequestParameters {
+  execution_backend: "provider" | "local_tagger";
   provider_type: string;
   provider_profile_name: string;
   model: string;
@@ -61,6 +62,12 @@ export interface AnnotationTraceRequestParameters {
   service_tier: string | null;
   reasoning_effort: string | null;
   prompt_cache_strategy: string | null;
+  adapter_id: string | null;
+  installation_id: string | null;
+  model_version: string | null;
+  threshold: number | null;
+  categories: string[] | null;
+  device: string | null;
 }
 
 export interface AnnotationTraceRequest {

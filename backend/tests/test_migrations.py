@@ -131,7 +131,7 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     }
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4, 5]
+    assert versions == [1, 2, 3, 4, 5, 6]
 
 
 def test_provider_model_config_migration_copies_shared_options_to_each_model(
@@ -276,6 +276,10 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
             entry["name"]: entry
             for entry in connection.execute("PRAGMA table_info('preprocess_items')").fetchall()
         }
+        job_columns = {
+            entry["name"]: entry
+            for entry in connection.execute("PRAGMA table_info('jobs')").fetchall()
+        }
         tables = {
             entry["name"]
             for entry in connection.execute(
@@ -285,7 +289,7 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
     finally:
         connection.close()
     assert row["image_metadata_version"] == 1
-    assert versions == [1, 2, 3, 4, 5, 6, 7]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
     assert "idx_job_items_asset_updated" in indexes
     assert {
         "cache_read_tokens",
@@ -297,6 +301,7 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
     assert {"export_operations", "export_items"}.issubset(tables)
     assert preprocess_item_columns["phase"]["notnull"] == 1
     assert preprocess_item_columns["phase"]["dflt_value"] == "'committed'"
+    assert {"execution_backend", "execution_profile_id", "execution_snapshot"}.issubset(job_columns)
 
 
 def test_workspace_migration_is_safe_when_api_and_worker_start_together(tmp_path: Path) -> None:
@@ -323,7 +328,7 @@ def test_workspace_migration_is_safe_when_api_and_worker_start_together(tmp_path
         ]
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6, 7]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
 
 
 def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None:
@@ -358,7 +363,7 @@ def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None
         ]
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6, 7]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
 
 
 def test_recent_workspace_list_applies_missing_migrations_before_summary(
@@ -396,4 +401,4 @@ def test_recent_workspace_list_applies_missing_migrations_before_summary(
     finally:
         connection.close()
     assert [summary.project_id for summary in summaries] == [manifest.project_id]
-    assert versions == [1, 2, 3, 4, 5, 6, 7]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]

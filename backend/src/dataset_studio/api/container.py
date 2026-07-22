@@ -14,6 +14,9 @@ from dataset_studio.modules.presets.secrets import KeyringSecretStore
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.providers.codex_runtime import CodexRuntime
 from dataset_studio.modules.statistics.service import StatisticsService
+from dataset_studio.modules.taggers.repository import TaggerRepository
+from dataset_studio.modules.taggers.runtime import TaggerRuntime
+from dataset_studio.modules.taggers.service import TaggerService
 from dataset_studio.modules.translations.service import TranslationService
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -34,6 +37,8 @@ class AppContainer:
     exports: ExportService
     statistics: StatisticsService
     codex: CodexRuntime
+    taggers: TaggerService
+    tagger_runtime: TaggerRuntime
 
     @classmethod
     def create(cls, settings: Settings) -> AppContainer:
@@ -45,8 +50,10 @@ class AppContainer:
         translations = TranslationService(workspaces)
         assets = AssetService(workspaces)
         presets = PresetService(PresetRepository(global_database), KeyringSecretStore())
-        jobs = JobService(workspaces, presets, annotations, translations)
+        taggers = TaggerService(settings, TaggerRepository(global_database))
+        jobs = JobService(workspaces, presets, annotations, translations, taggers)
         codex = CodexRuntime()
+        tagger_runtime = TaggerRuntime(taggers)
         exports = ExportService(workspaces)
         preprocessing = PreprocessService(
             workspaces,
@@ -72,7 +79,10 @@ class AppContainer:
             exports=exports,
             statistics=StatisticsService(workspaces),
             codex=codex,
+            taggers=taggers,
+            tagger_runtime=tagger_runtime,
         )
 
     async def aclose(self) -> None:
+        self.tagger_runtime.close()
         await self.codex.close()

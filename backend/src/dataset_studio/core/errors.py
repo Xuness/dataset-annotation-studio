@@ -16,3 +16,7 @@ class PresetNotFoundError(StudioError):
 
 class JobNotFoundError(StudioError):
     """Raised when a requested annotation job no longer exists."""
+
+
+class TaggerNotFoundError(StudioError):
+    """Raised when a local tagger installation or profile no longer exists."""

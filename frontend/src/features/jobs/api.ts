@@ -1,14 +1,17 @@
 import { apiRequest } from "../../shared/api/client";
 import type {
   ExistingTranslationPolicy,
+  ExecutionBackend,
   JobDetail,
   JobKind,
   JobSummary,
 } from "../../shared/api/types";
 
 export interface CreateJobInput {
-  provider_profile_id: string;
-  model_id: string;
+  execution_backend: ExecutionBackend;
+  provider_profile_id?: string;
+  model_id?: string;
+  tagger_profile_id?: string;
   kind: JobKind;
   scope: "all" | "selected";
   asset_ids: string[];

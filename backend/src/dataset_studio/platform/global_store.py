@@ -169,13 +169,54 @@ JOIN json_each(
 DROP TABLE provider_profiles_legacy;
 """
 
-GLOBAL_SCHEMA_VERSION = 5
+LOCAL_TAGGERS_MIGRATION = """
+CREATE TABLE local_tagger_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    model_root TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE local_tagger_installations (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    adapter_id TEXT NOT NULL,
+    model_version TEXT NOT NULL,
+    relative_path TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    fingerprint TEXT NOT NULL CHECK (length(fingerprint) = 64),
+    manifest_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_local_tagger_installations_adapter
+ON local_tagger_installations(adapter_id, model_version);
+
+CREATE TABLE local_tagger_profiles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    installation_id TEXT NOT NULL,
+    threshold REAL NOT NULL CHECK (threshold >= 0.01 AND threshold <= 0.99),
+    categories_json TEXT NOT NULL,
+    device TEXT NOT NULL CHECK (device IN ('auto', 'cpu', 'cuda', 'directml')),
+    concurrency INTEGER NOT NULL CHECK (concurrency >= 1 AND concurrency <= 8),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (installation_id)
+        REFERENCES local_tagger_installations(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_local_tagger_profiles_installation
+ON local_tagger_profiles(installation_id);
+"""
+
+GLOBAL_SCHEMA_VERSION = 6
 GLOBAL_MIGRATIONS = (
     Migration(1, "initial_global_schema", GLOBAL_SCHEMA),
     Migration(2, "provider_request_options", PROVIDER_REQUEST_OPTIONS_MIGRATION),
     Migration(3, "translation_prompt_presets", TRANSLATION_PROMPT_PRESETS_MIGRATION),
     Migration(4, "provider_models", PROVIDER_MODELS_MIGRATION),
     Migration(5, "provider_model_configs", PROVIDER_MODEL_CONFIGS_MIGRATION),
+    Migration(6, "local_taggers", LOCAL_TAGGERS_MIGRATION),
 )
 
 

@@ -33,6 +33,7 @@ vi.mock("../../src/pages/presets/components/ProviderProfilesPanel", () => ({
 import { PresetsPage } from "../../src/pages/presets/PresetsPage";
 import { AboutSettings } from "../../src/app/settings/sections/AboutSettings";
 import { PresetSettings } from "../../src/app/settings/sections/PresetSettings";
+import { TaggerSettings } from "../../src/app/settings/sections/TaggerSettings";
 import { SETTINGS_SECTION_IDS } from "../../src/shared/settings/settingsSectionIds";
 
 function createQueryClient() {
@@ -60,8 +61,8 @@ afterEach(() => {
 });
 
 describe("settings overview sections", () => {
-  test("registers appearance, presets and diagnostics in stable order", () => {
-    expect(SETTINGS_SECTION_IDS).toEqual(["appearance", "presets", "about"]);
+  test("registers appearance, presets, local taggers and diagnostics in stable order", () => {
+    expect(SETTINGS_SECTION_IDS).toEqual(["appearance", "presets", "taggers", "about"]);
   });
 
   test("summarizes preset resources and deep-links into creation", async () => {
@@ -115,6 +116,40 @@ describe("settings overview sections", () => {
     expect(screen.getByRole("status", { name: "当前位置" }).textContent).toBe(
       "/presets?tab=system&action=create",
     );
+  });
+
+  test("shows the local-only tagger library and runtime state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          model_root: "C:\\AppData\\DatasetAnnotationStudio\\models\\taggers",
+          disk_size: 0,
+          installations: [],
+          profiles: [],
+          runtime: {
+            available: true,
+            providers: ["CPUExecutionProvider"],
+            devices: ["auto", "cpu"],
+            error: null,
+          },
+          supported_adapters: [{ id: "cl_tagger_v2", name: "CL Tagger v2", description: "test" }],
+          scan_issues: [],
+        }),
+      ),
+    );
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <TaggerSettings onClose={() => undefined} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("ONNX Runtime 已就绪")).toBeTruthy();
+    expect(screen.getByText("CPUExecutionProvider")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "导入本地模型" })).toBeTruthy();
+    expect(screen.getByText(/当前版本仅支持本地导入/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Hugging Face/i })).toBeNull();
   });
 
   test("shows live service diagnostics and copies a privacy-safe summary", async () => {

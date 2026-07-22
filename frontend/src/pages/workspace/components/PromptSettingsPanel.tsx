@@ -29,6 +29,7 @@ const ATTEMPT_STATUS_LABELS: Record<string, string> = {
   request_failed: "请求失败",
   internal_error: "内部错误",
   interrupted: "已中断",
+  inference_failed: "本地推理失败",
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -37,6 +38,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   opencode_go: "OpenCode Go",
   gemini: "Gemini",
   codex: "Codex",
+  local_tagger: "本地打标器",
 };
 
 function TraceMessageCard({
@@ -73,6 +75,7 @@ function AnnotationTraceView({ trace }: { trace: AssetAnnotationTrace }) {
   ].filter((entry): entry is [string, number] => entry[1] !== null);
   const attemptLabel = ATTEMPT_STATUS_LABELS[trace.attempt_status] ?? trace.attempt_status;
   const providerLabel = PROVIDER_LABELS[parameters.provider_type] ?? parameters.provider_type;
+  const localTagger = parameters.execution_backend === "local_tagger";
 
   return (
     <div className="annotation-trace">
@@ -113,55 +116,73 @@ function AnnotationTraceView({ trace }: { trace: AssetAnnotationTrace }) {
 
       <dl className="annotation-trace__parameters">
         <div>
-          <dt>API 配置</dt>
+          <dt>{localTagger ? "打标配置" : "API 配置"}</dt>
           <dd>{parameters.provider_profile_name}</dd>
         </div>
         <div>
-          <dt>推理强度</dt>
-          <dd>{parameters.reasoning_effort ?? "未显式设置"}</dd>
-        </div>
-        <div>
-          <dt>最大输出</dt>
+          <dt>{localTagger ? "执行设备" : "推理强度"}</dt>
           <dd>
-            {parameters.max_output_tokens === null
-              ? "未记录"
-              : `${parameters.max_output_tokens.toLocaleString()} Token`}
+            {localTagger
+              ? (parameters.device ?? "未记录")
+              : (parameters.reasoning_effort ?? "未显式设置")}
           </dd>
         </div>
         <div>
-          <dt>温度</dt>
-          <dd>{parameters.temperature ?? "模型默认"}</dd>
+          <dt>{localTagger ? "统一阈值" : "最大输出"}</dt>
+          <dd>
+            {localTagger
+              ? (parameters.threshold ?? "未记录")
+              : parameters.max_output_tokens === null
+                ? "未记录"
+                : `${parameters.max_output_tokens.toLocaleString()} Token`}
+          </dd>
+        </div>
+        <div>
+          <dt>{localTagger ? "标签类别" : "温度"}</dt>
+          <dd>
+            {localTagger
+              ? (parameters.categories?.join("、") ?? "未记录")
+              : (parameters.temperature ?? "模型默认")}
+          </dd>
         </div>
       </dl>
 
       <div className="prompt-request-preview">
+        {!localTagger ? (
+          <>
+            <TraceMessageCard
+              label="SYSTEM"
+              detail={trace.request.source === "recorded" ? "实际请求快照" : "历史任务重建"}
+              content={trace.request.system_prompt}
+              empty="这次请求没有 System Prompt。"
+            />
+            <TraceMessageCard
+              label="USER"
+              detail="图片作为同一条 USER 消息的图像内容发送"
+              content={trace.request.user_prompt}
+              empty="这次请求没有 User Prompt。"
+            />
+            <TraceMessageCard
+              label="REASONING"
+              detail={
+                trace.response.reasoning_tokens === null
+                  ? "供应商返回的可见推理"
+                  : `${trace.response.reasoning_tokens.toLocaleString()} Token`
+              }
+              content={trace.response.reasoning_content}
+              empty="供应商没有返回可展示的推理内容；这不代表模型没有进行内部推理。"
+              tone="reasoning"
+            />
+          </>
+        ) : null}
         <TraceMessageCard
-          label="SYSTEM"
-          detail={trace.request.source === "recorded" ? "实际请求快照" : "历史任务重建"}
-          content={trace.request.system_prompt}
-          empty="这次请求没有 System Prompt。"
-        />
-        <TraceMessageCard
-          label="USER"
-          detail="图片作为同一条 USER 消息的图像内容发送"
-          content={trace.request.user_prompt}
-          empty="这次请求没有 User Prompt。"
-        />
-        <TraceMessageCard
-          label="REASONING"
+          label={localTagger ? "TAGS" : "FINAL"}
           detail={
-            trace.response.reasoning_tokens === null
-              ? "供应商返回的可见推理"
-              : `${trace.response.reasoning_tokens.toLocaleString()} Token`
-          }
-          content={trace.response.reasoning_content}
-          empty="供应商没有返回可展示的推理内容；这不代表模型没有进行内部推理。"
-          tone="reasoning"
-        />
-        <TraceMessageCard
-          label="FINAL"
-          detail={
-            trace.response.finish_reason ? `结束原因：${trace.response.finish_reason}` : "最终输出"
+            localTagger
+              ? "本地模型写入 TXT 的标签列表"
+              : trace.response.finish_reason
+                ? `结束原因：${trace.response.finish_reason}`
+                : "最终输出"
           }
           content={trace.response.final_content}
           empty="这次尝试没有可用的最终输出。"
@@ -170,7 +191,9 @@ function AnnotationTraceView({ trace }: { trace: AssetAnnotationTrace }) {
       </div>
 
       {trace.response.error_message ? (
-        <p className="form-error">请求异常：{trace.response.error_message}</p>
+        <p className="form-error">
+          {localTagger ? "本地推理异常" : "请求异常"}：{trace.response.error_message}
+        </p>
       ) : null}
       {tokenMetrics.length ? (
         <div className="annotation-trace__tokens">

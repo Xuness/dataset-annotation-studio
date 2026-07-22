@@ -70,10 +70,12 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
           <h2>
             {job.data.kind === "translation"
               ? `${job.data.target_language ?? "目标语言"} 译文任务`
-              : job.data.system_preset_name}
+              : job.data.execution_backend === "local_tagger"
+                ? "本地标签标注任务"
+                : job.data.system_preset_name}
           </h2>
           <p>
-            {job.data.provider_profile_name} · {job.data.model}
+            {job.data.execution_profile_name} · {job.data.model}
             {job.data.kind === "translation" ? ` · ${job.data.system_preset_name}` : ""}
           </p>
         </div>

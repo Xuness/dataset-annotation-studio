@@ -17,8 +17,10 @@ flowchart LR
     API --> Core["领域服务与仓储"]
     Worker["持久化任务 Worker"] --> Core
     Worker --> Provider["模型供应商适配器"]
+    Worker --> Tagger["本地 Tagger Runtime"]
     Core --> Project["项目文件夹与项目 SQLite"]
-    Core --> Global["全局预设 SQLite 与系统凭据存储"]
+    Core --> Global["全局预设 / Tagger SQLite 与系统凭据存储"]
+    Tagger --> ModelLibrary["本机受管模型库"]
     Tauri["Tauri 桌面生命周期"] --> UI
     Tauri --> Sidecar["发行版 Python sidecar"]
     Sidecar --> API
@@ -36,7 +38,8 @@ flowchart LR
 - `modules/prompts`：User Prompt 与选定 JSON 字段的纯函数组合。
 - `modules/presets`：全局 System Prompt / 模型连接聚合的持久化；API 密钥通过 `SecretStore` 隔离。
 - `modules/providers`：供应商协议类型、单模型参数、统一 `ModelProvider` 协议、各供应商适配器，以及惰性共享的 Codex Runtime。
-- `modules/jobs`：标注/翻译任务创建、Prompt 与模型连接快照、查询投影、原子认领、尝试记录、单图调用追踪和 Worker。
+- `modules/taggers`：本地模型适配器注册、受管安装、完整性清单、可复用打标配置与惰性 ONNX Runtime；不依赖页面或任务仓储。
+- `modules/jobs`：标注/翻译任务创建、通用执行后端与配置快照、查询投影、原子认领、尝试记录、单图调用追踪和 Worker。
 - `modules/preprocessing`：计划、图像渲染、恢复记录和撤销编排。
 - `modules/exports`：导出范围快照、活动标注校验、扁平文件名冲突检查、持久化进度和可停止/继续的复制 Worker。
 - `modules/statistics`：只读派生统计；当前实现为标签频次分析器。
@@ -59,6 +62,10 @@ flowchart LR
 因此之后修改连接、默认模型或其它模型都不会改变已创建任务。旧任务快照由
 `modules/jobs/provider_snapshot.py` 在读取时兼容转换，不原地改写项目历史。
 
+任务表以 `execution_backend` 区分远端 `provider` 与 `local_tagger`，并把具体执行配置写入统一的
+`execution_snapshot`。旧项目迁移时会把已有供应商字段回填为通用执行字段，原供应商快照仍保留用于兼容；
+本地 Tagger 任务不需要 Prompt、API 凭据或网络请求，翻译任务则继续强制使用供应商后端。
+
 OpenAI 兼容连接通过标准 `GET {base_url}/models` 拉取目录，并在本地按模型 ID、名称和描述搜索。
 标准目录通常不声明输入模态、参数或推理档位，界面会明确标记能力未知，且不会把缺失元数据解释为不支持。
 OpenRouter 目录仍使用其扩展元数据；两个协议各自由适配器映射推理参数，不共享供应商请求 JSON。
@@ -71,6 +78,23 @@ OpenRouter 目录仍使用其扩展元数据；两个协议各自由适配器映
 - Zustand 只保存短生命周期的界面选择，不复制后端持久状态。
 
 图片列表使用虚拟化，面向 2,000 余项仍只渲染可见行。页面使用按路由懒加载，工作区编辑器不会拖慢项目首页启动。
+
+## 本地 Tagger 模型库
+
+本地模型是全局资源，不写入数据集目录。默认模型库为应用数据目录下的 `models/taggers/`，用户可以在
+“设置 → 本地打标器”中把空模型库切换到明确选择的绝对路径。导入操作先由适配器校验源目录，再把受管文件
+复制到 `.staging/`，在复制过程中计算 SHA-256，写入版本化 `installation.json` 后原子提升为正式安装。
+模型列表的日常读取只比较清单中的路径、大小和修改时间；显式“完整校验”会重新解析模型并计算全部文件哈希。
+
+首个适配器 `cl_tagger_v2` 采用严格、失败关闭的文件契约：要求 `model.onnx`、
+`model.onnx.data`、`model_vocabulary.json` 与 `model_metadata.json`，校验 `pixel_values`
+输入、`logits` 输出、384×384 float32 张量、标签数量和外部权重位置。每个安装可以建立多份全局配置，独立保存
+阈值、输出类别、执行设备和并发数。创建任务时会冻结安装指纹与完整配置；模型文件后来发生变化时，旧任务不会
+静默改用新权重，而是拒绝执行并要求重新创建任务。
+
+Runtime 只在 Worker 真正处理本地任务时加载 ONNX Session，并用单项 LRU 约束常驻大模型数量。标准发行依赖
+CPU 版 ONNX Runtime；若运行环境提供 CUDA 或 DirectML provider，配置界面会按运行时探测结果开放对应设备。
+单图产物仍进入统一的 `runs/` 追踪结构，其中保存阈值、类别、设备、标签置信度和推理耗时，不保存图片副本。
 
 ## 单图调用追踪
 
@@ -98,6 +122,16 @@ Chat Completions 或 Anthropic Messages 通道、声明可用推理档位和缓�
 供应商中立的请求、响应与图片编码工具，不导入其它供应商适配器的内部函数。
 
 Codex 连接由官方 Python SDK 驱动：SDK 源码固定到 OpenAI `3f74f00295dcb1346340686bb09c5bfd4f0237c4` 提交，对应 CLI Runtime `0.144.4`，避免协议模型与运行时独立漂移。API 进程与 Worker 各自惰性维护一个 app-server，复用 Codex 自身缓存的 ChatGPT 登录。每张图片创建独立的临时 Thread，完成后丢弃；System Prompt 映射为 `developer_instructions`，最终 Assistant 回复原样进入统一的 `ProviderResponse.content`。标注任务支持到 `max` 推理强度；需要子代理的 `ultra` 不进入单图标注参数面。
+
+### 新本地 Tagger
+
+新增模型格式应实现独立 `TaggerAdapter`，负责检测目录、严格校验、读取标签词表和图像预处理，并在
+`TaggerAdapterRegistry` 注册。适配器返回明确的受管文件集合；模型管理服务、任务快照、Runtime 缓存和前端配置
+不需要理解模型仓库的原始布局。
+
+远端下载在首版中没有路由、实现或界面入口。`modules/taggers/sources` 仅保留不可变的
+`TaggerDownloadPlan` / `TaggerModelSource` 边界；未来如接入 Hugging Face，必须由具体适配器声明固定 revision、
+精确远端路径和目标相对路径，再复用现有 staging 与校验流程，不能递归下载未知仓库并猜测文件结构。
 
 ### 新校验与统计
 

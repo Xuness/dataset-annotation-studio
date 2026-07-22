@@ -69,10 +69,12 @@ export function JobList({
               <strong>
                 {job.kind === "translation"
                   ? `${job.target_language ?? "目标语言"} 译文`
-                  : job.system_preset_name}
+                  : job.execution_backend === "local_tagger"
+                    ? "本地标签标注"
+                    : job.system_preset_name}
               </strong>
               <span>
-                {job.provider_profile_name} · {job.model}
+                {job.execution_profile_name} · {job.model}
                 {job.kind === "translation" ? ` · ${job.system_preset_name}` : ""}
               </span>
               <div className="job-card__progress">

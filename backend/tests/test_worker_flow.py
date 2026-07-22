@@ -1,5 +1,6 @@
 import asyncio
 import json
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.exports.service import ExportService
 from dataset_studio.modules.jobs.models import (
+    ExecutionBackend,
     ExistingTranslationPolicy,
     JobCreateRequest,
     JobItemStatus,
@@ -39,6 +41,15 @@ from dataset_studio.modules.providers.config import (
 )
 from dataset_studio.modules.providers.models import ProviderResponse
 from dataset_studio.modules.statistics.service import StatisticsService
+from dataset_studio.modules.taggers.models import (
+    TaggerDevice,
+    TaggerExecutionProfile,
+    TaggerInferenceResult,
+    TaggerInferenceTag,
+)
+from dataset_studio.modules.taggers.repository import TaggerRepository
+from dataset_studio.modules.taggers.runtime import TaggerRuntime
+from dataset_studio.modules.taggers.service import TaggerService
 from dataset_studio.modules.translations.service import TranslationService
 from dataset_studio.modules.workspaces.models import WorkspaceSettingsUpdate
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
@@ -78,6 +89,45 @@ class TranslationProvider(RecordingProvider):
         )
 
 
+class StaticTaggerCatalog:
+    profile = TaggerExecutionProfile(
+        id="local-profile",
+        name="Local test profile",
+        installation_id="local-installation",
+        installation_name="Local test model",
+        adapter_id="test-adapter",
+        model_version="v1",
+        fingerprint="a" * 64,
+        threshold=0.55,
+        categories=["character", "general"],
+        device=TaggerDevice.CPU,
+        concurrency=1,
+    )
+
+    def resolve_execution_profile(self, profile_id: str) -> TaggerExecutionProfile:
+        assert profile_id == self.profile.id
+        return self.profile
+
+    def catalog_guard(self) -> AbstractContextManager[None]:
+        return nullcontext()
+
+
+class StaticTaggerRuntime:
+    def prune_missing_installations(self) -> None:
+        pass
+
+    def tag(self, _profile: TaggerExecutionProfile, _image_path: Path) -> TaggerInferenceResult:
+        return TaggerInferenceResult(
+            content="alice, blue_hair",
+            tags=[
+                TaggerInferenceTag(name="alice", category="character", confidence=0.91),
+                TaggerInferenceTag(name="blue_hair", category="general", confidence=0.84),
+            ],
+            provider="CPUExecutionProvider",
+            inference_ms=12.5,
+        )
+
+
 def _runtime(tmp_path: Path):
     settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
     settings.ensure_directories()
@@ -87,7 +137,8 @@ def _runtime(tmp_path: Path):
     annotations = AnnotationService(workspaces)
     translations = TranslationService(workspaces)
     presets = PresetService(PresetRepository(global_database), MemorySecrets())
-    jobs = JobService(workspaces, presets, annotations, translations)
+    taggers = TaggerService(settings, TaggerRepository(global_database))
+    jobs = JobService(workspaces, presets, annotations, translations, taggers)
     assets = AssetService(workspaces)
     container = AppContainer(
         settings=settings,
@@ -102,8 +153,68 @@ def _runtime(tmp_path: Path):
         exports=ExportService(workspaces),
         statistics=StatisticsService(workspaces),
         codex=CodexRuntime(),
+        taggers=taggers,
+        tagger_runtime=TaggerRuntime(taggers),
     )
     return container, workspaces, presets, jobs
+
+
+@pytest.mark.asyncio
+async def test_worker_runs_local_tagger_without_prompt_or_provider(
+    tmp_path: Path,
+) -> None:
+    container, workspaces, presets, _ = _runtime(tmp_path)
+    project = tmp_path / "local-tagger-dataset"
+    project.mkdir()
+    Image.new("RGB", (48, 48), "white").save(project / "sample.png")
+    workspace, _ = workspaces.open(str(project))
+    catalog = StaticTaggerCatalog()
+    jobs = JobService(
+        workspaces,
+        presets,
+        container.annotations,
+        container.translations,
+        catalog,  # type: ignore[arg-type]
+    )
+    container.jobs = jobs
+    container.tagger_runtime = StaticTaggerRuntime()  # type: ignore[assignment]
+    created = jobs.create(
+        workspace.project_id,
+        JobCreateRequest(
+            execution_backend=ExecutionBackend.LOCAL_TAGGER,
+            tagger_profile_id=catalog.profile.id,
+            scope=JobScope.ALL,
+        ),
+    )
+
+    worker = AnnotationWorker(container)
+    stopped = asyncio.Event()
+    worker_task = asyncio.create_task(worker.run(stopped))
+    try:
+        for _ in range(80):
+            current = jobs.get(workspace.project_id, created.id)
+            if current.status in {JobStatus.COMPLETED, JobStatus.COMPLETED_WITH_ERRORS}:
+                break
+            await asyncio.sleep(0.05)
+        else:
+            pytest.fail("worker did not complete the local tagger job")
+    finally:
+        stopped.set()
+        await asyncio.wait_for(worker_task, timeout=2)
+
+    detail = jobs.get(workspace.project_id, created.id)
+    assert detail.status == JobStatus.COMPLETED
+    assert detail.execution_backend == ExecutionBackend.LOCAL_TAGGER
+    assert detail.execution_profile_name == "Local test profile"
+    assert detail.provider_profile_id is None
+    assert detail.system_preset_id is None
+    assert (project / "sample.txt").read_text(encoding="utf-8") == "alice, blue_hair"
+    trace = container.annotation_traces.get(workspace.project_id, detail.items[0].asset_id)
+    assert trace is not None
+    assert trace.matches_current_annotation
+    assert trace.request.parameters.execution_backend == "local_tagger"
+    assert trace.request.parameters.threshold == 0.55
+    assert trace.response.final_content == "alice, blue_hair"
 
 
 @pytest.mark.asyncio

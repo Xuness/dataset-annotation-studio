@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 def _require_non_blank(value: str | None) -> str | None:
@@ -41,6 +41,11 @@ class JobKind(StrEnum):
     TRANSLATION = "translation"
 
 
+class ExecutionBackend(StrEnum):
+    PROVIDER = "provider"
+    LOCAL_TAGGER = "local_tagger"
+
+
 class ExistingTranslationPolicy(StrEnum):
     SKIP = "skip"
     STALE = "stale"
@@ -48,8 +53,10 @@ class ExistingTranslationPolicy(StrEnum):
 
 
 class JobCreateRequest(BaseModel):
-    provider_profile_id: str
+    execution_backend: ExecutionBackend = ExecutionBackend.PROVIDER
+    provider_profile_id: str | None = None
     model_id: str | None = Field(default=None, min_length=1, max_length=500)
+    tagger_profile_id: str | None = None
     kind: JobKind = JobKind.ANNOTATION
     scope: JobScope = JobScope.ALL
     asset_ids: list[str] = Field(default_factory=list)
@@ -60,15 +67,29 @@ class JobCreateRequest(BaseModel):
 
     _validate_model = field_validator("model_id")(_require_non_blank)
 
+    @model_validator(mode="after")
+    def validate_execution_backend(self) -> JobCreateRequest:
+        if self.kind == JobKind.TRANSLATION and self.execution_backend != ExecutionBackend.PROVIDER:
+            raise ValueError("翻译任务只能使用 LLM 模型连接。")
+        if self.execution_backend == ExecutionBackend.PROVIDER:
+            if not self.provider_profile_id or not self.provider_profile_id.strip():
+                raise ValueError("请选择模型连接。")
+        elif not self.tagger_profile_id or not self.tagger_profile_id.strip():
+            raise ValueError("请选择本地打标配置。")
+        return self
+
 
 class JobSummary(BaseModel):
     id: str
     status: JobStatus
     kind: JobKind = JobKind.ANNOTATION
-    system_preset_id: str
-    system_preset_name: str
-    provider_profile_id: str
-    provider_profile_name: str
+    execution_backend: ExecutionBackend = ExecutionBackend.PROVIDER
+    execution_profile_id: str
+    execution_profile_name: str
+    system_preset_id: str | None
+    system_preset_name: str | None
+    provider_profile_id: str | None
+    provider_profile_name: str | None
     model: str
     scope: JobScope
     overwrite_existing: bool

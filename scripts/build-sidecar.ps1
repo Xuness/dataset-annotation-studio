@@ -31,6 +31,8 @@ New-Item -ItemType Directory -Force -Path $WorkPath | Out-Null
     --paths (Join-Path $Root "backend/src") `
     --collect-all openai_codex `
     --collect-all codex_cli_bin `
+    --hidden-import onnx `
+    --hidden-import onnxruntime `
     --distpath $Binaries `
     --workpath $WorkPath `
     --specpath $WorkPath `

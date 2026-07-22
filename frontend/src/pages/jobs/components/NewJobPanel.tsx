@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Bot, Languages, Play, Settings2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bot, Languages, Play, Settings2, Tags } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useJobActions } from "../../../features/jobs/hooks";
@@ -8,12 +8,15 @@ import {
   useSystemPresets,
   useTranslationPromptPresets,
 } from "../../../features/presets/hooks";
+import { useTaggerLibrary } from "../../../features/taggers/hooks";
 import type {
   ExistingTranslationPolicy,
+  ExecutionBackend,
   JobDetail,
   JobKind,
   WorkspaceSummary,
 } from "../../../shared/api/types";
+import { useSettingsCenter } from "../../../shared/settings/settingsCenterStore";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 
@@ -31,20 +34,32 @@ export function NewJobPanel({
   onCreated,
 }: NewJobPanelProps) {
   const navigate = useNavigate();
+  const openSettings = useSettingsCenter((state) => state.open);
   const systemPresets = useSystemPresets();
   const translationPromptPresets = useTranslationPromptPresets();
   const providerProfiles = useProviderProfiles();
+  const taggerLibrary = useTaggerLibrary();
   const actions = useJobActions(projectId);
   const [kind, setKind] = useState<JobKind>("annotation");
+  const [annotationBackend, setAnnotationBackend] = useState<ExecutionBackend>("provider");
   const [providerProfileId, setProviderProfileId] = useState("");
   const [providerModelId, setProviderModelId] = useState("");
+  const [taggerProfileId, setTaggerProfileId] = useState("");
   const [translationPromptPresetId, setTranslationPromptPresetId] = useState("");
   const [scope, setScope] = useState<"all" | "selected">("all");
   const [targetLanguage, setTargetLanguage] = useState("zh-CN");
   const [translationPolicy, setTranslationPolicy] = useState<ExistingTranslationPolicy>("skip");
   const [error, setError] = useState<string | null>(null);
+  const executionBackend = kind === "translation" ? "provider" : annotationBackend;
   const selectedProvider = providerProfiles.data?.find(
     (profile) => profile.id === providerProfileId,
+  );
+  const readyTaggerProfiles = useMemo(
+    () => taggerLibrary.data?.profiles.filter((profile) => profile.ready) ?? [],
+    [taggerLibrary.data?.profiles],
+  );
+  const selectedTaggerProfile = readyTaggerProfiles.find(
+    (profile) => profile.id === taggerProfileId,
   );
 
   useEffect(() => {
@@ -69,6 +84,16 @@ export function NewJobPanel({
   }, [providerModelId, selectedProvider]);
 
   useEffect(() => {
+    if (!readyTaggerProfiles.length) {
+      if (taggerProfileId) setTaggerProfileId("");
+      return;
+    }
+    if (!readyTaggerProfiles.some((profile) => profile.id === taggerProfileId)) {
+      setTaggerProfileId(readyTaggerProfiles[0].id);
+    }
+  }, [readyTaggerProfiles, taggerProfileId]);
+
+  useEffect(() => {
     const available = translationPromptPresets.data;
     if (!available?.length) {
       if (translationPromptPresetId) setTranslationPromptPresetId("");
@@ -82,9 +107,12 @@ export function NewJobPanel({
   async function create() {
     setError(null);
     try {
+      const providerExecution = executionBackend === "provider";
       const job = await actions.create.mutateAsync({
-        provider_profile_id: providerProfileId,
-        model_id: providerModelId,
+        execution_backend: executionBackend,
+        provider_profile_id: providerExecution ? providerProfileId : undefined,
+        model_id: providerExecution ? providerModelId : undefined,
+        tagger_profile_id: providerExecution ? undefined : taggerProfileId,
         kind,
         scope,
         asset_ids: scope === "selected" ? checkedAssetIds : [],
@@ -117,10 +145,12 @@ export function NewJobPanel({
     : translationPromptPresets.isSuccess && !configuredTranslationPrompt
       ? "尚未创建可用的翻译 Prompt 预设"
       : null;
+  const providerReady = Boolean(
+    selectedProvider && selectedProvider.models.some((model) => model.model_id === providerModelId),
+  );
+  const promptReady = kind === "translation" ? configuredTranslationPrompt : configuredSystemPreset;
   const ready = Boolean(
-    (kind === "translation" ? configuredTranslationPrompt : configuredSystemPreset) &&
-    selectedProvider &&
-    selectedProvider.models.some((model) => model.model_id === providerModelId) &&
+    (executionBackend === "local_tagger" ? selectedTaggerProfile : providerReady && promptReady) &&
     (scope === "all" || checkedAssetIds.length > 0),
   );
 
@@ -128,7 +158,13 @@ export function NewJobPanel({
     <aside className="new-job-panel" data-surface-region="primary-sidebar">
       <header>
         <span className="new-job-icon">
-          {kind === "annotation" ? <Bot size={18} /> : <Languages size={18} />}
+          {kind === "translation" ? (
+            <Languages size={18} />
+          ) : annotationBackend === "local_tagger" ? (
+            <Tags size={18} />
+          ) : (
+            <Bot size={18} />
+          )}
         </span>
         <div>
           <span className="eyebrow">New processing run</span>
@@ -152,21 +188,23 @@ export function NewJobPanel({
       </div>
 
       {kind === "annotation" ? (
-        <div className={`job-prompt-source ${promptConfigurationIssue ? "has-error" : ""}`}>
-          <span>项目提示词</span>
-          <strong>
-            {systemPresets.isLoading
-              ? "正在读取项目配置…"
-              : (configuredSystemPreset?.name ?? promptConfigurationIssue)}
-          </strong>
-          <small>System Prompt 与 User Prompt 均沿用素材页最后保存的配置。</small>
-          {promptConfigurationIssue ? (
-            <button onClick={() => navigate(`/workspace/${projectId}?panel=prompt`)}>
-              回到素材页配置
-            </button>
-          ) : null}
+        <div className="job-kind-switch job-executor-switch" aria-label="标注执行方式">
+          <button
+            className={annotationBackend === "provider" ? "is-active" : ""}
+            onClick={() => setAnnotationBackend("provider")}
+          >
+            <Bot size={14} /> LLM 标注
+          </button>
+          <button
+            className={annotationBackend === "local_tagger" ? "is-active" : ""}
+            onClick={() => setAnnotationBackend("local_tagger")}
+          >
+            <Tags size={14} /> 本地打标器
+          </button>
         </div>
-      ) : (
+      ) : null}
+
+      {kind === "translation" ? (
         <>
           <label className="form-field">
             <span>翻译 Prompt 预设</span>
@@ -199,39 +237,92 @@ export function NewJobPanel({
             ) : null}
           </div>
         </>
+      ) : executionBackend === "provider" ? (
+        <div className={`job-prompt-source ${promptConfigurationIssue ? "has-error" : ""}`}>
+          <span>项目提示词</span>
+          <strong>
+            {systemPresets.isLoading
+              ? "正在读取项目配置…"
+              : (configuredSystemPreset?.name ?? promptConfigurationIssue)}
+          </strong>
+          <small>System Prompt 与 User Prompt 均沿用素材页最后保存的配置。</small>
+          {promptConfigurationIssue ? (
+            <button onClick={() => navigate(`/workspace/${projectId}?panel=prompt`)}>
+              回到素材页配置
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className={`job-prompt-source ${selectedTaggerProfile ? "" : "has-error"}`}>
+          <span>本地执行快照</span>
+          <strong>
+            {taggerLibrary.isLoading
+              ? "正在读取本地打标配置…"
+              : (selectedTaggerProfile?.name ?? "尚无可用的本地打标配置")}
+          </strong>
+          <small>
+            {selectedTaggerProfile
+              ? `阈值 ${selectedTaggerProfile.threshold.toFixed(2)} · ${selectedTaggerProfile.categories.length} 个类别 · ${selectedTaggerProfile.device}`
+              : (taggerLibrary.data?.runtime.error ?? "请先在设置中导入并配置本地模型。")}
+          </small>
+          {!selectedTaggerProfile ? (
+            <button onClick={() => openSettings("taggers")}>打开本地打标器设置</button>
+          ) : null}
+        </div>
       )}
 
-      <label className="form-field">
-        <span>模型连接</span>
-        <select
-          value={providerProfileId}
-          onChange={(event) => setProviderProfileId(event.target.value)}
-        >
-          {!providerProfiles.data?.length ? <option value="">尚未创建模型连接</option> : null}
-          {providerProfiles.data?.map((profile) => (
-            <option key={profile.id} value={profile.id}>
-              {profile.name} · {profile.models.length} 个模型
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="form-field">
-        <span>任务模型</span>
-        <select
-          value={providerModelId}
-          disabled={!selectedProvider}
-          onChange={(event) => setProviderModelId(event.target.value)}
-        >
-          {!selectedProvider ? <option value="">请先选择模型连接</option> : null}
-          {selectedProvider?.models.map((model) => (
-            <option key={model.model_id} value={model.model_id}>
-              {model.model_id}
-              {model.model_id === selectedProvider.default_model_id ? " · 默认" : ""}
-            </option>
-          ))}
-        </select>
-        <small>本次任务会固定模型及其参数；之后修改连接、默认模型或参数不会影响任务快照。</small>
-      </label>
+      {executionBackend === "provider" ? (
+        <>
+          <label className="form-field">
+            <span>模型连接</span>
+            <select
+              value={providerProfileId}
+              onChange={(event) => setProviderProfileId(event.target.value)}
+            >
+              {!providerProfiles.data?.length ? <option value="">尚未创建模型连接</option> : null}
+              {providerProfiles.data?.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name} · {profile.models.length} 个模型
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            <span>任务模型</span>
+            <select
+              value={providerModelId}
+              disabled={!selectedProvider}
+              onChange={(event) => setProviderModelId(event.target.value)}
+            >
+              {!selectedProvider ? <option value="">请先选择模型连接</option> : null}
+              {selectedProvider?.models.map((model) => (
+                <option key={model.model_id} value={model.model_id}>
+                  {model.model_id}
+                  {model.model_id === selectedProvider.default_model_id ? " · 默认" : ""}
+                </option>
+              ))}
+            </select>
+            <small>本次任务会固定模型及参数；之后修改连接不会影响任务快照。</small>
+          </label>
+        </>
+      ) : (
+        <label className="form-field">
+          <span>本地打标配置</span>
+          <select
+            value={taggerProfileId}
+            disabled={!readyTaggerProfiles.length}
+            onChange={(event) => setTaggerProfileId(event.target.value)}
+          >
+            {!readyTaggerProfiles.length ? <option value="">尚无可用配置</option> : null}
+            {readyTaggerProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name} · {profile.installation_name}
+              </option>
+            ))}
+          </select>
+          <small>任务会固定模型指纹、阈值、类别、设备与并发设置。</small>
+        </label>
+      )}
 
       {kind === "translation" ? (
         <>
@@ -289,20 +380,34 @@ export function NewJobPanel({
         </div>
         <div>
           <dt>失败重试</dt>
-          <dd>首次 + 3 次</dd>
+          <dd>{executionBackend === "local_tagger" ? "手动重试" : "首次 + 3 次"}</dd>
         </div>
         <div>
           <dt>输出处理</dt>
-          <dd>{kind === "annotation" ? "原样写入" : "标签结构校验"}</dd>
+          <dd>
+            {executionBackend === "local_tagger"
+              ? "Danbooru 标签列表"
+              : kind === "annotation"
+                ? "原样写入"
+                : "标签结构校验"}
+          </dd>
         </div>
         <div>
-          <dt>{kind === "annotation" ? "User Prompt" : "源标注"}</dt>
+          <dt>
+            {executionBackend === "local_tagger"
+              ? "联网请求"
+              : kind === "annotation"
+                ? "User Prompt"
+                : "源标注"}
+          </dt>
           <dd>
-            {kind === "annotation"
-              ? workspace.settings.user_prompt
-                ? "项目内已设置"
-                : "当前为空"
-              : "只读读取同名 TXT"}
+            {executionBackend === "local_tagger"
+              ? "无"
+              : kind === "annotation"
+                ? workspace.settings.user_prompt
+                  ? "项目内已设置"
+                  : "当前为空"
+                : "只读读取同名 TXT"}
           </dd>
         </div>
       </dl>
@@ -311,9 +416,13 @@ export function NewJobPanel({
       <div className="new-job-panel__actions">
         <Button
           icon={<Settings2 size={14} />}
-          onClick={() => navigate(kind === "translation" ? "/presets?tab=translation" : "/presets")}
+          onClick={() =>
+            executionBackend === "local_tagger"
+              ? openSettings("taggers")
+              : navigate(kind === "translation" ? "/presets?tab=translation" : "/presets")
+          }
         >
-          管理预设
+          {executionBackend === "local_tagger" ? "管理打标器" : "管理预设"}
         </Button>
         <Button
           tone="primary"

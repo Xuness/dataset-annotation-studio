@@ -8,3 +8,4 @@ export * from "./contracts/jobs";
 export * from "./contracts/preprocessing";
 export * from "./contracts/exports";
 export * from "./contracts/system";
+export * from "./contracts/taggers";

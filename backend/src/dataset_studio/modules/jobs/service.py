@@ -11,6 +11,7 @@ from dataset_studio.modules.jobs.execution_repository import JobExecutionReposit
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
 from dataset_studio.modules.jobs.models import (
     ActiveJobsOverview,
+    ExecutionBackend,
     ExistingTranslationPolicy,
     JobCreateRequest,
     JobDetail,
@@ -24,6 +25,8 @@ from dataset_studio.modules.jobs.query_repository import JobQueryRepository
 from dataset_studio.modules.jobs.repository import JobCreationRepository
 from dataset_studio.modules.presets.models import TranslationPromptPreset
 from dataset_studio.modules.presets.service import PresetService
+from dataset_studio.modules.taggers.models import TaggerExecutionProfile
+from dataset_studio.modules.taggers.service import TaggerService
 from dataset_studio.modules.translations.prompt import (
     DEFAULT_TRANSLATION_PROMPT_PRESET_ID,
     render_translation_system_prompt,
@@ -39,11 +42,13 @@ class JobService:
         presets: PresetService,
         annotations: AnnotationService,
         translations: TranslationService | None = None,
+        taggers: TaggerService | None = None,
     ) -> None:
         self._workspaces = workspaces
         self._presets = presets
         self._annotations = annotations
         self._translations = translations or TranslationService(workspaces)
+        self._taggers = taggers
 
     def create(
         self,
@@ -52,65 +57,39 @@ class JobService:
         *,
         include_items: bool = True,
     ) -> JobDetail:
-        paths, manifest = self._workspaces.get(project_id)
-        provider_profile = self._presets.get_provider(request.provider_profile_id)
-        self._presets.get_provider_credential(provider_profile)
-        provider_snapshot = self._presets.resolve_execution_profile(
-            provider_profile,
-            request.model_id,
-        )
+        if request.execution_backend == ExecutionBackend.LOCAL_TAGGER:
+            if self._taggers is None:
+                raise ValueError("当前本地服务没有启用本地打标器模块。")
+            with self._taggers.catalog_guard():
+                return self._create(project_id, request, include_items=include_items)
+        return self._create(project_id, request, include_items=include_items)
 
-        if request.kind == JobKind.TRANSLATION:
-            language = self._translations.normalize_language(request.target_language)
-            translation_prompt = self._resolve_translation_prompt(
-                request.translation_prompt_preset_id
-            )
-            system_preset_id = translation_prompt.id
-            system_prompt = render_translation_system_prompt(
-                translation_prompt.system_prompt,
-                language,
-            )
+    def _create(
+        self,
+        project_id: str,
+        request: JobCreateRequest,
+        *,
+        include_items: bool,
+    ) -> JobDetail:
+        paths, manifest = self._workspaces.get(project_id)
+        if request.execution_backend == ExecutionBackend.LOCAL_TAGGER:
+            assert self._taggers is not None
+            assert request.tagger_profile_id is not None
+            local_snapshot = self._taggers.resolve_execution_profile(request.tagger_profile_id)
+            execution_profile_id = local_snapshot.id
+            execution_snapshot = local_snapshot.model_dump_json()
+            provider_profile_id = ""
+            provider_snapshot_json = "{}"
+            system_preset_id = ""
             system_prompt_snapshot = json.dumps(
                 {
-                    "id": system_preset_id,
-                    "name": translation_prompt.name,
-                    "system_prompt": system_prompt,
-                    "system_prompt_template": translation_prompt.system_prompt,
-                    "created_at": translation_prompt.created_at,
-                    "updated_at": translation_prompt.updated_at,
+                    "id": "",
+                    "name": "本地打标器",
+                    "system_prompt": "",
                 },
                 ensure_ascii=False,
             )
-            configuration = {
-                "target_language": language,
-                "translation_policy": request.translation_policy.value,
-                "translation_prompt_preset_id": translation_prompt.id,
-            }
-            asset_ids = self._select_translation_assets(
-                paths.database,
-                paths.root,
-                request.scope,
-                request.asset_ids,
-                language=language,
-                policy=request.translation_policy,
-            )
-            if not asset_ids:
-                raise ValueError("当前范围内没有符合策略且带有源标注的素材可翻译。")
-            user_prompt_snapshot = ""
-            json_fields_snapshot = "[]"
-            overwrite_existing = request.translation_policy == ExistingTranslationPolicy.OVERWRITE
-        else:
-            system_preset_id = manifest.settings.system_preset_id
-            if not system_preset_id:
-                raise ValueError("请先在素材页的提示词面板选择并保存 System Prompt 预设。")
-            try:
-                system_preset = self._presets.get_system(system_preset_id)
-            except PresetNotFoundError as error:
-                raise ValueError(
-                    "项目关联的 System Prompt 预设已不存在，请在素材页重新选择并保存。"
-                ) from error
-            system_prompt_snapshot = system_preset.model_dump_json()
-            configuration = {}
+            configuration = {"tagger_profile_id": local_snapshot.id}
             asset_ids = self._select_annotation_assets(
                 paths.database,
                 request.scope,
@@ -119,12 +98,91 @@ class JobService:
             )
             if not asset_ids:
                 raise ValueError("当前范围内没有需要标注的图片；已有同名 TXT 会被自动跳过。")
-            user_prompt_snapshot = manifest.settings.user_prompt
-            json_fields_snapshot = json.dumps(
-                manifest.settings.json_fields,
-                ensure_ascii=False,
-            )
+            user_prompt_snapshot = ""
+            json_fields_snapshot = "[]"
             overwrite_existing = request.overwrite_existing
+            retry_limit = 0
+        else:
+            assert request.provider_profile_id is not None
+            provider_profile = self._presets.get_provider(request.provider_profile_id)
+            self._presets.get_provider_credential(provider_profile)
+            provider_snapshot = self._presets.resolve_execution_profile(
+                provider_profile,
+                request.model_id,
+            )
+            execution_profile_id = provider_snapshot.id
+            execution_snapshot = provider_snapshot.model_dump_json()
+            provider_profile_id = provider_profile.id
+            provider_snapshot_json = execution_snapshot
+            retry_limit = 3
+
+            if request.kind == JobKind.TRANSLATION:
+                language = self._translations.normalize_language(request.target_language)
+                translation_prompt = self._resolve_translation_prompt(
+                    request.translation_prompt_preset_id
+                )
+                system_preset_id = translation_prompt.id
+                system_prompt = render_translation_system_prompt(
+                    translation_prompt.system_prompt,
+                    language,
+                )
+                system_prompt_snapshot = json.dumps(
+                    {
+                        "id": system_preset_id,
+                        "name": translation_prompt.name,
+                        "system_prompt": system_prompt,
+                        "system_prompt_template": translation_prompt.system_prompt,
+                        "created_at": translation_prompt.created_at,
+                        "updated_at": translation_prompt.updated_at,
+                    },
+                    ensure_ascii=False,
+                )
+                configuration = {
+                    "target_language": language,
+                    "translation_policy": request.translation_policy.value,
+                    "translation_prompt_preset_id": translation_prompt.id,
+                }
+                asset_ids = self._select_translation_assets(
+                    paths.database,
+                    paths.root,
+                    request.scope,
+                    request.asset_ids,
+                    language=language,
+                    policy=request.translation_policy,
+                )
+                if not asset_ids:
+                    raise ValueError("当前范围内没有符合策略且带有源标注的素材可翻译。")
+                user_prompt_snapshot = ""
+                json_fields_snapshot = "[]"
+                overwrite_existing = (
+                    request.translation_policy == ExistingTranslationPolicy.OVERWRITE
+                )
+            else:
+                system_preset_id = manifest.settings.system_preset_id
+                if not system_preset_id:
+                    raise ValueError("请先在素材页的提示词面板选择并保存 System Prompt 预设。")
+                try:
+                    system_preset = self._presets.get_system(system_preset_id)
+                except PresetNotFoundError as error:
+                    raise ValueError(
+                        "项目关联的 System Prompt 预设已不存在，请在素材页重新选择并保存。"
+                    ) from error
+                system_prompt_snapshot = system_preset.model_dump_json()
+                configuration = {}
+                asset_ids = self._select_annotation_assets(
+                    paths.database,
+                    request.scope,
+                    request.asset_ids,
+                    overwrite_existing=request.overwrite_existing,
+                )
+                if not asset_ids:
+                    raise ValueError("当前范围内没有需要标注的图片；已有同名 TXT 会被自动跳过。")
+                user_prompt_snapshot = manifest.settings.user_prompt
+                json_fields_snapshot = json.dumps(
+                    manifest.settings.json_fields,
+                    ensure_ascii=False,
+                )
+                overwrite_existing = request.overwrite_existing
 
         job_id = str(uuid.uuid4())
         repository = JobCreationRepository(paths.database)
@@ -132,15 +190,18 @@ class JobService:
             job_id=job_id,
             kind=request.kind.value,
             configuration_snapshot=json.dumps(configuration, ensure_ascii=False),
+            execution_backend=request.execution_backend.value,
+            execution_profile_id=execution_profile_id,
+            execution_snapshot=execution_snapshot,
             system_preset_id=system_preset_id,
             system_prompt_snapshot=system_prompt_snapshot,
-            provider_profile_id=provider_profile.id,
-            provider_snapshot=provider_snapshot.model_dump_json(),
+            provider_profile_id=provider_profile_id,
+            provider_snapshot=provider_snapshot_json,
             user_prompt_snapshot=user_prompt_snapshot,
             json_fields_snapshot=json_fields_snapshot,
             scope=request.scope.value,
             overwrite_existing=overwrite_existing,
-            retry_limit=3,
+            retry_limit=retry_limit,
             asset_ids=asset_ids,
         )
         return self.get(project_id, job_id, include_items=include_items)
@@ -270,6 +331,34 @@ class JobService:
             if JobLifecycleRepository(paths.database).active_count():
                 projects.add(workspace.project_id)
         return projects
+
+    def is_tagger_installation_active(self, installation_id: str) -> bool:
+        for workspace in self._workspaces.list_recent():
+            if not workspace.exists:
+                continue
+            paths, _ = self._workspaces.get(workspace.project_id)
+            connection = connect(paths.database)
+            try:
+                rows = connection.execute(
+                    """
+                    SELECT execution_snapshot
+                    FROM jobs
+                    WHERE execution_backend = 'local_tagger'
+                      AND status IN ('queued', 'running', 'stopping')
+                    """
+                ).fetchall()
+            finally:
+                connection.close()
+            for row in rows:
+                try:
+                    snapshot = TaggerExecutionProfile.model_validate_json(
+                        str(row["execution_snapshot"])
+                    )
+                except ValueError:
+                    continue
+                if snapshot.installation_id == installation_id:
+                    return True
+        return False
 
     def stop_all_workspaces(self) -> int:
         stopped = 0

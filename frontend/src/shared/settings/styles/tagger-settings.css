@@ -1,0 +1,450 @@
+.tagger-settings {
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 28px 30px;
+}
+
+.tagger-settings__loading {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+}
+
+.tagger-library-location {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-left-color: var(--accent);
+  background: var(--surface-raised);
+}
+
+.tagger-library-location > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: var(--ink-soft);
+  background: var(--surface-soft);
+}
+
+.tagger-library-location small,
+.tagger-library-location code,
+.tagger-library-location p {
+  display: block;
+}
+
+.tagger-library-location small {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-library-location code {
+  overflow: hidden;
+  margin: 3px 0;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagger-library-location p {
+  margin: 0;
+  color: var(--faint);
+  font-size: var(--text-2xs);
+}
+
+.tagger-library-location > div:last-child,
+.tagger-installation-detail > footer,
+.tagger-profile-editor > footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tagger-runtime-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--surface-soft);
+}
+
+.tagger-runtime-status.is-ready > svg {
+  color: var(--sage);
+}
+
+.tagger-runtime-status.is-error {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--line));
+  background: var(--danger-soft);
+}
+
+.tagger-runtime-status > div {
+  display: grid;
+  gap: 2px;
+}
+
+.tagger-runtime-status strong {
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.tagger-runtime-status span {
+  font-size: var(--text-2xs);
+}
+
+.tagger-scan-issues,
+.tagger-inline-warning {
+  border: 1px solid color-mix(in srgb, var(--warning) 42%, var(--line));
+  color: var(--warning);
+  background: var(--warning-soft);
+  font-size: var(--text-xs);
+}
+
+.tagger-scan-issues {
+  margin-top: 10px;
+  padding: 8px 11px;
+}
+
+.tagger-scan-issues p,
+.tagger-inline-warning {
+  margin: 0;
+}
+
+.tagger-inline-warning {
+  padding: 8px 10px;
+  line-height: 1.5;
+}
+
+.tagger-manager-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.78fr) minmax(300px, 1.22fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.tagger-installation-list,
+.tagger-installation-detail,
+.tagger-profiles {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+}
+
+.tagger-installation-list > header,
+.tagger-installation-detail > header,
+.tagger-profiles > header,
+.tagger-profile-editor > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tagger-installation-list > header,
+.tagger-installation-detail > header {
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tagger-installation-list h3,
+.tagger-installation-detail h3,
+.tagger-profiles h3,
+.tagger-profile-editor h3 {
+  margin: 3px 0 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+.tagger-installation-list > header > small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.tagger-installation-list > div {
+  max-height: 305px;
+  overflow: auto;
+  padding: 6px;
+}
+
+.tagger-installation-list > div > button {
+  display: grid;
+  width: 100%;
+  justify-items: start;
+  gap: 4px;
+  margin-bottom: 4px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  color: var(--ink-soft);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tagger-installation-list > div > button:hover {
+  background: var(--surface-soft);
+}
+
+.tagger-installation-list > div > button.is-active {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.tagger-installation-list button strong {
+  overflow: hidden;
+  width: 100%;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagger-installation-list button small {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-status {
+  display: inline-flex;
+  padding: 2px 6px;
+  border-radius: 99px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: var(--text-2xs);
+}
+
+.tagger-status--ready {
+  color: var(--sage);
+  background: var(--sage-soft);
+}
+
+.tagger-status--invalid,
+.tagger-status--missing {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.tagger-installation-detail {
+  padding-bottom: 12px;
+}
+
+.tagger-installation-detail > header p,
+.tagger-profiles > header p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-installation-detail > .tagger-inline-warning {
+  margin: 10px 12px 0;
+}
+
+.tagger-installation-detail > dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 10px 12px;
+  background: var(--line);
+}
+
+.tagger-installation-detail > dl > div {
+  min-width: 0;
+  padding: 8px 9px;
+  background: var(--surface-soft);
+}
+
+.tagger-installation-detail dt {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-installation-detail dd {
+  overflow: hidden;
+  margin: 3px 0 0;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagger-file-list {
+  display: grid;
+  max-height: 112px;
+  margin: 0 12px 11px;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+}
+
+.tagger-file-list > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 1px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tagger-file-list code {
+  overflow: hidden;
+  font-size: var(--text-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagger-file-list small {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-installation-detail > footer {
+  justify-content: flex-end;
+  padding: 0 12px;
+}
+
+.tagger-profiles {
+  margin-top: 12px;
+  padding: 13px;
+}
+
+.tagger-profile-tabs {
+  display: flex;
+  gap: 5px;
+  margin: 12px 0 10px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+}
+
+.tagger-profile-tabs button {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: start;
+  gap: 2px;
+  min-width: 145px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  text-align: left;
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+
+.tagger-profile-tabs button.is-active {
+  border-color: var(--line-strong);
+  color: var(--ink-soft);
+  background: var(--surface);
+  box-shadow: inset 0 -2px var(--accent);
+}
+
+.tagger-profile-tabs strong,
+.tagger-profile-tabs small {
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagger-profile-tabs strong {
+  font-size: var(--text-xs);
+}
+
+.tagger-profile-tabs small {
+  font-size: var(--text-2xs);
+}
+
+.tagger-profile-editor {
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.tagger-profile-editor > .tagger-inline-warning {
+  margin-top: 9px;
+}
+
+.tagger-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 10px;
+  margin-top: 11px;
+}
+
+.tagger-profile-grid .form-field {
+  margin-bottom: 10px;
+}
+
+.tagger-category-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 2px 0 12px;
+  padding: 9px;
+  border: 1px solid var(--line);
+}
+
+.tagger-category-options legend {
+  padding: 0 5px;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-category-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  background: var(--surface-soft);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.tagger-category-options small {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-profile-editor > footer {
+  justify-content: space-between;
+}
+
+.tagger-empty-copy {
+  margin: 0;
+  padding: 22px 14px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.tagger-action-message {
+  position: sticky;
+  bottom: 0;
+  margin: 10px 0 0;
+  padding: 7px 10px;
+  color: var(--sage);
+  background: var(--sage-soft);
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 940px) {
+  .tagger-manager-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tagger-library-location {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .tagger-library-location > div:last-child {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}

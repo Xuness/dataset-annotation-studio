@@ -12,6 +12,14 @@ export async function pickExportFolder(): Promise<string | null> {
   return pickFolder("选择空的导出文件夹", "输入用于存放图片和同名 TXT 的空文件夹绝对路径：");
 }
 
+export async function pickTaggerModelFolder(): Promise<string | null> {
+  return pickFolder("选择本地打标器模型目录", "输入本地打标器模型目录的绝对路径：");
+}
+
+export async function pickTaggerLibraryFolder(): Promise<string | null> {
+  return pickFolder("选择本地打标器模型库", "输入本地打标器模型库的绝对路径：");
+}
+
 async function pickFolder(title: string, fallbackPrompt: string): Promise<string | null> {
   if (isTauriRuntime()) {
     const selected = await open({

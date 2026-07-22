@@ -37,6 +37,7 @@ class Settings:
         self.app_data_dir.mkdir(parents=True, exist_ok=True)
         (self.app_data_dir / "cache").mkdir(exist_ok=True)
         (self.app_data_dir / "logs").mkdir(exist_ok=True)
+        (self.app_data_dir / "models" / "taggers").mkdir(parents=True, exist_ok=True)
 
 
 settings = Settings.from_environment()
