@@ -35,19 +35,18 @@ describe("appearance settings", () => {
       target: { value: "47" },
     });
     expect(
-      useAppPreferences.getState().preferences.appearance.sceneOverrides["silent-gallery"]?.home
-        .opacity,
+      useAppPreferences.getState().preferences.appearance.sceneOverrides["sea-fog"]?.home.opacity,
     ).toBe(0.47);
 
     await user.click(screen.getByRole("button", { name: /暖纸手札/ }));
     expect((screen.getByRole("slider", { name: "首页背景可见度" }) as HTMLInputElement).value).toBe(
-      "82",
+      "65",
     );
     fireEvent.change(screen.getByRole("slider", { name: "首页背景可见度" }), {
       target: { value: "64" },
     });
 
-    await user.click(screen.getByRole("button", { name: /静默展厅/ }));
+    await user.click(screen.getByRole("button", { name: /雨白哥特/ }));
     expect((screen.getByRole("slider", { name: "首页背景可见度" }) as HTMLInputElement).value).toBe(
       "47",
     );
@@ -58,10 +57,10 @@ describe("appearance settings", () => {
 
     await user.click(screen.getAllByRole("button", { name: "重置" })[0]);
     expect((screen.getByRole("slider", { name: "首页背景可见度" }) as HTMLInputElement).value).toBe(
-      "78",
+      "85",
     );
     expect(
-      useAppPreferences.getState().preferences.appearance.sceneOverrides["silent-gallery"],
+      useAppPreferences.getState().preferences.appearance.sceneOverrides["sea-fog"],
     ).toBeUndefined();
     expect(
       useAppPreferences.getState().preferences.appearance.sceneOverrides["warm-paper"]?.home
@@ -73,15 +72,16 @@ describe("appearance settings", () => {
     ).toBe(0.64);
   });
 
-  test("updates immersive mode through the rendered controls", async () => {
+  test("toggles the default immersive mode through the rendered controls", async () => {
     const user = userEvent.setup();
     render(<AppearanceSettings onClose={() => undefined} />);
 
+    expect(useAppPreferences.getState().preferences.appearance.immersiveMode).toBe(true);
     await user.click(screen.getByRole("button", { name: /让工作台完全沉入场景/ }));
 
-    expect(useAppPreferences.getState().preferences.appearance.immersiveMode).toBe(true);
+    expect(useAppPreferences.getState().preferences.appearance.immersiveMode).toBe(false);
     expect(screen.getByRole("button", { name: /图片画布/ }).getAttribute("aria-pressed")).toBe(
-      "true",
+      "false",
     );
   });
 

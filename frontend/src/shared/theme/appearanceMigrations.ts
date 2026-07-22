@@ -177,7 +177,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
   if (value.version === 1) return createDefaultPreferences(themeId);
 
   // Version 2 already had scene controls. Preserve those values and add the
-  // new region-material defaults, with the image canvas transparent by default.
+  // current region-material defaults for every surface.
   if (value.version === 2 && isRecord(value.appearance)) {
     return {
       version: PREFERENCES_VERSION,
@@ -196,8 +196,8 @@ export function normalizePreferences(value: unknown): AppPreferences {
   // Version 3 introduced per-region transparency. A short-lived development
   // build also wrote version 4 while prototyping the retired rain animation.
   // Preserve the useful appearance settings from both formats while adding
-  // immersive mode in its disabled state. Normalization also adds the desktop
-  // titlebar as an opaque region for backward compatibility.
+  // immersive mode in its disabled state. Normalization also fills any surface
+  // keys that did not exist yet from the current project baseline.
   if ((value.version === 3 || value.version === 4) && isRecord(value.appearance)) {
     return {
       version: PREFERENCES_VERSION,

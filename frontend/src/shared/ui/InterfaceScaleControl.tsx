@@ -1,6 +1,6 @@
 import { RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 
-import { useInterfaceScale } from "../desktop/useInterfaceScale";
+import { DEFAULT_INTERFACE_SCALE, useInterfaceScale } from "../desktop/useInterfaceScale";
 
 export function InterfaceScaleControl() {
   const scale = useInterfaceScale();
@@ -29,8 +29,8 @@ export function InterfaceScaleControl() {
       <button
         type="button"
         onClick={scale.reset}
-        disabled={scale.scale === 1}
-        title="恢复 100%"
+        disabled={scale.scale === DEFAULT_INTERFACE_SCALE}
+        title={`恢复 ${Math.round(DEFAULT_INTERFACE_SCALE * 100)}%`}
         aria-label="恢复默认界面缩放"
       >
         <RotateCcw size={13} />

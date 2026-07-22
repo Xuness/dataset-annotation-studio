@@ -75,11 +75,6 @@
   filter: var(--home-scene-filter) blur(var(--home-scene-blur));
 }
 
-:root[data-background-source="theme"] .appearance-background__preview > span {
-  background-position: 100% 48%;
-  background-size: auto 220%;
-}
-
 .appearance-background__preview::after,
 .scene-control__preview::after {
   position: absolute;

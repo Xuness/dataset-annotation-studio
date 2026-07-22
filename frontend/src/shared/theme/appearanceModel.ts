@@ -3,8 +3,8 @@ import { DEFAULT_THEME_ID, getThemeDefinition, type ThemeId } from "./themes.ts"
 export const PREFERENCES_VERSION = 11 as const;
 
 export const DEFAULT_HOME_CONTENT = {
-  headline: "让每一张图，在沉默中显影。",
-  description: "本地优先的图像数据集工作台",
+  headline: "好久不见......",
+  description: "今天想做什么？",
 } as const;
 
 export const HOME_CONTENT_LIMITS = {
@@ -109,11 +109,11 @@ export function createDefaultHomeContent(): HomeContentPreferences {
 
 export function createDefaultSurfaceTransparency(): AppSurfaceTransparency {
   return {
-    "desktop-titlebar": false,
+    "desktop-titlebar": true,
     "home-topbar": false,
     "home-entry": false,
     "home-recents": false,
-    canvas: true,
+    canvas: false,
     navigation: false,
     "primary-sidebar": false,
     content: false,
@@ -136,7 +136,7 @@ export function createDefaultPreferences(themeId: ThemeId = DEFAULT_THEME_ID): A
       customBackgrounds: {},
       sceneOverrides: {},
       transparentRegions: createDefaultSurfaceTransparency(),
-      immersiveMode: false,
+      immersiveMode: true,
     },
     homeContent: createDefaultHomeContent(),
   };

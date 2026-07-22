@@ -45,21 +45,21 @@ export const THEMES = defineThemes([
     nativeWindowTheme: "light",
     material: { id: "paper", workspaceSurfaceOpacity: 0.97 },
     scene: {
-      image: "/home/warm-paper-still-life.svg",
-      previewPosition: "72% 48%",
+      image: "/home/暖纸手札-默认壁纸-含彩蛋.png",
+      previewPosition: "center",
       home: {
         position: "center",
-        size: "cover",
+        size: "contain",
         filter: "saturate(0.88) contrast(0.98)",
-        opacity: 0.82,
-        blurPx: 0,
+        opacity: 0.65,
+        blurPx: 6,
       },
       workspace: {
-        position: "72% 50%",
+        position: "center",
         size: "cover",
         filter: "saturate(0.76) contrast(0.96)",
-        opacity: 0.055,
-        blurPx: 0,
+        opacity: 0.55,
+        blurPx: 4,
       },
     },
     swatches: ["#f5f1ea", "#fbfaf7", "#302d2a", "#b77f73"],
@@ -73,21 +73,21 @@ export const THEMES = defineThemes([
     nativeWindowTheme: "dark",
     material: { id: "glass", workspaceSurfaceOpacity: 0.97 },
     scene: {
-      image: "/home/silent-gallery-hall.webp",
-      previewPosition: "76% 46%",
+      image: "/home/静默展厅-默认壁纸-含彩蛋.png",
+      previewPosition: "center",
       home: {
         position: "center",
-        size: "cover",
+        size: "contain",
         filter: "saturate(0.42) contrast(1.07) brightness(0.52)",
-        opacity: 0.78,
-        blurPx: 0,
+        opacity: 0.85,
+        blurPx: 6,
       },
       workspace: {
-        position: "100% 48%",
-        size: "auto 165%",
+        position: "center",
+        size: "cover",
         filter: "grayscale(0.48) saturate(0.32) contrast(1.08) brightness(0.5)",
-        opacity: 0.055,
-        blurPx: 0,
+        opacity: 0.85,
+        blurPx: 6,
       },
     },
     swatches: ["#050607", "#0c0e0f", "#d8d5cf", "#74232a"],
@@ -101,21 +101,21 @@ export const THEMES = defineThemes([
     nativeWindowTheme: "light",
     material: { id: "wet-glass", workspaceSurfaceOpacity: 0.74 },
     scene: {
-      image: "/home/rainveil-gothic-example.png",
-      previewPosition: "63% 50%",
+      image: "/home/雨白哥特-默认壁纸-含彩蛋.png",
+      previewPosition: "center",
       home: {
-        position: "63% 50%",
-        size: "auto 168%",
+        position: "center",
+        size: "contain",
         filter: "saturate(0.42) contrast(0.82) brightness(1.16)",
-        opacity: 0.62,
-        blurPx: 0,
+        opacity: 0.85,
+        blurPx: 10,
       },
       workspace: {
-        position: "66% 50%",
-        size: "auto 168%",
+        position: "center",
+        size: "cover",
         filter: "grayscale(0.28) saturate(0.42) contrast(0.82) brightness(1.12)",
-        opacity: 0.32,
-        blurPx: 0,
+        opacity: 0.65,
+        blurPx: 4,
       },
     },
     swatches: ["#e9edf0", "#aebbc3", "#20262b", "#9b5367"],
@@ -126,7 +126,7 @@ export const THEMES = defineThemes([
 export type ThemeDefinition = (typeof THEMES)[number];
 export type ThemeId = ThemeDefinition["id"];
 
-export const DEFAULT_THEME_ID = "silent-gallery" satisfies ThemeId;
+export const DEFAULT_THEME_ID = "sea-fog" satisfies ThemeId;
 
 const defaultTheme: ThemeDefinition = (() => {
   const theme = THEMES.find((candidate) => candidate.id === DEFAULT_THEME_ID);

@@ -37,17 +37,17 @@ function readLayout(projectId: string): WorkspaceLayout {
     const value = JSON.parse(stored) as Partial<WorkspaceLayout>;
     return {
       assetPaneWidth: clamp(
-        value.assetPaneWidth ?? 278,
+        value.assetPaneWidth ?? DEFAULT_WORKSPACE_LAYOUT.assetPaneWidth,
         WORKSPACE_LAYOUT_LIMITS.assetPaneMin,
         WORKSPACE_LAYOUT_LIMITS.assetPaneMax,
       ),
       inspectorPaneWidth: clamp(
-        value.inspectorPaneWidth ?? 310,
+        value.inspectorPaneWidth ?? DEFAULT_WORKSPACE_LAYOUT.inspectorPaneWidth,
         WORKSPACE_LAYOUT_LIMITS.inspectorPaneMin,
         WORKSPACE_LAYOUT_LIMITS.inspectorPaneMax,
       ),
       imagePaneRatio: clamp(
-        value.imagePaneRatio ?? 66,
+        value.imagePaneRatio ?? DEFAULT_WORKSPACE_LAYOUT.imagePaneRatio,
         WORKSPACE_LAYOUT_LIMITS.imagePaneMin,
         WORKSPACE_LAYOUT_LIMITS.imagePaneMax,
       ),

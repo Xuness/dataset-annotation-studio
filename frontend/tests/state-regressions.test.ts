@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import { providerCredentialCacheToken } from "../src/features/presets/queryKeys.ts";
@@ -8,6 +8,8 @@ import {
   createDesktopFullscreenToggle,
   isFullscreenShortcut,
 } from "../src/shared/desktop/useDesktopWindowBehavior.ts";
+import { DEFAULT_INTERFACE_SCALE } from "../src/shared/desktop/useInterfaceScale.ts";
+import { DEFAULT_WORKSPACE_LAYOUT } from "../src/pages/workspace/hooks/useWorkspaceLayout.ts";
 import {
   DEFAULT_HOME_CONTENT,
   HOME_CONTENT_LIMITS,
@@ -18,7 +20,12 @@ import {
   resolveAppearance,
   resolveSurfaceTransparency,
 } from "../src/shared/theme/appearance.ts";
-import { DEFAULT_THEME_ID, getThemeDefinition, type ThemeId } from "../src/shared/theme/themes.ts";
+import {
+  DEFAULT_THEME_ID,
+  getThemeDefinition,
+  THEMES,
+  type ThemeId,
+} from "../src/shared/theme/themes.ts";
 
 test("save reconciliation preserves edits made while the request is pending", () => {
   assert.equal(
@@ -57,6 +64,15 @@ test("fullscreen shortcut accepts only an unmodified first F11 press", () => {
   assert.equal(isFullscreenShortcut({ ...f11, repeat: true }), false);
   assert.equal(isFullscreenShortcut({ ...f11, ctrlKey: true }), false);
   assert.equal(isFullscreenShortcut({ ...f11, key: "F10" }), false);
+});
+
+test("fresh interface geometry uses the curated local baseline", () => {
+  assert.equal(DEFAULT_INTERFACE_SCALE, 1.2);
+  assert.deepEqual(DEFAULT_WORKSPACE_LAYOUT, {
+    assetPaneWidth: 278,
+    inspectorPaneWidth: 310,
+    imagePaneRatio: 66,
+  });
 });
 
 test("fullscreen toggle restores a maximized Windows window without carrying its work area", async () => {
@@ -149,18 +165,67 @@ test("version one appearance preferences migrate without losing the selected the
   assert.equal(preferences.themeId, "sea-fog");
   assert.deepEqual(preferences.appearance.customBackgrounds, {});
   assert.deepEqual(preferences.appearance.sceneOverrides, {});
-  assert.equal(preferences.appearance.transparentRegions.canvas, true);
+  assert.equal(preferences.appearance.transparentRegions.canvas, false);
+  assert.equal(preferences.appearance.immersiveMode, true);
   assert.deepEqual(preferences.homeContent, DEFAULT_HOME_CONTENT);
 });
 
-test("fresh appearance preferences use the silent gallery theme", () => {
+test("fresh appearance preferences use the rainveil gothic theme", () => {
   const preferences = createDefaultPreferences();
   const resolved = resolveAppearance(preferences);
 
-  assert.equal(DEFAULT_THEME_ID, "silent-gallery");
-  assert.equal(preferences.themeId, "silent-gallery");
-  assert.equal(resolved.theme.id, "silent-gallery");
-  assert.equal(resolved.home.opacity, 0.78);
+  assert.equal(DEFAULT_THEME_ID, "sea-fog");
+  assert.equal(preferences.themeId, "sea-fog");
+  assert.equal(resolved.theme.id, "sea-fog");
+  assert.deepEqual(resolved.home, { opacity: 0.85, blurPx: 10 });
+  assert.deepEqual(resolved.workspace, { opacity: 0.65, blurPx: 4 });
+  assert.equal(preferences.appearance.immersiveMode, true);
+  assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], true);
+  assert.equal(preferences.appearance.transparentRegions.canvas, false);
+  assert.deepEqual(preferences.homeContent, {
+    headline: "好久不见......",
+    description: "今天想做什么？",
+  });
+});
+
+test("theme defaults bundle the selected wallpapers and current scene clarity", () => {
+  const expected = {
+    "warm-paper": {
+      image: "/home/暖纸手札-默认壁纸-含彩蛋.png",
+      home: { opacity: 0.65, blurPx: 6 },
+      workspace: { opacity: 0.55, blurPx: 4 },
+    },
+    "silent-gallery": {
+      image: "/home/静默展厅-默认壁纸-含彩蛋.png",
+      home: { opacity: 0.85, blurPx: 6 },
+      workspace: { opacity: 0.85, blurPx: 6 },
+    },
+    "sea-fog": {
+      image: "/home/雨白哥特-默认壁纸-含彩蛋.png",
+      home: { opacity: 0.85, blurPx: 10 },
+      workspace: { opacity: 0.65, blurPx: 4 },
+    },
+  } as const;
+
+  for (const theme of THEMES) {
+    const themeDefaults = expected[theme.id];
+    const publicFile = new URL(`../public${themeDefaults.image}`, import.meta.url);
+
+    assert.equal(theme.scene.image, themeDefaults.image);
+    assert.equal(theme.scene.home.position, "center");
+    assert.equal(theme.scene.home.size, "contain");
+    assert.equal(theme.scene.workspace.position, "center");
+    assert.equal(theme.scene.workspace.size, "cover");
+    assert.deepEqual(
+      resolveAppearance(createDefaultPreferences(theme.id)).home,
+      themeDefaults.home,
+    );
+    assert.deepEqual(
+      resolveAppearance(createDefaultPreferences(theme.id)).workspace,
+      themeDefaults.workspace,
+    );
+    assert.equal(existsSync(publicFile), true, `${theme.name} default wallpaper is missing`);
+  }
 });
 
 test("theme lookup falls back to the configured default instead of registry order", () => {
@@ -185,7 +250,7 @@ test("appearance preferences clamp unsafe values and reject incomplete backgroun
     home: { opacity: 1, blurPx: 0 },
     workspace: { opacity: null, blurPx: 32 },
   });
-  assert.equal(preferences.appearance.transparentRegions.canvas, true);
+  assert.equal(preferences.appearance.transparentRegions.canvas, false);
 });
 
 test("version two appearance preferences keep scene overrides and gain region defaults", () => {
@@ -209,7 +274,7 @@ test("version two appearance preferences keep scene overrides and gain region de
     opacity: 0.18,
     blurPx: 5,
   });
-  assert.equal(preferences.appearance.transparentRegions.canvas, true);
+  assert.equal(preferences.appearance.transparentRegions.canvas, false);
   assert.equal(preferences.appearance.transparentRegions.navigation, false);
 });
 
@@ -234,7 +299,7 @@ test("version three appearance preferences keep transparency and gain disabled i
 
   assert.equal(preferences.version, PREFERENCES_VERSION);
   assert.equal(preferences.appearance.immersiveMode, false);
-  assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], false);
+  assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], true);
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
   assert.equal(preferences.appearance.transparentRegions.navigation, true);
   assert.equal(preferences.appearance.transparentRegions.content, true);
@@ -272,7 +337,7 @@ test("retired version four preferences keep appearance settings without atmosphe
   });
   assert.equal(Object.hasOwn(preferences.appearance, "atmosphereMotion"), false);
   assert.equal(preferences.appearance.immersiveMode, false);
-  assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], false);
+  assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], true);
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
   assert.equal(preferences.appearance.transparentRegions.canvas, false);
   assert.equal(preferences.appearance.transparentRegions.navigation, true);
@@ -304,7 +369,7 @@ test("version five preferences preserve immersive mode and gain titlebar transpa
 
   assert.equal(preferences.version, PREFERENCES_VERSION);
   assert.equal(preferences.appearance.immersiveMode, true);
-  assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], false);
+  assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], true);
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
   assert.equal(preferences.appearance.transparentRegions.navigation, true);
   assert.deepEqual(preferences.appearance.sceneOverrides["sea-fog"]?.workspace, {
@@ -506,8 +571,8 @@ test("current preferences keep scene overrides independent for each known theme"
     blurPx: 32,
   });
   assert.deepEqual(resolveAppearance({ ...preferences, themeId: "sea-fog" }).workspace, {
-    opacity: 0.32,
-    blurPx: 0,
+    opacity: 0.65,
+    blurPx: 4,
   });
 });
 
@@ -564,7 +629,7 @@ test("region transparency accepts only known boolean values", () => {
   });
 
   assert.deepEqual(preferences.appearance.transparentRegions, {
-    "desktop-titlebar": false,
+    "desktop-titlebar": true,
     "home-topbar": false,
     "home-entry": false,
     "home-recents": true,
@@ -620,9 +685,9 @@ test("theme scene defaults remain active until a user override is stored", () =>
   assert.equal(resolvedDefaults.theme.nativeWindowTheme, "light");
   assert.equal(resolvedDefaults.theme.material.id, "wet-glass");
   assert.equal(resolvedDefaults.theme.material.workspaceSurfaceOpacity, 0.74);
-  assert.equal(resolvedDefaults.theme.scene.image, "/home/rainveil-gothic-example.png");
-  assert.equal(resolvedDefaults.workspace.opacity, 0.32);
-  assert.equal(resolvedDefaults.workspace.blurPx, 0);
+  assert.equal(resolvedDefaults.theme.scene.image, "/home/雨白哥特-默认壁纸-含彩蛋.png");
+  assert.equal(resolvedDefaults.workspace.opacity, 0.65);
+  assert.equal(resolvedDefaults.workspace.blurPx, 4);
   assert.deepEqual(resolvedCustomized.workspace, { opacity: 0.42, blurPx: 9 });
 });
 

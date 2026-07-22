@@ -7,6 +7,7 @@ const STORAGE_KEY = "dataset-studio.interface-scale";
 const MIN_SCALE = 0.8;
 const MAX_SCALE = 1.5;
 const SCALE_STEP = 0.1;
+export const DEFAULT_INTERFACE_SCALE = 1.2;
 
 function normalizeScale(value: number): number {
   const rounded = Math.round(value * 10) / 10;
@@ -14,8 +15,11 @@ function normalizeScale(value: number): number {
 }
 
 function readStoredScale(): number {
-  const value = Number.parseFloat(window.localStorage.getItem(STORAGE_KEY) ?? "1");
-  return Number.isFinite(value) ? normalizeScale(value) : 1;
+  if (typeof window === "undefined") return DEFAULT_INTERFACE_SCALE;
+  const value = Number.parseFloat(
+    window.localStorage.getItem(STORAGE_KEY) ?? String(DEFAULT_INTERFACE_SCALE),
+  );
+  return Number.isFinite(value) ? normalizeScale(value) : DEFAULT_INTERFACE_SCALE;
 }
 
 function applyScale(scale: number) {
@@ -42,7 +46,7 @@ const useInterfaceScaleStore = create<InterfaceScaleState>((set) => ({
     set((state) => ({
       scale: normalizeScale(state.scale + delta),
     })),
-  reset: () => set({ scale: 1 }),
+  reset: () => set({ scale: DEFAULT_INTERFACE_SCALE }),
 }));
 
 export function useApplyInterfaceScale() {
