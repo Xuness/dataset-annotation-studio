@@ -1,0 +1,123 @@
+.home-content-editor {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.84fr) minmax(320px, 1.16fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+}
+
+.home-content-editor__preview {
+  position: relative;
+  display: flex;
+  min-height: 188px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  overflow: hidden;
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--app-backdrop) 86%, transparent), transparent),
+    var(--home-gallery-image) var(--home-gallery-position) / var(--home-scene-size) no-repeat,
+    var(--app-backdrop);
+}
+
+.home-content-editor__preview::after {
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 46%, transparent);
+  pointer-events: none;
+  content: "";
+}
+
+.home-content-editor__preview > span,
+.home-content-editor__preview > strong,
+.home-content-editor__preview > p {
+  position: relative;
+  z-index: 1;
+}
+
+.home-content-editor__preview > span {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.home-content-editor__preview > strong {
+  max-width: 420px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2vw, 26px);
+  font-weight: 400;
+  line-height: 1.24;
+  overflow-wrap: anywhere;
+}
+
+.home-content-editor__preview > p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.home-content-editor__fields {
+  display: grid;
+  align-content: center;
+  gap: 13px;
+  padding: 18px 20px;
+  border-left: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-raised) 74%, transparent);
+}
+
+.home-content-editor__fields .form-field > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-content-editor__fields .form-field > span > small {
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.home-content-editor__fields input[aria-invalid="true"] {
+  border-color: color-mix(in srgb, var(--danger) 62%, var(--line));
+}
+
+.home-content-editor__actions {
+  display: flex;
+  min-height: 31px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.home-content-editor__actions > span {
+  margin: 0;
+  color: var(--faint);
+  font-size: var(--text-2xs);
+  line-height: 1.45;
+}
+
+.home-content-editor__actions > span.form-error {
+  color: var(--danger);
+}
+
+.home-content-editor__actions > div {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 7px;
+}
+
+.home-content-editor__actions .button {
+  min-height: 31px;
+  padding-inline: 11px;
+  font-size: var(--text-xs);
+}

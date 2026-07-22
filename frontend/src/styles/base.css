@@ -223,6 +223,22 @@ select:focus-visible {
   margin: 10vh auto;
 }
 
+.workspace-loading {
+  display: grid;
+  height: 100%;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  color: var(--muted);
+  background:
+    radial-gradient(circle at 68% 24%, var(--home-glow), transparent 31%), var(--app-backdrop);
+  font-size: var(--text-md);
+}
+
+.workspace-loading--error {
+  color: var(--danger);
+}
+
 .placeholder-page h1 {
   margin: 12px 0;
   font-family: var(--font-display);

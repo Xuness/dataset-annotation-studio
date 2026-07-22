@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAssets } from "../../features/assets/hooks";
 import { useExportActions, useExportOperations } from "../../features/exports/hooks";
 import { useRescanWorkspace, useWorkspace } from "../../features/workspaces/hooks";
+import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
 import type { ExportRequest } from "../../shared/api/types";
 import { openLocalFolder } from "../../shared/desktop/openLocalFolder";
 import { pickExportFolder } from "../../shared/desktop/pickFolder";
@@ -12,8 +13,6 @@ import { useAppStore } from "../../shared/store/appStore";
 import { Button } from "../../shared/ui/Button";
 import { alertDialog, confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
-import { WorkspaceFrame } from "../workspace/components/WorkspaceFrame";
-import "../workspace/workspace.css";
 import { ExportHistoryPanel } from "./components/ExportHistoryPanel";
 import { ExportPreviewPanel } from "./components/ExportPreviewPanel";
 import { ExportSettingsPanel } from "./components/ExportSettingsPanel";
@@ -56,7 +55,10 @@ export function ExportPage() {
     }),
     [checkedAssetIds, form],
   );
-  const requestFingerprint = useMemo(() => JSON.stringify(request), [request]);
+  const requestFingerprint = useMemo(
+    () => JSON.stringify([projectId, request]),
+    [projectId, request],
+  );
   const validPreview = previewFingerprint === requestFingerprint ? actions.preview.data : undefined;
   const activeExport = Boolean(
     operations.data?.some((operation) => activeStatuses.has(operation.status)),
@@ -192,7 +194,7 @@ export function ExportPage() {
       active="export"
       rescanning={rescan.isPending}
       rescanDisabled={activeExport}
-      onRescan={() => void rescan.mutateAsync()}
+      onRescan={() => rescan.mutate()}
       bodyClassName="export-workspace-body"
       statusbar={
         <>

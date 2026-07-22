@@ -18,6 +18,7 @@ import { resolveDesktopLogDirectory } from "../../../shared/desktop/logDirectori
 import { openLocalFolder } from "../../../shared/desktop/openLocalFolder";
 import { writeClipboardText } from "../../../shared/desktop/writeClipboardText";
 import { SettingsSectionHeader } from "../../../shared/settings/components/SettingsSectionHeader";
+import "../../../shared/settings/styles/about-settings.css";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 

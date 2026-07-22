@@ -1,0 +1,265 @@
+.model-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+}
+
+.model-input-row .button {
+  min-width: 98px;
+}
+
+.provider-model-list {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.provider-model-list > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+
+.provider-model-list > header small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.provider-model-list > div {
+  display: grid;
+  max-height: 240px;
+  overflow: auto;
+  padding: 6px;
+  gap: 4px;
+}
+
+.provider-model-list > div > div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+}
+
+.provider-model-list > div > div.is-default {
+  color: var(--accent-deep);
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--line));
+  background: var(--accent-soft);
+}
+
+.provider-model-list > div > div.is-selected {
+  outline: 1px solid color-mix(in srgb, var(--accent) 58%, var(--line));
+}
+
+.provider-model-list__select {
+  display: grid;
+  min-width: 0;
+  padding: 8px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.provider-model-list__select code,
+.provider-model-list__select small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-model-list__select code {
+  color: var(--ink-soft);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: var(--text-xs);
+}
+
+.provider-model-list__select small {
+  margin-top: 3px;
+  color: inherit;
+  font-size: var(--text-2xs);
+}
+
+.provider-model-list__default,
+.provider-model-list__remove {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.provider-model-list__default:hover {
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+.provider-model-list__remove:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.provider-model-list > div > p {
+  margin: 0;
+  padding: 20px 10px;
+  color: var(--muted);
+  text-align: center;
+  font-size: var(--text-xs);
+}
+
+.provider-options-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 5px 10px;
+  margin-top: 7px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.provider-options-heading strong {
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.provider-options-heading small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.provider-option-note {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.provider-option-note--error {
+  color: var(--danger);
+}
+
+.provider-model-config {
+  overflow: hidden;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 88%, var(--paper));
+}
+
+.provider-model-config > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.provider-model-config > header span,
+.provider-model-config > header strong {
+  display: block;
+}
+
+.provider-model-config > header strong {
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: var(--text-sm);
+}
+
+.provider-model-config > header small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.provider-model-config__fields {
+  padding: 14px;
+}
+
+.provider-model-config > .provider-option-note {
+  margin: 0;
+  padding: 0 14px 14px;
+}
+
+.codex-connection {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 90%, var(--accent-soft));
+}
+
+.codex-connection__status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 13px;
+}
+
+.codex-connection__status > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted);
+  background: var(--surface-soft);
+}
+
+.codex-connection__status > span.is-ready {
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+.codex-connection__status strong,
+.codex-connection__status small {
+  display: block;
+}
+
+.codex-connection__status strong {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.codex-connection__status small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.codex-connection__actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 13px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-raised);
+}
+
+.codex-connection__link {
+  margin-left: auto;
+  padding: 3px;
+  color: var(--accent-deep);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  background: transparent;
+  cursor: pointer;
+}
+
+.codex-connection > .form-error {
+  margin: 0;
+  padding: 0 13px 11px;
+}

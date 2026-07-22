@@ -7,6 +7,8 @@ import { ImmersiveModeSection } from "./appearance/ImmersiveModeSection";
 import { SceneClaritySection } from "./appearance/SceneClaritySection";
 import { SurfaceTransparencySection } from "./appearance/SurfaceTransparencySection";
 import { ThemePresetSection } from "./appearance/ThemePresetSection";
+import "../styles/appearance-settings.css";
+import "../styles/theme-presets.css";
 
 export function AppearanceSettings({ onClose }: { onClose: () => void }) {
   const preferences = useAppPreferences((state) => state.preferences);

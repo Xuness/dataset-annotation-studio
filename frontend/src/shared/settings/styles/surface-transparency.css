@@ -1,0 +1,166 @@
+.surface-transparency {
+  display: grid;
+  gap: 10px;
+}
+
+.surface-transparency__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--surface-sunken) 78%, transparent);
+  box-shadow: inset 2px 0 color-mix(in srgb, var(--accent) 72%, transparent);
+}
+
+.surface-transparency__summary strong,
+.surface-transparency__summary p {
+  display: block;
+}
+
+.surface-transparency__summary strong {
+  color: var(--ink-soft);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+.surface-transparency__summary p {
+  max-width: 660px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
+}
+
+.surface-transparency__summary > button {
+  min-width: 76px;
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface-raised) 76%, transparent);
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+
+.surface-transparency__summary > button:hover,
+.surface-transparency__summary > button.is-active {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line-strong));
+  background: color-mix(in srgb, var(--accent-soft) 46%, var(--surface-raised));
+}
+
+.surface-transparency__summary > button:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.surface-transparency__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.surface-transparency__option {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 88px;
+  grid-template-columns: 17px minmax(0, 1fr);
+  align-content: start;
+  gap: 8px;
+  padding: 11px 12px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--muted);
+  text-align: left;
+  background: color-mix(in srgb, var(--surface-sunken) 64%, transparent);
+  cursor: pointer;
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background var(--transition);
+}
+
+.surface-transparency__option--wide {
+  min-height: 72px;
+  grid-column: 1 / -1;
+  grid-template-columns: 17px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.surface-transparency__option.surface-transparency__option--wide > em {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
+  padding: 4px 7px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 54%, transparent);
+  border-radius: 999px;
+}
+
+.surface-transparency__option:hover {
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface-soft) 68%, transparent);
+}
+
+.surface-transparency__option.is-active {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--line-strong) 64%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 62%, transparent);
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.surface-transparency__grid.is-managed .surface-transparency__option {
+  opacity: 0.88;
+}
+
+.surface-transparency__grid.is-managed .surface-transparency__option:hover {
+  opacity: 1;
+}
+
+.surface-transparency__check {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  color: var(--surface-raised);
+  background: color-mix(in srgb, var(--surface-raised) 78%, transparent);
+}
+
+.surface-transparency__option.is-active .surface-transparency__check {
+  color: white;
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.surface-transparency__copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.surface-transparency__copy strong {
+  font-size: var(--text-sm);
+  font-weight: 620;
+}
+
+.surface-transparency__copy small {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  line-height: 1.45;
+}
+
+.surface-transparency__option > em {
+  grid-column: 2;
+  color: var(--faint);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+}

@@ -1,7 +1,8 @@
-import { useLayoutEffect, useRef } from "react";
+import { Suspense, useLayoutEffect, useRef } from "react";
 import { Settings } from "lucide-react";
 
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
+import { Spinner } from "../../shared/ui/Spinner";
 import "../../shared/settings/settings-center.css";
 import { SETTINGS_SECTIONS } from "./settingsSections";
 
@@ -87,7 +88,15 @@ export function SettingsCenter() {
         </aside>
 
         <section className="settings-center__content">
-          <ActiveSection onClose={close} />
+          <Suspense
+            fallback={
+              <div className="settings-section-loading">
+                <Spinner label={`读取${activeSection.label}`} />
+              </div>
+            }
+          >
+            <ActiveSection onClose={close} />
+          </Suspense>
         </section>
       </div>
     </dialog>

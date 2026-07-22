@@ -1,0 +1,151 @@
+.immersive-mode-card {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 82px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--ink-soft);
+  text-align: left;
+  background: linear-gradient(
+    112deg,
+    color-mix(in srgb, var(--surface-raised) 82%, transparent),
+    color-mix(in srgb, var(--surface-sunken) 68%, transparent)
+  );
+  cursor: pointer;
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background var(--transition),
+    box-shadow var(--transition);
+}
+
+.immersive-mode-card:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--line-strong) 76%, transparent);
+  background: linear-gradient(
+    112deg,
+    color-mix(in srgb, var(--surface-raised) 92%, transparent),
+    color-mix(in srgb, var(--surface-soft) 74%, transparent)
+  );
+}
+
+.immersive-mode-card:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.immersive-mode-card.is-active {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--line-strong));
+  background:
+    radial-gradient(
+      circle at 86% 18%,
+      color-mix(in srgb, var(--home-glow) 72%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      112deg,
+      color-mix(in srgb, var(--surface-raised) 88%, transparent),
+      color-mix(in srgb, var(--accent-soft) 42%, var(--surface-soft))
+    );
+  box-shadow:
+    inset 2px 0 var(--accent),
+    inset 0 1px color-mix(in srgb, var(--surface-raised) 80%, transparent);
+}
+
+.immersive-mode-card__mark {
+  position: relative;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-raised) 58%, transparent);
+}
+
+.immersive-mode-card__mark::before,
+.immersive-mode-card__mark::after {
+  position: absolute;
+  content: "";
+}
+
+.immersive-mode-card__mark::before {
+  inset: 9px;
+  border: 1px solid currentcolor;
+  box-shadow:
+    -4px -4px 0 -3px currentcolor,
+    4px 4px 0 -3px currentcolor;
+}
+
+.immersive-mode-card__mark::after {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 9px color-mix(in srgb, var(--accent) 56%, transparent);
+}
+
+.immersive-mode-card.is-active .immersive-mode-card__mark {
+  color: var(--ink-soft);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line-strong));
+}
+
+.immersive-mode-card__copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.immersive-mode-card__copy strong {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+.immersive-mode-card__copy small {
+  max-width: 720px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.58;
+}
+
+.immersive-mode-card__state {
+  display: inline-flex;
+  min-width: 70px;
+  min-height: 29px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+  font-size: var(--text-2xs);
+}
+
+.immersive-mode-card__state i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.immersive-mode-card.is-active .immersive-mode-card__state {
+  color: var(--accent-deep);
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 72%, transparent);
+}
+
+.immersive-mode-card.is-active .immersive-mode-card__state i {
+  background: var(--accent);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 48%, transparent);
+}

@@ -1,8 +1,9 @@
 import type { CSSProperties, ReactNode, Ref } from "react";
 
-import type { WorkspaceSummary } from "../../../shared/api/types";
+import type { WorkspaceSummary } from "../../shared/api/types";
 import { NavigationRail, type WorkspaceSection } from "./NavigationRail";
 import { WorkspaceTopbar } from "./WorkspaceTopbar";
+import "./workspace-shell.css";
 
 interface WorkspaceFrameProps {
   workspace: WorkspaceSummary;

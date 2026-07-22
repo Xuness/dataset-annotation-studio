@@ -17,6 +17,7 @@ import {
   useUpdateWorkspace,
   useWorkspace,
 } from "../../features/workspaces/hooks";
+import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
 import type { AssetFilterStatus } from "../../shared/api/types";
 import { useAppStore } from "../../shared/store/appStore";
 import { Button } from "../../shared/ui/Button";
@@ -26,7 +27,6 @@ import { AssetBrowser } from "./components/AssetBrowser";
 import { ImageStage } from "./components/ImageStage";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { PaneResizeHandle } from "./components/PaneResizeHandle";
-import { WorkspaceFrame } from "./components/WorkspaceFrame";
 import {
   clamp,
   DEFAULT_WORKSPACE_LAYOUT,
@@ -96,11 +96,10 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
 
   useEffect(() => {
     setActiveProject(projectId);
-  }, [projectId, setActiveProject]);
-
-  useEffect(() => {
+    setSearch("");
     setStatusFilter(mode === "review" ? "needs_review" : null);
-  }, [mode]);
+    setEditorDirty(false);
+  }, [mode, projectId, setActiveProject]);
 
   useEffect(() => {
     const body = workspaceBodyRef.current;
@@ -201,7 +200,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
       projectId={projectId}
       active={mode}
       rescanning={rescan.isPending}
-      onRescan={() => void rescan.mutateAsync()}
+      onRescan={() => rescan.mutate()}
       statusbar={
         <>
           <span>
@@ -238,7 +237,18 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         onSelect={requestSelectAsset}
         onSetChecked={setAssetsChecked}
         onToggleAll={() => void toggleAllMatchingAssets()}
-        onRecursiveChange={(recursive_scan) => void updateWorkspace.mutateAsync({ recursive_scan })}
+        onRecursiveChange={(recursive_scan) =>
+          updateWorkspace.mutate(
+            { recursive_scan },
+            {
+              onError: (error) =>
+                void alertDialog(
+                  error instanceof Error ? error.message : "无法更新递归扫描设置。",
+                  { title: "保存扫描设置失败" },
+                ),
+            },
+          )
+        }
       />
       <PaneResizeHandle
         orientation="vertical"

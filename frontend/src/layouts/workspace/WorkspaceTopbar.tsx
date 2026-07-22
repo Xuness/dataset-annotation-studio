@@ -1,13 +1,13 @@
 import { ChevronLeft, FolderOpen, RefreshCw, Settings2, SquareActivity } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { useExportOperations } from "../../../features/exports/hooks";
-import { useJobs } from "../../../features/jobs/hooks";
-import { useUnsavedChangesGuard } from "../../../shared/desktop/useUnsavedChanges";
-import type { WorkspaceSummary } from "../../../shared/api/types";
-import { Button } from "../../../shared/ui/Button";
-import { InterfaceScaleControl } from "../../../shared/ui/InterfaceScaleControl";
-import { Spinner } from "../../../shared/ui/Spinner";
+import { useExportOperations } from "../../features/exports/hooks";
+import { useJobs } from "../../features/jobs/hooks";
+import type { WorkspaceSummary } from "../../shared/api/types";
+import { useUnsavedChangesGuard } from "../../shared/desktop/useUnsavedChanges";
+import { Button } from "../../shared/ui/Button";
+import { InterfaceScaleControl } from "../../shared/ui/InterfaceScaleControl";
+import { Spinner } from "../../shared/ui/Spinner";
 
 interface WorkspaceTopbarProps {
   workspace: WorkspaceSummary;

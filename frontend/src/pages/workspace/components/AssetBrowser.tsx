@@ -282,54 +282,51 @@ export function AssetBrowser({
             {virtualItems.map((virtualRow) => {
               const asset = assets[virtualRow.index];
               return (
-                <button
+                <div
                   key={asset.id}
                   className={`asset-row ${asset.id === selectedAssetId ? "is-selected" : ""}`}
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
-                  onClick={(event) => void handleRowClick(asset.id, event.shiftKey)}
                 >
-                  <span
+                  <button
+                    type="button"
                     className={`asset-check ${checkedAssetIdSet.has(asset.id) ? "is-checked" : ""}`}
                     role="checkbox"
                     aria-label={`选择 ${asset.filename}`}
                     aria-checked={checkedAssetIdSet.has(asset.id)}
-                    tabIndex={0}
                     onClick={(event) => {
-                      event.stopPropagation();
                       toggleChecked(asset.id, event.shiftKey);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === " " || event.key === "Enter") {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        toggleChecked(asset.id, event.shiftKey);
-                      }
                     }}
                   >
                     {checkedAssetIdSet.has(asset.id) ? "✓" : ""}
-                  </span>
-                  <img
-                    src={thumbnailUrl(projectId, asset.id, asset.content_version, 160)}
-                    alt=""
-                    loading="lazy"
-                  />
-                  <span className="asset-row__copy">
-                    <strong title={asset.filename}>{asset.filename}</strong>
-                    <small>
-                      {asset.width} × {asset.height} · {formatBytes(asset.byte_size, "KB")}
-                    </small>
-                    <span title={asset.relative_path}>{asset.relative_path}</span>
-                  </span>
-                  <StatusDot
-                    status={asset.generation_status ?? asset.annotation_status}
-                    showLabel={asset.generation_status === "failed"}
-                    title={
-                      asset.generation_status === "failed"
-                        ? `生成失败${asset.generation_error ? `：${asset.generation_error}` : ""}`
-                        : undefined
-                    }
-                  />
-                </button>
+                  </button>
+                  <button
+                    type="button"
+                    className="asset-row__open"
+                    onClick={(event) => void handleRowClick(asset.id, event.shiftKey)}
+                  >
+                    <img
+                      src={thumbnailUrl(projectId, asset.id, asset.content_version, 160)}
+                      alt=""
+                      loading="lazy"
+                    />
+                    <span className="asset-row__copy">
+                      <strong title={asset.filename}>{asset.filename}</strong>
+                      <small>
+                        {asset.width} × {asset.height} · {formatBytes(asset.byte_size, "KB")}
+                      </small>
+                      <span title={asset.relative_path}>{asset.relative_path}</span>
+                    </span>
+                    <StatusDot
+                      status={asset.generation_status ?? asset.annotation_status}
+                      showLabel={asset.generation_status === "failed"}
+                      title={
+                        asset.generation_status === "failed"
+                          ? `生成失败${asset.generation_error ? `：${asset.generation_error}` : ""}`
+                          : undefined
+                      }
+                    />
+                  </button>
+                </div>
               );
             })}
           </div>

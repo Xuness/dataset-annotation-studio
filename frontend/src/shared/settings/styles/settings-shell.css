@@ -173,6 +173,14 @@
   font-size: var(--text-2xs);
 }
 
+.settings-section-loading {
+  display: grid;
+  min-height: 0;
+  grid-row: 1 / -1;
+  place-items: center;
+  color: var(--muted);
+}
+
 @keyframes settings-center-enter {
   from {
     opacity: 0;

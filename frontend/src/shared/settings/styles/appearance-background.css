@@ -1,0 +1,117 @@
+.appearance-background__body {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.84fr) minmax(270px, 1.16fr);
+  min-height: 142px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+}
+
+.appearance-background__preview,
+.scene-control__preview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--app-backdrop);
+}
+
+.appearance-background__preview > span,
+.scene-control__preview > span {
+  position: absolute;
+  inset: -9px;
+  z-index: -1;
+  background-image: var(--home-gallery-image);
+  background-repeat: no-repeat;
+  background-position: var(--home-gallery-position);
+  background-size: var(--home-scene-size);
+}
+
+.appearance-background__preview > span {
+  filter: var(--home-scene-filter);
+}
+
+.scene-control__preview > span {
+  filter: var(--home-scene-filter) blur(var(--home-scene-blur));
+}
+
+.appearance-background__preview::after,
+.scene-control__preview::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--app-backdrop) 76%, transparent),
+      transparent 68%
+    ),
+    linear-gradient(
+      180deg,
+      transparent 42%,
+      color-mix(in srgb, var(--app-backdrop) 84%, transparent)
+    );
+  content: "";
+}
+
+.appearance-background__preview i,
+.scene-control__preview i {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  z-index: 1;
+  color: color-mix(in srgb, var(--ink) 58%, transparent);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 0.15em;
+}
+
+.appearance-background__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 17px 19px;
+  border-left: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-raised) 74%, transparent);
+}
+
+.appearance-background__copy > strong {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appearance-background__copy > p {
+  margin: 7px 0 13px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.65;
+}
+
+.appearance-background__copy > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.appearance-background__copy .button {
+  min-height: 31px;
+  padding-inline: 11px;
+  font-size: var(--text-xs);
+}
+
+.appearance-background__hint,
+.appearance-background__copy > .form-error {
+  display: block;
+  margin-top: 9px;
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+}
+
+.appearance-background__hint {
+  color: var(--faint);
+}

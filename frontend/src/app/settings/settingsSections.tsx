@@ -1,19 +1,33 @@
-import type { ComponentType } from "react";
+import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 import { BadgeInfo, Cable, Palette, type LucideIcon } from "lucide-react";
 
-import { AppearanceSettings } from "../../shared/settings/sections/AppearanceSettings";
 import {
   type SettingsSection,
   SETTINGS_SECTION_IDS,
 } from "../../shared/settings/settingsSectionIds";
-import { AboutSettings } from "./sections/AboutSettings";
-import { PresetSettings } from "./sections/PresetSettings";
+
+const AppearanceSettings = lazy(async () => {
+  const module = await import("../../shared/settings/sections/AppearanceSettings");
+  return { default: module.AppearanceSettings };
+});
+
+const PresetSettings = lazy(async () => {
+  const module = await import("./sections/PresetSettings");
+  return { default: module.PresetSettings };
+});
+
+const AboutSettings = lazy(async () => {
+  const module = await import("./sections/AboutSettings");
+  return { default: module.AboutSettings };
+});
+
+type SettingsSectionComponent = LazyExoticComponent<ComponentType<{ onClose: () => void }>>;
 
 interface SettingsSectionDefinition {
   id: SettingsSection;
   label: string;
   icon: LucideIcon;
-  component: ComponentType<{ onClose: () => void }>;
+  component: SettingsSectionComponent;
   sidebarNote: string;
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 export interface WorkspaceLayout {
   assetPaneWidth: number;
@@ -35,19 +35,21 @@ function readLayout(projectId: string): WorkspaceLayout {
     const stored = window.localStorage.getItem(`${STORAGE_PREFIX}.${projectId}`);
     if (!stored) return DEFAULT_WORKSPACE_LAYOUT;
     const value = JSON.parse(stored) as Partial<WorkspaceLayout>;
+    const numberOrDefault = (candidate: unknown, fallback: number) =>
+      typeof candidate === "number" && Number.isFinite(candidate) ? candidate : fallback;
     return {
       assetPaneWidth: clamp(
-        value.assetPaneWidth ?? DEFAULT_WORKSPACE_LAYOUT.assetPaneWidth,
+        numberOrDefault(value.assetPaneWidth, DEFAULT_WORKSPACE_LAYOUT.assetPaneWidth),
         WORKSPACE_LAYOUT_LIMITS.assetPaneMin,
         WORKSPACE_LAYOUT_LIMITS.assetPaneMax,
       ),
       inspectorPaneWidth: clamp(
-        value.inspectorPaneWidth ?? DEFAULT_WORKSPACE_LAYOUT.inspectorPaneWidth,
+        numberOrDefault(value.inspectorPaneWidth, DEFAULT_WORKSPACE_LAYOUT.inspectorPaneWidth),
         WORKSPACE_LAYOUT_LIMITS.inspectorPaneMin,
         WORKSPACE_LAYOUT_LIMITS.inspectorPaneMax,
       ),
       imagePaneRatio: clamp(
-        value.imagePaneRatio ?? DEFAULT_WORKSPACE_LAYOUT.imagePaneRatio,
+        numberOrDefault(value.imagePaneRatio, DEFAULT_WORKSPACE_LAYOUT.imagePaneRatio),
         WORKSPACE_LAYOUT_LIMITS.imagePaneMin,
         WORKSPACE_LAYOUT_LIMITS.imagePaneMax,
       ),
@@ -87,10 +89,27 @@ export function fitWorkspaceLayoutToWidth(
 }
 
 export function useWorkspaceLayout(projectId: string) {
-  const [layout, setLayout] = useState(() => readLayout(projectId));
+  const [layouts, setLayouts] = useState<Record<string, WorkspaceLayout>>(() => ({
+    [projectId]: readLayout(projectId),
+  }));
+  const layout = layouts[projectId] ?? readLayout(projectId);
+  const setLayout = useCallback<Dispatch<SetStateAction<WorkspaceLayout>>>(
+    (update) => {
+      setLayouts((current) => {
+        const previous = current[projectId] ?? readLayout(projectId);
+        const next = typeof update === "function" ? update(previous) : update;
+        return { ...current, [projectId]: next };
+      });
+    },
+    [projectId],
+  );
 
   useEffect(() => {
-    window.localStorage.setItem(`${STORAGE_PREFIX}.${projectId}`, JSON.stringify(layout));
+    try {
+      window.localStorage.setItem(`${STORAGE_PREFIX}.${projectId}`, JSON.stringify(layout));
+    } catch {
+      // Keep resizing usable for the current session when browser storage is unavailable.
+    }
   }, [layout, projectId]);
 
   return { layout, setLayout };

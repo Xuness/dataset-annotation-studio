@@ -1,0 +1,361 @@
+@import "./workspace-surface-materials.css";
+
+.workspace-page {
+  --workspace-rail-width: 60px;
+  --workspace-divider: color-mix(in srgb, var(--line-strong) 36%, transparent);
+  --workspace-divider-strong: color-mix(in srgb, var(--line-strong) 54%, transparent);
+
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  height: 100%;
+  grid-template-rows: 58px minmax(0, 1fr) 27px;
+  overflow: hidden;
+  background: var(--app-backdrop);
+}
+
+.workspace-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.workspace-atmosphere::before,
+.workspace-atmosphere::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+
+.workspace-atmosphere::before {
+  opacity: var(--workspace-scene-opacity);
+  background-image: var(--workspace-scene-image);
+  background-repeat: no-repeat;
+  background-position: var(--workspace-scene-position);
+  background-size: var(--workspace-scene-size);
+  filter: var(--workspace-scene-filter) blur(var(--workspace-scene-blur));
+  transform: scale(1.04);
+}
+
+.workspace-atmosphere::after {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--app-backdrop) 68%, transparent),
+      transparent 36%,
+      color-mix(in srgb, var(--app-backdrop) 66%, transparent)
+    ),
+    radial-gradient(
+      circle at 72% 12%,
+      color-mix(in srgb, var(--ink) 7%, transparent),
+      transparent 28%
+    );
+}
+
+.workspace-scene-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.workspace-scene-surface::before {
+  position: absolute;
+  inset: -24px;
+  z-index: 0;
+  opacity: clamp(0, var(--workspace-scene-opacity), 0.42);
+  background-image: var(--workspace-scene-image);
+  background-repeat: no-repeat;
+  background-position: var(--workspace-scene-position);
+  background-size: var(--workspace-scene-size);
+  content: "";
+  filter: var(--workspace-scene-filter) blur(var(--workspace-scene-blur));
+  pointer-events: none;
+  transform: scale(1.035);
+}
+
+.workspace-scene-surface > * {
+  position: relative;
+  z-index: 1;
+}
+
+.workspace-topbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 0 10px;
+  border-bottom: 1px solid var(--workspace-divider-strong);
+  background: color-mix(in srgb, var(--surface-sunken) 95%, transparent);
+  backdrop-filter: blur(22px);
+}
+
+.workspace-topbar__identity,
+.workspace-topbar__actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-topbar__identity {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.workspace-topbar__actions {
+  flex: 0 0 auto;
+}
+
+.workspace-topbar__actions .button {
+  min-height: 33px;
+  padding-inline: 11px;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface-raised) 54%, transparent);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.workspace-topbar__actions .button:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.workspace-topbar__identity > div:last-child {
+  min-width: 0;
+}
+
+.workspace-topbar__identity strong,
+.workspace-topbar__identity small {
+  display: block;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-topbar__identity strong {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.055em;
+}
+
+.workspace-topbar__identity small {
+  margin-top: 3px;
+  color: var(--faint);
+  font-size: var(--text-2xs);
+  text-shadow: var(--workspace-muted-text-shadow, none);
+}
+
+.workspace-glyph {
+  position: relative;
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.workspace-glyph::before,
+.workspace-glyph::after,
+.workspace-glyph span {
+  position: absolute;
+  height: 1px;
+  background: var(--line-strong);
+  content: "";
+}
+
+.workspace-glyph::before {
+  width: 17px;
+  transform: rotate(90deg);
+}
+
+.workspace-glyph::after {
+  width: 13px;
+  transform: translate(4px, 5px);
+}
+
+.workspace-glyph span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 48%, transparent);
+  transform: translate(-6px, -5px);
+}
+
+.quiet-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 5px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.workspace-body {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  gap: 0;
+  background: transparent;
+}
+
+.navigation-rail {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  padding: 13px 5px 9px;
+  background: color-mix(in srgb, var(--surface-sunken) 96%, transparent);
+  backdrop-filter: blur(20px);
+}
+
+.navigation-rail__destinations,
+.navigation-rail__utility {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+
+.navigation-rail__utility {
+  margin-top: auto;
+  padding-top: 9px;
+  border-top: 1px solid var(--workspace-divider);
+}
+
+.navigation-rail button {
+  position: relative;
+  display: flex;
+  width: 50px;
+  min-height: 47px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--text-2xs);
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background var(--transition);
+}
+
+.navigation-rail button::before {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: -1px;
+  width: 2px;
+  background: transparent;
+  content: "";
+}
+
+.navigation-rail button:hover:not(.is-active) {
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface-raised) 48%, transparent);
+}
+
+.navigation-rail button.is-active {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-raised) 66%, transparent);
+}
+
+.navigation-rail button.is-active::before {
+  background: var(--accent);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.navigation-rail button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.workspace-body > [data-surface-region] + [data-surface-region] {
+  border-left: 1px solid var(--workspace-divider-strong);
+}
+
+.interface-scale-control {
+  display: inline-flex;
+  height: 29px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 86%, transparent);
+}
+
+.interface-scale-control button {
+  display: grid;
+  width: 27px;
+  height: 100%;
+  place-items: center;
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+}
+
+.interface-scale-control button:hover:not(:disabled) {
+  background: var(--surface-soft);
+}
+
+.interface-scale-control button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.interface-scale-control > span {
+  width: 42px;
+  color: var(--muted);
+  text-align: center;
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-statusbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 13px;
+  border-top: 1px solid var(--workspace-divider-strong);
+  color: var(--workspace-meta-ink, color-mix(in srgb, var(--faint) 82%, transparent));
+  background: color-mix(in srgb, var(--app-backdrop) 97%, transparent);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-shadow: var(--workspace-muted-text-shadow, none);
+}
+
+.workspace-statusbar__path {
+  margin-left: auto;
+}
+
+/* Fullscreen already uses the physical display edge as its frame. */
+:root[data-desktop-fullscreen="true"] .workspace-page > .workspace-statusbar {
+  border-top-color: transparent;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+@media (max-width: 1220px) {
+  .quiet-stat {
+    display: none;
+  }
+}

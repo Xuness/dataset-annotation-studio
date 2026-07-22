@@ -9,8 +9,8 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { useUnsavedChangesGuard } from "../../../shared/desktop/useUnsavedChanges";
-import { useSettingsCenter } from "../../../shared/settings/settingsCenterStore";
+import { useUnsavedChangesGuard } from "../../shared/desktop/useUnsavedChanges";
+import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 
 export type WorkspaceSection = "assets" | "preprocess" | "jobs" | "review" | "export";
 

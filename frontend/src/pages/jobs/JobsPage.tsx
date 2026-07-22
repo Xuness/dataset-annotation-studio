@@ -4,14 +4,13 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useJobHistory, useJobs } from "../../features/jobs/hooks";
 import { useRescanWorkspace, useWorkspace } from "../../features/workspaces/hooks";
+import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
 import { useAppStore } from "../../shared/store/appStore";
 import { Spinner } from "../../shared/ui/Spinner";
 import { Button } from "../../shared/ui/Button";
-import { WorkspaceFrame } from "../workspace/components/WorkspaceFrame";
 import { JobDetailPanel } from "./components/JobDetailPanel";
 import { JobList } from "./components/JobList";
 import { NewJobPanel } from "./components/NewJobPanel";
-import "../workspace/workspace.css";
 import "./jobs.css";
 import "./job-detail.css";
 
@@ -29,8 +28,10 @@ export function JobsPage() {
 
   useEffect(() => setActiveProject(projectId), [projectId, setActiveProject]);
   useEffect(() => {
-    if (!selectedJobId && jobItems.length) setSelectedJobId(jobItems[0].id);
-  }, [jobItems, selectedJobId]);
+    setSelectedJobId((current) =>
+      current && jobItems.some((job) => job.id === current) ? current : (jobItems[0]?.id ?? null),
+    );
+  }, [jobItems, projectId]);
 
   if (workspace.isError)
     return (
@@ -54,7 +55,7 @@ export function JobsPage() {
       projectId={projectId}
       active="jobs"
       rescanning={rescan.isPending}
-      onRescan={() => void rescan.mutateAsync()}
+      onRescan={() => rescan.mutate()}
       bodyClassName="jobs-workspace-body"
       statusbar={
         <>

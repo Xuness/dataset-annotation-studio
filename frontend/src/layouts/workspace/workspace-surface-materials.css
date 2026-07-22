@@ -1,0 +1,42 @@
+[data-surface-region] {
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    backdrop-filter var(--transition);
+}
+
+:root[data-transparent-regions~="canvas"] .workspace-page [data-surface-region="canvas"],
+:root[data-transparent-regions~="navigation"] .workspace-page [data-surface-region="navigation"],
+:root[data-transparent-regions~="primary-sidebar"]
+  .workspace-page
+  [data-surface-region="primary-sidebar"],
+:root[data-transparent-regions~="content"] .workspace-page [data-surface-region="content"],
+:root[data-transparent-regions~="secondary-sidebar"]
+  .workspace-page
+  [data-surface-region="secondary-sidebar"],
+:root[data-transparent-regions~="chrome"] .workspace-page [data-surface-region="chrome"] {
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+:root[data-transparent-regions~="content"]
+  .workspace-page
+  [data-surface-region="content"].workspace-scene-surface::before,
+:root[data-transparent-regions~="secondary-sidebar"]
+  .workspace-page
+  [data-surface-region="secondary-sidebar"].workspace-scene-surface::before {
+  opacity: 0;
+}
+
+/* Immersive mode keeps the saved region choices intact while removing the
+   persistent structure lines. Interactive controls retain their own focus and
+   status outlines. */
+:root[data-immersive-mode="true"] .workspace-page {
+  --workspace-divider: transparent;
+  --workspace-divider-strong: transparent;
+}
+
+:root[data-immersive-mode="true"] .workspace-page [data-surface-region] {
+  border-color: transparent;
+}

@@ -188,6 +188,44 @@ test("fresh appearance preferences use the rainveil gothic theme", () => {
   });
 });
 
+test("theme styles keep a complete shared token contract and the configured default baseline", () => {
+  const styleFiles: Record<ThemeId, string> = {
+    "warm-paper": "warm-paper.css",
+    "silent-gallery": "silent-gallery.css",
+    "sea-fog": "sea-fog.css",
+  };
+  const styles = Object.fromEntries(
+    Object.entries(styleFiles).map(([themeId, filename]) => [
+      themeId,
+      readFileSync(new URL(`../src/styles/themes/${filename}`, import.meta.url), "utf8"),
+    ]),
+  ) as Record<ThemeId, string>;
+  const tokenNames = (css: string) =>
+    new Set([...css.matchAll(/^\s*(--[\w-]+)\s*:/gm)].map((match) => match[1]));
+  const sharedTokens = tokenNames(styles["silent-gallery"]);
+
+  for (const [themeId, css] of Object.entries(styles) as Array<[ThemeId, string]>) {
+    const missing = [...sharedTokens].filter((token) => !tokenNames(css).has(token));
+    assert.deepEqual(missing, [], `${themeId} is missing shared theme tokens`);
+  }
+
+  assert.match(
+    styles[DEFAULT_THEME_ID],
+    new RegExp(`^:root,\\s*\\n:root\\[data-theme="${DEFAULT_THEME_ID}"\\]`, "m"),
+  );
+  for (const theme of THEMES.filter((candidate) => candidate.id !== DEFAULT_THEME_ID)) {
+    assert.doesNotMatch(styles[theme.id], /^:root,/m);
+  }
+
+  const documentHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(
+    documentHtml,
+    new RegExp(
+      `<meta name="theme-color" content="${getThemeDefinition(DEFAULT_THEME_ID).browserThemeColor}"`,
+    ),
+  );
+});
+
 test("theme defaults bundle the selected wallpapers and current scene clarity", () => {
   const expected = {
     "warm-paper": {

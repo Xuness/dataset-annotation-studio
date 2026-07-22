@@ -1,0 +1,150 @@
+.scene-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scene-control {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 104px minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto;
+  column-gap: 14px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+}
+
+.scene-control__preview {
+  grid-row: 1 / -1;
+  min-height: 126px;
+  border-right: 1px solid var(--line);
+}
+
+.scene-control--home .scene-control__preview > span {
+  opacity: var(--home-scene-opacity);
+}
+
+.scene-control--workspace .scene-control__preview > span {
+  opacity: var(--workspace-scene-opacity);
+  background-image: var(--workspace-scene-image);
+  background-position: var(--workspace-scene-position);
+  background-size: var(--workspace-scene-size);
+  filter: var(--workspace-scene-filter) blur(var(--workspace-scene-blur));
+}
+
+.scene-control__heading {
+  display: flex;
+  min-width: 0;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scene-control__heading strong,
+.scene-control__heading small {
+  display: block;
+}
+
+.scene-control__heading strong {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.scene-control__heading small {
+  margin-top: 2px;
+  color: var(--faint);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scene-control__heading button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--text-2xs);
+}
+
+.scene-control__heading button:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.scene-control__heading button:disabled {
+  cursor: default;
+  opacity: 0.28;
+}
+
+.scene-control > p {
+  margin: 7px 0 9px;
+  color: var(--faint);
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+}
+
+.scene-control > label {
+  display: grid;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.scene-control > label > span {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.scene-control output {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.scene-control input[type="range"] {
+  --range-progress: 0%;
+
+  appearance: none;
+  width: 100%;
+  height: 15px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.scene-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0 var(--range-progress),
+    var(--line-strong) var(--range-progress) 100%
+  );
+}
+
+.scene-control input[type="range"]::-webkit-slider-thumb {
+  width: 11px;
+  height: 11px;
+  margin-top: -4px;
+  appearance: none;
+  border: 1px solid var(--accent-deep);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.scene-control input[type="range"]:focus-visible {
+  outline: 0;
+}
+
+.scene-control input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--surface-sunken) 72%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--accent-deep) 75%, transparent);
+}

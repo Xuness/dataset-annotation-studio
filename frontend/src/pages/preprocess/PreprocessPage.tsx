@@ -8,13 +8,12 @@ import {
   usePreprocessingActions,
 } from "../../features/preprocessing/hooks";
 import { useRescanWorkspace, useWorkspace } from "../../features/workspaces/hooks";
+import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
 import type { PreprocessExecutionOptions, PreprocessRequest } from "../../shared/api/types";
 import { useAppStore } from "../../shared/store/appStore";
 import { confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
 import { Button } from "../../shared/ui/Button";
-import { WorkspaceFrame } from "../workspace/components/WorkspaceFrame";
-import "../workspace/workspace.css";
 import { PreprocessHistoryPanel } from "./components/PreprocessHistoryPanel";
 import { PreprocessPreviewPanel } from "./components/PreprocessPreviewPanel";
 import { PreprocessSettingsPanel } from "./components/PreprocessSettingsPanel";
@@ -53,7 +52,12 @@ export function PreprocessPage() {
   const [error, setError] = useState<string | null>(null);
   const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
 
-  useEffect(() => setActiveProject(projectId), [projectId, setActiveProject]);
+  useEffect(() => {
+    setActiveProject(projectId);
+    setForm({ ...initialForm });
+    setError(null);
+    setPreviewFingerprint(null);
+  }, [projectId, setActiveProject]);
   const request = useMemo<PreprocessRequest>(
     () => ({
       asset_ids: form.scope === "selected" ? checkedAssetIds : [],
@@ -83,7 +87,10 @@ export function PreprocessPage() {
     }),
     [form.concurrencyMode, form.maxWorkers],
   );
-  const requestFingerprint = useMemo(() => JSON.stringify(request), [request]);
+  const requestFingerprint = useMemo(
+    () => JSON.stringify([projectId, request]),
+    [projectId, request],
+  );
   const validPreview = previewFingerprint === requestFingerprint ? actions.preview.data : undefined;
   const filesChanging = actions.execute.isPending || actions.undo.isPending;
   const workspaceBusy = filesChanging || rescan.isPending;
@@ -161,7 +168,7 @@ export function PreprocessPage() {
       active="preprocess"
       rescanning={workspaceBusy}
       onRescan={() => {
-        if (!filesChanging) void rescan.mutateAsync();
+        if (!filesChanging) rescan.mutate();
       }}
       bodyClassName="preprocess-workspace-body"
       statusbar={

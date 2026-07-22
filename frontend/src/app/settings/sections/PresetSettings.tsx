@@ -11,6 +11,7 @@ import { buildPresetLibraryPath, type PresetTab } from "../../../features/preset
 import { SettingsSectionHeader } from "../../../shared/settings/components/SettingsSectionHeader";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
+import "../../../shared/settings/styles/preset-settings.css";
 
 interface PresetResourceCardProps {
   icon: LucideIcon;
