@@ -31,6 +31,7 @@ export function HomePage() {
   const openSettings = useSettingsCenter((state) => state.open);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
   const themeId = useAppPreferences((state) => state.preferences.themeId);
+  const homeContent = useAppPreferences((state) => state.preferences.homeContent);
   const theme = getThemeDefinition(themeId);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -91,8 +92,8 @@ export function HomePage() {
               <span aria-hidden="true" />
               {theme.englishName} · Local archive
             </p>
-            <h1 id="home-title">让每一张图，在沉默中显影。</h1>
-            <p className="home-hero__description">本地优先的图像数据集工作台</p>
+            <h1 id="home-title">{homeContent.headline}</h1>
+            <p className="home-hero__description">{homeContent.description}</p>
             <button
               type="button"
               className="home-entry"

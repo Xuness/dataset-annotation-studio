@@ -2,11 +2,13 @@ import { create } from "zustand";
 
 import {
   createDefaultSurfaceTransparency,
+  createDefaultHomeContent,
   createUniformSurfaceTransparency,
   normalizePreferences,
   type AppSurfaceRegion,
   type AppPreferences,
   type CustomBackground,
+  type HomeContentPreferences,
   type SceneOverrides,
   type SceneTarget,
 } from "./appearance";
@@ -25,6 +27,8 @@ interface AppPreferencesState {
   setAllRegionsTransparent: () => void;
   resetRegionTransparency: () => void;
   setImmersiveMode: (enabled: boolean) => void;
+  setHomeContent: (content: HomeContentPreferences) => void;
+  resetHomeContent: () => void;
 }
 
 function readStoredPreferences(): AppPreferences {
@@ -121,6 +125,16 @@ export const useAppPreferences = create<AppPreferencesState>((set) => {
       commit((current) => ({
         ...current,
         appearance: { ...current.appearance, immersiveMode },
+      })),
+    setHomeContent: (homeContent) =>
+      commit((current) => ({
+        ...current,
+        homeContent,
+      })),
+    resetHomeContent: () =>
+      commit((current) => ({
+        ...current,
+        homeContent: createDefaultHomeContent(),
       })),
   };
 });

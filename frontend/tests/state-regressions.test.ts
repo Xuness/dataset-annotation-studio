@@ -6,6 +6,8 @@ import { providerCredentialCacheToken } from "../src/features/presets/queryKeys.
 import { reconcilePersistedContent } from "../src/pages/workspace/components/annotationEditorState.ts";
 import { isFullscreenShortcut } from "../src/shared/desktop/useDesktopWindowBehavior.ts";
 import {
+  DEFAULT_HOME_CONTENT,
+  HOME_CONTENT_LIMITS,
   createDefaultPreferences,
   normalizePreferences,
   resolveAppearance,
@@ -78,11 +80,12 @@ test("desktop capabilities allow opening verified local folders", () => {
 test("version one appearance preferences migrate without losing the selected theme", () => {
   const preferences = normalizePreferences({ version: 1, themeId: "sea-fog" });
 
-  assert.equal(preferences.version, 9);
+  assert.equal(preferences.version, 10);
   assert.equal(preferences.themeId, "sea-fog");
   assert.deepEqual(preferences.appearance.customBackgrounds, {});
   assert.deepEqual(preferences.appearance.home, { opacity: null, blurPx: null });
   assert.equal(preferences.appearance.transparentRegions.canvas, true);
+  assert.deepEqual(preferences.homeContent, DEFAULT_HOME_CONTENT);
 });
 
 test("fresh appearance preferences use the silent gallery theme", () => {
@@ -129,7 +132,7 @@ test("version two appearance preferences keep scene overrides and gain region de
     },
   });
 
-  assert.equal(preferences.version, 9);
+  assert.equal(preferences.version, 10);
   assert.equal(preferences.themeId, "silent-gallery");
   assert.deepEqual(preferences.appearance.customBackgrounds["silent-gallery"], {
     path: "E:/background.webp",
@@ -159,7 +162,7 @@ test("version three appearance preferences keep transparency and gain disabled i
     },
   });
 
-  assert.equal(preferences.version, 9);
+  assert.equal(preferences.version, 10);
   assert.equal(preferences.appearance.immersiveMode, false);
   assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], false);
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
@@ -188,7 +191,7 @@ test("retired version four preferences keep appearance settings without atmosphe
     },
   });
 
-  assert.equal(preferences.version, 9);
+  assert.equal(preferences.version, 10);
   assert.equal(preferences.themeId, "sea-fog");
   assert.deepEqual(preferences.appearance.customBackgrounds["sea-fog"], {
     path: "E:/background.webp",
@@ -223,7 +226,7 @@ test("version five preferences preserve immersive mode and gain titlebar transpa
     },
   });
 
-  assert.equal(preferences.version, 9);
+  assert.equal(preferences.version, 10);
   assert.equal(preferences.appearance.immersiveMode, true);
   assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], false);
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], false);
@@ -252,7 +255,7 @@ test("version six preferences preserve titlebar and immersive choices and gain h
     },
   });
 
-  assert.equal(preferences.version, 9);
+  assert.equal(preferences.version, 10);
   assert.equal(preferences.appearance.immersiveMode, true);
   assert.deepEqual(preferences.appearance.customBackgrounds["silent-gallery"], {
     path: "E:/background.webp",
@@ -286,7 +289,7 @@ test("version seven preferences preserve home chrome and gain home content trans
     },
   });
 
-  assert.equal(preferences.version, 9);
+  assert.equal(preferences.version, 10);
   assert.equal(preferences.appearance.immersiveMode, false);
   assert.equal(preferences.appearance.transparentRegions["desktop-titlebar"], true);
   assert.equal(preferences.appearance.transparentRegions["home-topbar"], true);
@@ -308,7 +311,7 @@ test("version eight custom background migrates only to the active theme", () => 
     },
   });
 
-  assert.equal(preferences.version, 9);
+  assert.equal(preferences.version, 10);
   assert.deepEqual(preferences.appearance.customBackgrounds, {
     "sea-fog": { path: "E:/legacy.webp", name: "legacy.webp" },
   });
@@ -319,10 +322,11 @@ test("version eight custom background migrates only to the active theme", () => 
   );
 });
 
-test("version nine keeps independent valid backgrounds for known themes", () => {
+test("version nine keeps independent backgrounds and gains default homepage copy", () => {
   const defaults = createDefaultPreferences("warm-paper");
   const preferences = normalizePreferences({
-    ...defaults,
+    version: 9,
+    themeId: defaults.themeId,
     appearance: {
       ...defaults.appearance,
       customBackgrounds: {
@@ -344,6 +348,27 @@ test("version nine keeps independent valid backgrounds for known themes", () => 
     "dark.webp",
   );
   assert.equal(resolveAppearance({ ...preferences, themeId: "sea-fog" }).customBackground, null);
+  assert.deepEqual(preferences.homeContent, DEFAULT_HOME_CONTENT);
+});
+
+test("current preferences normalize editable homepage copy", () => {
+  const defaults = createDefaultPreferences();
+  const preferences = normalizePreferences({
+    ...defaults,
+    homeContent: {
+      headline: `  ${"雾".repeat(HOME_CONTENT_LIMITS.headline + 4)}  `,
+      description: "  一座   安静的本地图像档案馆  ",
+    },
+  });
+
+  assert.equal(preferences.homeContent.headline, "雾".repeat(HOME_CONTENT_LIMITS.headline));
+  assert.equal(preferences.homeContent.description, "一座 安静的本地图像档案馆");
+
+  const invalid = normalizePreferences({
+    ...defaults,
+    homeContent: { headline: "   ", description: null },
+  });
+  assert.deepEqual(invalid.homeContent, DEFAULT_HOME_CONTENT);
 });
 
 test("region transparency accepts only known boolean values", () => {

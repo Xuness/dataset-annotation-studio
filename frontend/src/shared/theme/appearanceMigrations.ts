@@ -1,14 +1,17 @@
 import { DEFAULT_THEME_ID, isThemeId, type ThemeId } from "./themes.ts";
 import {
   APP_SURFACE_REGIONS,
+  HOME_CONTENT_LIMITS,
   PREFERENCES_VERSION,
   SCENE_LIMITS,
+  createDefaultHomeContent,
   createDefaultPreferences,
   createDefaultSurfaceTransparency,
   type AppPreferences,
   type AppSurfaceTransparency,
   type AppearancePreferences,
   type CustomBackground,
+  type HomeContentPreferences,
   type SceneOverrides,
   type ThemeCustomBackgrounds,
 } from "./appearanceModel.ts";
@@ -74,6 +77,26 @@ function normalizeSurfaceTransparency(value: unknown): AppSurfaceTransparency {
   ) as AppSurfaceTransparency;
 }
 
+function normalizeInlineText(value: unknown, fallback: string, maxLength: number): string {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized ? normalized.slice(0, maxLength) : fallback;
+}
+
+function normalizeHomeContent(value: unknown): HomeContentPreferences {
+  const defaults = createDefaultHomeContent();
+  if (!isRecord(value)) return defaults;
+
+  return {
+    headline: normalizeInlineText(value.headline, defaults.headline, HOME_CONTENT_LIMITS.headline),
+    description: normalizeInlineText(
+      value.description,
+      defaults.description,
+      HOME_CONTENT_LIMITS.description,
+    ),
+  };
+}
+
 function normalizeAppearancePreferences(
   value: Record<string, unknown>,
   options: {
@@ -117,6 +140,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
         preserveImmersiveMode: false,
         preserveThemeBackgrounds: false,
       }),
+      homeContent: createDefaultHomeContent(),
     };
   }
 
@@ -135,6 +159,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
         preserveImmersiveMode: false,
         preserveThemeBackgrounds: false,
       }),
+      homeContent: createDefaultHomeContent(),
     };
   }
 
@@ -158,6 +183,23 @@ export function normalizePreferences(value: unknown): AppPreferences {
         preserveImmersiveMode: true,
         preserveThemeBackgrounds: false,
       }),
+      homeContent: createDefaultHomeContent(),
+    };
+  }
+
+  // Version 9 introduced independent backgrounds for each theme. Keep those
+  // assignments while adding editable homepage copy with its original text.
+  if (storedVersion === 9 && isRecord(value.appearance)) {
+    return {
+      version: PREFERENCES_VERSION,
+      themeId,
+      appearance: normalizeAppearancePreferences(value.appearance, {
+        themeId,
+        preserveRegions: true,
+        preserveImmersiveMode: true,
+        preserveThemeBackgrounds: true,
+      }),
+      homeContent: createDefaultHomeContent(),
     };
   }
 
@@ -171,6 +213,7 @@ export function normalizePreferences(value: unknown): AppPreferences {
         preserveImmersiveMode: true,
         preserveThemeBackgrounds: true,
       }),
+      homeContent: normalizeHomeContent(value.homeContent),
     };
   }
 

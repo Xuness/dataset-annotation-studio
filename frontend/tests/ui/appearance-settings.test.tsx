@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AppearanceSettings } from "../../src/shared/settings/sections/AppearanceSettings";
 import { applyPreferences } from "../../src/shared/theme/appearanceRuntime";
 import { useAppPreferences } from "../../src/shared/theme/appPreferences";
-import { createDefaultPreferences } from "../../src/shared/theme/appearance";
+import { createDefaultPreferences, DEFAULT_HOME_CONTENT } from "../../src/shared/theme/appearance";
 
 function resetAppearance() {
   const preferences = createDefaultPreferences();
@@ -42,5 +42,29 @@ describe("appearance settings", () => {
     expect(screen.getByRole("button", { name: /图片画布/ }).getAttribute("aria-pressed")).toBe(
       "true",
     );
+  });
+
+  test("saves and restores custom homepage copy", async () => {
+    const user = userEvent.setup();
+    render(<AppearanceSettings onClose={() => undefined} />);
+
+    const headline = screen.getByRole("textbox", { name: /首页主标题/ });
+    const description = screen.getByRole("textbox", { name: /首页说明文字/ });
+    await user.clear(headline);
+    await user.type(headline, "雨停以后，仍有图像在呼吸。");
+    await user.clear(description);
+    await user.type(description, "只属于这台设备的本地图像工作台");
+    await user.click(screen.getByRole("button", { name: /保存文案/ }));
+
+    expect(useAppPreferences.getState().preferences.homeContent).toEqual({
+      headline: "雨停以后，仍有图像在呼吸。",
+      description: "只属于这台设备的本地图像工作台",
+    });
+    expect(
+      JSON.parse(window.localStorage.getItem("dataset-studio.preferences") ?? "null").homeContent,
+    ).toEqual(useAppPreferences.getState().preferences.homeContent);
+
+    await user.click(screen.getByRole("button", { name: /恢复默认/ }));
+    expect(useAppPreferences.getState().preferences.homeContent).toEqual(DEFAULT_HOME_CONTENT);
   });
 });

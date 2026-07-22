@@ -1,6 +1,16 @@
 import { DEFAULT_THEME_ID, getThemeDefinition, type ThemeId } from "./themes.ts";
 
-export const PREFERENCES_VERSION = 9 as const;
+export const PREFERENCES_VERSION = 10 as const;
+
+export const DEFAULT_HOME_CONTENT = {
+  headline: "让每一张图，在沉默中显影。",
+  description: "本地优先的图像数据集工作台",
+} as const;
+
+export const HOME_CONTENT_LIMITS = {
+  headline: 48,
+  description: 72,
+} as const;
 
 export const SCENE_LIMITS = {
   opacity: { min: 0, max: 1 },
@@ -45,10 +55,16 @@ export interface AppearancePreferences {
   immersiveMode: boolean;
 }
 
+export interface HomeContentPreferences {
+  headline: string;
+  description: string;
+}
+
 export interface AppPreferences {
   version: typeof PREFERENCES_VERSION;
   themeId: ThemeId;
   appearance: AppearancePreferences;
+  homeContent: HomeContentPreferences;
 }
 
 export interface ResolvedSceneAppearance {
@@ -65,6 +81,10 @@ export interface ResolvedAppearance {
 
 function emptySceneOverrides(): SceneOverrides {
   return { opacity: null, blurPx: null };
+}
+
+export function createDefaultHomeContent(): HomeContentPreferences {
+  return { ...DEFAULT_HOME_CONTENT };
 }
 
 export function createDefaultSurfaceTransparency(): AppSurfaceTransparency {
@@ -99,6 +119,7 @@ export function createDefaultPreferences(themeId: ThemeId = DEFAULT_THEME_ID): A
       transparentRegions: createDefaultSurfaceTransparency(),
       immersiveMode: false,
     },
+    homeContent: createDefaultHomeContent(),
   };
 }
 
