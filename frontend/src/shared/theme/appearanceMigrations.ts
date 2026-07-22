@@ -77,10 +77,16 @@ function normalizeSurfaceTransparency(value: unknown): AppSurfaceTransparency {
   ) as AppSurfaceTransparency;
 }
 
-function normalizeInlineText(value: unknown, fallback: string, maxLength: number): string {
+function normalizeInlineText(
+  value: unknown,
+  fallback: string,
+  maxLength: number,
+  allowEmpty = false,
+): string {
   if (typeof value !== "string") return fallback;
   const normalized = value.replace(/\s+/g, " ").trim();
-  return normalized ? normalized.slice(0, maxLength) : fallback;
+  if (normalized) return normalized.slice(0, maxLength);
+  return allowEmpty ? "" : fallback;
 }
 
 function normalizeHomeContent(value: unknown): HomeContentPreferences {
@@ -88,11 +94,17 @@ function normalizeHomeContent(value: unknown): HomeContentPreferences {
   if (!isRecord(value)) return defaults;
 
   return {
-    headline: normalizeInlineText(value.headline, defaults.headline, HOME_CONTENT_LIMITS.headline),
+    headline: normalizeInlineText(
+      value.headline,
+      defaults.headline,
+      HOME_CONTENT_LIMITS.headline,
+      true,
+    ),
     description: normalizeInlineText(
       value.description,
       defaults.description,
       HOME_CONTENT_LIMITS.description,
+      true,
     ),
   };
 }

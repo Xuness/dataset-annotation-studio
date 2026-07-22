@@ -44,21 +44,19 @@ describe("appearance settings", () => {
     );
   });
 
-  test("saves and restores custom homepage copy", async () => {
+  test("saves empty homepage copy and restores defaults", async () => {
     const user = userEvent.setup();
     render(<AppearanceSettings onClose={() => undefined} />);
 
     const headline = screen.getByRole("textbox", { name: /首页主标题/ });
     const description = screen.getByRole("textbox", { name: /首页说明文字/ });
     await user.clear(headline);
-    await user.type(headline, "雨停以后，仍有图像在呼吸。");
     await user.clear(description);
-    await user.type(description, "只属于这台设备的本地图像工作台");
     await user.click(screen.getByRole("button", { name: /保存文案/ }));
 
     expect(useAppPreferences.getState().preferences.homeContent).toEqual({
-      headline: "雨停以后，仍有图像在呼吸。",
-      description: "只属于这台设备的本地图像工作台",
+      headline: "",
+      description: "",
     });
     expect(
       JSON.parse(window.localStorage.getItem("dataset-studio.preferences") ?? "null").homeContent,

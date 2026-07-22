@@ -27,11 +27,6 @@ export function HomeContentSection() {
     headline: cleanInlineText(draft.headline),
     description: cleanInlineText(draft.description),
   };
-  const validationMessage = !cleanedDraft.headline
-    ? "首页主标题不能为空。"
-    : !cleanedDraft.description
-      ? "首页说明文字不能为空。"
-      : null;
   const hasChanges =
     cleanedDraft.headline !== content.headline || cleanedDraft.description !== content.description;
   const usesDefaults =
@@ -46,7 +41,7 @@ export function HomeContentSection() {
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (validationMessage || !hasChanges) return;
+    if (!hasChanges) return;
     setHomeContent(cleanedDraft);
   }
 
@@ -68,14 +63,14 @@ export function HomeContentSection() {
       <form className="home-content-editor" onSubmit={save}>
         <div className="home-content-editor__preview" aria-label="首页文案预览">
           <span>Landing copy</span>
-          <strong>{cleanedDraft.headline || "等待一句开场白……"}</strong>
-          <p>{cleanedDraft.description || "等待一行说明文字……"}</p>
+          {cleanedDraft.headline ? <strong>{cleanedDraft.headline}</strong> : null}
+          {cleanedDraft.description ? <p>{cleanedDraft.description}</p> : null}
         </div>
 
         <div className="home-content-editor__fields">
           <label className="form-field" htmlFor="home-content-headline">
             <span>
-              首页主标题
+              首页主标题（可选）
               <small>
                 {draft.headline.length}/{HOME_CONTENT_LIMITS.headline}
               </small>
@@ -85,14 +80,13 @@ export function HomeContentSection() {
               type="text"
               value={draft.headline}
               maxLength={HOME_CONTENT_LIMITS.headline}
-              aria-invalid={!cleanedDraft.headline}
               onChange={(event) => updateDraft("headline", event.currentTarget.value)}
             />
           </label>
 
           <label className="form-field" htmlFor="home-content-description">
             <span>
-              首页说明文字
+              首页说明文字（可选）
               <small>
                 {draft.description.length}/{HOME_CONTENT_LIMITS.description}
               </small>
@@ -102,15 +96,12 @@ export function HomeContentSection() {
               type="text"
               value={draft.description}
               maxLength={HOME_CONTENT_LIMITS.description}
-              aria-invalid={!cleanedDraft.description}
               onChange={(event) => updateDraft("description", event.currentTarget.value)}
             />
           </label>
 
           <div className="home-content-editor__actions">
-            <span className={validationMessage ? "form-error" : ""} aria-live="polite">
-              {validationMessage ?? "保存后，首页会立即使用新的文案。"}
-            </span>
+            <span aria-live="polite">两项均可留空；保存后，首页会立即使用新的文案。</span>
             <div>
               <Button
                 type="button"
@@ -120,12 +111,7 @@ export function HomeContentSection() {
               >
                 恢复默认
               </Button>
-              <Button
-                type="submit"
-                tone="primary"
-                icon={<Save size={14} />}
-                disabled={Boolean(validationMessage) || !hasChanges}
-              >
+              <Button type="submit" tone="primary" icon={<Save size={14} />} disabled={!hasChanges}>
                 保存文案
               </Button>
             </div>

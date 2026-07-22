@@ -33,6 +33,9 @@ export function HomePage() {
   const themeId = useAppPreferences((state) => state.preferences.themeId);
   const homeContent = useAppPreferences((state) => state.preferences.homeContent);
   const theme = getThemeDefinition(themeId);
+  const hasHomeHeadline = Boolean(homeContent.headline);
+  const hasHomeDescription = Boolean(homeContent.description);
+  const hasHomeCopy = hasHomeHeadline || hasHomeDescription;
   const [message, setMessage] = useState<string | null>(null);
 
   async function chooseAndOpenWorkspace() {
@@ -86,14 +89,24 @@ export function HomePage() {
       </header>
 
       <div className="home-shell">
-        <section className="home-hero" aria-labelledby="home-title">
+        <section
+          className="home-hero"
+          aria-labelledby={hasHomeHeadline ? "home-title" : undefined}
+          aria-label={hasHomeHeadline ? undefined : "数据集入口"}
+        >
           <div className="home-hero__copy">
             <p className="home-hero__kicker">
               <span aria-hidden="true" />
               {theme.englishName} · Local archive
             </p>
-            <h1 id="home-title">{homeContent.headline}</h1>
-            <p className="home-hero__description">{homeContent.description}</p>
+            {hasHomeCopy ? (
+              <div className="home-hero__text">
+                {hasHomeHeadline ? <h1 id="home-title">{homeContent.headline}</h1> : null}
+                {hasHomeDescription ? (
+                  <p className="home-hero__description">{homeContent.description}</p>
+                ) : null}
+              </div>
+            ) : null}
             <button
               type="button"
               className="home-entry"

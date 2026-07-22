@@ -224,12 +224,20 @@
   white-space: nowrap;
 }
 
+.home-hero__text {
+  margin-bottom: 34px;
+}
+
 .home-hero__description {
-  margin: 22px 0 34px;
+  margin: 22px 0 0;
   color: color-mix(in srgb, var(--ink-soft) 62%, transparent);
   font-family: "STSong", "Songti SC", SimSun, serif;
   font-size: 15px;
   letter-spacing: 0.2em;
+}
+
+.home-hero__description:first-child {
+  margin-top: 0;
 }
 
 .home-entry {

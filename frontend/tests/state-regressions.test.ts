@@ -364,11 +364,20 @@ test("current preferences normalize editable homepage copy", () => {
   assert.equal(preferences.homeContent.headline, "雾".repeat(HOME_CONTENT_LIMITS.headline));
   assert.equal(preferences.homeContent.description, "一座 安静的本地图像档案馆");
 
+  const emptyContent = normalizePreferences({
+    ...defaults,
+    homeContent: { headline: "   ", description: "   " },
+  });
+  assert.deepEqual(emptyContent.homeContent, { headline: "", description: "" });
+
   const invalid = normalizePreferences({
     ...defaults,
     homeContent: { headline: "   ", description: null },
   });
-  assert.deepEqual(invalid.homeContent, DEFAULT_HOME_CONTENT);
+  assert.deepEqual(invalid.homeContent, {
+    headline: "",
+    description: DEFAULT_HOME_CONTENT.description,
+  });
 });
 
 test("region transparency accepts only known boolean values", () => {
