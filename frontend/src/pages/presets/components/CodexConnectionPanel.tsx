@@ -3,11 +3,11 @@ import { CheckCircle2, LogIn, RefreshCw, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import {
-  presetKeys,
   useCodexAccount,
   useCodexAuthMutations,
   useCodexLoginStatus,
 } from "../../../features/presets/hooks";
+import { presetKeys } from "../../../features/presets/queryKeys";
 import { openExternalUrl } from "../../../shared/desktop/openExternalUrl";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";

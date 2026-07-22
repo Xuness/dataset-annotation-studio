@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { promptPreviewKeys } from "../assets/queryKeys";
 import {
   cancelCodexLogin,
   createProviderProfile,
@@ -23,14 +24,7 @@ import {
   type SystemPresetInput,
   type TranslationPromptPresetInput,
 } from "./api";
-import { providerCredentialCacheToken } from "./queryKeys";
-
-export const presetKeys = {
-  system: ["presets", "system"] as const,
-  translationPrompts: ["presets", "translation-prompts"] as const,
-  providers: ["presets", "providers"] as const,
-  codexAccount: ["providers", "codex", "account"] as const,
-};
+import { presetKeys } from "./queryKeys";
 
 export function useSystemPresets() {
   return useQuery({ queryKey: presetKeys.system, queryFn: listSystemPresets });
@@ -54,7 +48,7 @@ export function useCodexAccount(enabled: boolean) {
 
 export function useCodexLoginStatus(loginId: string | null) {
   return useQuery({
-    queryKey: ["providers", "codex", "login", loginId],
+    queryKey: presetKeys.codexLogin(loginId),
     queryFn: () => getCodexLoginStatus(loginId as string),
     enabled: Boolean(loginId),
     refetchInterval: (query) => (query.state.data?.state === "pending" ? 1_000 : false),
@@ -74,15 +68,7 @@ export function useProviderProfiles() {
 
 export function useProviderModelSearch(input: ProviderModelSearchInput, enabled: boolean) {
   return useQuery({
-    queryKey: [
-      "presets",
-      "provider-models",
-      input.profile_id ?? "new",
-      input.provider_type,
-      input.base_url,
-      input.query,
-      providerCredentialCacheToken(input.api_key),
-    ],
+    queryKey: presetKeys.providerModelSearch(input),
     queryFn: () => searchProviderModels(input),
     enabled,
     staleTime: 60_000,
@@ -93,7 +79,7 @@ export function useSystemPresetMutations() {
   const queryClient = useQueryClient();
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: presetKeys.system });
-    void queryClient.invalidateQueries({ queryKey: ["prompt-preview"] });
+    void queryClient.invalidateQueries({ queryKey: promptPreviewKeys.all });
   };
   return {
     create: useMutation({ mutationFn: createSystemPreset, onSuccess: invalidate }),
@@ -132,7 +118,7 @@ export function useProviderProfileMutations() {
   const invalidate = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: presetKeys.providers }),
-      queryClient.invalidateQueries({ queryKey: ["presets", "provider-models"] }),
+      queryClient.invalidateQueries({ queryKey: presetKeys.providerModels }),
     ]);
   return {
     create: useMutation({ mutationFn: createProviderProfile, onSuccess: invalidate }),

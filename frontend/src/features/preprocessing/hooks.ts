@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { assetKeys } from "../assets/queryKeys";
+import { workspaceKeys } from "../workspaces/queryKeys";
 import {
   executePreprocessing,
   listPreprocessOperations,
@@ -7,10 +9,11 @@ import {
   undoPreprocessOperation,
 } from "./api";
 import type { PreprocessExecutionOptions, PreprocessRequest } from "../../shared/api/types";
+import { preprocessingKeys } from "./queryKeys";
 
 export function usePreprocessOperations(projectId: string) {
   return useQuery({
-    queryKey: ["preprocessing", projectId, "operations"],
+    queryKey: preprocessingKeys.operations(projectId),
     queryFn: () => listPreprocessOperations(projectId),
   });
 }
@@ -18,9 +21,9 @@ export function usePreprocessOperations(projectId: string) {
 export function usePreprocessingActions(projectId: string) {
   const queryClient = useQueryClient();
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ["preprocessing", projectId] });
-    void queryClient.invalidateQueries({ queryKey: ["assets", projectId] });
-    void queryClient.invalidateQueries({ queryKey: ["workspaces", projectId] });
+    void queryClient.invalidateQueries({ queryKey: preprocessingKeys.project(projectId) });
+    void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
+    void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
   };
   return {
     preview: useMutation({

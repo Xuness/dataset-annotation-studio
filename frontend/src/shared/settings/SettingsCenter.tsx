@@ -1,16 +1,20 @@
 import { useLayoutEffect, useRef } from "react";
-import { Palette, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 
-import { AppearanceSettings } from "./sections/AppearanceSettings";
 import { useSettingsCenter } from "./settingsCenterStore";
+import { SETTINGS_SECTIONS } from "./settingsSections";
 import "./settings-center.css";
 
 export function SettingsCenter() {
   const isOpen = useSettingsCenter((state) => state.isOpen);
   const section = useSettingsCenter((state) => state.section);
   const close = useSettingsCenter((state) => state.close);
+  const open = useSettingsCenter((state) => state.open);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const activeSection =
+    SETTINGS_SECTIONS.find((candidate) => candidate.id === section) ?? SETTINGS_SECTIONS[0];
+  const ActiveSection = activeSection.component;
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -63,16 +67,27 @@ export function SettingsCenter() {
             </div>
           </div>
           <nav aria-label="设置分类">
-            <button type="button" className={section === "appearance" ? "is-active" : ""}>
-              <Palette size={15} aria-hidden="true" />
-              <span>外观与主题</span>
-            </button>
+            {SETTINGS_SECTIONS.map((entry) => {
+              const Icon = entry.icon;
+              return (
+                <button
+                  type="button"
+                  key={entry.id}
+                  className={section === entry.id ? "is-active" : ""}
+                  aria-current={section === entry.id ? "page" : undefined}
+                  onClick={() => open(entry.id)}
+                >
+                  <Icon size={15} aria-hidden="true" />
+                  <span>{entry.label}</span>
+                </button>
+              );
+            })}
           </nav>
           <p>设置保存在此设备上，不会写入数据集项目。</p>
         </aside>
 
         <section className="settings-center__content">
-          {section === "appearance" ? <AppearanceSettings onClose={close} /> : null}
+          <ActiveSection onClose={close} />
         </section>
       </div>
     </dialog>

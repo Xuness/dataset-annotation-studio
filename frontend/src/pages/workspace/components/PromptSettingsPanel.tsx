@@ -160,7 +160,9 @@ function AnnotationTraceView({ trace }: { trace: AssetAnnotationTrace }) {
         />
         <TraceMessageCard
           label="FINAL"
-          detail={trace.response.finish_reason ? `结束原因：${trace.response.finish_reason}` : "最终输出"}
+          detail={
+            trace.response.finish_reason ? `结束原因：${trace.response.finish_reason}` : "最终输出"
+          }
           content={trace.response.final_content}
           empty="这次尝试没有可用的最终输出。"
           tone="final"
@@ -379,9 +381,7 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
                     </header>
                     <pre>{preview.data.final_user_prompt || "User Prompt 当前为空。"}</pre>
                   </article>
-                  <p className="prompt-image-note">
-                    当前图片会与 USER 消息一起发送给多模态模型。
-                  </p>
+                  <p className="prompt-image-note">当前图片会与 USER 消息一起发送给多模态模型。</p>
                 </div>
               ) : (
                 <Spinner label="拼装最终请求" />

@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { ExportRequest } from "../../shared/api/types";
 import { createExport, listExports, previewExport, resumeExport, stopExport } from "./api";
+import { exportKeys } from "./queryKeys";
 
 const activeStatuses = new Set(["queued", "running", "stopping"]);
 
 export function useExportOperations(projectId: string) {
   return useQuery({
-    queryKey: ["exports", projectId],
+    queryKey: exportKeys.project(projectId),
     queryFn: () => listExports(projectId),
     enabled: Boolean(projectId),
     refetchInterval: (query) =>
@@ -18,7 +19,7 @@ export function useExportOperations(projectId: string) {
 export function useExportActions(projectId: string) {
   const queryClient = useQueryClient();
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ["exports", projectId] });
+    void queryClient.invalidateQueries({ queryKey: exportKeys.project(projectId) });
   };
   return {
     preview: useMutation({

@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getTranslation, listTranslations } from "./api";
+import { translationKeys } from "./queryKeys";
 
 export function useTranslations(projectId: string, assetId: string | null) {
   return useQuery({
-    queryKey: ["translations", projectId, assetId],
+    queryKey: translationKeys.asset(projectId, assetId),
     queryFn: () => listTranslations(projectId, assetId!),
     enabled: Boolean(projectId && assetId),
   });
@@ -12,7 +13,7 @@ export function useTranslations(projectId: string, assetId: string | null) {
 
 export function useTranslation(projectId: string, assetId: string | null, language: string) {
   return useQuery({
-    queryKey: ["translations", projectId, assetId, language],
+    queryKey: translationKeys.detail(projectId, assetId, language),
     queryFn: () => getTranslation(projectId, assetId!, language),
     enabled: Boolean(projectId && assetId && language),
   });

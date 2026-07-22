@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { assetKeys, metadataKeys, promptPreviewKeys } from "../assets/queryKeys";
 import { alertDialog } from "../../shared/ui/dialogs";
 import {
   getWorkspace,
@@ -8,11 +9,7 @@ import {
   rescanWorkspace,
   updateWorkspace,
 } from "./api";
-
-export const workspaceKeys = {
-  all: ["workspaces"] as const,
-  detail: (projectId: string) => ["workspaces", projectId] as const,
-};
+import { workspaceKeys } from "./queryKeys";
 
 export function useRecentWorkspaces() {
   return useQuery({ queryKey: workspaceKeys.all, queryFn: listWorkspaces });
@@ -43,9 +40,9 @@ export function useRescanWorkspace(projectId: string) {
     mutationFn: () => rescanWorkspace(projectId),
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
-      void queryClient.invalidateQueries({ queryKey: ["assets", projectId] });
-      void queryClient.invalidateQueries({ queryKey: ["metadata", projectId] });
-      void queryClient.invalidateQueries({ queryKey: ["prompt-preview", projectId] });
+      void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
+      void queryClient.invalidateQueries({ queryKey: metadataKeys.project(projectId) });
+      void queryClient.invalidateQueries({ queryKey: promptPreviewKeys.project(projectId) });
       if (result.failed) {
         const examples = result.issues
           .slice(0, 5)
@@ -70,8 +67,8 @@ export function useUpdateWorkspace(projectId: string) {
       updateWorkspace(projectId, update),
     onSuccess: (workspace) => {
       queryClient.setQueryData(workspaceKeys.detail(projectId), workspace);
-      void queryClient.invalidateQueries({ queryKey: ["assets", projectId] });
-      void queryClient.invalidateQueries({ queryKey: ["prompt-preview", projectId] });
+      void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
+      void queryClient.invalidateQueries({ queryKey: promptPreviewKeys.project(projectId) });
     },
   });
 }

@@ -1,5 +1,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { annotationTraceKeys, assetKeys } from "../assets/queryKeys";
+import { translationKeys } from "../translations/queryKeys";
+import { workspaceKeys } from "../workspaces/queryKeys";
 import {
   acceptJobItem,
   createJob,
@@ -10,12 +13,13 @@ import {
   stopJob,
   type CreateJobInput,
 } from "./api";
+import { jobKeys } from "./queryKeys";
 
 const isActive = (status: string) => ["queued", "running", "stopping"].includes(status);
 
 export function useJobs(projectId: string) {
   return useQuery({
-    queryKey: ["jobs", projectId],
+    queryKey: jobKeys.project(projectId),
     queryFn: () => listJobs(projectId, { limit: 500, activeOnly: true }),
     enabled: Boolean(projectId),
     refetchInterval: (query) =>
@@ -25,7 +29,7 @@ export function useJobs(projectId: string) {
 
 export function useJobHistory(projectId: string, pageSize = 100) {
   return useInfiniteQuery({
-    queryKey: ["jobs", projectId, "history", pageSize],
+    queryKey: jobKeys.history(projectId, pageSize),
     queryFn: ({ pageParam }) => listJobs(projectId, { offset: pageParam, limit: pageSize }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, pages) =>
@@ -40,7 +44,7 @@ export function useJobHistory(projectId: string, pageSize = 100) {
 
 export function useJob(projectId: string, jobId: string | null, itemLimit = 200) {
   return useQuery({
-    queryKey: ["jobs", projectId, jobId, itemLimit],
+    queryKey: jobKeys.detail(projectId, jobId, itemLimit),
     queryFn: () => getJob(projectId, jobId!, itemLimit),
     enabled: Boolean(jobId),
     refetchInterval: (query) =>
@@ -51,12 +55,14 @@ export function useJob(projectId: string, jobId: string | null, itemLimit = 200)
 export function useJobActions(projectId: string) {
   const queryClient = useQueryClient();
   const invalidate = (jobId?: string) => {
-    void queryClient.invalidateQueries({ queryKey: ["jobs", projectId] });
-    if (jobId) void queryClient.invalidateQueries({ queryKey: ["jobs", projectId, jobId] });
-    void queryClient.invalidateQueries({ queryKey: ["assets", projectId] });
-    void queryClient.invalidateQueries({ queryKey: ["annotation-trace", projectId] });
-    void queryClient.invalidateQueries({ queryKey: ["translations", projectId] });
-    void queryClient.invalidateQueries({ queryKey: ["workspaces", projectId] });
+    void queryClient.invalidateQueries({ queryKey: jobKeys.project(projectId) });
+    if (jobId) {
+      void queryClient.invalidateQueries({ queryKey: jobKeys.detailPrefix(projectId, jobId) });
+    }
+    void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
+    void queryClient.invalidateQueries({ queryKey: annotationTraceKeys.project(projectId) });
+    void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
+    void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
   };
   return {
     create: useMutation({

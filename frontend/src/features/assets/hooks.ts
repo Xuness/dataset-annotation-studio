@@ -8,10 +8,11 @@ import {
   listAssets,
   type AssetQuery,
 } from "./api";
+import { annotationTraceKeys, assetKeys, metadataKeys, promptPreviewKeys } from "./queryKeys";
 
 export function useAssets(projectId: string, query: AssetQuery) {
   return useQuery({
-    queryKey: ["assets", projectId, query],
+    queryKey: assetKeys.list(projectId, query),
     queryFn: () => listAssets(projectId, query),
     enabled: Boolean(projectId),
   });
@@ -19,7 +20,7 @@ export function useAssets(projectId: string, query: AssetQuery) {
 
 export function useInfiniteAssets(projectId: string, query: AssetQuery, pageSize = 500) {
   return useInfiniteQuery({
-    queryKey: ["assets", projectId, "infinite", query, pageSize],
+    queryKey: assetKeys.infinite(projectId, query, pageSize),
     queryFn: ({ pageParam }) =>
       listAssets(projectId, { ...query, offset: pageParam, limit: pageSize }),
     initialPageParam: 0,
@@ -33,7 +34,7 @@ export function useInfiniteAssets(projectId: string, query: AssetQuery, pageSize
 
 export function useAssetIds(projectId: string, query: AssetQuery) {
   return useQuery({
-    queryKey: ["assets", projectId, "ids", query],
+    queryKey: assetKeys.ids(projectId, query),
     queryFn: () => listAssetIds(projectId, query),
     enabled: false,
     staleTime: Number.POSITIVE_INFINITY,
@@ -42,7 +43,7 @@ export function useAssetIds(projectId: string, query: AssetQuery) {
 
 export function usePromptPreview(projectId: string, assetId: string | null) {
   return useQuery({
-    queryKey: ["prompt-preview", projectId, assetId],
+    queryKey: promptPreviewKeys.detail(projectId, assetId),
     queryFn: () => getPromptPreview(projectId, assetId!),
     enabled: Boolean(projectId && assetId),
   });
@@ -50,7 +51,7 @@ export function usePromptPreview(projectId: string, assetId: string | null) {
 
 export function useAnnotationTrace(projectId: string, assetId: string | null) {
   return useQuery({
-    queryKey: ["annotation-trace", projectId, assetId],
+    queryKey: annotationTraceKeys.detail(projectId, assetId),
     queryFn: () => getAnnotationTrace(projectId, assetId!),
     enabled: Boolean(projectId && assetId),
     refetchInterval: (query) => {
@@ -66,7 +67,7 @@ export function useAnnotationTrace(projectId: string, assetId: string | null) {
 
 export function useAssetMetadata(projectId: string, assetId: string | null) {
   return useQuery({
-    queryKey: ["metadata", projectId, assetId],
+    queryKey: metadataKeys.detail(projectId, assetId),
     queryFn: () => getMetadata(projectId, assetId!),
     enabled: Boolean(projectId && assetId),
   });
