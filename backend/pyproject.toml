@@ -9,7 +9,7 @@ dependencies = [
     "keyring>=25.6,<26",
     "numpy>=2,<3",
     "onnx>=1.17,<2",
-    "onnxruntime>=1.20,<2",
+    "onnxruntime-gpu[cuda,cudnn]>=1.21,<1.27",
     "openai-codex",
     "opencv-python-headless>=4.11,<5",
     "pillow>=11.3,<13",

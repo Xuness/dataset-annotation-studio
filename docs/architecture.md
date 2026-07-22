@@ -92,8 +92,11 @@ OpenRouter 目录仍使用其扩展元数据；两个协议各自由适配器映
 阈值、输出类别、执行设备和并发数。创建任务时会冻结安装指纹与完整配置；模型文件后来发生变化时，旧任务不会
 静默改用新权重，而是拒绝执行并要求重新创建任务。
 
-Runtime 只在 Worker 真正处理本地任务时加载 ONNX Session，并用单项 LRU 约束常驻大模型数量。标准发行依赖
-CPU 版 ONNX Runtime；若运行环境提供 CUDA 或 DirectML provider，配置界面会按运行时探测结果开放对应设备。
+Runtime 只在 Worker 真正处理本地任务时加载 ONNX Session，并用单项 LRU 约束常驻大模型数量。后端只安装一个
+`onnxruntime-gpu[cuda,cudnn]` ORT wheel，不与 CPU wheel 并存；当前锁定 CUDA 12 兼容系列，并由 extras 提供
+所需运行库。自动设备模式优先创建 CUDA + CPU 算子回退链；若 CUDA Session 因驱动或动态库问题无法初始化，
+或在执行期间失效，则重建或切换为纯 CPU Session。显式选择 CUDA 时保持严格失败，不会把 CPU 降级伪装成
+GPU 执行；DirectML 仍作为替代 Runtime 构建可用时的兼容设备。
 单图产物仍进入统一的 `runs/` 追踪结构，其中保存阈值、类别、设备、标签置信度和推理耗时，不保存图片副本。
 
 ## 单图调用追踪

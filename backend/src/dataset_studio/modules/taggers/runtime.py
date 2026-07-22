@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import logging
+import os
 import threading
 import time
 from collections import OrderedDict
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import numpy as np
 from PIL import Image
@@ -19,6 +21,18 @@ from dataset_studio.modules.taggers.models import (
     TaggerInferenceTag,
 )
 from dataset_studio.modules.taggers.service import TaggerService
+
+LOGGER = logging.getLogger("dataset_studio.tagger_runtime")
+
+_DEVICE_PROVIDERS = {
+    TaggerDevice.CPU: "CPUExecutionProvider",
+    TaggerDevice.CUDA: "CUDAExecutionProvider",
+    TaggerDevice.DIRECTML: "DmlExecutionProvider",
+}
+_CUDA_RUNTIME_LOCK = threading.Lock()
+_CUDA_RUNTIME_PREPARED = False
+_CUDA_DLL_DIRECTORY_HANDLES: list[object] = []
+_CUDA_PRELOADED_DLLS: list[Any] = []
 
 
 class _Session(Protocol):
@@ -37,6 +51,7 @@ class _RuntimeEntry:
     session: _Session
     adapter: TaggerAdapter
     vocabulary: TaggerVocabulary
+    primary_provider: str
     serialize_runs: bool
     run_lock: threading.Lock
 
@@ -58,8 +73,8 @@ class TaggerRuntime:
         if not image_path.is_file():
             raise ValueError("图片已不存在，无法执行本地打标。")
         directory, adapter = self._taggers.resolve_snapshot(profile)
-        providers = self._providers_for_device(profile.device)
-        entry = self._entry(profile, directory, adapter, providers)
+        provider_candidates = self._provider_candidates_for_device(profile.device)
+        entry = self._entry(profile, directory, adapter, provider_candidates)
         started = time.perf_counter()
         try:
             with Image.open(image_path) as image:
@@ -73,6 +88,25 @@ class TaggerRuntime:
                 outputs = entry.session.run(["logits"], {"pixel_values": pixels})
         except Exception as error:
             raise ValueError(f"ONNX 本地推理失败：{error}") from error
+        active_providers = entry.session.get_providers()
+        if not active_providers:
+            raise ValueError("ONNX 本地推理完成后没有活动的执行提供程序。")
+        active_provider = active_providers[0]
+        if profile.device != TaggerDevice.AUTO:
+            expected_provider = _DEVICE_PROVIDERS[profile.device]
+            if active_provider != expected_provider:
+                raise ValueError(
+                    f"请求的执行设备 {expected_provider} 在推理期间失效，"
+                    f"实际为：{', '.join(active_providers)}"
+                )
+        elif active_provider != entry.primary_provider:
+            previous_provider = entry.primary_provider
+            entry.primary_provider = active_provider
+            LOGGER.warning(
+                "Local tagger provider changed during inference from %s to %s",
+                previous_provider,
+                active_provider,
+            )
         if not outputs:
             raise ValueError("ONNX 本地推理没有返回 logits。")
         logits = np.asarray(outputs[0], dtype=np.float32)
@@ -98,11 +132,10 @@ class TaggerRuntime:
         if not selected:
             raise ValueError("当前阈值与类别设置没有产生任何标签，请调整打标配置后重试。")
         elapsed_ms = (time.perf_counter() - started) * 1_000
-        active_providers = entry.session.get_providers()
         return TaggerInferenceResult(
             content=", ".join(item.name for item in selected),
             tags=selected,
-            provider=active_providers[0] if active_providers else providers[0],
+            provider=active_provider,
             inference_ms=elapsed_ms,
         )
 
@@ -135,7 +168,7 @@ class TaggerRuntime:
         profile: TaggerExecutionProfile,
         directory: Path,
         adapter: TaggerAdapter,
-        providers: list[str],
+        provider_candidates: list[list[str]],
     ) -> _RuntimeEntry:
         key = (profile.installation_id, profile.fingerprint, profile.device.value)
         with self._entry_lock:
@@ -143,18 +176,18 @@ class TaggerRuntime:
             if existing is not None:
                 self._entries[key] = existing
                 return existing
-            session = self._session_factory(directory / "model.onnx", providers)
-            actual = session.get_providers()
-            if not actual or actual[0] != providers[0]:
-                raise ValueError(
-                    f"请求的执行设备 {providers[0]} 未能启用，实际为：{', '.join(actual) or '无'}"
-                )
+            session, actual = self._create_session_for_device(
+                profile.device,
+                directory / "model.onnx",
+                provider_candidates,
+            )
             entry = _RuntimeEntry(
                 installation_id=profile.installation_id,
                 session=session,
                 adapter=adapter,
                 vocabulary=adapter.load_vocabulary(directory),
-                serialize_runs=providers[0] == "DmlExecutionProvider",
+                primary_provider=actual[0],
+                serialize_runs=actual[0] == "DmlExecutionProvider",
                 run_lock=threading.Lock(),
             )
             self._entries[key] = entry
@@ -162,21 +195,47 @@ class TaggerRuntime:
                 self._entries.popitem(last=False)
             return entry
 
+    def _create_session_for_device(
+        self,
+        device: TaggerDevice,
+        model_path: Path,
+        provider_candidates: list[list[str]],
+    ) -> tuple[_Session, list[str]]:
+        failures: list[str] = []
+        for providers in provider_candidates:
+            requested = providers[0]
+            try:
+                session = self._session_factory(model_path, providers)
+                actual = session.get_providers()
+                if not actual or actual[0] != requested:
+                    raise ValueError(
+                        f"请求的执行设备 {requested} 未能启用，实际为：{', '.join(actual) or '无'}"
+                    )
+                return session, actual
+            except Exception as error:
+                if device != TaggerDevice.AUTO:
+                    if isinstance(error, ValueError):
+                        raise
+                    raise ValueError(f"无法加载 ONNX 本地打标器：{error}") from error
+                failures.append(f"{requested}: {error}")
+                LOGGER.warning(
+                    "Local tagger provider %s could not initialize; trying the next provider: %s",
+                    requested,
+                    error,
+                )
+        detail = "；".join(failures) or "没有候选执行设备。"
+        raise ValueError(f"ONNX Runtime 自动设备选择失败：{detail}")
+
     @staticmethod
-    def _providers_for_device(device: TaggerDevice) -> list[str]:
+    def _provider_candidates_for_device(device: TaggerDevice) -> list[list[str]]:
         try:
             import onnxruntime as ort
         except (ImportError, OSError) as error:
             raise ValueError(f"ONNX Runtime 不可用：{error}") from error
         available = list(ort.get_available_providers())
-        requested = {
-            TaggerDevice.CPU: "CPUExecutionProvider",
-            TaggerDevice.CUDA: "CUDAExecutionProvider",
-            TaggerDevice.DIRECTML: "DmlExecutionProvider",
-        }
         if device == TaggerDevice.AUTO:
-            preferred = [
-                provider
+            candidates = [
+                TaggerRuntime._provider_chain(provider, available)
                 for provider in (
                     "CUDAExecutionProvider",
                     "DmlExecutionProvider",
@@ -184,14 +243,20 @@ class TaggerRuntime:
                 )
                 if provider in available
             ]
-            if not preferred:
+            if not candidates:
                 raise ValueError("ONNX Runtime 没有可用的本地执行提供程序。")
-            return preferred
-        provider = requested[device]
+            return candidates
+        provider = _DEVICE_PROVIDERS[device]
         if provider not in available:
             raise ValueError(f"当前 ONNX Runtime 不支持执行设备：{device.value}")
-        fallbacks = ["CPUExecutionProvider"] if provider != "CPUExecutionProvider" else []
-        return [provider, *[item for item in fallbacks if item in available]]
+        return [TaggerRuntime._provider_chain(provider, available)]
+
+    @staticmethod
+    def _provider_chain(provider: str, available: list[str]) -> list[str]:
+        providers = [provider]
+        if provider != "CPUExecutionProvider" and "CPUExecutionProvider" in available:
+            providers.append("CPUExecutionProvider")
+        return providers
 
     @staticmethod
     def _create_onnx_session(model_path: Path, providers: list[str]) -> _Session:
@@ -201,6 +266,8 @@ class TaggerRuntime:
             raise ValueError(f"ONNX Runtime 不可用：{error}") from error
         options = ort.SessionOptions()
         options.log_severity_level = 3
+        if providers[0] == "CUDAExecutionProvider":
+            _prepare_cuda_runtime(ort)
         if providers[0] == "DmlExecutionProvider":
             options.enable_mem_pattern = False
             options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
@@ -212,3 +279,64 @@ class TaggerRuntime:
             )
         except Exception as error:
             raise ValueError(f"无法加载 ONNX 本地打标器：{error}") from error
+
+
+def _prepare_cuda_runtime(ort: Any) -> None:
+    """Make wheel-provided CUDA DLLs discoverable before the first session."""
+
+    global _CUDA_RUNTIME_PREPARED
+    if _CUDA_RUNTIME_PREPARED:
+        return
+    with _CUDA_RUNTIME_LOCK:
+        if _CUDA_RUNTIME_PREPARED:
+            return
+        dll_directories: list[Path] = []
+        if os.name == "nt":
+            dll_directories = _nvidia_dll_directories(ort)
+            add_dll_directory = getattr(os, "add_dll_directory", None)
+            if callable(add_dll_directory):
+                for directory in dll_directories:
+                    try:
+                        _CUDA_DLL_DIRECTORY_HANDLES.append(add_dll_directory(str(directory)))
+                    except OSError as error:
+                        LOGGER.warning(
+                            "Could not register CUDA DLL directory %s: %s", directory, error
+                        )
+        preload_dlls = getattr(ort, "preload_dlls", None)
+        if callable(preload_dlls):
+            try:
+                preload_dlls()
+            except Exception as error:
+                LOGGER.warning("Could not preload CUDA runtime libraries: %s", error)
+        if os.name == "nt":
+            _preload_cudnn_sublibraries(dll_directories)
+        _CUDA_RUNTIME_PREPARED = True
+
+
+def _nvidia_dll_directories(ort: Any) -> list[Path]:
+    package_file = getattr(ort, "__file__", None)
+    if not package_file:
+        return []
+    nvidia_root = Path(package_file).resolve().parent.parent / "nvidia"
+    if not nvidia_root.is_dir():
+        return []
+    return sorted(
+        (directory for directory in nvidia_root.glob("*/bin") if directory.is_dir()),
+        key=lambda directory: directory.as_posix().casefold(),
+    )
+
+
+def _preload_cudnn_sublibraries(dll_directories: list[Path]) -> None:
+    # cuDNN can delay-load sublibraries that older ORT preload lists do not
+    # include yet. Holding every wheel-provided cuDNN handle keeps those
+    # dependencies discoverable for the lifetime of the worker process.
+    import ctypes
+
+    for directory in dll_directories:
+        if directory.parent.name.casefold() != "cudnn":
+            continue
+        for dll_path in sorted(directory.glob("cudnn*.dll")):
+            try:
+                _CUDA_PRELOADED_DLLS.append(ctypes.CDLL(str(dll_path)))
+            except OSError as error:
+                LOGGER.warning("Could not preload cuDNN sublibrary %s: %s", dll_path, error)

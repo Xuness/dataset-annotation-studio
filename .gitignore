@@ -34,3 +34,6 @@ src-tauri/binaries/dataset-studio-service-*
 .env.*
 !.env.example
 .codex-*.log
+
+# Local model library
+/models/

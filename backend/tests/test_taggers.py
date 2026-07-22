@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -22,7 +23,7 @@ from dataset_studio.modules.taggers.models import (
 )
 from dataset_studio.modules.taggers.registry import TaggerAdapterRegistry
 from dataset_studio.modules.taggers.repository import TaggerRepository
-from dataset_studio.modules.taggers.runtime import TaggerRuntime
+from dataset_studio.modules.taggers.runtime import TaggerRuntime, _nvidia_dll_directories
 from dataset_studio.modules.taggers.service import TaggerService
 from dataset_studio.platform.global_store import initialize_global_database
 
@@ -65,11 +66,14 @@ class FakeTaggerAdapter:
 
 
 class FakeSession:
+    def __init__(self, providers: list[str] | None = None) -> None:
+        self._providers = providers or ["CPUExecutionProvider"]
+
     def run(self, _output_names, _input_feed):
         return [np.asarray([[2.0, 1.0]], dtype=np.float32)]
 
     def get_providers(self) -> list[str]:
-        return ["CPUExecutionProvider"]
+        return self._providers
 
 
 def _service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TaggerService:
@@ -247,7 +251,11 @@ def test_runtime_filters_categories_and_formats_confidence_order(
     library = service.import_local(TaggerImportRequest(path=str(_model_source(tmp_path))))
     profile = service.resolve_execution_profile(library.profiles[0].id)
     runtime = TaggerRuntime(service, session_factory=lambda _path, _providers: FakeSession())
-    monkeypatch.setattr(runtime, "_providers_for_device", lambda _device: ["CPUExecutionProvider"])
+    monkeypatch.setattr(
+        runtime,
+        "_provider_candidates_for_device",
+        lambda _device: [["CPUExecutionProvider"]],
+    )
     image_path = tmp_path / "image.png"
     Image.new("RGB", (32, 16), "white").save(image_path)
 
@@ -262,6 +270,172 @@ def test_runtime_filters_categories_and_formats_confidence_order(
     runtime.prune_missing_installations()
 
     assert not runtime._entries
+
+
+def test_runtime_auto_rebuilds_a_cpu_session_when_cuda_cannot_initialize(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service(tmp_path, monkeypatch)
+    library = service.import_local(TaggerImportRequest(path=str(_model_source(tmp_path))))
+    profile = service.resolve_execution_profile(library.profiles[0].id)
+    attempts: list[list[str]] = []
+
+    def create_session(_path: Path, providers: list[str]) -> FakeSession:
+        attempts.append(providers)
+        # ONNX Runtime can return a CPU-only session after its CUDA provider
+        # fails to load. AUTO must then build a deliberate CPU session.
+        return FakeSession(
+            ["CPUExecutionProvider"] if providers[0] == "CUDAExecutionProvider" else providers
+        )
+
+    runtime = TaggerRuntime(service, session_factory=create_session)
+    monkeypatch.setattr(
+        runtime,
+        "_provider_candidates_for_device",
+        lambda _device: [
+            ["CUDAExecutionProvider", "CPUExecutionProvider"],
+            ["CPUExecutionProvider"],
+        ],
+    )
+    image_path = tmp_path / "image.png"
+    Image.new("RGB", (32, 16), "white").save(image_path)
+
+    result = runtime.tag(profile, image_path)
+
+    assert attempts == [
+        ["CUDAExecutionProvider", "CPUExecutionProvider"],
+        ["CPUExecutionProvider"],
+    ]
+    assert result.provider == "CPUExecutionProvider"
+
+
+def test_runtime_explicit_cuda_rejects_a_silent_cpu_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service(tmp_path, monkeypatch)
+    library = service.import_local(TaggerImportRequest(path=str(_model_source(tmp_path))))
+    profile = service.resolve_execution_profile(library.profiles[0].id).model_copy(
+        update={"device": TaggerDevice.CUDA}
+    )
+    runtime = TaggerRuntime(
+        service,
+        session_factory=lambda _path, _providers: FakeSession(["CPUExecutionProvider"]),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_provider_candidates_for_device",
+        lambda _device: [["CUDAExecutionProvider", "CPUExecutionProvider"]],
+    )
+    image_path = tmp_path / "image.png"
+    Image.new("RGB", (32, 16), "white").save(image_path)
+
+    with pytest.raises(ValueError, match="CUDAExecutionProvider 未能启用"):
+        runtime.tag(profile, image_path)
+
+
+def test_runtime_explicit_cuda_rejects_a_fallback_during_inference(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class RuntimeFallbackSession(FakeSession):
+        def run(self, output_names, input_feed):
+            self._providers = ["CPUExecutionProvider"]
+            return super().run(output_names, input_feed)
+
+    service = _service(tmp_path, monkeypatch)
+    library = service.import_local(TaggerImportRequest(path=str(_model_source(tmp_path))))
+    profile = service.resolve_execution_profile(library.profiles[0].id).model_copy(
+        update={"device": TaggerDevice.CUDA}
+    )
+    runtime = TaggerRuntime(
+        service,
+        session_factory=lambda _path, _providers: RuntimeFallbackSession(
+            ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_provider_candidates_for_device",
+        lambda _device: [["CUDAExecutionProvider", "CPUExecutionProvider"]],
+    )
+    image_path = tmp_path / "image.png"
+    Image.new("RGB", (32, 16), "white").save(image_path)
+
+    with pytest.raises(ValueError, match="CUDAExecutionProvider 在推理期间失效"):
+        runtime.tag(profile, image_path)
+
+
+def test_runtime_auto_accepts_a_cpu_fallback_during_inference(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class RuntimeFallbackSession(FakeSession):
+        def run(self, output_names, input_feed):
+            self._providers = ["CPUExecutionProvider"]
+            return super().run(output_names, input_feed)
+
+    service = _service(tmp_path, monkeypatch)
+    library = service.import_local(TaggerImportRequest(path=str(_model_source(tmp_path))))
+    profile = service.resolve_execution_profile(library.profiles[0].id)
+    runtime = TaggerRuntime(
+        service,
+        session_factory=lambda _path, _providers: RuntimeFallbackSession(
+            ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_provider_candidates_for_device",
+        lambda _device: [["CUDAExecutionProvider", "CPUExecutionProvider"]],
+    )
+    image_path = tmp_path / "image.png"
+    Image.new("RGB", (32, 16), "white").save(image_path)
+
+    result = runtime.tag(profile, image_path)
+
+    assert result.provider == "CPUExecutionProvider"
+
+
+def test_provider_candidates_keep_operator_and_session_level_cpu_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import onnxruntime as ort
+
+    monkeypatch.setattr(
+        ort,
+        "get_available_providers",
+        lambda: [
+            "CUDAExecutionProvider",
+            "DmlExecutionProvider",
+            "CPUExecutionProvider",
+        ],
+    )
+
+    assert TaggerRuntime._provider_candidates_for_device(TaggerDevice.AUTO) == [
+        ["CUDAExecutionProvider", "CPUExecutionProvider"],
+        ["DmlExecutionProvider", "CPUExecutionProvider"],
+        ["CPUExecutionProvider"],
+    ]
+    assert TaggerRuntime._provider_candidates_for_device(TaggerDevice.CUDA) == [
+        ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    ]
+
+
+def test_nvidia_dll_directories_discovers_wheel_bin_directories(tmp_path: Path) -> None:
+    site_packages = tmp_path / "site-packages"
+    package_file = site_packages / "onnxruntime" / "__init__.py"
+    package_file.parent.mkdir(parents=True)
+    package_file.touch()
+    cudnn = site_packages / "nvidia" / "cudnn" / "bin"
+    cublas = site_packages / "nvidia" / "cublas" / "bin"
+    cudnn.mkdir(parents=True)
+    cublas.mkdir(parents=True)
+
+    directories = _nvidia_dll_directories(SimpleNamespace(__file__=str(package_file)))
+
+    assert directories == [cublas, cudnn]
 
 
 def test_cl_tagger_v2_adapter_and_onnxruntime_execute_external_data_model(
