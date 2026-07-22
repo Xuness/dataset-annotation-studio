@@ -264,7 +264,7 @@ export function NewJobPanel({
         </>
       ) : null}
 
-      <div className="job-scope">
+      <div className="scope-selector">
         <span>处理范围</span>
         <button className={scope === "all" ? "is-active" : ""} onClick={() => setScope("all")}>
           {kind === "annotation" ? "全部未标注" : "全部有源标注"}

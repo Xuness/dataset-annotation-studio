@@ -52,7 +52,7 @@ export function ExportSettingsPanel({
         </div>
       </header>
 
-      <div className="job-scope">
+      <div className="scope-selector">
         <span>导出范围</span>
         <button
           className={form.scope === "all" ? "is-active" : ""}

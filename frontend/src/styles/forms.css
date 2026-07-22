@@ -111,3 +111,47 @@
   color: var(--danger);
   font-size: var(--text-xs);
 }
+
+/* Scope choices are shared by several lazy workspace routes. Keep their
+   structural styles in the eager form layer so first render never depends on
+   which route-specific stylesheet happened to load earlier. */
+.scope-selector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.scope-selector > span {
+  grid-column: 1 / -1;
+  margin-bottom: 1px;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+
+.scope-selector button {
+  display: flex;
+  min-height: 50px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: var(--surface-raised);
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+
+.scope-selector button small {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.scope-selector button.is-active {
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background: var(--surface-soft);
+  box-shadow: inset 2px 0 var(--accent);
+}

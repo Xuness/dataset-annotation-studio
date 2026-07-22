@@ -127,46 +127,8 @@
   text-underline-offset: 2px;
 }
 
-.job-scope {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+.new-job-panel .scope-selector {
   margin: 19px 0;
-}
-
-.job-scope > span {
-  grid-column: 1 / -1;
-  margin-bottom: 1px;
-  color: var(--ink-soft);
-  font-size: var(--text-xs);
-  font-weight: 650;
-}
-
-.job-scope button {
-  display: flex;
-  min-height: 50px;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--ink-soft);
-  background: var(--surface-raised);
-  cursor: pointer;
-  font-size: var(--text-xs);
-}
-
-.job-scope button small {
-  color: var(--muted);
-  font-size: var(--text-2xs);
-}
-
-.job-scope button.is-active {
-  color: var(--ink);
-  border-color: var(--line-strong);
-  background: var(--surface-soft);
-  box-shadow: inset 2px 0 var(--accent);
 }
 
 .job-rules {

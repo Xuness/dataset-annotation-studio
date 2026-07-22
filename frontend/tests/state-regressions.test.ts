@@ -123,6 +123,25 @@ test("desktop capabilities allow opening verified local folders", () => {
   assert.equal(capability.permissions.includes("core:window:allow-unmaximize"), true);
 });
 
+test("preprocess scope controls use eager route-independent styles", () => {
+  const globalStyles = readFileSync(new URL("../src/styles/global.css", import.meta.url), "utf8");
+  const formStyles = readFileSync(new URL("../src/styles/forms.css", import.meta.url), "utf8");
+  const preprocessStyles = readFileSync(
+    new URL("../src/pages/preprocess/preprocess.css", import.meta.url),
+    "utf8",
+  );
+  const preprocessPanel = readFileSync(
+    new URL("../src/pages/preprocess/components/PreprocessSettingsPanel.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(globalStyles, /@import "\.\/forms\.css";/);
+  assert.match(formStyles, /\.scope-selector\s*\{/);
+  assert.match(preprocessStyles, /\.preprocess-settings \.scope-selector\s*\{/);
+  assert.match(preprocessPanel, /className="scope-selector"/);
+  assert.doesNotMatch(preprocessPanel, /job-scope/);
+});
+
 test("version one appearance preferences migrate without losing the selected theme", () => {
   const preferences = normalizePreferences({ version: 1, themeId: "sea-fog" });
 

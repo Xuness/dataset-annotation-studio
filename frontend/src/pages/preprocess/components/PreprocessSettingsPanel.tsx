@@ -61,7 +61,7 @@ export function PreprocessSettingsPanel({
           <h2>图片预处理</h2>
         </div>
       </header>
-      <div className="job-scope">
+      <div className="scope-selector">
         <span>处理范围</span>
         <button
           className={form.scope === "all" ? "is-active" : ""}
