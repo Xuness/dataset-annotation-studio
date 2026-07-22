@@ -4,7 +4,10 @@ import test from "node:test";
 
 import { providerCredentialCacheToken } from "../src/features/presets/queryKeys.ts";
 import { reconcilePersistedContent } from "../src/pages/workspace/components/annotationEditorState.ts";
-import { isFullscreenShortcut } from "../src/shared/desktop/useDesktopWindowBehavior.ts";
+import {
+  createDesktopFullscreenToggle,
+  isFullscreenShortcut,
+} from "../src/shared/desktop/useDesktopWindowBehavior.ts";
 import {
   DEFAULT_HOME_CONTENT,
   HOME_CONTENT_LIMITS,
@@ -54,6 +57,45 @@ test("fullscreen shortcut accepts only an unmodified first F11 press", () => {
   assert.equal(isFullscreenShortcut({ ...f11, key: "F10" }), false);
 });
 
+test("fullscreen toggle restores a maximized Windows window without carrying its work area", async () => {
+  let fullscreen = false;
+  let maximized = true;
+  const calls: string[] = [];
+  const toggleFullscreen = createDesktopFullscreenToggle(
+    {
+      async isFullscreen() {
+        calls.push("is-fullscreen");
+        return fullscreen;
+      },
+      async isMaximized() {
+        calls.push("is-maximized");
+        return maximized;
+      },
+      async maximize() {
+        calls.push("maximize");
+        maximized = true;
+      },
+      async setFullscreen(nextFullscreen) {
+        calls.push(`set-fullscreen:${nextFullscreen}`);
+        fullscreen = nextFullscreen;
+      },
+      async unmaximize() {
+        calls.push("unmaximize");
+        maximized = false;
+      },
+    },
+    true,
+  );
+
+  assert.equal(await toggleFullscreen(), true);
+  assert.deepEqual(calls, ["is-fullscreen", "is-maximized", "unmaximize", "set-fullscreen:true"]);
+
+  calls.length = 0;
+  assert.equal(await toggleFullscreen(), false);
+  assert.deepEqual(calls, ["is-fullscreen", "set-fullscreen:false", "maximize"]);
+  assert.equal(maximized, true);
+});
+
 test("desktop capabilities allow opening verified local folders", () => {
   const capabilityPath = new URL("../../src-tauri/capabilities/default.json", import.meta.url);
   const capability = JSON.parse(readFileSync(capabilityPath, "utf8")) as {
@@ -75,6 +117,8 @@ test("desktop capabilities allow opening verified local folders", () => {
     openPathPermission.allow?.map((entry) => entry.path),
     ["$LOCALDATA/DatasetAnnotationStudio/**", "$LOCALDATA/Dataset Studio/**"],
   );
+  assert.equal(capability.permissions.includes("core:window:allow-maximize"), true);
+  assert.equal(capability.permissions.includes("core:window:allow-unmaximize"), true);
 });
 
 test("version one appearance preferences migrate without losing the selected theme", () => {
