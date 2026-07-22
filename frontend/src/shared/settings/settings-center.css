@@ -1,3 +1,5 @@
 @import "./styles/settings-shell.css";
 @import "./styles/theme-presets.css";
 @import "./styles/appearance-settings.css";
+@import "./styles/preset-settings.css";
+@import "./styles/about-settings.css";

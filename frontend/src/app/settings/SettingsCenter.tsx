@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef } from "react";
 import { Settings } from "lucide-react";
 
-import { useSettingsCenter } from "./settingsCenterStore";
+import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
+import "../../shared/settings/settings-center.css";
 import { SETTINGS_SECTIONS } from "./settingsSections";
-import "./settings-center.css";
 
 export function SettingsCenter() {
   const isOpen = useSettingsCenter((state) => state.isOpen);
@@ -83,7 +83,7 @@ export function SettingsCenter() {
               );
             })}
           </nav>
-          <p>设置保存在此设备上，不会写入数据集项目。</p>
+          <p>{activeSection.sidebarNote}</p>
         </aside>
 
         <section className="settings-center__content">

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { providerCredentialCacheToken } from "../src/features/presets/queryKeys.ts";
@@ -49,6 +50,29 @@ test("fullscreen shortcut accepts only an unmodified first F11 press", () => {
   assert.equal(isFullscreenShortcut({ ...f11, repeat: true }), false);
   assert.equal(isFullscreenShortcut({ ...f11, ctrlKey: true }), false);
   assert.equal(isFullscreenShortcut({ ...f11, key: "F10" }), false);
+});
+
+test("desktop capabilities allow opening verified local folders", () => {
+  const capabilityPath = new URL("../../src-tauri/capabilities/default.json", import.meta.url);
+  const capability = JSON.parse(readFileSync(capabilityPath, "utf8")) as {
+    permissions: Array<
+      | string
+      | {
+          identifier: string;
+          allow?: Array<{ path?: string }>;
+        }
+    >;
+  };
+  const openPathPermission = capability.permissions.find(
+    (permission) =>
+      typeof permission !== "string" && permission.identifier === "opener:allow-open-path",
+  );
+
+  assert.ok(openPathPermission && typeof openPathPermission !== "string");
+  assert.deepEqual(
+    openPathPermission.allow?.map((entry) => entry.path),
+    ["$LOCALDATA/DatasetAnnotationStudio/**", "$LOCALDATA/Dataset Studio/**"],
+  );
 });
 
 test("version one appearance preferences migrate without losing the selected theme", () => {

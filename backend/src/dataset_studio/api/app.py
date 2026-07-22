@@ -17,6 +17,7 @@ from dataset_studio.api.routes import (
     presets,
     providers,
     statistics,
+    system,
     translations,
     workspaces,
 )
@@ -81,6 +82,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(preprocessing.router, prefix=api_prefix)
     app.include_router(exports.router, prefix=api_prefix)
     app.include_router(statistics.router, prefix=api_prefix)
+    app.include_router(system.router, prefix=api_prefix)
     return app
 
 

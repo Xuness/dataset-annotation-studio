@@ -6,9 +6,9 @@ import { DesktopTitlebar } from "../shared/desktop/DesktopTitlebar";
 import { useClipboardHistoryBridge } from "../shared/desktop/useClipboardHistoryBridge";
 import { useDesktopWindowBehavior } from "../shared/desktop/useDesktopWindowBehavior";
 import { useApplyInterfaceScale } from "../shared/desktop/useInterfaceScale";
-import { SettingsCenter } from "../shared/settings/SettingsCenter";
 import { DialogHost } from "../shared/ui/DialogHost";
 import { Spinner } from "../shared/ui/Spinner";
+import { SettingsCenter } from "./settings/SettingsCenter";
 import { useCloseGuard } from "./useCloseGuard";
 
 const HomePage = lazy(() =>

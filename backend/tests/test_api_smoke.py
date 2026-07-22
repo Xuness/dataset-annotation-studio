@@ -18,6 +18,16 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
         assert health.status_code == 200
         assert health.json()["status"] == "ok"
 
+        diagnostics = client.get("/api/v1/system/diagnostics")
+        assert diagnostics.status_code == 200
+        assert diagnostics.json() == {
+            "status": "ok",
+            "version": health.json()["version"],
+            "app_data_dir": str(tmp_path / "app-data"),
+            "log_dir": str(tmp_path / "app-data" / "logs"),
+        }
+        assert (tmp_path / "app-data" / "logs").is_dir()
+
         opened = client.post("/api/v1/workspaces/open", json={"path": str(project)})
         assert opened.status_code == 200
         project_id = opened.json()["workspace"]["project_id"]

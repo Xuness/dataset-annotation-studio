@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Braces, Cable, Languages, Plus } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
+import { resolvePresetTab, type PresetTab } from "../../features/presets/navigation";
 import { useUnsavedChangesGuard } from "../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../shared/ui/Button";
 import { ProviderProfilesPanel } from "./components/ProviderProfilesPanel";
@@ -9,22 +10,35 @@ import { SystemPresetsPanel } from "./components/SystemPresetsPanel";
 import { TranslationPromptsPanel } from "./components/TranslationPromptsPanel";
 import "./presets.css";
 
-type PresetTab = "system" | "translation" | "providers";
-
 export function PresetsPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { confirmDiscard } = useUnsavedChangesGuard();
-  const [tab, setTab] = useState<PresetTab>(() => {
-    const requestedTab = searchParams.get("tab");
-    return requestedTab === "translation" || requestedTab === "providers" ? requestedTab : "system";
-  });
+  const [tab, setTab] = useState<PresetTab>(() => resolvePresetTab(searchParams.get("tab")));
   const [createSignal, setCreateSignal] = useState(0);
+  const handledCreateLocation = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("action") !== "create" || handledCreateLocation.current === location.key) {
+      return;
+    }
+    handledCreateLocation.current = location.key;
+    setCreateSignal((value) => value + 1);
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete("action");
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [location.key, searchParams, setSearchParams]);
 
   function changeTab(nextTab: PresetTab) {
     if (nextTab === tab) return;
     void (async () => {
-      if (await confirmDiscard()) setTab(nextTab);
+      if (!(await confirmDiscard())) return;
+      setTab(nextTab);
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.set("tab", nextTab);
+      nextSearchParams.delete("action");
+      setSearchParams(nextSearchParams, { replace: true });
     })();
   }
 
