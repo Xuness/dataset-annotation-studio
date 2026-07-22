@@ -12,6 +12,7 @@
     "build:frontend": "pnpm --dir frontend build",
     "build:sidecar": "pwsh -NoProfile -File scripts/build-sidecar.ps1",
     "build": "pnpm build:sidecar && tauri build --config src-tauri/tauri.release.conf.json",
+    "icons:generate": "tauri icon assets/app-icon.png --output src-tauri/icons --ios-color \"#050607\" && node scripts/sync-app-icon.mjs",
     "clean": "pwsh -NoProfile -File scripts/clean-generated.ps1",
     "check": "pnpm --dir frontend check && uv run --project backend ruff check backend/src backend/tests && uv run --project backend pytest && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo check --manifest-path src-tauri/Cargo.toml",
     "format": "pnpm --dir frontend format && uv run --project backend ruff format backend/src backend/tests"

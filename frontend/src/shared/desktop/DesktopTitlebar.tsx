@@ -2,6 +2,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minus, Square, X } from "lucide-react";
 
+import appIconUrl from "../../assets/app-icon.png";
 import "./desktop-titlebar.css";
 
 function runWindowAction(action: () => Promise<void>) {
@@ -20,8 +21,8 @@ export function DesktopTitlebar() {
         data-tauri-drag-region=""
         onDoubleClick={() => runWindowAction(() => appWindow.toggleMaximize())}
       >
-        <span className="desktop-titlebar__mark" aria-hidden="true">
-          <i />
+        <span className="desktop-titlebar__mark" aria-hidden="true" data-tauri-drag-region="">
+          <img src={appIconUrl} alt="" draggable={false} data-tauri-drag-region="" />
         </span>
         <span data-tauri-drag-region="">Dataset Studio</span>
       </div>
