@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image, ImageOps
 
 from dataset_studio.core.files import file_sha256
+from dataset_studio.core.paths import relative_path_key
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.annotations.models import AnnotationStatus
 from dataset_studio.modules.annotations.text import read_annotation_text
@@ -38,10 +39,13 @@ class AssetScanner:
             )
             for row in existing_by_path.values()
         }
-        existing_by_casefold: dict[str, list[object]] = {}
+        existing_by_path_key: dict[str, list[object]] = {}
         unmatched_by_hash: dict[str, list[object]] = {}
         for row in existing_by_path.values():
-            existing_by_casefold.setdefault(str(row["relative_path"]).casefold(), []).append(row)
+            existing_by_path_key.setdefault(
+                relative_path_key(str(row["relative_path"])),
+                [],
+            ).append(row)
             unmatched_by_hash.setdefault(str(row["content_hash"]), []).append(row)
 
         records: list[AssetRecord] = []
@@ -58,7 +62,7 @@ class AssetScanner:
                     image_path,
                     paths,
                     existing_by_path,
-                    existing_by_casefold,
+                    existing_by_path_key,
                     unmatched_by_hash,
                     present_ids,
                 )
@@ -93,7 +97,7 @@ class AssetScanner:
         image_path: Path,
         paths: WorkspacePaths,
         existing_by_path,
-        existing_by_casefold,
+        existing_by_path_key,
         unmatched_by_hash,
         present_ids: set[str],
     ) -> tuple[AssetRecord, bool]:
@@ -106,12 +110,12 @@ class AssetScanner:
         stat = image_path.stat()
         existing = existing_by_path.get(relative_path)
         if existing is None:
-            case_matches = existing_by_casefold.get(relative_path.casefold(), [])
-            if len(case_matches) == 1:
-                previous_path = paths.root / str(case_matches[0]["relative_path"])
+            identity_matches = existing_by_path_key.get(relative_path_key(relative_path), [])
+            if len(identity_matches) == 1:
+                previous_path = paths.root / str(identity_matches[0]["relative_path"])
                 try:
                     if previous_path.is_file() and previous_path.samefile(image_path):
-                        existing = case_matches[0]
+                        existing = identity_matches[0]
                 except OSError:
                     pass
         path_changed = bool(existing and str(existing["relative_path"]) != relative_path)

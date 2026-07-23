@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
 from dataset_studio.core.files import file_sha256
+from dataset_studio.core.paths import relative_path_key
 from dataset_studio.modules.assets.companions import (
     AssetBundleFileKind,
     discover_asset_companions,
@@ -110,7 +111,7 @@ def build_plan(
             stat = safe_companion.stat()
             relative = safe_companion.relative_to(root).as_posix()
             files_by_path.setdefault(
-                relative.casefold(),
+                relative_path_key(relative),
                 DeletionFilePlan(
                     kind=companion.kind,
                     source_relative_path=relative,
@@ -175,7 +176,7 @@ def _add_image_file(
         blocking_issues.append(f"图片内容与工作区索引不一致：{relative_path}")
         return
     relative = image_path.relative_to(root).as_posix()
-    files_by_path[relative.casefold()] = DeletionFilePlan(
+    files_by_path[relative_path_key(relative)] = DeletionFilePlan(
         kind=AssetBundleFileKind.IMAGE,
         source_relative_path=relative,
         content_hash=content_hash,
@@ -203,4 +204,4 @@ def _safe_source(
 
 
 def _bundle_base(relative_path: str) -> str:
-    return PurePosixPath(relative_path).with_suffix("").as_posix().casefold()
+    return relative_path_key(PurePosixPath(relative_path).with_suffix(""))

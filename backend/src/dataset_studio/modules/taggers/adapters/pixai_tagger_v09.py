@@ -214,6 +214,11 @@ class PixAITaggerV09Adapter:
                 source_id="deepghs/pixai-tagger-v0.9-onnx",
                 revision="d8cf666911a2c3d10d586d7823259192313c7eb7",
                 source_url="https://huggingface.co/deepghs/pixai-tagger-v0.9-onnx",
+                license_id="Apache-2.0",
+                license_url=(
+                    "https://huggingface.co/deepghs/pixai-tagger-v0.9-onnx/"
+                    "tree/d8cf666911a2c3d10d586d7823259192313c7eb7"
+                ),
                 gated=False,
                 provenance="community",
                 files=(

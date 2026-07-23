@@ -121,6 +121,8 @@ export interface TaggerDownloadOffer {
   repo_id: string;
   revision: string;
   source_url: string;
+  license_id: string;
+  license_url: string;
   gated: boolean;
   provenance: "author" | "community";
   download_size: number;
@@ -165,6 +167,8 @@ export interface HuggingFaceConnectionSettings {
   proxy_mode: HuggingFaceProxyMode;
   has_custom_proxy: boolean;
   proxy_display: string | null;
+  credential_store_available: boolean;
+  credential_store_error: string | null;
 }
 
 export interface HuggingFaceSettingsUpdate {

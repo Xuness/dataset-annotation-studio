@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.modules.translations.languages import LANGUAGE_PATTERN
 
 
@@ -48,4 +49,4 @@ def path_key(path: Path) -> str:
 
 
 def _path_key(path: Path) -> str:
-    return path.resolve().as_posix().casefold()
+    return filesystem_path_key(path)

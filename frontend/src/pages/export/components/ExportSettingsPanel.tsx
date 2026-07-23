@@ -78,7 +78,7 @@ export function ExportSettingsPanel({
         >
           <FolderOpen size={16} />
           <span title={form.destinationPath}>
-            {form.destinationPath || "使用 Windows 目录选择器选择空文件夹"}
+            {form.destinationPath || "使用系统目录选择器选择空文件夹"}
           </span>
         </button>
         <small>选择的文件夹就是最终输出位置。文件会扁平放置，不创建子目录；目标必须为空。</small>

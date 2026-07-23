@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from dataset_studio.core.config import Settings
+from dataset_studio.core.errors import SecretStoreUnavailableError
 from dataset_studio.modules.taggers.adapters.base import ValidatedTaggerModel
 from dataset_studio.modules.taggers.downloads.models import (
     HuggingFaceProxyMode,
@@ -50,6 +51,8 @@ _PLAN = TaggerDownloadPlan(
     source_id="example/fake-tagger",
     revision="a" * 40,
     source_url="https://huggingface.co/example/fake-tagger",
+    license_id="Apache-2.0",
+    license_url="https://huggingface.co/example/fake-tagger/tree/" + "a" * 40,
     gated=False,
     provenance="author",
     files=(
@@ -194,7 +197,18 @@ def test_registry_exposes_six_pinned_audited_download_plans() -> None:
     ]
     assert all(len(plan.revision) == 40 for plan in plans)
     assert all(plan.download_size > 0 and plan.files for plan in plans)
+    assert all(plan.license_id and plan.license_url for plan in plans)
     assert all(len(file.sha256) == 64 and file.size > 0 for plan in plans for file in plan.files)
+
+
+def test_download_requires_explicit_model_license_acceptance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, downloads, _ = _services(tmp_path, monkeypatch)
+
+    with pytest.raises(ValueError, match="许可证"):
+        downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
 
 
 def test_download_task_pause_resume_and_cleanup_are_durable(
@@ -202,7 +216,7 @@ def test_download_task_pause_resume_and_cleanup_are_durable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     taggers, downloads, _ = _services(tmp_path, monkeypatch)
-    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id, license_accepted=True))
     with pytest.raises(ValueError, match="未完成或可恢复"):
         taggers.update_settings(
             TaggerSettingsUpdate(model_root=str((tmp_path / "other-models").resolve()))
@@ -233,7 +247,7 @@ def test_worker_installs_verified_materialization_and_marks_offer_installed(
 ) -> None:
     taggers, downloads, _ = _services(tmp_path, monkeypatch)
     monkeypatch.setattr(downloads, "source", FakeHuggingFaceSource)
-    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id, license_accepted=True))
     row = downloads.repository.claim_next("test-worker")
     assert row is not None
 
@@ -266,7 +280,7 @@ def test_worker_honors_pause_requested_during_preflight(
 ) -> None:
     taggers, downloads, _ = _services(tmp_path, monkeypatch)
     monkeypatch.setattr(downloads, "source", FakeHuggingFaceSource)
-    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id, license_accepted=True))
     row = downloads.repository.claim_next("test-worker")
     assert row is not None
     assert downloads.active_count() == 1
@@ -287,7 +301,7 @@ def test_download_cleanup_failure_keeps_task_record_for_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, downloads, _ = _services(tmp_path, monkeypatch)
-    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id, license_accepted=True))
     downloads.pause(task.id)
 
     def fail_cleanup(_row) -> None:
@@ -305,7 +319,7 @@ def test_download_staging_rejects_a_linked_download_root(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, downloads, _ = _services(tmp_path, monkeypatch)
-    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id, license_accepted=True))
     row = downloads.repository.get(task.id)
     assert row is not None
     external = tmp_path / "external-downloads"
@@ -326,7 +340,7 @@ def test_completed_download_is_not_reclassified_when_staging_cleanup_fails(
 ) -> None:
     taggers, downloads, _ = _services(tmp_path, monkeypatch)
     monkeypatch.setattr(downloads, "source", FakeHuggingFaceSource)
-    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id, license_accepted=True))
     row = downloads.repository.claim_next("test-worker")
     assert row is not None
 
@@ -346,7 +360,7 @@ def test_orphaned_download_can_resume_after_worker_restart(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, downloads, _ = _services(tmp_path, monkeypatch)
-    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id, license_accepted=True))
     row = downloads.repository.claim_next("worker-that-stopped")
     assert row is not None
     downloads.repository.set_phase(task.id, TaggerDownloadStatus.DOWNLOADING)
@@ -395,3 +409,25 @@ def test_huggingface_settings_hide_credentials_and_require_custom_proxy(
             proxy_mode=HuggingFaceProxyMode.CUSTOM,
             proxy_url="http://127.0.0.1:not-a-port",
         )
+
+
+def test_huggingface_environment_token_survives_unavailable_keyring(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, downloads, secrets = _services(tmp_path, monkeypatch)
+    monkeypatch.setenv("HF_TOKEN", "hf_environment_token")
+
+    def unavailable(_key: str) -> str | None:
+        raise SecretStoreUnavailableError("Secret Service unavailable")
+
+    monkeypatch.setattr(secrets, "get", unavailable)
+
+    settings = downloads.connection_settings()
+    config, token_source = downloads._client_config()
+
+    assert not settings.credential_store_available
+    assert settings.credential_store_error == "Secret Service unavailable"
+    assert settings.token_source == "environment"
+    assert config.token == "hf_environment_token"
+    assert token_source == "environment"

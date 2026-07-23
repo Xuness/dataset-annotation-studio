@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
+from contextlib import suppress
 
 from pydantic import TypeAdapter
 
-from dataset_studio.core.errors import PresetNotFoundError
+from dataset_studio.core.errors import PresetNotFoundError, SecretStoreUnavailableError
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.presets.models import (
     ProviderProfile,
@@ -211,17 +212,18 @@ class PresetService:
                 raise ValueError("Codex 使用自身的 ChatGPT 登录，不接受 API Key。")
         updated_at = utc_now_iso()
         secret_key = self._secret_key(profile_id)
-        should_update_secret = (
-            data.api_key is not None or not updated.provider_type.requires_api_key
+        should_update_secret = data.api_key is not None or (
+            current.provider_type.requires_api_key and not updated.provider_type.requires_api_key
         )
         old_api_key = self._secrets.get(secret_key) if should_update_secret else None
-        if not updated.provider_type.requires_api_key:
-            self._secrets.delete(secret_key)
-        elif data.api_key is not None:
-            if data.api_key:
-                self._secrets.set(secret_key, data.api_key)
-            else:
+        if should_update_secret:
+            if not updated.provider_type.requires_api_key:
                 self._secrets.delete(secret_key)
+            elif data.api_key is not None:
+                if data.api_key:
+                    self._secrets.set(secret_key, data.api_key)
+                else:
+                    self._secrets.delete(secret_key)
         try:
             self._repository.update_provider(
                 profile_id,
@@ -260,7 +262,11 @@ class PresetService:
         )
 
     def delete_provider(self, profile_id: str) -> None:
-        self.get_provider(profile_id)
+        profile = self.get_provider(profile_id)
+        if not profile.provider_type.requires_api_key:
+            if not self._repository.delete_provider(profile_id):
+                raise PresetNotFoundError(f"找不到 API 配置：{profile_id}")
+            return
         secret_key = self._secret_key(profile_id)
         old_api_key = self._secrets.get(secret_key)
         self._secrets.delete(secret_key)
@@ -293,9 +299,14 @@ class PresetService:
             )
         values["models"] = models
         provider_type = ProviderType(str(values["provider_type"]))
-        values["has_api_key"] = provider_type.requires_api_key and bool(
-            self._secrets.get(self._secret_key(str(row["id"])))
-        )
+        has_api_key = False
+        if provider_type.requires_api_key:
+            # Profiles remain readable when a Linux desktop session has no
+            # unlocked Secret Service. Any operation that actually needs or
+            # changes the credential still raises the actionable error.
+            with suppress(SecretStoreUnavailableError):
+                has_api_key = bool(self._secrets.get(self._secret_key(str(row["id"]))))
+        values["has_api_key"] = has_api_key
         return ProviderProfile.model_validate(values)
 
     @staticmethod

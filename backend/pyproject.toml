@@ -2,6 +2,8 @@
 name = "dataset-annotation-studio-backend"
 version = "0.1.0"
 description = "Local backend and durable worker for Dataset Annotation Studio"
+license = "Apache-2.0"
+authors = [{ name = "Xuness" }]
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.116,<1",
@@ -11,13 +13,25 @@ dependencies = [
     "keyring>=25.6,<26",
     "numpy>=2,<3",
     "onnx>=1.17,<2",
-    "onnxruntime-gpu[cuda,cudnn]>=1.21,<1.27",
     "openai-codex",
     "opencv-python-headless>=4.11,<5",
     "pillow>=11.3,<13",
     "pydantic>=2.11,<3",
     "uvicorn[standard]>=0.35,<1",
 ]
+
+[project.optional-dependencies]
+cpu = [
+    "onnxruntime>=1.21,<1.27",
+]
+cuda = [
+    "onnxruntime-gpu[cuda,cudnn]>=1.21,<1.27",
+]
+
+[project.urls]
+Homepage = "https://github.com/Xuness/dataset-annotation-studio"
+Repository = "https://github.com/Xuness/dataset-annotation-studio"
+Issues = "https://github.com/Xuness/dataset-annotation-studio/issues"
 
 [project.scripts]
 dataset-studio-api = "dataset_studio.entrypoints.api:main"
@@ -55,6 +69,14 @@ ignore = ["RUF001"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.uv]
+conflicts = [
+    [
+        { extra = "cpu" },
+        { extra = "cuda" },
+    ],
+]
 
 [tool.uv.sources]
 # Official Python SDK stable-release commit paired with Codex CLI 0.144.4.

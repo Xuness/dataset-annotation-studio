@@ -2,7 +2,10 @@
 name = "dataset-annotation-studio"
 version = "0.1.0"
 description = "A quiet desktop workspace for image dataset annotation"
-authors = ["Dataset Annotation Studio Contributors"]
+authors = ["Xuness"]
+license = "Apache-2.0"
+repository = "https://github.com/Xuness/dataset-annotation-studio"
+homepage = "https://github.com/Xuness/dataset-annotation-studio"
 edition = "2021"
 
 [lib]

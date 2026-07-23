@@ -9,6 +9,7 @@ from pathlib import Path
 from PIL import Image, ImageOps
 
 from dataset_studio.core.files import file_sha256
+from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.preprocessing.models import OutputFormat, PreprocessRequest
 from dataset_studio.modules.translations.languages import LANGUAGE_PATTERN
@@ -280,4 +281,4 @@ def _claimed_annotation_paths(database_path: Path, root: Path) -> set[str]:
 
 
 def _path_key(path: Path) -> str:
-    return path.resolve().as_posix().casefold()
+    return filesystem_path_key(path)

@@ -4,9 +4,13 @@ const WRITE_COMMAND = "write_clipboard_text_with_history";
 
 export async function writeClipboardText(text: string): Promise<void> {
   if (isTauri()) {
-    const written = await invoke<boolean>(WRITE_COMMAND, { text });
-    if (!written) throw new Error("系统剪贴板正忙，请稍后重试。");
-    return;
+    try {
+      const written = await invoke<boolean>(WRITE_COMMAND, { text });
+      if (written) return;
+    } catch {
+      // Non-Windows runtimes and temporarily unavailable native clipboards
+      // continue through the WebView fallback below.
+    }
   }
 
   if (navigator.clipboard?.writeText) {

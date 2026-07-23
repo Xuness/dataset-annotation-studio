@@ -1,68 +1,162 @@
 # Dataset Annotation Studio
 
-一个本地优先的桌面图像数据集标注工作台。它把用户选择的文件夹直接视为可携带项目：图片仍按用户自己的多级目录组织，当前标注保存为图片旁的同名 `.txt`，任务状态、历史、恢复文件与校验结果跟随项目一起移动。
+一个本地优先的桌面图像数据集标注工作台，用于整理图片、调用本地 Tagger 或多模态模型、
+审阅标注、预处理并导出可训练数据集。
 
-当前版本已经具备一条完整的首期工作流：
+> 当前状态：`0.1.x` 源码预览版。仓库暂不提供安装包或预编译 sidecar；Linux 支持仍处于
+> x86_64 桌面环境实验阶段。
 
-- 递归或仅当前层扫描 PNG、JPG/JPEG、WebP、BMP、TIFF
-- 缩略图浏览、筛选、批量选择与中央大图预览
-- 同名 JSON 字段选择、User Prompt 拼接、下一次请求预览与单图实际请求/推理/最终输出追踪
-- 全局 System Prompt、翻译 Prompt 与支持多模型和默认模型的供应商连接预设；标注、翻译任务可按次切换模型
-- OpenRouter、OpenAI 兼容接口、OpenCode Go 专用协议、Gemini 原生接口，以及复用 ChatGPT OAuth 的 Codex 适配层
-- 设置页内的全局本地 Tagger 模型库、完整性清单与可复用执行配置；首版支持本地导入 CL Tagger v2，不包含 Hugging Face 下载
-- 持久化批量任务、并发、停止、断点续跑、失败重试和人工采用
-- 模型原始响应直接写入同名 `.txt`，并保留每次脱敏请求快照与供应商响应
-- 标签闭合轻量校验、异常优先查看、显式编辑保存和标注历史
-- 有界多线程最长边缩放，支持 Lanczos 3、Lanczos 4 与二次元低光晕自适应模式，并提供 WebP/JPEG/PNG 转换、模板化批量重命名、执行前预览、项目内原图恢复和逆序撤销
-- 导出整个项目或工作台所选图片：原生目录选择、导出前标注校验、警告确认后强制导出，以及可停止和继续的持久化进度；最终目录只含扁平放置的原图与活动同名 `.txt`
-- Tauri 桌面窗口；发行构建会把 Python API 与 Worker 打包为本地 sidecar
+## 它能做什么
 
-## 仓库结构
+- 直接把一个可写文件夹作为项目，不强制导入或复制图片。
+- 扫描 PNG、JPG/JPEG、WebP、BMP、TIFF，保留多级目录浏览和批量选择。
+- 使用本地 ONNX Tagger，或 OpenRouter、OpenAI 兼容接口、OpenCode Go、Gemini、
+  Codex 等外部提供方生成标注。
+- 保存原始响应、任务快照、失败原因和标注历史，支持停止、继续和失败重试。
+- 批量缩放、格式转换、重命名、恢复与撤销，文件写入带预览和冲突检查。
+- 校验后导出原图与活动同名 `.txt`，支持整个项目或当前勾选范围。
+
+## 支持范围
+
+| 平台 | 当前状态 | 源码运行方式 |
+| --- | --- | --- |
+| Windows 10/11 x86_64 | 主要开发平台 | `pnpm dev` 或双击 `启动开发版.vbs` |
+| Linux x86_64 | 实验性 | 安装 Tauri 系统依赖后运行 `pnpm dev` |
+| macOS / ARM64 | 尚未验证 | 暂不承诺支持 |
+
+源码运行仍会在本机编译 Rust/Tauri 桌面壳，但不会生成或发布安装包。
+
+## 从源码启动
+
+需要以下工具：
+
+- Node.js LTS、Corepack 和 pnpm
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- Rust stable
+- 当前平台的 [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)
+
+克隆仓库并使用默认 CPU Runtime：
 
 ```text
-backend/        Python 业务内核、FastAPI、本地任务 Worker
-frontend/       React + TypeScript 界面
-src-tauri/      Tauri 桌面壳与发行配置
-scripts/        构建辅助脚本
-docs/           架构、工作区格式与设计决策
-assets/         项目级视觉源文件
-```
-
-模块边界与扩展规则见 [架构说明](docs/architecture.md)，项目内部文件格式见 [工作区格式](docs/workspace-layout.md)。
-
-## 开发
-
-需要 Node.js、pnpm、Python 3.11+、uv、Rust 与 PowerShell 7。
-
-```powershell
-pnpm install
-uv sync --project backend --all-groups
+git clone https://github.com/Xuness/dataset-annotation-studio.git
+cd dataset-annotation-studio
+corepack enable
+pnpm install --frozen-lockfile
+uv sync --project backend --extra cpu --all-groups --locked
 pnpm dev
 ```
 
-`pnpm dev` 会同时启动 Vite、仅监听 `127.0.0.1` 的本地 API、任务 Worker 和 Tauri 窗口。关闭开发命令会一起停止这些进程。
+首次启动会编译桌面壳，因此会比后续启动慢。Vite、本地 API、任务 Worker 和窗口都附着在
+当前终端；结束 `pnpm dev` 会停止整套源码服务。
 
-Windows 下推荐直接双击仓库根目录的 `启动开发版.vbs`：它会在后台隐藏 PowerShell
-窗口，检查并同步依赖，然后启动同一套源码开发环境；关闭 Dataset Studio 后，启动器和
-开发服务会一并退出。`启动开发版.bat` 仍作为兼容入口保留，它会立即转交给无控制台的
-Windows Script Host，再由后者隐藏启动 PowerShell；因此 BAT 自身只会在双击瞬间短暂
-闪过，不会再产生第二个命令窗口。前端修改会热更新，不会生成安装包。
+### Windows 快捷入口
 
-## 检查与发行构建
+安装好 Node.js、pnpm、uv、Rust 和 PowerShell 7 后，可以双击根目录的
+`启动开发版.vbs`。它会检查锁定依赖并在后台启动 CPU 源码环境。`启动开发版.bat`
+是兼容入口，会转交给同一个 VBS 启动器。
 
-```powershell
-pnpm check
-pnpm build
+### 可选 NVIDIA CUDA
+
+CPU 是默认且跨平台的基线。x86_64 NVIDIA 环境可以显式选择 CUDA：
+
+```text
+uv sync --project backend --extra cuda --all-groups --locked
+pnpm dev:cuda
 ```
 
-`pnpm check` 执行前端类型检查与 ESLint、Python Ruff 和 Pytest。`pnpm build` 先用 PyInstaller 生成当前 Rust target triple 对应的本地服务，再生成 Tauri 安装包；最终用户不需要单独安装 Python 或启动服务。
+`onnxruntime` 与 `onnxruntime-gpu` 不能在同一环境中并存，uv 配置会阻止同时选择两个
+extra。CUDA Runtime 还受 NVIDIA 软件条款约束；本仓库不分发其二进制文件。
 
-需要移除 Rust 编译缓存、发行产物、临时冒烟数据与本地日志时，可以运行 `pnpm clean`。该命令会保留 `node_modules` 与 `backend/.venv`，因此清理后仍可直接启动源码版。
+如果已有 `.venv` 曾经切换或混装过 CPU/GPU Runtime，先运行
+`uv venv --clear backend/.venv`，再执行上面选定的一条 `uv sync` 命令。它只重建项目
+虚拟环境，不会删除数据集或应用数据。
 
-## 数据边界
+Linux 的系统包、XDG 数据目录、Secret Service 和桌面环境注意事项见
+[Linux 源码指南](docs/linux.md)。
 
-- 应用不会把图片复制到全局素材库，也不会继续依赖最初导入来源。
-- `.annotation-workspace/` 是项目的一部分，默认永久保留；移动整个文件夹后重新打开即可识别原项目。
-- API Key 不写入项目或 SQLite，而由操作系统凭据存储保存。
-- Codex OAuth Token 不由本应用读写，也不会保存到项目或应用数据库；凭据存储与现有登录复用均由官方 Codex Runtime 管理。
-- 运行服务默认只监听 `127.0.0.1:8765`，架构允许日后替换传输层，但当前不提供局域网服务入口。
+## 五分钟上手
+
+1. 在首页选择一个**可写**的图片目录。应用会把这个目录直接作为项目。
+2. 等待首次扫描完成，在左侧目录树或素材列表中选择图片。
+3. 根据需要配置执行方式：
+   - 在“设置 → 本地打标器”中下载、导入并配置本地模型；
+   - 或在“预设与连接”中配置外部模型提供方和 System Prompt。
+4. 在工作台预览本次请求，先用单图确认输出，再创建批量标注或翻译任务。
+5. 审阅异常项和标注历史，必要时人工修改并保存。
+6. 在导出页选择空目录，检查阻塞错误与警告后开始导出。
+
+模型下载不会递归复制整个仓库，只会拉取适配器声明的固定 revision 和文件，并核对大小
+与 SHA-256。下载前必须阅读并确认模型自己的许可证；项目的 Apache-2.0 许可证不覆盖
+模型权重。完整清单见[模型许可证说明](docs/model-licenses.md)。
+
+## 数据与隐私
+
+- 当前标注保存在图片旁的同名 `.txt`，不会被改写成项目专用格式。
+- `.annotation-workspace/` 保存项目 ID、SQLite 状态、任务历史、恢复文件和运行追踪。
+  移动项目时应连同整个目录一起移动。
+- 图片预处理和素材删除会修改项目文件，但必须先生成计划，并保留可恢复状态。重要数据仍
+  建议先备份。
+- API Key 和 Hugging Face 连接秘密通过操作系统凭据库保存，不写入项目 SQLite。
+- Codex OAuth 凭据由官方 Codex Runtime 管理，本应用不读取、复制或转发 Token。
+- 本地 Tagger 不上传图片。选择外部提供方后，对应图片、Prompt 和所选元数据会发送给该
+  提供方；费用、保留策略和使用条款由用户与提供方之间的协议决定。
+- 本项目未实现遥测或使用分析。Hugging Face 模型下载和用户主动发起的外部模型请求是
+  明确的联网行为。
+- 本地 API 默认只监听 `127.0.0.1:8765`，不是局域网或公共服务入口。
+
+Codex 连接面向用户本人、受信任设备上的本地工作流，不应被改造成共享代理、Token 转发
+服务或规避服务限制的高并发后端。大规模或商业自动标注应优先使用对应提供方正式开放的
+API 与批处理产品。
+
+## 文件位置
+
+全局设置、日志和默认模型库位于：
+
+- Windows：`%LOCALAPPDATA%\DatasetAnnotationStudio`
+- Linux：`${XDG_DATA_HOME:-$HOME/.local/share}/DatasetAnnotationStudio`
+- macOS：`~/Library/Application Support/DatasetAnnotationStudio`（尚未验证）
+
+可以通过 `DATASET_STUDIO_APP_DATA` 指定绝对路径。项目数据仍位于用户选择的数据集目录，
+不会迁入全局应用目录。
+
+## 常见问题
+
+### 本地服务没有响应
+
+确认 `5173` 和 `8765` 端口没有被其它进程占用，并查看“设置 → 关于与诊断”显示的日志
+目录。源码终端中的第一条错误通常最有价值。
+
+### Linux 无法保存 Token 或 API Key
+
+确认当前桌面/DBus 会话中存在并已解锁 GNOME Keyring、KWallet 或其它 Freedesktop
+Secret Service。应用不会退回到明文凭据文件。Hugging Face 下载仍可使用 `HF_TOKEN`
+或本机 `hf auth login` 登录。
+
+### 本地模型只显示 CPU
+
+默认源码环境安装 CPU Runtime。需要 NVIDIA CUDA 时，重新执行 CUDA extra 同步命令并
+使用 `pnpm dev:cuda` 启动。
+
+### 数据集打开后无法写入
+
+数据集根目录必须允许创建 `.annotation-workspace/`、同名 `.txt` 和恢复文件。只读挂载、
+受限网络共享或没有写权限的目录不能作为完整项目使用。
+
+## 开发与设计文档
+
+- [源码开发与检查](docs/development.md)
+- [Linux 源码指南](docs/linux.md)
+- [架构与模块边界](docs/architecture.md)
+- [工作区文件格式](docs/workspace-layout.md)
+- [模型许可证说明](docs/model-licenses.md)
+- [贡献指南](CONTRIBUTING.md)
+- [安全报告方式](SECURITY.md)
+- [变更记录](CHANGELOG.md)
+
+## 许可证
+
+项目代码以及 [ASSETS.md](ASSETS.md) 中列出的项目原创视觉资产，在相应权利存在且由项目
+作者持有的范围内，按 [Apache License 2.0](LICENSE) 授权。
+
+依赖库、在线服务、下载模型和用户提供的素材保留各自的许可证、服务条款与权利归属。

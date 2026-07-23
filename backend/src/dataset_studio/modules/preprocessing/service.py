@@ -11,6 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from dataset_studio.core.files import atomic_copy_file
+from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.modules.assets.scanner import IMAGE_METADATA_VERSION, AssetScanner
 from dataset_studio.modules.preprocessing.executor import PreparedItem, PreprocessItemPreparer
@@ -715,7 +716,7 @@ class PreprocessService:
 
     @staticmethod
     def _path_key(path: Path) -> str:
-        return path.resolve().as_posix().casefold()
+        return filesystem_path_key(path)
 
     @staticmethod
     def _same_file(first: Path, second: Path) -> bool:

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 const writeClipboardText = vi.hoisted(() => vi.fn(async () => undefined));
 const openLocalFolder = vi.hoisted(() => vi.fn(async () => undefined));
 const resolveDesktopLogDirectory = vi.hoisted(() =>
-  vi.fn(async () => "C:\\AppData\\Dataset Studio\\logs"),
+  vi.fn(async () => "C:\\AppData\\DatasetAnnotationStudio\\logs"),
 );
 
 vi.mock("../../src/shared/desktop/writeClipboardText", () => ({ writeClipboardText }));
@@ -137,6 +137,9 @@ describe("settings overview sections", () => {
                 repo_id: "cella110n/cl_tagger_v2",
                 revision: "b57909b8e9c63f71e208a26473e7aabdf45ed6b6",
                 source_url: "https://huggingface.co/cella110n/cl_tagger_v2",
+                license_id: "LicenseRef-CL-Tagger-v2",
+                license_url:
+                  "https://huggingface.co/cella110n/cl_tagger_v2/tree/b57909b8e9c63f71e208a26473e7aabdf45ed6b6",
                 gated: true,
                 provenance: "author",
                 download_size: 2_200_000_000,
@@ -153,6 +156,8 @@ describe("settings overview sections", () => {
               proxy_mode: "environment",
               has_custom_proxy: false,
               proxy_display: null,
+              credential_store_available: true,
+              credential_store_error: null,
             },
           });
         }
@@ -185,6 +190,7 @@ describe("settings overview sections", () => {
     await user.click(screen.getByRole("tab", { name: "Hugging Face 下载" }));
     expect(await screen.findByText("可下载模型")).toBeTruthy();
     expect(screen.getByText("CL Tagger v2 v2.01a")).toBeTruthy();
+    expect(screen.getByText("LicenseRef-CL-Tagger-v2")).toBeTruthy();
     expect(screen.getByRole("button", { name: "下载并安装" })).toBeTruthy();
   });
 
@@ -213,13 +219,13 @@ describe("settings overview sections", () => {
     const summary = String(writeClipboardText.mock.calls[0][0]);
     expect(summary).toContain("Service: connected");
     expect(summary).toContain("Backend version: 0.1.0");
-    expect(summary).toContain("Logs: C:\\AppData\\Dataset Studio\\logs");
+    expect(summary).toContain("Logs: C:\\AppData\\DatasetAnnotationStudio\\logs");
     expect(summary).not.toContain("API Key");
     expect(await screen.findByText("诊断摘要已复制")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "打开日志目录" }));
     await waitFor(() =>
-      expect(openLocalFolder).toHaveBeenCalledWith("C:\\AppData\\Dataset Studio\\logs"),
+      expect(openLocalFolder).toHaveBeenCalledWith("C:\\AppData\\DatasetAnnotationStudio\\logs"),
     );
     expect(await screen.findByText("已打开当前日志目录")).toBeTruthy();
 
@@ -247,7 +253,7 @@ describe("settings overview sections", () => {
     await user.click(openLogsButton);
 
     await waitFor(() =>
-      expect(openLocalFolder).toHaveBeenCalledWith("C:\\AppData\\Dataset Studio\\logs"),
+      expect(openLocalFolder).toHaveBeenCalledWith("C:\\AppData\\DatasetAnnotationStudio\\logs"),
     );
   });
 });

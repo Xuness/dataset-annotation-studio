@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from dataset_studio.core.errors import ResourceConflictError
+from dataset_studio.core.paths import relative_path_key
 from dataset_studio.core.sqlite import transaction
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.translations.languages import LANGUAGE_PATTERN
@@ -97,7 +98,7 @@ def hold_output_resources(
 
 
 def _normalized_relative_path(value: str) -> str:
-    return _relative_path(value).as_posix().casefold()
+    return relative_path_key(_relative_path(value))
 
 
 def _relative_path(value: str) -> PurePosixPath:

@@ -140,7 +140,7 @@ test("desktop capabilities allow opening verified local folders", () => {
   assert.ok(openPathPermission && typeof openPathPermission !== "string");
   assert.deepEqual(
     openPathPermission.allow?.map((entry) => entry.path),
-    ["$LOCALDATA/DatasetAnnotationStudio/**", "$LOCALDATA/Dataset Studio/**"],
+    ["$LOCALDATA/DatasetAnnotationStudio/**"],
   );
   assert.equal(capability.permissions.includes("core:window:allow-maximize"), true);
   assert.equal(capability.permissions.includes("core:window:allow-unmaximize"), true);

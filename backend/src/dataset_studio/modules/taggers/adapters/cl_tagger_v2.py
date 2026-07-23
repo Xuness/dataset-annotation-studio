@@ -246,6 +246,11 @@ class CLTaggerV2Adapter:
                 source_id="cella110n/cl_tagger_v2",
                 revision="b57909b8e9c63f71e208a26473e7aabdf45ed6b6",
                 source_url="https://huggingface.co/cella110n/cl_tagger_v2",
+                license_id="LicenseRef-CL-Tagger-v2",
+                license_url=(
+                    "https://huggingface.co/cella110n/cl_tagger_v2/"
+                    "tree/b57909b8e9c63f71e208a26473e7aabdf45ed6b6"
+                ),
                 gated=True,
                 provenance="author",
                 files=(

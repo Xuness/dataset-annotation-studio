@@ -45,6 +45,7 @@ class HuggingFaceProxyMode(StrEnum):
 
 class TaggerDownloadCreate(BaseModel):
     plan_id: str = Field(min_length=3, max_length=120)
+    license_accepted: bool = False
 
 
 class TaggerDownloadOffer(BaseModel):
@@ -57,6 +58,8 @@ class TaggerDownloadOffer(BaseModel):
     repo_id: str
     revision: str
     source_url: str
+    license_id: str
+    license_url: str
     gated: bool
     provenance: Literal["author", "community"]
     download_size: int = Field(ge=1)
@@ -101,6 +104,8 @@ class HuggingFaceConnectionSettings(BaseModel):
     proxy_mode: HuggingFaceProxyMode
     has_custom_proxy: bool
     proxy_display: str | None = None
+    credential_store_available: bool = True
+    credential_store_error: str | None = None
 
 
 class HuggingFaceSettingsUpdate(BaseModel):

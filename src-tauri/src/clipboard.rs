@@ -11,9 +11,10 @@ pub(crate) fn write_clipboard_text_with_history(text: String) -> Result<bool, St
 
     #[cfg(not(target_os = "windows"))]
     {
-        // The WebView keeps handling the clipboard normally on other platforms.
+        // Signal that the native Windows-history bridge is unsupported so the
+        // frontend can fall back to the WebView clipboard implementation.
         let _ = text;
-        Ok(true)
+        Ok(false)
     }
 }
 
@@ -52,6 +53,15 @@ mod tests {
     fn empty_text_is_not_written() {
         assert_eq!(
             super::write_clipboard_text_with_history(String::new()),
+            Ok(false)
+        );
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn non_windows_runtime_defers_to_the_webview_clipboard() {
+        assert_eq!(
+            super::write_clipboard_text_with_history("copied text".to_string()),
             Ok(false)
         );
     }

@@ -15,7 +15,7 @@ $TranscriptStarted = $false
 $PreviousCargoIncremental = $env:CARGO_INCREMENTAL
 $ExitCode = 0
 
-$LogDirectory = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "Dataset Studio\logs"
+$LogDirectory = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "DatasetAnnotationStudio\logs"
 $LogPath = Join-Path $LogDirectory "dev-launch-$PID.log"
 
 function Assert-Command {
@@ -121,7 +121,7 @@ try {
         Assert-LastExitCode -Step "前端依赖同步"
 
         Write-Host "[Dataset Studio] 检查 Python 环境..." -ForegroundColor Cyan
-        & uv sync --project $Backend --all-groups --locked
+        & uv sync --project $Backend --extra cpu --all-groups --locked
         Assert-LastExitCode -Step "Python 依赖同步"
 
         if ($CheckOnly) {

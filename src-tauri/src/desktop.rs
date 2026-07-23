@@ -70,7 +70,11 @@ pub(crate) fn setup<R: Runtime>(app: &App<R>) -> tauri::Result<()> {
     } else {
         tray
     };
-    tray.build(app)?;
+    let tray_result = tray.build(app);
+    #[cfg(target_os = "linux")]
+    let _ = tray_result;
+    #[cfg(not(target_os = "linux"))]
+    tray_result?;
     Ok(())
 }
 
@@ -80,6 +84,9 @@ pub(crate) fn handle_window_event<R: Runtime>(window: &Window<R>, event: &Window
     }
     if let WindowEvent::CloseRequested { api, .. } = event {
         api.prevent_close();
+        #[cfg(target_os = "linux")]
+        request_application_exit(window.app_handle());
+        #[cfg(not(target_os = "linux"))]
         let _ = window.hide();
     }
 }

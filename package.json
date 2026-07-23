@@ -1,21 +1,38 @@
 {
   "name": "dataset-annotation-studio",
   "version": "0.1.0",
+  "description": "Local-first desktop workspace for image dataset annotation",
   "private": true,
+  "license": "Apache-2.0",
+  "author": "Xuness",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Xuness/dataset-annotation-studio.git"
+  },
+  "homepage": "https://github.com/Xuness/dataset-annotation-studio#readme",
+  "bugs": {
+    "url": "https://github.com/Xuness/dataset-annotation-studio/issues"
+  },
   "packageManager": "pnpm@10.30.3",
   "scripts": {
     "dev": "tauri dev",
+    "dev:cuda": "tauri dev --config src-tauri/tauri.cuda.conf.json",
     "dev:frontend": "pnpm --dir frontend dev",
-    "dev:api": "uv run --project backend dataset-studio-api",
-    "dev:worker": "uv run --project backend dataset-studio-worker",
+    "dev:api": "uv run --project backend --extra cpu dataset-studio-api",
+    "dev:worker": "uv run --project backend --extra cpu dataset-studio-worker",
     "dev:services": "concurrently --kill-others --names frontend,api,worker \"pnpm dev:frontend\" \"pnpm dev:api\" \"pnpm dev:worker\"",
+    "dev:api:cuda": "uv run --project backend --extra cuda dataset-studio-api",
+    "dev:worker:cuda": "uv run --project backend --extra cuda dataset-studio-worker",
+    "dev:services:cuda": "concurrently --kill-others --names frontend,api,worker \"pnpm dev:frontend\" \"pnpm dev:api:cuda\" \"pnpm dev:worker:cuda\"",
     "build:frontend": "pnpm --dir frontend build",
     "build:sidecar": "pwsh -NoProfile -File scripts/build-sidecar.ps1",
+    "build:sidecar:cuda": "pwsh -NoProfile -File scripts/build-sidecar.ps1 -Runtime cuda",
     "build": "pnpm build:sidecar && tauri build --config src-tauri/tauri.release.conf.json",
+    "build:cuda": "pnpm build:sidecar:cuda && tauri build --config src-tauri/tauri.release.conf.json",
     "icons:generate": "tauri icon assets/app-icon.png --output src-tauri/icons --ios-color \"#050607\" && node scripts/sync-app-icon.mjs",
     "clean": "pwsh -NoProfile -File scripts/clean-generated.ps1",
-    "check": "pnpm --dir frontend check && uv run --project backend ruff check backend/src backend/tests && uv run --project backend pytest && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo check --manifest-path src-tauri/Cargo.toml",
-    "format": "pnpm --dir frontend format && uv run --project backend ruff format backend/src backend/tests"
+    "check": "pnpm --dir frontend check && uv run --project backend --extra cpu ruff check backend/src backend/tests && uv run --project backend --extra cpu pytest && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo check --manifest-path src-tauri/Cargo.toml",
+    "format": "pnpm --dir frontend format && uv run --project backend --extra cpu ruff format backend/src backend/tests"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.8.5",

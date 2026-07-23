@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.workspaces.models import WorkspaceManifest
@@ -22,11 +23,21 @@ class WorkerWorkspaceCandidate:
 
 
 class WorkspaceRegistry:
-    def __init__(self, database_path: Path) -> None:
+    def __init__(
+        self,
+        database_path: Path,
+        *,
+        case_sensitive_paths: bool | None = None,
+    ) -> None:
         self._database_path = database_path
+        self._case_sensitive_paths = case_sensitive_paths
 
     def upsert(self, manifest: WorkspaceManifest, root_path: Path, opened_at: str) -> None:
         root = str(root_path)
+        root_key = filesystem_path_key(
+            root_path,
+            case_sensitive=self._case_sensitive_paths,
+        )
         with transaction(self._database_path) as connection:
             connection.execute(
                 """
@@ -34,18 +45,20 @@ class WorkspaceRegistry:
                 SET hidden_at = ?
                 WHERE project_id != ?
                   AND hidden_at IS NULL
-                  AND root_path = ? COLLATE NOCASE
+                  AND root_path_key = ?
                 """,
-                (opened_at, manifest.project_id, root),
+                (opened_at, manifest.project_id, root_key),
             )
             connection.execute(
                 """
                 INSERT INTO recent_workspaces (
-                    project_id, name, root_path, created_at, last_opened_at, hidden_at
-                ) VALUES (?, ?, ?, ?, ?, NULL)
+                    project_id, name, root_path, root_path_key,
+                    created_at, last_opened_at, hidden_at
+                ) VALUES (?, ?, ?, ?, ?, ?, NULL)
                 ON CONFLICT(project_id) DO UPDATE SET
                     name = excluded.name,
                     root_path = excluded.root_path,
+                    root_path_key = excluded.root_path_key,
                     last_opened_at = excluded.last_opened_at,
                     hidden_at = NULL
                 """,
@@ -53,6 +66,7 @@ class WorkspaceRegistry:
                     manifest.project_id,
                     manifest.name,
                     root,
+                    root_key,
                     manifest.created_at,
                     opened_at,
                 ),

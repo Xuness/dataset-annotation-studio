@@ -9,6 +9,7 @@ from typing import Protocol
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _REVISION = re.compile(r"^[0-9a-f]{40}$")
 _PLAN_ID = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._:-]{2,119}$")
+_LICENSE_ID = re.compile(r"^[0-9A-Za-z][0-9A-Za-z.+-]{1,63}$")
 
 
 def _safe_relative_path(value: str, label: str) -> str:
@@ -63,6 +64,8 @@ class TaggerDownloadPlan:
     source_id: str
     revision: str
     source_url: str
+    license_id: str
+    license_url: str
     gated: bool
     provenance: str
     files: tuple[TaggerRemoteFile, ...]
@@ -80,6 +83,10 @@ class TaggerDownloadPlan:
         object.__setattr__(self, "revision", normalized_revision)
         if not self.source_url.startswith("https://huggingface.co/"):
             raise ValueError("打标器下载计划来源必须是 Hugging Face HTTPS 地址。")
+        if not _LICENSE_ID.fullmatch(self.license_id):
+            raise ValueError(f"打标器下载计划许可证标识无效：{self.license_id}")
+        if not self.license_url.startswith("https://huggingface.co/"):
+            raise ValueError("打标器下载计划许可证地址必须是 Hugging Face HTTPS 地址。")
         if self.provenance not in {"author", "community"}:
             raise ValueError(f"打标器下载计划来源类型无效：{self.provenance}")
         if not self.files:

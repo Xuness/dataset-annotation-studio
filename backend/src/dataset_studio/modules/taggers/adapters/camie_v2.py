@@ -264,6 +264,11 @@ class CamieV2Adapter:
                 source_id="Camais03/camie-tagger-v2",
                 revision="7d40c1b85b86ab4f607b2caf26b1b50c99db743e",
                 source_url="https://huggingface.co/Camais03/camie-tagger-v2",
+                license_id="GPL-3.0",
+                license_url=(
+                    "https://huggingface.co/Camais03/camie-tagger-v2/"
+                    "tree/7d40c1b85b86ab4f607b2caf26b1b50c99db743e"
+                ),
                 gated=False,
                 provenance="author",
                 files=(

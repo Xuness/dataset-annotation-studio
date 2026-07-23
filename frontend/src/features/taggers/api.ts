@@ -66,10 +66,16 @@ export function getTaggerDownloadCenter(): Promise<TaggerDownloadCenter> {
   return apiRequest("/api/v1/taggers/downloads");
 }
 
-export function createTaggerDownload(planId: string): Promise<TaggerDownloadTask> {
+export function createTaggerDownload(input: {
+  planId: string;
+  licenseAccepted: boolean;
+}): Promise<TaggerDownloadTask> {
   return apiRequest("/api/v1/taggers/downloads", {
     method: "POST",
-    body: JSON.stringify({ plan_id: planId }),
+    body: JSON.stringify({
+      plan_id: input.planId,
+      license_accepted: input.licenseAccepted,
+    }),
   });
 }
 

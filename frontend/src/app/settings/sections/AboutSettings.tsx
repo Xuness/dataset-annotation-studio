@@ -36,13 +36,13 @@ export function AboutSettings({ onClose }: { onClose: () => void }) {
   const developmentBuild = import.meta.env.DEV;
   const buildChannel = developmentBuild ? "源码开发版" : "桌面发行版";
   const checkedAt = formatCheckedAt(diagnostics.dataUpdatedAt);
-  const activeLogDirectory = desktopLogDirectory ?? diagnostics.data?.log_dir;
+  const activeLogDirectory = diagnostics.data?.log_dir ?? desktopLogDirectory;
 
   useEffect(() => {
     if (!desktopRuntime) return;
 
     let disposed = false;
-    void resolveDesktopLogDirectory(developmentBuild)
+    void resolveDesktopLogDirectory()
       .then((path) => {
         if (!disposed) setDesktopLogDirectory(path);
       })
@@ -53,7 +53,7 @@ export function AboutSettings({ onClose }: { onClose: () => void }) {
     return () => {
       disposed = true;
     };
-  }, [desktopRuntime, developmentBuild]);
+  }, [desktopRuntime]);
 
   function diagnosticText(): string {
     const service = diagnostics.data;
@@ -187,7 +187,9 @@ export function AboutSettings({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <dt>当前日志</dt>
-              <dd title={activeLogDirectory}>{activeLogDirectory ?? "服务连接后显示"}</dd>
+              <dd title={activeLogDirectory ?? undefined}>
+                {activeLogDirectory ?? "服务连接后显示"}
+              </dd>
             </div>
           </dl>
 

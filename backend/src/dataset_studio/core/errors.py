@@ -22,6 +22,10 @@ class TaggerNotFoundError(StudioError):
     """Raised when a local tagger installation or profile no longer exists."""
 
 
+class SecretStoreUnavailableError(StudioError):
+    """Raised when the operating-system credential store cannot be used."""
+
+
 class ResourceConflictError(ValueError):
     """Raised when a write would overwrite a newer or actively owned resource."""
 

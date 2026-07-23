@@ -46,8 +46,8 @@ export function DesktopTitlebar() {
         <button
           type="button"
           className="desktop-titlebar__close"
-          aria-label="隐藏到系统托盘"
-          title="隐藏到系统托盘"
+          aria-label="关闭窗口"
+          title="关闭窗口"
           onClick={() => runWindowAction(() => appWindow.close())}
         >
           <X size={14} strokeWidth={1.45} aria-hidden="true" />

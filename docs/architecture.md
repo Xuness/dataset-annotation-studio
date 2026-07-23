@@ -32,7 +32,7 @@ flowchart LR
 
 ## 桌面生命周期
 
-主窗口的关闭请求只隐藏窗口，不销毁 WebView，也不停止正在运行的任务；托盘左键和“打开 Dataset Studio”菜单会恢复并聚焦同一个窗口。托盘“退出”先唤醒窗口，再由前端统一检查未保存内容、不可中断的文件写入和可安全停止的后台任务，检查通过后才请求 Tauri 退出。发行版 sidecar 仍只在应用收到真正的 `RunEvent::Exit` 时终止。
+Windows 主窗口的关闭请求只隐藏窗口，不销毁 WebView，也不停止正在运行的任务；托盘左键和“打开 Dataset Studio”菜单会恢复并聚焦同一个窗口。托盘“退出”先唤醒窗口，再由前端统一检查未保存内容、不可中断的文件写入和可安全停止的后台任务，检查通过后才请求 Tauri 退出。Linux 不假定桌面环境一定显示托盘图标，关闭窗口会直接进入同一套安全退出检查；托盘创建失败也不会阻止应用启动。发行版 sidecar 仍只在应用收到真正的 `RunEvent::Exit` 时终止。
 
 应用启用单实例保护。用户在窗口隐藏期间再次启动程序时，新实例不会创建第二套 UI 或争用本地 API 端口，而是恢复已有主窗口。
 
@@ -118,25 +118,37 @@ OpenRouter 目录仍使用其扩展元数据；两个协议各自由适配器映
 模型列表的日常读取只比较清单中的路径、大小和修改时间；显式“完整校验”会重新解析模型并计算全部文件哈希。
 
 设置页的“Hugging Face 下载”只展示适配器内置的审核计划。每个计划固定 40 位 commit revision、精确远端路径、
-目标相对路径、文件大小和 SHA-256；下载器不会递归拉取仓库或猜测目录结构。全局 SQLite 保存下载计划快照和
+目标相对路径、文件大小、SHA-256、许可证标识和条款链接；用户明确确认模型许可证后才能创建下载任务。
+下载器不会递归拉取仓库或猜测目录结构。全局 SQLite 保存下载计划快照和
 队列状态，Worker 同一时间只传输一个模型。文件进入模型库内的 `.downloads/<task-id>/`，支持暂停、失败和进程
 中断后的续传；全部文件再次校验并通过适配器验证后，`payload/` 才会原子提升为正式安装。已存在且文件集合完全
 匹配的本地安装会被识别为同一审核版本，不会重复下载。
 
 Hugging Face Token 保存在系统凭据库；解析顺序为应用凭据、`HF_TOKEN`、本机 Hugging Face 登录和匿名访问。
-代理支持跟随环境变量、自定义 HTTP(S) 地址和明确直连，自定义地址同样存放在系统凭据库。下载清单和任务表不
+Linux Secret Service 不可用时不会降级为明文存储，界面会显示诊断，同时仍允许 `HF_TOKEN`、本机登录和环境
+代理工作。代理支持跟随环境变量、自定义 HTTP(S) 地址和明确直连，自定义地址同样存放在系统凭据库。下载清单和任务表不
 保存 Token 或代理凭据。当前适配器覆盖 CL Tagger v2、WD Tagger v3、PixAI Tagger v0.9、JoyTag、
 AnimeTimm DBv4 与 Camie Tagger v2，且各自拥有独立的目录契约与下载计划。
 
 每个安装可以建立多份全局配置，独立保存阈值、输出类别、执行设备和批大小。创建任务时会冻结安装指纹与完整
 配置；模型文件后来发生变化时，旧任务不会静默改用新权重，而是拒绝执行并要求重新创建任务。
 
-Runtime 只在 Worker 真正处理本地任务时加载 ONNX Session，并用单项 LRU 约束常驻大模型数量。后端只安装一个
-`onnxruntime-gpu[cuda,cudnn]` ORT wheel，不与 CPU wheel 并存；当前锁定 CUDA 12 兼容系列，并由 extras 提供
-所需运行库。自动设备模式优先创建 CUDA + CPU 算子回退链；若 CUDA Session 因驱动或动态库问题无法初始化，
+Runtime 只在 Worker 真正处理本地任务时加载 ONNX Session，并用单项 LRU 约束常驻大模型数量。源码依赖把
+`onnxruntime` CPU 与 `onnxruntime-gpu[cuda,cudnn]` 声明为互斥 extra；CPU 是便携默认值，CUDA 必须由用户
+显式选择，因此两种 wheel 不会在同一环境并存。自动设备模式在 CUDA 环境中优先创建 CUDA + CPU 算子回退链；若 CUDA Session 因驱动或动态库问题无法初始化，
 或在执行期间失效，则重建或切换为纯 CPU Session。显式选择 CUDA 时保持严格失败，不会把 CPU 降级伪装成
 GPU 执行；DirectML 仍作为替代 Runtime 构建可用时的兼容设备。
 单图产物仍进入统一的 `runs/` 追踪结构，其中保存阈值、类别、设备、标签置信度和推理耗时，不保存图片副本。
+
+## 平台路径与应用数据
+
+全局应用数据使用同一个 `DatasetAnnotationStudio` 目录名，并分别落在 Windows
+`LocalAppData`、Linux XDG data home 和 macOS Application Support 下。后端诊断返回的实际目录是界面打开日志
+位置时的首选真值，`DATASET_STUDIO_APP_DATA` 只接受用户显式提供的覆盖。
+
+文件路径身份集中由 `core.paths` 决定：Windows 比较时忽略大小写，Linux 保留大小写。排序、面向 Windows
+可携带性的重命名限制和扁平导出的大小写冲突检查仍可采用更严格规则，但素材身份、旁车归属、输出租约、删除计划
+与最近项目不能再用无条件 `casefold()` 合并 Linux 上实际不同的文件。
 
 ## 单图调用追踪
 

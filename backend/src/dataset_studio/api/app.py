@@ -24,7 +24,11 @@ from dataset_studio.api.routes import (
     workspaces,
 )
 from dataset_studio.core.config import Settings, settings
-from dataset_studio.core.errors import ResourceConflictError, StudioError
+from dataset_studio.core.errors import (
+    ResourceConflictError,
+    SecretStoreUnavailableError,
+    StudioError,
+)
 from dataset_studio.modules.providers.models import ProviderRequestError
 
 
@@ -59,6 +63,13 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     @app.exception_handler(StudioError)
     async def studio_error_handler(_request: Request, error: StudioError):
         return JSONResponse(status_code=404, content={"detail": str(error)})
+
+    @app.exception_handler(SecretStoreUnavailableError)
+    async def secret_store_unavailable_handler(
+        _request: Request,
+        error: SecretStoreUnavailableError,
+    ):
+        return JSONResponse(status_code=503, content={"detail": str(error)})
 
     @app.exception_handler(ValueError)
     async def value_error_handler(_request: Request, error: ValueError):

@@ -5,7 +5,42 @@ from PIL import Image
 
 from dataset_studio.api.app import create_app
 from dataset_studio.core.config import Settings
+from dataset_studio.core.errors import SecretStoreUnavailableError
 from dataset_studio.platform.secrets import KeyringSecretStore
+
+
+def test_unavailable_credential_store_returns_service_unavailable(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+
+    def fail_secret_write(_self, _key: str, _value: str) -> None:
+        raise SecretStoreUnavailableError("Secret Service unavailable")
+
+    monkeypatch.setattr(KeyringSecretStore, "set", fail_secret_write)
+    with TestClient(create_app(settings)) as client:
+        response = client.post(
+            "/api/v1/presets/providers",
+            json={
+                "name": "Linux provider",
+                "provider_type": "openai_compatible",
+                "base_url": "https://example.invalid/v1",
+                "default_model_id": "example/model",
+                "models": [
+                    {
+                        "model_id": "example/model",
+                        "protocol_options": {
+                            "provider_type": "openai_compatible",
+                        },
+                    }
+                ],
+                "api_key": "not-a-real-key",
+            },
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Secret Service unavailable"}
 
 
 def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> None:

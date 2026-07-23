@@ -199,6 +199,11 @@ class WDTaggerV3Adapter:
                 source_id="SmilingWolf/wd-swinv2-tagger-v3",
                 revision="627aef95638667ddcaa3ac8ae625e88ea5b02f51",
                 source_url="https://huggingface.co/SmilingWolf/wd-swinv2-tagger-v3",
+                license_id="Apache-2.0",
+                license_url=(
+                    "https://huggingface.co/SmilingWolf/wd-swinv2-tagger-v3/"
+                    "tree/627aef95638667ddcaa3ac8ae625e88ea5b02f51"
+                ),
                 gated=False,
                 provenance="author",
                 files=(

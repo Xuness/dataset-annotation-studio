@@ -81,7 +81,7 @@ function enqueueClipboardWrite(text: string): void {
 
 export function useClipboardHistoryBridge(): void {
   useEffect(() => {
-    if (!isTauri()) {
+    if (!isTauri() || !/Windows/i.test(navigator.userAgent)) {
       return;
     }
 

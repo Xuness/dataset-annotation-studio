@@ -48,6 +48,7 @@ MyDataset/
 - `thumbnails/`、`cache/`：可重建派生数据。
 
 整个目录移动后，`project.json` 中的稳定 ID 不变。再次选择新路径时，全局“最近项目”记录会更新到新位置。
+最近路径身份遵循当前操作系统：Windows 忽略大小写，Linux 保留大小写。
 
 ## 导出目录
 

@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from dataset_studio.core.errors import TaggerNotFoundError
+from dataset_studio.core.errors import SecretStoreUnavailableError, TaggerNotFoundError
 from dataset_studio.modules.taggers.downloads.models import (
     ACTIVE_DOWNLOAD_STATUSES,
     RESUMABLE_DOWNLOAD_STATUSES,
@@ -87,8 +87,14 @@ class TaggerDownloadService:
         )
 
     def connection_settings(self) -> HuggingFaceConnectionSettings:
-        saved_token = self._secrets.get(_TOKEN_SECRET_KEY)
-        saved_proxy = self._secrets.get(_PROXY_SECRET_KEY)
+        credential_store_error: str | None = None
+        try:
+            saved_token = self._secrets.get(_TOKEN_SECRET_KEY)
+            saved_proxy = self._secrets.get(_PROXY_SECRET_KEY)
+        except SecretStoreUnavailableError as error:
+            saved_token = None
+            saved_proxy = None
+            credential_store_error = str(error)
         _, token_source = resolve_huggingface_login_token(saved_token)
         proxy_mode = self._repository.get_proxy_mode()
         return HuggingFaceConnectionSettings(
@@ -97,14 +103,30 @@ class TaggerDownloadService:
             proxy_mode=proxy_mode,
             has_custom_proxy=bool(saved_proxy),
             proxy_display=self._proxy_display(proxy_mode, saved_proxy),
+            credential_store_available=credential_store_error is None,
+            credential_store_error=credential_store_error,
         )
 
     def update_connection_settings(
         self,
         data: HuggingFaceSettingsUpdate,
     ) -> HuggingFaceConnectionSettings:
-        old_token = self._secrets.get(_TOKEN_SECRET_KEY)
-        old_proxy = self._secrets.get(_PROXY_SECRET_KEY)
+        secret_store_available = True
+        try:
+            old_token = self._secrets.get(_TOKEN_SECRET_KEY)
+            old_proxy = self._secrets.get(_PROXY_SECRET_KEY)
+        except SecretStoreUnavailableError:
+            secret_store_available = False
+            old_token = None
+            old_proxy = None
+            if (
+                data.token is not None
+                or data.clear_token
+                or data.proxy_url is not None
+                or data.clear_proxy
+                or data.proxy_mode == HuggingFaceProxyMode.CUSTOM
+            ):
+                raise
         old_mode = self._repository.get_proxy_mode()
         new_proxy = (
             None
@@ -127,8 +149,9 @@ class TaggerDownloadService:
                 self._secrets.set(_PROXY_SECRET_KEY, data.proxy_url)
             self._repository.set_proxy_mode(data.proxy_mode)
         except BaseException:
-            self._restore_secret(_TOKEN_SECRET_KEY, old_token)
-            self._restore_secret(_PROXY_SECRET_KEY, old_proxy)
+            if secret_store_available:
+                self._restore_secret(_TOKEN_SECRET_KEY, old_token)
+                self._restore_secret(_PROXY_SECRET_KEY, old_proxy)
             if self._repository.get_proxy_mode() != old_mode:
                 self._repository.set_proxy_mode(old_mode)
             raise
@@ -193,6 +216,8 @@ class TaggerDownloadService:
 
     def create(self, data: TaggerDownloadCreate) -> TaggerDownloadTask:
         plan = self._taggers.registry.get_download_plan(data.plan_id)
+        if not data.license_accepted:
+            raise ValueError("下载前必须确认已阅读并接受该模型自己的许可证。")
         with self._taggers.catalog_guard():
             if self.find_matching_installation(plan) is not None:
                 raise ValueError("这个审核版本已经安装，无需重复下载。")
@@ -274,6 +299,8 @@ class TaggerDownloadService:
         try:
             payload = json.loads(str(row["plan_snapshot_json"]))
             raw_files = payload.pop("files")
+            payload.setdefault("license_id", "NOASSERTION")
+            payload.setdefault("license_url", payload.get("source_url"))
             plan = TaggerDownloadPlan(
                 **payload,
                 files=tuple(TaggerRemoteFile(**file) for file in raw_files),
@@ -353,6 +380,8 @@ class TaggerDownloadService:
             repo_id=plan.source_id,
             revision=plan.revision,
             source_url=plan.source_url,
+            license_id=plan.license_id,
+            license_url=plan.license_url,
             gated=plan.gated,
             provenance=plan.provenance,
             download_size=plan.download_size,
@@ -402,11 +431,19 @@ class TaggerDownloadService:
         )
 
     def _client_config(self) -> tuple[HuggingFaceClientConfig, str]:
-        app_token = self._secrets.get(_TOKEN_SECRET_KEY)
+        credential_store_error: SecretStoreUnavailableError | None = None
+        try:
+            app_token = self._secrets.get(_TOKEN_SECRET_KEY)
+            proxy_url = self._secrets.get(_PROXY_SECRET_KEY)
+        except SecretStoreUnavailableError as error:
+            app_token = None
+            proxy_url = None
+            credential_store_error = error
         token, token_source = resolve_huggingface_login_token(app_token)
         mode = self._repository.get_proxy_mode()
-        proxy_url = self._secrets.get(_PROXY_SECRET_KEY)
         if mode == HuggingFaceProxyMode.CUSTOM and not proxy_url:
+            if credential_store_error is not None:
+                raise credential_store_error
             raise ValueError("自定义代理模式尚未保存代理地址。")
         return (
             HuggingFaceClientConfig(

@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from dataset_studio.core.errors import SecretStoreUnavailableError
 from dataset_studio.modules.presets.models import (
     ProviderProfileCreate,
     ProviderProfileUpdate,
@@ -34,6 +35,17 @@ class MemorySecrets:
 
     def delete(self, key: str) -> None:
         self.values.pop(key, None)
+
+
+class UnavailableSecrets:
+    def get(self, _key: str) -> str | None:
+        raise SecretStoreUnavailableError("Secret Service unavailable")
+
+    def set(self, _key: str, _value: str) -> None:
+        raise SecretStoreUnavailableError("Secret Service unavailable")
+
+    def delete(self, _key: str) -> None:
+        raise SecretStoreUnavailableError("Secret Service unavailable")
 
 
 def _service(tmp_path: Path):
@@ -316,6 +328,52 @@ def test_codex_profile_uses_no_endpoint_or_project_secret(tmp_path: Path) -> Non
     assert profile.has_api_key is False
     assert service.get_provider_credential(profile) is None
     assert secrets.values == {}
+
+
+def test_codex_profiles_remain_usable_without_a_linux_secret_service(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "global.sqlite3"
+    initialize_global_database(database)
+    repository = PresetRepository(database)
+    service = PresetService(repository, UnavailableSecrets())
+
+    profile = service.create_provider(
+        ProviderProfileCreate(
+            name="Codex subscription",
+            provider_type=ProviderType.CODEX,
+            default_model_id="gpt-example",
+            models=[
+                ProviderModelConfig(
+                    model_id="gpt-example",
+                    protocol_options=CodexModelOptions(),
+                )
+            ],
+        )
+    )
+    updated = service.update_provider(
+        profile.id,
+        ProviderProfileUpdate(name="Codex local login"),
+    )
+
+    assert updated.name == "Codex local login"
+    assert service.get_provider_credential(updated) is None
+    service.delete_provider(profile.id)
+    assert service.list_providers() == []
+
+
+def test_api_profiles_stay_readable_when_the_secret_store_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    service, repository, _ = _service(tmp_path)
+    profile = service.create_provider(_provider("Profile", "secret"))
+    unavailable_service = PresetService(repository, UnavailableSecrets())
+
+    listed = unavailable_service.get_provider(profile.id)
+
+    assert listed.has_api_key is False
+    with pytest.raises(SecretStoreUnavailableError, match="Secret Service"):
+        unavailable_service.get_provider_credential(listed)
 
 
 def test_codex_profile_rejects_api_key() -> None:

@@ -8,6 +8,7 @@ import pytest
 
 from dataset_studio.core.config import Settings
 from dataset_studio.core.migrations import migrate_database
+from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.core.sqlite import connect
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.workspaces.models import WorkspaceManifest
@@ -132,7 +133,7 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     }
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
 
 def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> None:
@@ -166,7 +167,7 @@ def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> 
 
     assert {"local_tagger_hf_settings", "local_tagger_downloads"}.issubset(tables)
     assert "idx_local_tagger_downloads_active_plan" in indexes
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
 
 def test_recent_workspace_activity_migration_hides_duplicate_roots(
@@ -230,12 +231,14 @@ def test_recent_workspace_activity_migration_hides_duplicate_roots(
             connection.execute(
                 """
                 INSERT INTO recent_workspaces (
-                    project_id, name, root_path, created_at, last_opened_at, hidden_at
+                    project_id, name, root_path, root_path_key,
+                    created_at, last_opened_at, hidden_at
                 ) VALUES (
-                    'duplicate', 'Duplicate', 'E:\\DATASET',
+                    'duplicate', 'Duplicate', 'E:\\DATASET', ?,
                     '2026-01-01T00:00:00Z', '2026-01-04T00:00:00Z', NULL
                 )
-                """
+                """,
+                (filesystem_path_key(Path(r"E:\DATASET"), case_sensitive=False),),
             )
     finally:
         connection.close()
@@ -249,6 +252,57 @@ def test_recent_workspace_activity_migration_hides_duplicate_roots(
         "exports_requested_at",
     }
     assert activity_projects == ["newer"]
+
+
+def test_recent_workspace_identity_can_preserve_posix_case(tmp_path: Path) -> None:
+    database = tmp_path / "global.sqlite3"
+    initialize_global_database(database, case_sensitive_paths=True)
+    registry = WorkspaceRegistry(database, case_sensitive_paths=True)
+    opened_at = "2026-01-01T00:00:00Z"
+
+    registry.upsert(
+        WorkspaceManifest(project_id="upper", name="Upper", created_at=opened_at),
+        tmp_path / "Dataset",
+        opened_at,
+    )
+    registry.upsert(
+        WorkspaceManifest(project_id="lower", name="Lower", created_at=opened_at),
+        tmp_path / "dataset",
+        opened_at,
+    )
+
+    assert set(registry.list_recent_project_ids()) == {"upper", "lower"}
+
+
+def test_recent_workspace_identity_rebuilds_when_case_policy_changes(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "global.sqlite3"
+    initialize_global_database(database, case_sensitive_paths=True)
+    sensitive_registry = WorkspaceRegistry(database, case_sensitive_paths=True)
+    sensitive_registry.upsert(
+        WorkspaceManifest(
+            project_id="upper",
+            name="Upper",
+            created_at="2026-01-01T00:00:00Z",
+        ),
+        tmp_path / "Dataset",
+        "2026-01-01T00:00:00Z",
+    )
+    sensitive_registry.upsert(
+        WorkspaceManifest(
+            project_id="lower",
+            name="Lower",
+            created_at="2026-01-02T00:00:00Z",
+        ),
+        tmp_path / "dataset",
+        "2026-01-02T00:00:00Z",
+    )
+
+    initialize_global_database(database, case_sensitive_paths=False)
+    insensitive_registry = WorkspaceRegistry(database, case_sensitive_paths=False)
+
+    assert insensitive_registry.list_recent_project_ids() == ["lower"]
 
 
 def test_local_tagger_batching_migration_preserves_profiles_and_allows_auto(

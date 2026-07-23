@@ -16,6 +16,7 @@ import { useTaggerDownloadActions, useTaggerDownloadCenter } from "../../../feat
 import type {
   HuggingFaceProxyMode,
   HuggingFaceTokenSource,
+  TaggerDownloadOffer,
   TaggerDownloadStatus,
   TaggerDownloadTask,
 } from "../../../shared/api/types";
@@ -157,6 +158,25 @@ export function TaggerDownloadPanel() {
     await run(() => actions.remove.mutateAsync(task.id), "下载任务已清理。");
   }
 
+  async function startDownload(offer: TaggerDownloadOffer) {
+    const accepted = await confirmDialog(
+      `“${offer.name}”受 ${offer.license_id} 许可证约束，模型权重不属于 Dataset Studio。请先通过“许可证”按钮阅读原始条款；确认后才会开始下载。`,
+      {
+        title: "确认模型许可证",
+        confirmLabel: "我已阅读并接受",
+      },
+    );
+    if (!accepted) return;
+    await run(
+      () =>
+        actions.create.mutateAsync({
+          planId: offer.plan_id,
+          licenseAccepted: true,
+        }),
+      "下载任务已加入队列。",
+    );
+  }
+
   if (center.isLoading) {
     return (
       <div className="tagger-settings__loading">
@@ -196,6 +216,12 @@ export function TaggerDownloadPanel() {
             {TOKEN_SOURCE_LABELS[data.huggingface.token_source]}
           </span>
         </header>
+        {!data.huggingface.credential_store_available ? (
+          <p className="form-error">
+            {data.huggingface.credential_store_error ??
+              "系统凭据库不可用；仍可使用 HF_TOKEN、本机登录与环境代理。"}
+          </p>
+        ) : null}
         <div className="tagger-hf-form">
           <label className="form-field">
             <span>访问 Token</span>
@@ -203,6 +229,7 @@ export function TaggerDownloadPanel() {
               type="password"
               autoComplete="off"
               value={token}
+              disabled={!data.huggingface.credential_store_available}
               placeholder={data.huggingface.has_saved_token ? "已保存；留空保持不变" : "hf_…"}
               onChange={(event) => setToken(event.target.value)}
             />
@@ -214,7 +241,11 @@ export function TaggerDownloadPanel() {
               onChange={(event) => setProxyMode(event.target.value as HuggingFaceProxyMode)}
             >
               {Object.entries(PROXY_MODE_LABELS).map(([value, label]) => (
-                <option value={value} key={value}>
+                <option
+                  value={value}
+                  key={value}
+                  disabled={value === "custom" && !data.huggingface.credential_store_available}
+                >
                   {label}
                 </option>
               ))}
@@ -224,7 +255,7 @@ export function TaggerDownloadPanel() {
             <span>自定义代理</span>
             <input
               value={proxyUrl}
-              disabled={proxyMode !== "custom"}
+              disabled={proxyMode !== "custom" || !data.huggingface.credential_store_available}
               placeholder={
                 data.huggingface.has_custom_proxy ? "已保存；留空保持不变" : "http://127.0.0.1:7890"
               }
@@ -291,7 +322,10 @@ export function TaggerDownloadPanel() {
             </Button>
             <Button
               tone="primary"
-              disabled={actions.saveHuggingFace.isPending}
+              disabled={
+                actions.saveHuggingFace.isPending ||
+                (!data.huggingface.credential_store_available && proxyMode === "custom")
+              }
               onClick={() => void saveConnection()}
             >
               保存连接
@@ -322,6 +356,7 @@ export function TaggerDownloadPanel() {
                   <div className="tagger-download-badges">
                     {offer.gated ? <span>门控仓库</span> : null}
                     <span>{offer.provenance === "author" ? "作者发布" : "社区转换"}</span>
+                    <span>{offer.license_id}</span>
                   </div>
                 </header>
                 <p>{offer.description}</p>
@@ -350,15 +385,16 @@ export function TaggerDownloadPanel() {
                     仓库
                   </Button>
                   <Button
+                    icon={<ExternalLink size={13} />}
+                    onClick={() => void openExternalUrl(offer.license_url)}
+                  >
+                    许可证
+                  </Button>
+                  <Button
                     tone="primary"
                     icon={actions.create.isPending ? <Spinner /> : <Download size={13} />}
                     disabled={Boolean(offer.installed_installation_id || task || busy)}
-                    onClick={() =>
-                      void run(
-                        () => actions.create.mutateAsync(offer.plan_id),
-                        "下载任务已加入队列。",
-                      )
-                    }
+                    onClick={() => void startDownload(offer)}
                   >
                     {offer.installed_installation_id
                       ? "已安装"

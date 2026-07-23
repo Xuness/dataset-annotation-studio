@@ -245,6 +245,11 @@ class AnimeTimmAdapter:
                 source_id="animetimm/caformer_b36.dbv4-full",
                 revision="aac0699c88553d50eb673b41a81d8222936b22b2",
                 source_url="https://huggingface.co/animetimm/caformer_b36.dbv4-full",
+                license_id="GPL-3.0",
+                license_url=(
+                    "https://huggingface.co/animetimm/caformer_b36.dbv4-full/"
+                    "tree/aac0699c88553d50eb673b41a81d8222936b22b2"
+                ),
                 gated=True,
                 provenance="author",
                 files=(

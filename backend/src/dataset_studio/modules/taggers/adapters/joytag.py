@@ -180,6 +180,11 @@ class JoyTagAdapter:
                 source_id="fancyfeast/joytag",
                 revision="6b7f16331a6ccf0fdce37d5a9564715f6e772b22",
                 source_url="https://huggingface.co/fancyfeast/joytag",
+                license_id="Apache-2.0",
+                license_url=(
+                    "https://huggingface.co/fancyfeast/joytag/"
+                    "tree/6b7f16331a6ccf0fdce37d5a9564715f6e772b22"
+                ),
                 gated=False,
                 provenance="author",
                 files=(

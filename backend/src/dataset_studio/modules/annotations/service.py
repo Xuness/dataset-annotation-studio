@@ -14,6 +14,7 @@ from dataset_studio.core.errors import (
     ResourceConflictError,
 )
 from dataset_studio.core.files import atomic_copy_file, atomic_write_text
+from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.annotations.models import (
@@ -575,7 +576,7 @@ class AnnotationService:
 
     @staticmethod
     def _path_key(path: Path) -> str:
-        return path.resolve().as_posix().casefold()
+        return filesystem_path_key(path)
 
     @staticmethod
     def _annotation_owner_ids(
