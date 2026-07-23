@@ -1,4 +1,5 @@
 import json
+import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -131,7 +132,59 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     }
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4, 5, 6]
+    assert versions == [1, 2, 3, 4, 5, 6, 7]
+
+
+def test_local_tagger_batching_migration_preserves_profiles_and_allows_auto(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "global.sqlite3"
+    migrate_database(database, GLOBAL_MIGRATIONS[:6])
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            INSERT INTO local_tagger_installations (
+                id, name, adapter_id, model_version, relative_path,
+                fingerprint, manifest_json, created_at, updated_at
+            ) VALUES (
+                'installation', 'Model', 'fake', 'v1', 'fake/v1',
+                ?, '{}', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'
+            )
+            """,
+            ("a" * 64,),
+        )
+        connection.execute(
+            """
+            INSERT INTO local_tagger_profiles (
+                id, name, installation_id, threshold, categories_json,
+                device, concurrency, created_at, updated_at
+            ) VALUES (
+                'profile', 'Profile', 'installation', 0.55, '["general"]',
+                'auto', 4, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'
+            )
+            """
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    initialize_global_database(database)
+
+    connection = connect(database)
+    try:
+        profile = connection.execute(
+            "SELECT concurrency, batch_size FROM local_tagger_profiles WHERE id = 'profile'"
+        ).fetchone()
+        assert profile["concurrency"] == 4
+        assert profile["batch_size"] is None
+        connection.execute("UPDATE local_tagger_profiles SET batch_size = 32 WHERE id = 'profile'")
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "UPDATE local_tagger_profiles SET batch_size = 33 WHERE id = 'profile'"
+            )
+    finally:
+        connection.close()
 
 
 def test_provider_model_config_migration_copies_shared_options_to_each_model(

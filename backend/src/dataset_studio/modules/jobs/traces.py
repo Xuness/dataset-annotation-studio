@@ -36,6 +36,7 @@ class TraceRequestParameters(BaseModel):
     threshold: float | None = None
     categories: list[str] | None = None
     device: str | None = None
+    batch_size: int | None = None
 
 
 class TraceRequest(BaseModel):
@@ -343,6 +344,7 @@ def _request_parameters(
                 "threshold": _number(snapshot.get("threshold")),
                 "categories": _string_list(snapshot.get("categories")),
                 "device": _string(snapshot.get("device")),
+                "batch_size": _integer(snapshot.get("batch_size")),
             }
         return {
             "execution_backend": "local_tagger",
@@ -355,6 +357,7 @@ def _request_parameters(
             "threshold": profile.threshold,
             "categories": profile.categories,
             "device": profile.device.value,
+            "batch_size": profile.batch_size,
         }
     try:
         profile = load_provider_snapshot(snapshot)

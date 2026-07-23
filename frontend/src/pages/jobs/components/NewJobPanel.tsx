@@ -262,7 +262,11 @@ export function NewJobPanel({
           </strong>
           <small>
             {selectedTaggerProfile
-              ? `阈值 ${selectedTaggerProfile.threshold.toFixed(2)} · ${selectedTaggerProfile.categories.length} 个类别 · ${selectedTaggerProfile.device}`
+              ? `阈值 ${selectedTaggerProfile.threshold.toFixed(2)} · ${selectedTaggerProfile.categories.length} 个类别 · ${selectedTaggerProfile.device} · ${
+                  selectedTaggerProfile.batch_size === null
+                    ? "自动批次"
+                    : `批次 ${selectedTaggerProfile.batch_size}`
+                }`
               : (taggerLibrary.data?.runtime.error ?? "请先在设置中导入并配置本地模型。")}
           </small>
           {!selectedTaggerProfile ? (
@@ -320,7 +324,7 @@ export function NewJobPanel({
               </option>
             ))}
           </select>
-          <small>任务会固定模型指纹、阈值、类别、设备与并发设置。</small>
+          <small>任务会固定模型指纹、阈值、类别、设备与批大小设置。</small>
         </label>
       )}
 

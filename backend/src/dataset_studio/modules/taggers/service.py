@@ -327,6 +327,7 @@ class TaggerService:
             categories=categories,
             device=data.device,
             concurrency=data.concurrency,
+            batch_size=data.batch_size,
             created_at=now,
             updated_at=now,
         )
@@ -340,6 +341,8 @@ class TaggerService:
     def update_profile(self, profile_id: str, data: TaggerProfileUpdate) -> TaggerProfile:
         current = self.get_profile(profile_id)
         values = data.model_dump(exclude_none=True)
+        if "batch_size" in data.model_fields_set:
+            values["batch_size"] = data.batch_size
         installation_id = str(values.get("installation_id", current.installation_id))
         installation = self._ready_installation(installation_id)
         categories = list(values.get("categories", current.categories))
@@ -384,6 +387,7 @@ class TaggerService:
             categories=profile.categories,
             device=profile.device,
             concurrency=profile.concurrency,
+            batch_size=profile.batch_size,
         )
 
     def resolve_snapshot(
@@ -531,6 +535,7 @@ class TaggerService:
             categories=categories,
             device=device,
             concurrency=int(row["concurrency"]),
+            batch_size=int(row["batch_size"]) if row["batch_size"] is not None else None,
             installation_name=installation.name if installation else None,
             model_version=installation.model_version if installation else None,
             ready=not issues,
@@ -613,6 +618,7 @@ class TaggerService:
                 categories=sorted(manifest.categories),
                 device=TaggerDevice.AUTO,
                 concurrency=1,
+                batch_size=None,
             )
         )
 
@@ -712,6 +718,7 @@ class TaggerService:
             json.dumps(profile.categories, ensure_ascii=False),
             profile.device.value,
             profile.concurrency,
+            profile.batch_size,
             profile.created_at,
             profile.updated_at,
         )
@@ -725,6 +732,7 @@ class TaggerService:
             json.dumps(profile.categories, ensure_ascii=False),
             profile.device.value,
             profile.concurrency,
+            profile.batch_size,
             profile.updated_at,
         )
 

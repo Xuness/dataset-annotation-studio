@@ -1,11 +1,31 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.jobs.models import JobItemStatus, JobStatus
+
+
+@dataclass(frozen=True, slots=True)
+class AttemptCompletion:
+    attempt_id: str
+    status: str
+    response_content: str | None = None
+    error_message: str | None = None
+    provider_payload_path: str | None = None
+    finish_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ItemCompletion:
+    item_id: str
+    status: JobItemStatus
+    error: str | None = None
+    validation_status: str | None = None
+    manually_accepted: bool = False
 
 
 class JobExecutionRepository:
@@ -100,6 +120,47 @@ class JobExecutionRepository:
             )
         return attempt_id, attempt_number
 
+    def start_attempts(self, item_ids: list[str]) -> dict[str, tuple[str, int]]:
+        if not item_ids:
+            return {}
+        if len(item_ids) != len(set(item_ids)):
+            raise ValueError("批量创建任务尝试时包含重复条目。")
+        started: dict[str, tuple[str, int]] = {}
+        now = utc_now_iso()
+        with transaction(self._database_path) as connection:
+            for item_id in item_ids:
+                row = connection.execute(
+                    """
+                    SELECT ji.attempt_count,
+                           COALESCE(MAX(ja.attempt_number), 0) AS last_attempt_number
+                    FROM job_items ji
+                    LEFT JOIN job_attempts ja ON ja.job_item_id = ji.id
+                    WHERE ji.id = ?
+                    GROUP BY ji.id
+                    """,
+                    (item_id,),
+                ).fetchone()
+                if row is None:
+                    raise ValueError(f"找不到任务条目：{item_id}")
+                cycle_attempt_count = int(row["attempt_count"]) + 1
+                attempt_number = int(row["last_attempt_number"]) + 1
+                attempt_id = str(uuid.uuid4())
+                connection.execute(
+                    "UPDATE job_items SET attempt_count = ?, updated_at = ? WHERE id = ?",
+                    (cycle_attempt_count, now, item_id),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO job_attempts (
+                        id, job_item_id, attempt_number, status, started_at,
+                        source_annotation_hash
+                    ) VALUES (?, ?, ?, 'running', ?, NULL)
+                    """,
+                    (attempt_id, item_id, attempt_number, now),
+                )
+                started[item_id] = (attempt_id, attempt_number)
+        return started
+
     def finish_attempt(
         self,
         attempt_id: str,
@@ -167,6 +228,52 @@ class JobExecutionRepository:
                     item_id,
                 ),
             )
+
+    def finish_batch(
+        self,
+        attempts: list[AttemptCompletion],
+        items: list[ItemCompletion],
+    ) -> None:
+        if not attempts and not items:
+            return
+        now = utc_now_iso()
+        with transaction(self._database_path) as connection:
+            for attempt in attempts:
+                connection.execute(
+                    """
+                    UPDATE job_attempts
+                    SET status = ?, response_content = ?, error_message = ?,
+                        provider_payload_path = ?, finished_at = ?,
+                        finish_reason = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        attempt.status,
+                        attempt.response_content,
+                        attempt.error_message,
+                        attempt.provider_payload_path,
+                        now,
+                        attempt.finish_reason,
+                        attempt.attempt_id,
+                    ),
+                )
+            for item in items:
+                connection.execute(
+                    """
+                    UPDATE job_items
+                    SET status = ?, last_error = ?, validation_status = ?,
+                        manually_accepted = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        item.status.value,
+                        item.error,
+                        item.validation_status,
+                        int(item.manually_accepted),
+                        now,
+                        item.item_id,
+                    ),
+                )
 
     def is_stop_requested(self, job_id: str) -> bool:
         connection = connect(self._database_path)

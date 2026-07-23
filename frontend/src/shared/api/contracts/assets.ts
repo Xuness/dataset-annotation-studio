@@ -68,6 +68,7 @@ export interface AnnotationTraceRequestParameters {
   threshold: number | null;
   categories: string[] | null;
   device: string | null;
+  batch_size: number | null;
 }
 
 export interface AnnotationTraceRequest {

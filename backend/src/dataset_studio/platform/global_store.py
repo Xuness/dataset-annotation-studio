@@ -209,7 +209,13 @@ CREATE INDEX idx_local_tagger_profiles_installation
 ON local_tagger_profiles(installation_id);
 """
 
-GLOBAL_SCHEMA_VERSION = 6
+LOCAL_TAGGER_BATCHING_MIGRATION = """
+ALTER TABLE local_tagger_profiles
+ADD COLUMN batch_size INTEGER
+CHECK (batch_size IS NULL OR (batch_size >= 1 AND batch_size <= 32));
+"""
+
+GLOBAL_SCHEMA_VERSION = 7
 GLOBAL_MIGRATIONS = (
     Migration(1, "initial_global_schema", GLOBAL_SCHEMA),
     Migration(2, "provider_request_options", PROVIDER_REQUEST_OPTIONS_MIGRATION),
@@ -217,6 +223,7 @@ GLOBAL_MIGRATIONS = (
     Migration(4, "provider_models", PROVIDER_MODELS_MIGRATION),
     Migration(5, "provider_model_configs", PROVIDER_MODEL_CONFIGS_MIGRATION),
     Migration(6, "local_taggers", LOCAL_TAGGERS_MIGRATION),
+    Migration(7, "local_tagger_batching", LOCAL_TAGGER_BATCHING_MIGRATION),
 )
 
 

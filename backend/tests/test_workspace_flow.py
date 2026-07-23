@@ -4,7 +4,7 @@ import pytest
 from PIL import Image
 
 from dataset_studio.core.config import Settings
-from dataset_studio.modules.annotations.service import AnnotationService
+from dataset_studio.modules.annotations.service import AnnotationService, GeneratedAnnotation
 from dataset_studio.modules.annotations.text import AnnotationEncodingError
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.assets.service import AssetService
@@ -191,6 +191,51 @@ def test_annotation_save_failure_restores_exact_previous_file(
     assert annotation_path.read_bytes() == previous_bytes
     assert annotation_path.stat().st_mtime_ns == previous_modified_ns
     assert annotations.get(summary.project_id, asset.id).status.value == "manually_accepted"
+
+
+def test_annotation_batch_failure_rolls_back_every_file_and_revision(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "first.png")
+    _write_image(project / "second.png")
+    summary, _ = workspaces.open(str(project))
+    indexed = assets.list_assets(summary.project_id).items
+    first = next(item for item in indexed if item.filename == "first.png")
+    second = next(item for item in indexed if item.filename == "second.png")
+    annotations.save_generated(
+        summary.project_id,
+        first.id,
+        "<caption>previous</caption>",
+        manually_accepted=True,
+    )
+    previous_bytes = (project / "first.txt").read_bytes()
+    original_insert = annotations._insert_revision
+    insert_count = 0
+
+    def fail_second_revision(*args, **kwargs):
+        nonlocal insert_count
+        insert_count += 1
+        if insert_count == 2:
+            raise RuntimeError("simulated batch revision failure")
+        return original_insert(*args, **kwargs)
+
+    monkeypatch.setattr(annotations, "_insert_revision", fail_second_revision)
+    with pytest.raises(RuntimeError, match="simulated batch revision failure"):
+        annotations.save_generated_batch(
+            summary.project_id,
+            [
+                GeneratedAnnotation(first.id, "<caption>replacement</caption>"),
+                GeneratedAnnotation(second.id, "<caption>new</caption>"),
+            ],
+        )
+
+    assert (project / "first.txt").read_bytes() == previous_bytes
+    assert not (project / "second.txt").exists()
+    assert len(annotations.history(summary.project_id, first.id)) == 1
+    assert annotations.history(summary.project_id, second.id) == []
 
 
 def test_annotation_delete_failure_restores_file(tmp_path: Path, monkeypatch) -> None:

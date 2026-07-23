@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from contextlib import suppress
 from pathlib import Path
 from typing import Protocol
@@ -12,7 +12,10 @@ from dataset_studio.core.files import atomic_write_text
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
 from dataset_studio.modules.assets.service import AssetService
-from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
+from dataset_studio.modules.jobs.execution_repository import (
+    ItemCompletion,
+    JobExecutionRepository,
+)
 from dataset_studio.modules.jobs.execution_snapshot import load_execution_snapshot
 from dataset_studio.modules.jobs.executors.local_tagger import LocalTaggerJobExecutor
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
@@ -48,6 +51,7 @@ from dataset_studio.modules.translations.validation import validate_translation_
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 LOGGER = logging.getLogger("dataset_studio.worker")
+_LOCAL_TAGGER_CLAIM_SIZE = 16
 
 
 class AnnotationWorkerContainer(Protocol):
@@ -126,6 +130,29 @@ class AnnotationWorker:
                     active_profile == active_key
                     for active_profile in self._active_profiles.values()
                 )
+                if isinstance(profile, TaggerExecutionProfile):
+                    if profile_running:
+                        continue
+                    items = repository.claim_items(
+                        str(job["id"]),
+                        max(_LOCAL_TAGGER_CLAIM_SIZE, profile.batch_size or 0),
+                    )
+                    if not items:
+                        continue
+                    task = asyncio.create_task(
+                        self._process_local_tagger_batch(
+                            workspace.project_id,
+                            paths.database,
+                            paths.root,
+                            paths.runs,
+                            job,
+                            items,
+                            profile,
+                        )
+                    )
+                    self._active.add(task)
+                    self._active_profiles[task] = active_key
+                    continue
                 available = profile.concurrency - profile_running
                 for item in repository.claim_items(str(job["id"]), available):
                     task = asyncio.create_task(
@@ -188,6 +215,49 @@ class AnnotationWorker:
                     validation_status="failed",
                 )
 
+    async def _process_local_tagger_batch(
+        self,
+        project_id: str,
+        database_path: Path,
+        workspace_root: Path,
+        runs_root: Path,
+        job: dict[str, object],
+        items: Sequence[dict[str, object]],
+        profile: TaggerExecutionProfile,
+    ) -> None:
+        repository = JobExecutionRepository(database_path)
+        try:
+            await self._local_tagger_executor.process_batch(
+                project_id,
+                workspace_root,
+                runs_root,
+                job,
+                items,
+                repository,
+                profile,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            message = str(error) or type(error).__name__
+            LOGGER.exception(
+                "Local tagger batch for job %s failed before it could finish cleanly.",
+                job["id"],
+            )
+            with suppress(Exception):
+                repository.finish_batch(
+                    [],
+                    [
+                        ItemCompletion(
+                            item_id=str(item["id"]),
+                            status=JobItemStatus.FAILED,
+                            error=f"内部错误：{message}",
+                            validation_status="failed",
+                        )
+                        for item in items
+                    ],
+                )
+
     async def _process_item_inner(
         self,
         project_id: str,
@@ -211,12 +281,12 @@ class AnnotationWorker:
             legacy_provider_snapshot=str(job["provider_snapshot"]),
         )
         if isinstance(execution_profile, TaggerExecutionProfile):
-            await self._local_tagger_executor.process(
+            await self._local_tagger_executor.process_batch(
                 project_id,
                 workspace_root,
                 runs_root,
                 job,
-                item,
+                [item],
                 repository,
                 execution_profile,
             )

@@ -47,7 +47,7 @@ export function TaggerProfileEditor({
   const [threshold, setThreshold] = useState(profile.threshold);
   const [categories, setCategories] = useState(profile.categories);
   const [device, setDevice] = useState(profile.device);
-  const [concurrency, setConcurrency] = useState(profile.concurrency);
+  const [batchSize, setBatchSize] = useState<number | null>(profile.batch_size);
   const selectedInstallation = useMemo(
     () => installations.find((item) => item.id === installationId) ?? null,
     [installationId, installations],
@@ -59,7 +59,7 @@ export function TaggerProfileEditor({
     setThreshold(profile.threshold);
     setCategories(profile.categories);
     setDevice(profile.device);
-    setConcurrency(profile.concurrency);
+    setBatchSize(profile.batch_size);
   }, [profile]);
 
   function changeInstallation(nextId: string) {
@@ -81,9 +81,14 @@ export function TaggerProfileEditor({
     installationId !== profile.installation_id ||
     threshold !== profile.threshold ||
     device !== profile.device ||
-    concurrency !== profile.concurrency ||
+    batchSize !== profile.batch_size ||
     [...categories].sort().join("\0") !== [...profile.categories].sort().join("\0");
-  const valid = Boolean(name.trim() && selectedInstallation && categories.length);
+  const valid = Boolean(
+    name.trim() &&
+    selectedInstallation &&
+    categories.length &&
+    (batchSize === null || (Number.isInteger(batchSize) && batchSize >= 1 && batchSize <= 32)),
+  );
 
   return (
     <section className="tagger-profile-editor">
@@ -130,16 +135,26 @@ export function TaggerProfileEditor({
           <small>CL Tagger v2 推荐 0.55。</small>
         </label>
         <label className="form-field">
-          <span>并发图片数</span>
-          <input
-            type="number"
-            min="1"
-            max="8"
-            step="1"
-            value={concurrency}
-            onChange={(event) => setConcurrency(Number(event.target.value))}
-          />
-          <small>大型模型建议从 1 开始。</small>
+          <span>推理批大小</span>
+          <select
+            value={batchSize === null ? "auto" : "manual"}
+            onChange={(event) => setBatchSize(event.target.value === "auto" ? null : 4)}
+          >
+            <option value="auto">自动（推荐）</option>
+            <option value="manual">手动指定</option>
+          </select>
+          {batchSize !== null ? (
+            <input
+              aria-label="手动推理批大小"
+              type="number"
+              min="1"
+              max="32"
+              step="1"
+              value={batchSize}
+              onChange={(event) => setBatchSize(Number(event.target.value))}
+            />
+          ) : null}
+          <small>自动模式会按模型与设备选择，并在失败时缩小批次。</small>
         </label>
         <label className="form-field form-field--wide">
           <span>执行设备</span>
@@ -189,7 +204,7 @@ export function TaggerProfileEditor({
               threshold,
               categories,
               device,
-              concurrency,
+              batch_size: batchSize,
             })
           }
         >

@@ -39,6 +39,7 @@ export interface TaggerProfile {
   categories: string[];
   device: TaggerDevice;
   concurrency: number;
+  batch_size: number | null;
   installation_name: string | null;
   model_version: string | null;
   ready: boolean;
@@ -53,7 +54,7 @@ export interface TaggerProfileInput {
   threshold: number;
   categories: string[];
   device: TaggerDevice;
-  concurrency: number;
+  batch_size: number | null;
 }
 
 export interface TaggerLibrary {

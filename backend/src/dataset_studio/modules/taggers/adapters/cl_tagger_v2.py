@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from collections.abc import Sequence
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +13,7 @@ from dataset_studio.modules.taggers.adapters.base import (
     TaggerVocabulary,
     ValidatedTaggerModel,
 )
+from dataset_studio.modules.taggers.models import TaggerInferenceResult, TaggerInferenceTag
 from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan
 
 _REQUIRED_FILES = (
@@ -117,7 +120,99 @@ class CLTaggerV2Adapter:
         rgb = image.convert("RGB").resize((384, 384), Image.Resampling.BICUBIC)
         pixels = np.asarray(rgb, dtype=np.float32)
         normalized = (pixels / 255.0 - 0.5) / 0.5
-        return np.ascontiguousarray(normalized.transpose(2, 0, 1)[None])
+        return np.ascontiguousarray(normalized.transpose(2, 0, 1))
+
+    def batch_size_limit(self, directory: Path) -> int | None:
+        try:
+            import onnx
+        except ImportError as error:
+            raise ValueError("本地服务缺少 ONNX 模型校验组件。") from error
+        try:
+            model = onnx.load_model(directory / "model.onnx", load_external_data=False)
+        except Exception as error:
+            raise ValueError("无法读取 ONNX 模型批次信息。") from error
+        inputs = {value.name: value for value in model.graph.input}
+        input_info = inputs.get("pixel_values")
+        if input_info is None:
+            raise ValueError("ONNX 模型缺少 pixel_values 输入。")
+        batch_dimension = _tensor_shape(input_info)[0]
+        return batch_dimension
+
+    def preferred_batch_size(self, execution_provider: str) -> int:
+        if execution_provider == "CUDAExecutionProvider":
+            return 4
+        if execution_provider == "CPUExecutionProvider":
+            return 2
+        return 1
+
+    def collate(self, prepared: Sequence[np.ndarray]) -> dict[str, np.ndarray]:
+        if not prepared:
+            raise ValueError("本地打标批次不能为空。")
+        for pixels in prepared:
+            if pixels.shape != (3, 384, 384) or pixels.dtype != np.float32:
+                raise ValueError(
+                    f"CL Tagger v2 预处理结果形状或类型异常：{pixels.shape} / {pixels.dtype}"
+                )
+        return {"pixel_values": np.ascontiguousarray(np.stack(prepared, axis=0))}
+
+    def output_names(self) -> tuple[str, ...]:
+        return ("logits",)
+
+    def postprocess(
+        self,
+        outputs: Sequence[object],
+        vocabulary: TaggerVocabulary,
+        *,
+        threshold: float,
+        categories: tuple[str, ...],
+        provider: str,
+        inference_ms: float,
+    ) -> list[TaggerInferenceResult | Exception]:
+        if not outputs:
+            raise ValueError("ONNX 本地推理没有返回 logits。")
+        logits = np.asarray(outputs[0], dtype=np.float32)
+        if logits.ndim != 2:
+            raise ValueError(f"ONNX logits 形状异常：{tuple(logits.shape)}")
+        if logits.shape[1] != len(vocabulary.tags):
+            raise ValueError("ONNX 输出标签数与模型词表不一致。")
+
+        enabled_mask = _category_mask(vocabulary.categories, categories)
+        logit_threshold = float(np.log(threshold / (1.0 - threshold)))
+        per_image_ms = inference_ms / max(logits.shape[0], 1)
+        results: list[TaggerInferenceResult | Exception] = []
+        for row in logits:
+            selected_indices = np.flatnonzero(enabled_mask & (row >= logit_threshold))
+            if selected_indices.size == 0:
+                results.append(
+                    ValueError("当前阈值与类别设置没有产生任何标签，请调整打标配置后重试。")
+                )
+                continue
+            selected_logits = np.clip(row[selected_indices], -80.0, 80.0)
+            probabilities = 1.0 / (1.0 + np.exp(-selected_logits))
+            selected = [
+                TaggerInferenceTag(
+                    name=vocabulary.tags[int(index)],
+                    category=vocabulary.categories[int(index)],
+                    confidence=float(probability),
+                )
+                for index, probability in zip(
+                    selected_indices,
+                    probabilities,
+                    strict=True,
+                )
+            ]
+            selected.sort(key=lambda item: (-item.confidence, item.name.casefold()))
+            results.append(
+                TaggerInferenceResult(
+                    content=", ".join(item.name for item in selected),
+                    tags=selected,
+                    provider=provider,
+                    inference_ms=per_image_ms,
+                    batch_size=logits.shape[0],
+                    batch_inference_ms=inference_ms,
+                )
+            )
+        return results
 
     def download_plans(self) -> tuple[TaggerDownloadPlan, ...]:
         # Remote plans are intentionally absent in v1. A future audited source can
@@ -173,6 +268,21 @@ def _normalize_category(value: object, names: dict[object, str]) -> str:
 def _canonical_category(value: str) -> str:
     normalized = value.strip().casefold().replace(" ", "_")
     return _CATEGORY_ALIASES.get(normalized, normalized or "unknown")
+
+
+@lru_cache(maxsize=16)
+def _category_mask(
+    vocabulary_categories: tuple[str, ...],
+    enabled_categories: tuple[str, ...],
+) -> np.ndarray:
+    enabled = frozenset(enabled_categories)
+    mask = np.fromiter(
+        (category in enabled for category in vocabulary_categories),
+        dtype=np.bool_,
+        count=len(vocabulary_categories),
+    )
+    mask.setflags(write=False)
+    return mask
 
 
 def _find_integer(value: object, keys: set[str]) -> int | None:

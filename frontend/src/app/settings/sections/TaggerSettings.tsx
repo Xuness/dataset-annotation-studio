@@ -127,7 +127,7 @@ export function TaggerSettings({ onClose }: { onClose: () => void }) {
         threshold: 0.55,
         categories: Object.keys(selectedInstallation.categories),
         device: "auto",
-        concurrency: 1,
+        batch_size: null,
       });
       setSelectedProfileId(profile.id);
     }, "已创建新的打标配置。");
@@ -374,7 +374,7 @@ export function TaggerSettings({ onClose }: { onClose: () => void }) {
                 <div>
                   <span className="eyebrow">Reusable profiles</span>
                   <h3>打标配置</h3>
-                  <p>阈值、标签类别与执行设备独立于模型文件，可由任务直接选择。</p>
+                  <p>阈值、标签类别、执行设备与批大小独立于模型文件，可由任务直接选择。</p>
                 </div>
                 <Button
                   icon={<Plus size={13} />}

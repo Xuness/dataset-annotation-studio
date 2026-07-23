@@ -3,6 +3,7 @@ import json
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -113,19 +114,44 @@ class StaticTaggerCatalog:
 
 
 class StaticTaggerRuntime:
+    def __init__(self) -> None:
+        self.batch_sizes: list[int] = []
+
     def prune_missing_installations(self) -> None:
         pass
 
-    def tag(self, _profile: TaggerExecutionProfile, _image_path: Path) -> TaggerInferenceResult:
-        return TaggerInferenceResult(
-            content="alice, blue_hair",
-            tags=[
-                TaggerInferenceTag(name="alice", category="character", confidence=0.91),
-                TaggerInferenceTag(name="blue_hair", category="general", confidence=0.84),
-            ],
-            provider="CPUExecutionProvider",
-            inference_ms=12.5,
-        )
+    def bind(self, _profile: TaggerExecutionProfile):
+        return self
+
+    @property
+    def provider(self) -> str:
+        return "CPUExecutionProvider"
+
+    def effective_batch_size(self) -> int:
+        return 4
+
+    def record_batch_failure(self, _failed_batch_size: int) -> None:
+        pass
+
+    def preprocess_bytes(self, _payload: bytes):
+        return np.zeros((3, 8, 8), dtype=np.float32)
+
+    def infer_batch(self, prepared):
+        self.batch_sizes.append(len(prepared))
+        return [
+            TaggerInferenceResult(
+                content="alice, blue_hair",
+                tags=[
+                    TaggerInferenceTag(name="alice", category="character", confidence=0.91),
+                    TaggerInferenceTag(name="blue_hair", category="general", confidence=0.84),
+                ],
+                provider="CPUExecutionProvider",
+                inference_ms=12.5 / len(prepared),
+                batch_size=len(prepared),
+                batch_inference_ms=12.5,
+            )
+            for _ in prepared
+        ]
 
 
 def _runtime(tmp_path: Path):
@@ -166,7 +192,9 @@ async def test_worker_runs_local_tagger_without_prompt_or_provider(
     container, workspaces, presets, _ = _runtime(tmp_path)
     project = tmp_path / "local-tagger-dataset"
     project.mkdir()
-    Image.new("RGB", (48, 48), "white").save(project / "sample.png")
+    image_paths = [project / f"sample-{index}.png" for index in range(5)]
+    for image_path in image_paths:
+        Image.new("RGB", (48, 48), "white").save(image_path)
     workspace, _ = workspaces.open(str(project))
     catalog = StaticTaggerCatalog()
     jobs = JobService(
@@ -177,7 +205,8 @@ async def test_worker_runs_local_tagger_without_prompt_or_provider(
         catalog,  # type: ignore[arg-type]
     )
     container.jobs = jobs
-    container.tagger_runtime = StaticTaggerRuntime()  # type: ignore[assignment]
+    tagger_runtime = StaticTaggerRuntime()
+    container.tagger_runtime = tagger_runtime  # type: ignore[assignment]
     created = jobs.create(
         workspace.project_id,
         JobCreateRequest(
@@ -208,7 +237,11 @@ async def test_worker_runs_local_tagger_without_prompt_or_provider(
     assert detail.execution_profile_name == "Local test profile"
     assert detail.provider_profile_id is None
     assert detail.system_preset_id is None
-    assert (project / "sample.txt").read_text(encoding="utf-8") == "alice, blue_hair"
+    assert len(detail.items) == 5
+    assert all(item.status == JobItemStatus.SUCCEEDED for item in detail.items)
+    assert tagger_runtime.batch_sizes == [4, 1]
+    for image_path in image_paths:
+        assert image_path.with_suffix(".txt").read_text(encoding="utf-8") == "alice, blue_hair"
     trace = container.annotation_traces.get(workspace.project_id, detail.items[0].asset_id)
     assert trace is not None
     assert trace.matches_current_annotation

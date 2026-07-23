@@ -141,8 +141,8 @@ class TaggerRepository:
                 """
                 INSERT INTO local_tagger_profiles (
                     id, name, installation_id, threshold, categories_json,
-                    device, concurrency, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    device, concurrency, batch_size, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
             )
@@ -153,7 +153,7 @@ class TaggerRepository:
                 """
                 UPDATE local_tagger_profiles
                 SET name = ?, installation_id = ?, threshold = ?, categories_json = ?,
-                    device = ?, concurrency = ?, updated_at = ?
+                    device = ?, concurrency = ?, batch_size = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (*values, profile_id),

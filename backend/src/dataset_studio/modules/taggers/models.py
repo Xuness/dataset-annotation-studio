@@ -93,6 +93,7 @@ class TaggerProfile(BaseModel):
     categories: list[str]
     device: TaggerDevice = TaggerDevice.AUTO
     concurrency: int = Field(default=1, ge=1, le=8)
+    batch_size: int | None = Field(default=None, ge=1, le=32)
     installation_name: str | None = None
     model_version: str | None = None
     ready: bool = False
@@ -108,6 +109,7 @@ class TaggerProfileCreate(BaseModel):
     categories: list[str] = Field(default_factory=list, max_length=32)
     device: TaggerDevice = TaggerDevice.AUTO
     concurrency: int = Field(default=1, ge=1, le=8)
+    batch_size: int | None = Field(default=None, ge=1, le=32)
 
     _validate_name = field_validator("name")(_non_blank)
 
@@ -127,6 +129,7 @@ class TaggerProfileUpdate(BaseModel):
     categories: list[str] | None = Field(default=None, max_length=32)
     device: TaggerDevice | None = None
     concurrency: int | None = Field(default=None, ge=1, le=8)
+    batch_size: int | None = Field(default=None, ge=1, le=32)
 
     _validate_name = field_validator("name")(_non_blank)
 
@@ -142,7 +145,7 @@ class TaggerProfileUpdate(BaseModel):
 
 
 class TaggerExecutionProfile(BaseModel):
-    snapshot_version: Literal[1] = 1
+    snapshot_version: Literal[1, 2] = 2
     backend: Literal["local_tagger"] = "local_tagger"
     id: str
     name: str
@@ -155,6 +158,20 @@ class TaggerExecutionProfile(BaseModel):
     categories: list[str]
     device: TaggerDevice
     concurrency: int = Field(ge=1, le=8)
+    batch_size: int | None = Field(default=None, ge=1, le=32)
+
+    @model_validator(mode="before")
+    @classmethod
+    def upgrade_legacy_snapshot(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        upgraded = dict(value)
+        if int(upgraded.get("snapshot_version") or 1) == 1 and "batch_size" not in upgraded:
+            # v1 used independent one-image workers. Reusing that value as the
+            # requested inference batch preserves the user's throughput intent;
+            # adapters and the runtime still clamp or split unsafe batches.
+            upgraded["batch_size"] = int(upgraded.get("concurrency") or 1)
+        return upgraded
 
     @model_validator(mode="after")
     def require_categories(self) -> TaggerExecutionProfile:
@@ -199,3 +216,5 @@ class TaggerInferenceResult(BaseModel):
     tags: list[TaggerInferenceTag]
     provider: str
     inference_ms: float
+    batch_size: int = Field(default=1, ge=1)
+    batch_inference_ms: float | None = Field(default=None, ge=0)

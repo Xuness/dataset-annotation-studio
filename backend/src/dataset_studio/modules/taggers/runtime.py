@@ -5,20 +5,21 @@ import os
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Protocol
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from dataset_studio.modules.taggers.adapters.base import TaggerAdapter, TaggerVocabulary
 from dataset_studio.modules.taggers.models import (
     TaggerDevice,
     TaggerExecutionProfile,
     TaggerInferenceResult,
-    TaggerInferenceTag,
 )
 from dataset_studio.modules.taggers.service import TaggerService
 
@@ -52,8 +53,108 @@ class _RuntimeEntry:
     adapter: TaggerAdapter
     vocabulary: TaggerVocabulary
     primary_provider: str
+    batch_size_limit: int | None
+    adaptive_batch_size: int | None
+    batch_size_lock: threading.Lock
     serialize_runs: bool
     run_lock: threading.Lock
+
+
+@dataclass(slots=True)
+class TaggerInferenceSession:
+    """A resolved adapter/session pair reusable across an entire claimed batch."""
+
+    profile: TaggerExecutionProfile
+    entry: _RuntimeEntry
+
+    @property
+    def provider(self) -> str:
+        return self.entry.primary_provider
+
+    def effective_batch_size(self) -> int:
+        requested = self.profile.batch_size
+        preferred = self.entry.adapter.preferred_batch_size(self.provider)
+        batch_size = requested if requested is not None else preferred
+        if self.entry.batch_size_limit is not None:
+            batch_size = min(batch_size, self.entry.batch_size_limit)
+        with self.entry.batch_size_lock:
+            if self.entry.adaptive_batch_size is not None:
+                batch_size = min(batch_size, self.entry.adaptive_batch_size)
+        return min(32, max(1, batch_size))
+
+    def record_batch_failure(self, failed_batch_size: int) -> None:
+        if failed_batch_size <= 1:
+            return
+        reduced = max(1, failed_batch_size // 2)
+        with self.entry.batch_size_lock:
+            current = self.entry.adaptive_batch_size
+            self.entry.adaptive_batch_size = reduced if current is None else min(current, reduced)
+
+    def preprocess_bytes(self, payload: bytes) -> np.ndarray:
+        try:
+            with Image.open(BytesIO(payload)) as source:
+                image = ImageOps.exif_transpose(source)
+                prepared = self.entry.adapter.preprocess(image)
+        except (OSError, ValueError) as error:
+            raise ValueError(f"无法读取待打标图片：{error}") from error
+        return np.asarray(prepared, dtype=np.float32)
+
+    def infer_batch(
+        self,
+        prepared: Sequence[np.ndarray],
+    ) -> list[TaggerInferenceResult | Exception]:
+        if not prepared:
+            return []
+        if self.entry.batch_size_limit is not None and len(prepared) > self.entry.batch_size_limit:
+            raise ValueError(f"当前模型最多支持 {self.entry.batch_size_limit} 张图片的推理批次。")
+        inputs = self.entry.adapter.collate(prepared)
+        run_guard = self.entry.run_lock if self.entry.serialize_runs else nullcontext()
+        started = time.perf_counter()
+        try:
+            with run_guard:
+                outputs = self.entry.session.run(
+                    list(self.entry.adapter.output_names()),
+                    inputs,
+                )
+        except Exception as error:
+            raise ValueError(f"ONNX 本地推理失败：{error}") from error
+        elapsed_ms = (time.perf_counter() - started) * 1_000
+        active_provider = self._validate_active_provider()
+        results = self.entry.adapter.postprocess(
+            outputs,
+            self.entry.vocabulary,
+            threshold=self.profile.threshold,
+            categories=tuple(self.profile.categories),
+            provider=active_provider,
+            inference_ms=elapsed_ms,
+        )
+        if len(results) != len(prepared):
+            raise ValueError(
+                f"打标器返回了 {len(results)} 条结果，但当前批次包含 {len(prepared)} 张图片。"
+            )
+        return results
+
+    def _validate_active_provider(self) -> str:
+        active_providers = self.entry.session.get_providers()
+        if not active_providers:
+            raise ValueError("ONNX 本地推理完成后没有活动的执行提供程序。")
+        active_provider = active_providers[0]
+        if self.profile.device != TaggerDevice.AUTO:
+            expected_provider = _DEVICE_PROVIDERS[self.profile.device]
+            if active_provider != expected_provider:
+                raise ValueError(
+                    f"请求的执行设备 {expected_provider} 在推理期间失效，"
+                    f"实际为：{', '.join(active_providers)}"
+                )
+        elif active_provider != self.entry.primary_provider:
+            previous_provider = self.entry.primary_provider
+            self.entry.primary_provider = active_provider
+            LOGGER.warning(
+                "Local tagger provider changed during inference from %s to %s",
+                previous_provider,
+                active_provider,
+            )
+        return active_provider
 
 
 class TaggerRuntime:
@@ -72,72 +173,22 @@ class TaggerRuntime:
     def tag(self, profile: TaggerExecutionProfile, image_path: Path) -> TaggerInferenceResult:
         if not image_path.is_file():
             raise ValueError("图片已不存在，无法执行本地打标。")
+        session = self.bind(profile)
+        try:
+            payload = image_path.read_bytes()
+        except OSError as error:
+            raise ValueError(f"无法读取待打标图片：{error}") from error
+        prepared = session.preprocess_bytes(payload)
+        result = session.infer_batch((prepared,))[0]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def bind(self, profile: TaggerExecutionProfile) -> TaggerInferenceSession:
         directory, adapter = self._taggers.resolve_snapshot(profile)
         provider_candidates = self._provider_candidates_for_device(profile.device)
         entry = self._entry(profile, directory, adapter, provider_candidates)
-        started = time.perf_counter()
-        try:
-            with Image.open(image_path) as image:
-                pixels = adapter.preprocess(image)
-        except (OSError, ValueError) as error:
-            raise ValueError(f"无法读取待打标图片：{error}") from error
-
-        run_guard = entry.run_lock if entry.serialize_runs else nullcontext()
-        try:
-            with run_guard:
-                outputs = entry.session.run(["logits"], {"pixel_values": pixels})
-        except Exception as error:
-            raise ValueError(f"ONNX 本地推理失败：{error}") from error
-        active_providers = entry.session.get_providers()
-        if not active_providers:
-            raise ValueError("ONNX 本地推理完成后没有活动的执行提供程序。")
-        active_provider = active_providers[0]
-        if profile.device != TaggerDevice.AUTO:
-            expected_provider = _DEVICE_PROVIDERS[profile.device]
-            if active_provider != expected_provider:
-                raise ValueError(
-                    f"请求的执行设备 {expected_provider} 在推理期间失效，"
-                    f"实际为：{', '.join(active_providers)}"
-                )
-        elif active_provider != entry.primary_provider:
-            previous_provider = entry.primary_provider
-            entry.primary_provider = active_provider
-            LOGGER.warning(
-                "Local tagger provider changed during inference from %s to %s",
-                previous_provider,
-                active_provider,
-            )
-        if not outputs:
-            raise ValueError("ONNX 本地推理没有返回 logits。")
-        logits = np.asarray(outputs[0], dtype=np.float32)
-        if logits.ndim != 2 or logits.shape[0] != 1:
-            raise ValueError(f"ONNX logits 形状异常：{tuple(logits.shape)}")
-        values = logits[0]
-        if values.shape[0] != len(entry.vocabulary.tags):
-            raise ValueError("ONNX 输出标签数与模型词表不一致。")
-        probabilities = 1.0 / (1.0 + np.exp(-np.clip(values, -80.0, 80.0)))
-        enabled_categories = set(profile.categories)
-        selected = [
-            TaggerInferenceTag(
-                name=tag,
-                category=category,
-                confidence=float(probabilities[index]),
-            )
-            for index, (tag, category) in enumerate(
-                zip(entry.vocabulary.tags, entry.vocabulary.categories, strict=True)
-            )
-            if category in enabled_categories and probabilities[index] >= profile.threshold
-        ]
-        selected.sort(key=lambda item: (-item.confidence, item.name.casefold()))
-        if not selected:
-            raise ValueError("当前阈值与类别设置没有产生任何标签，请调整打标配置后重试。")
-        elapsed_ms = (time.perf_counter() - started) * 1_000
-        return TaggerInferenceResult(
-            content=", ".join(item.name for item in selected),
-            tags=selected,
-            provider=active_provider,
-            inference_ms=elapsed_ms,
-        )
+        return TaggerInferenceSession(profile=profile, entry=entry)
 
     def close(self) -> None:
         with self._entry_lock:
@@ -187,6 +238,9 @@ class TaggerRuntime:
                 adapter=adapter,
                 vocabulary=adapter.load_vocabulary(directory),
                 primary_provider=actual[0],
+                batch_size_limit=adapter.batch_size_limit(directory),
+                adaptive_batch_size=None,
+                batch_size_lock=threading.Lock(),
                 serialize_runs=actual[0] == "DmlExecutionProvider",
                 run_lock=threading.Lock(),
             )

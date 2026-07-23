@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Sequence
+from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
 
 from dataset_studio.core.errors import AssetNotFoundError
@@ -18,6 +21,20 @@ from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
 from dataset_studio.modules.annotations.text import read_annotation_text
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.workspaces.service import WorkspaceService
+
+
+@dataclass(frozen=True, slots=True)
+class GeneratedAnnotation:
+    asset_id: str
+    content: str
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedAnnotation:
+    asset_id: str
+    content: str
+    path: Path
+    validation: ValidationResult
 
 
 class AnnotationService:
@@ -72,6 +89,93 @@ class AnnotationService:
             source="manual_accept" if manually_accepted else "model_response",
             manually_accepted=manually_accepted,
         )
+
+    def save_generated_batch(
+        self,
+        project_id: str,
+        annotations: Sequence[GeneratedAnnotation],
+    ) -> None:
+        """Write a staged annotation batch, then commit all metadata once."""
+
+        if not annotations:
+            return
+        asset_ids = [annotation.asset_id for annotation in annotations]
+        if len(asset_ids) != len(set(asset_ids)):
+            raise ValueError("批量保存标注时包含重复素材。")
+        paths, _ = self._workspaces.get(project_id)
+        placeholders = ", ".join("?" for _ in asset_ids)
+        connection = connect(paths.database)
+        try:
+            rows = connection.execute(
+                f"SELECT * FROM assets WHERE id IN ({placeholders})",
+                asset_ids,
+            ).fetchall()
+        finally:
+            connection.close()
+        assets = {str(row["id"]): row for row in rows}
+        missing = [asset_id for asset_id in asset_ids if asset_id not in assets]
+        if missing:
+            raise AssetNotFoundError(f"找不到素材：{missing[0]}")
+
+        prepared = [
+            _PreparedAnnotation(
+                asset_id=annotation.asset_id,
+                content=annotation.content,
+                path=self._annotation_path(paths.root, assets[annotation.asset_id]),
+                validation=validate_tag_balance(annotation.content),
+            )
+            for annotation in annotations
+        ]
+        backups: dict[Path, Path] = {}
+        written_paths: set[Path] = set()
+        modified_ns: dict[str, int] = {}
+        try:
+            for item in prepared:
+                if item.path.is_file():
+                    backup = item.path.with_name(f".{item.path.name}.{uuid.uuid4().hex}.backup")
+                    atomic_copy_file(item.path, backup)
+                    backups[item.path] = backup
+            for item in prepared:
+                atomic_write_text(item.path, item.content)
+                written_paths.add(item.path)
+                modified_ns[item.asset_id] = item.path.stat().st_mtime_ns
+            with transaction(paths.database) as database:
+                for item in prepared:
+                    self._insert_revision(
+                        database,
+                        item.asset_id,
+                        item.content,
+                        source="model_response",
+                        validation=item.validation,
+                    )
+                    self._update_annotation_status(
+                        database,
+                        item.asset_id,
+                        item.validation.status.value,
+                        modified_ns[item.asset_id],
+                    )
+        except BaseException as error:
+            rollback_errors: list[OSError] = []
+            for item in reversed(prepared):
+                backup = backups.get(item.path)
+                try:
+                    if item.path in written_paths:
+                        if backup is not None and backup.is_file():
+                            os.replace(backup, item.path)
+                        else:
+                            item.path.unlink(missing_ok=True)
+                    elif backup is not None:
+                        backup.unlink(missing_ok=True)
+                except OSError as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if rollback_errors:
+                raise RuntimeError(
+                    f"批量标注写入失败，且有 {len(rollback_errors)} 个文件无法回滚。"
+                ) from error
+            raise
+        for backup in backups.values():
+            with suppress(OSError):
+                backup.unlink(missing_ok=True)
 
     def _save(
         self,

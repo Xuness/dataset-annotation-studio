@@ -145,6 +145,12 @@ function AnnotationTraceView({ trace }: { trace: AssetAnnotationTrace }) {
               : (parameters.temperature ?? "模型默认")}
           </dd>
         </div>
+        {localTagger ? (
+          <div>
+            <dt>推理批大小</dt>
+            <dd>{parameters.batch_size === null ? "自动" : parameters.batch_size}</dd>
+          </div>
+        ) : null}
       </dl>
 
       <div className="prompt-request-preview">
