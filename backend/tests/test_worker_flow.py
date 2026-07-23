@@ -128,6 +128,10 @@ class StaticTaggerRuntime:
     def provider(self) -> str:
         return "CPUExecutionProvider"
 
+    @property
+    def prepared_tensor_bytes(self) -> int:
+        return 3 * 8 * 8 * 4
+
     def effective_batch_size(self) -> int:
         return 4
 

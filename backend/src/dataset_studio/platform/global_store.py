@@ -260,7 +260,18 @@ FROM recent_workspaces
 WHERE hidden_at IS NULL;
 """
 
-GLOBAL_SCHEMA_VERSION = 8
+LOCAL_TAGGER_SELECTION_POLICY_MIGRATION = """
+ALTER TABLE local_tagger_profiles
+ADD COLUMN selection_json TEXT NOT NULL
+DEFAULT '{"mode":"global","global_threshold":0.55,"category_thresholds":{},"max_tags":null}';
+
+UPDATE local_tagger_profiles
+SET selection_json =
+    '{"mode":"global","global_threshold":' || CAST(threshold AS TEXT) ||
+    ',"category_thresholds":{},"max_tags":null}';
+"""
+
+GLOBAL_SCHEMA_VERSION = 9
 GLOBAL_MIGRATIONS = (
     Migration(1, "initial_global_schema", GLOBAL_SCHEMA),
     Migration(2, "provider_request_options", PROVIDER_REQUEST_OPTIONS_MIGRATION),
@@ -273,6 +284,11 @@ GLOBAL_MIGRATIONS = (
         8,
         "recent_workspace_activity",
         RECENT_WORKSPACE_ACTIVITY_MIGRATION,
+    ),
+    Migration(
+        9,
+        "local_tagger_selection_policy",
+        LOCAL_TAGGER_SELECTION_POLICY_MIGRATION,
     ),
 )
 

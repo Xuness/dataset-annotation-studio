@@ -9,6 +9,7 @@ import {
   useTranslationPromptPresets,
 } from "../../../features/presets/hooks";
 import { useTaggerLibrary } from "../../../features/taggers/hooks";
+import { taggerSelectionModeLabel } from "../../../features/taggers/labels";
 import type {
   ExistingTranslationPolicy,
   ExecutionBackend,
@@ -262,7 +263,7 @@ export function NewJobPanel({
           </strong>
           <small>
             {selectedTaggerProfile
-              ? `阈值 ${selectedTaggerProfile.threshold.toFixed(2)} · ${selectedTaggerProfile.categories.length} 个类别 · ${selectedTaggerProfile.device} · ${
+              ? `${taggerSelectionModeLabel(selectedTaggerProfile.selection.mode)} · 回退阈值 ${selectedTaggerProfile.selection.global_threshold.toFixed(2)} · ${selectedTaggerProfile.categories.length} 个类别 · ${selectedTaggerProfile.device} · ${
                   selectedTaggerProfile.batch_size === null
                     ? "自动批次"
                     : `批次 ${selectedTaggerProfile.batch_size}`

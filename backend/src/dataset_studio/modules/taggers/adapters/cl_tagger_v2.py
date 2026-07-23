@@ -3,17 +3,28 @@ from __future__ import annotations
 import json
 from collections import Counter
 from collections.abc import Sequence
-from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
 from dataset_studio.modules.taggers.adapters.base import (
+    TaggerBatchContract,
+    TaggerRuntimeSpec,
+    TaggerTensorSpec,
     TaggerVocabulary,
     ValidatedTaggerModel,
 )
-from dataset_studio.modules.taggers.models import TaggerInferenceResult, TaggerInferenceTag
+from dataset_studio.modules.taggers.adapters.common.multilabel import (
+    build_multilabel_results,
+    probabilities_from_logits,
+)
+from dataset_studio.modules.taggers.models import (
+    TaggerInferenceResult,
+    TaggerProfileCapabilities,
+    TaggerSelectionMode,
+    TaggerSelectionPolicy,
+)
 from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan
 
 _REQUIRED_FILES = (
@@ -41,6 +52,8 @@ class CLTaggerV2Adapter:
     id = "cl_tagger_v2"
     name = "CL Tagger v2"
     description = "面向插画与动漫图片的 Danbooru 多标签 ONNX 打标器。"
+    contract_version = 1
+    discovery_markers = ("model_vocabulary.json",)
 
     def detect(self, directory: Path) -> bool:
         return (directory / "model.onnx").is_file() and (
@@ -82,9 +95,11 @@ class CLTaggerV2Adapter:
         )
         return ValidatedTaggerModel(
             adapter_id=self.id,
+            adapter_contract_version=self.contract_version,
             model_version=version,
             tag_count=len(vocabulary.tags),
             categories=category_counts,
+            profile_capabilities=self.profile_capabilities(root),
             managed_files=managed_files,
         )
 
@@ -116,13 +131,49 @@ class CLTaggerV2Adapter:
         categories = tuple(_normalize_category(mapping.get(tag), category_names) for tag in tags)
         return TaggerVocabulary(tags=tags, categories=categories)
 
-    def preprocess(self, image: Image.Image) -> np.ndarray:
+    def preprocess(self, directory: Path, image: Image.Image) -> np.ndarray:
+        del directory
         rgb = image.convert("RGB").resize((384, 384), Image.Resampling.BICUBIC)
         pixels = np.asarray(rgb, dtype=np.float32)
         normalized = (pixels / 255.0 - 0.5) / 0.5
         return np.ascontiguousarray(normalized.transpose(2, 0, 1))
 
-    def batch_size_limit(self, directory: Path) -> int | None:
+    def runtime_spec(self, directory: Path) -> TaggerRuntimeSpec:
+        batch_dimension = self._batch_dimension(directory)
+        batch = (
+            TaggerBatchContract(
+                mode="dynamic",
+                max_size=32,
+                preferred_cpu=2,
+                preferred_cuda=4,
+            )
+            if batch_dimension is None
+            else TaggerBatchContract(
+                mode="fixed",
+                max_size=batch_dimension,
+                fixed_size=batch_dimension,
+                preferred_cpu=batch_dimension,
+                preferred_cuda=batch_dimension,
+            )
+        )
+        return TaggerRuntimeSpec(
+            backend="onnx",
+            model_file="model.onnx",
+            input=TaggerTensorSpec(
+                name="pixel_values",
+                shape=(batch_dimension, 3, 384, 384),
+            ),
+            outputs=(
+                TaggerTensorSpec(
+                    name="logits",
+                    shape=(batch_dimension, len(self.load_vocabulary(directory).tags)),
+                ),
+            ),
+            batch=batch,
+            sample_shape=(3, 384, 384),
+        )
+
+    def _batch_dimension(self, directory: Path) -> int | None:
         try:
             import onnx
         except ImportError as error:
@@ -138,14 +189,22 @@ class CLTaggerV2Adapter:
         batch_dimension = _tensor_shape(input_info)[0]
         return batch_dimension
 
-    def preferred_batch_size(self, execution_provider: str) -> int:
-        if execution_provider == "CUDAExecutionProvider":
-            return 4
-        if execution_provider == "CPUExecutionProvider":
-            return 2
-        return 1
+    def profile_capabilities(self, directory: Path) -> TaggerProfileCapabilities:
+        categories = sorted(set(self.load_vocabulary(directory).categories))
+        return TaggerProfileCapabilities(
+            supported_selection_modes=[TaggerSelectionMode.GLOBAL],
+            default_selection=TaggerSelectionPolicy(
+                mode=TaggerSelectionMode.GLOBAL,
+                global_threshold=0.55,
+            ),
+            default_categories=categories,
+        )
 
-    def collate(self, prepared: Sequence[np.ndarray]) -> dict[str, np.ndarray]:
+    def collate(
+        self,
+        prepared: Sequence[np.ndarray],
+        runtime_spec: TaggerRuntimeSpec,
+    ) -> dict[str, np.ndarray]:
         if not prepared:
             raise ValueError("本地打标批次不能为空。")
         for pixels in prepared:
@@ -153,66 +212,28 @@ class CLTaggerV2Adapter:
                 raise ValueError(
                     f"CL Tagger v2 预处理结果形状或类型异常：{pixels.shape} / {pixels.dtype}"
                 )
-        return {"pixel_values": np.ascontiguousarray(np.stack(prepared, axis=0))}
-
-    def output_names(self) -> tuple[str, ...]:
-        return ("logits",)
+        return {runtime_spec.input.name: np.ascontiguousarray(np.stack(prepared, axis=0))}
 
     def postprocess(
         self,
         outputs: Sequence[object],
         vocabulary: TaggerVocabulary,
         *,
-        threshold: float,
+        selection: TaggerSelectionPolicy,
         categories: tuple[str, ...],
         provider: str,
         inference_ms: float,
     ) -> list[TaggerInferenceResult | Exception]:
         if not outputs:
             raise ValueError("ONNX 本地推理没有返回 logits。")
-        logits = np.asarray(outputs[0], dtype=np.float32)
-        if logits.ndim != 2:
-            raise ValueError(f"ONNX logits 形状异常：{tuple(logits.shape)}")
-        if logits.shape[1] != len(vocabulary.tags):
-            raise ValueError("ONNX 输出标签数与模型词表不一致。")
-
-        enabled_mask = _category_mask(vocabulary.categories, categories)
-        logit_threshold = float(np.log(threshold / (1.0 - threshold)))
-        per_image_ms = inference_ms / max(logits.shape[0], 1)
-        results: list[TaggerInferenceResult | Exception] = []
-        for row in logits:
-            selected_indices = np.flatnonzero(enabled_mask & (row >= logit_threshold))
-            if selected_indices.size == 0:
-                results.append(
-                    ValueError("当前阈值与类别设置没有产生任何标签，请调整打标配置后重试。")
-                )
-                continue
-            selected_logits = np.clip(row[selected_indices], -80.0, 80.0)
-            probabilities = 1.0 / (1.0 + np.exp(-selected_logits))
-            selected = [
-                TaggerInferenceTag(
-                    name=vocabulary.tags[int(index)],
-                    category=vocabulary.categories[int(index)],
-                    confidence=float(probability),
-                )
-                for index, probability in zip(
-                    selected_indices,
-                    probabilities,
-                    strict=True,
-                )
-            ]
-            selected.sort(key=lambda item: (-item.confidence, item.name.casefold()))
-            results.append(
-                TaggerInferenceResult(
-                    content=", ".join(item.name for item in selected),
-                    tags=selected,
-                    provider=provider,
-                    inference_ms=per_image_ms,
-                    batch_size=logits.shape[0],
-                    batch_inference_ms=inference_ms,
-                )
-            )
-        return results
+        return build_multilabel_results(
+            probabilities_from_logits(outputs[0]),
+            vocabulary,
+            selection=selection,
+            categories=categories,
+            provider=provider,
+            inference_ms=inference_ms,
+        )
 
     def download_plans(self) -> tuple[TaggerDownloadPlan, ...]:
         # Remote plans are intentionally absent in v1. A future audited source can
@@ -268,21 +289,6 @@ def _normalize_category(value: object, names: dict[object, str]) -> str:
 def _canonical_category(value: str) -> str:
     normalized = value.strip().casefold().replace(" ", "_")
     return _CATEGORY_ALIASES.get(normalized, normalized or "unknown")
-
-
-@lru_cache(maxsize=16)
-def _category_mask(
-    vocabulary_categories: tuple[str, ...],
-    enabled_categories: tuple[str, ...],
-) -> np.ndarray:
-    enabled = frozenset(enabled_categories)
-    mask = np.fromiter(
-        (category in enabled for category in vocabulary_categories),
-        dtype=np.bool_,
-        count=len(vocabulary_categories),
-    )
-    mask.setflags(write=False)
-    return mask
 
 
 def _find_integer(value: object, keys: set[str]) -> int | None:

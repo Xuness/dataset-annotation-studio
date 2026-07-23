@@ -132,7 +132,7 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     }
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 
 def test_recent_workspace_activity_migration_hides_duplicate_roots(
@@ -256,10 +256,20 @@ def test_local_tagger_batching_migration_preserves_profiles_and_allows_auto(
     connection = connect(database)
     try:
         profile = connection.execute(
-            "SELECT concurrency, batch_size FROM local_tagger_profiles WHERE id = 'profile'"
+            """
+            SELECT concurrency, batch_size, selection_json
+            FROM local_tagger_profiles
+            WHERE id = 'profile'
+            """
         ).fetchone()
         assert profile["concurrency"] == 4
         assert profile["batch_size"] is None
+        assert json.loads(profile["selection_json"]) == {
+            "mode": "global",
+            "global_threshold": 0.55,
+            "category_thresholds": {},
+            "max_tags": None,
+        }
         connection.execute("UPDATE local_tagger_profiles SET batch_size = 32 WHERE id = 'profile'")
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(

@@ -140,9 +140,9 @@ class TaggerRepository:
             connection.execute(
                 """
                 INSERT INTO local_tagger_profiles (
-                    id, name, installation_id, threshold, categories_json,
+                    id, name, installation_id, threshold, selection_json, categories_json,
                     device, concurrency, batch_size, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
             )
@@ -152,7 +152,8 @@ class TaggerRepository:
             cursor = connection.execute(
                 """
                 UPDATE local_tagger_profiles
-                SET name = ?, installation_id = ?, threshold = ?, categories_json = ?,
+                SET name = ?, installation_id = ?, threshold = ?, selection_json = ?,
+                    categories_json = ?,
                     device = ?, concurrency = ?, batch_size = ?, updated_at = ?
                 WHERE id = ?
                 """,

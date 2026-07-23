@@ -10,6 +10,9 @@ from pydantic import ValidationError
 from dataset_studio.core.config import Settings
 from dataset_studio.modules.jobs.models import ExecutionBackend, JobCreateRequest, JobKind
 from dataset_studio.modules.taggers.adapters.base import (
+    TaggerBatchContract,
+    TaggerRuntimeSpec,
+    TaggerTensorSpec,
     TaggerVocabulary,
     ValidatedTaggerModel,
 )
@@ -18,8 +21,13 @@ from dataset_studio.modules.taggers.models import (
     TaggerDevice,
     TaggerExecutionProfile,
     TaggerImportRequest,
+    TaggerInferenceResult,
+    TaggerInferenceTag,
     TaggerInstallationStatus,
+    TaggerProfileCapabilities,
     TaggerRuntimeInfo,
+    TaggerSelectionMode,
+    TaggerSelectionPolicy,
     TaggerSettingsUpdate,
 )
 from dataset_studio.modules.taggers.pipeline import TaggerBatchPipeline, TaggerPipelineInput
@@ -34,6 +42,8 @@ class FakeTaggerAdapter:
     id = "fake_tagger"
     name = "Fake Tagger"
     description = "Test-only tagger adapter."
+    contract_version = 1
+    discovery_markers = ("model_vocabulary.json",)
 
     def detect(self, directory: Path) -> bool:
         return (directory / "model.onnx").is_file()
@@ -48,9 +58,11 @@ class FakeTaggerAdapter:
             raise ValueError("missing: " + ", ".join(missing))
         return ValidatedTaggerModel(
             adapter_id=self.id,
+            adapter_contract_version=self.contract_version,
             model_version="v1.0",
             tag_count=2,
             categories={"character": 1, "general": 1},
+            profile_capabilities=self.profile_capabilities(directory),
             managed_files=("model.onnx", "model.onnx.data", "model_vocabulary.json"),
         )
 
@@ -60,27 +72,40 @@ class FakeTaggerAdapter:
             categories=("character", "general"),
         )
 
-    def preprocess(self, _image: Image.Image) -> np.ndarray:
+    def preprocess(self, _directory: Path, _image: Image.Image) -> np.ndarray:
         return np.zeros((3, 384, 384), dtype=np.float32)
 
-    def batch_size_limit(self, _directory: Path) -> int | None:
-        return None
+    def runtime_spec(self, _directory: Path) -> TaggerRuntimeSpec:
+        return TaggerRuntimeSpec(
+            backend="onnx",
+            model_file="model.onnx",
+            input=TaggerTensorSpec(name="pixel_values", shape=(None, 3, 384, 384)),
+            outputs=(TaggerTensorSpec(name="logits", shape=(None, 2)),),
+            batch=TaggerBatchContract(
+                mode="dynamic",
+                max_size=32,
+                preferred_cpu=2,
+                preferred_cuda=4,
+            ),
+            sample_shape=(3, 384, 384),
+        )
 
-    def preferred_batch_size(self, _execution_provider: str) -> int:
-        return 2
+    def profile_capabilities(self, _directory: Path) -> TaggerProfileCapabilities:
+        return TaggerProfileCapabilities(
+            supported_selection_modes=[TaggerSelectionMode.GLOBAL],
+            default_selection=TaggerSelectionPolicy(global_threshold=0.55),
+            default_categories=["character", "general"],
+        )
 
-    def collate(self, prepared):
-        return CLTaggerV2Adapter().collate(prepared)
-
-    def output_names(self):
-        return ("logits",)
+    def collate(self, prepared, runtime_spec):
+        return CLTaggerV2Adapter().collate(prepared, runtime_spec)
 
     def postprocess(
         self,
         outputs,
         vocabulary,
         *,
-        threshold,
+        selection,
         categories,
         provider,
         inference_ms,
@@ -88,7 +113,7 @@ class FakeTaggerAdapter:
         return CLTaggerV2Adapter().postprocess(
             outputs,
             vocabulary,
-            threshold=threshold,
+            selection=selection,
             categories=categories,
             provider=provider,
             inference_ms=inference_ms,
@@ -113,6 +138,24 @@ class FakeSession:
 
     def get_providers(self) -> list[str]:
         return self._providers
+
+    def get_inputs(self):
+        return [
+            SimpleNamespace(
+                name="pixel_values",
+                shape=["batch", 3, 384, 384],
+                type="tensor(float)",
+            )
+        ]
+
+    def get_outputs(self):
+        return [
+            SimpleNamespace(
+                name="logits",
+                shape=["batch", 2],
+                type="tensor(float)",
+            )
+        ]
 
 
 def _service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TaggerService:
@@ -231,7 +274,7 @@ def test_local_import_creates_managed_installation_and_default_profile(
     assert (Path(installation.path) / "installation.json").is_file()
     assert len(library.profiles) == 1
     assert library.profiles[0].ready
-    assert library.profiles[0].threshold == 0.55
+    assert library.profiles[0].selection.global_threshold == 0.55
     assert set(library.profiles[0].categories) == {"character", "general"}
     assert service.registry.get("fake_tagger").download_plans() == ()
 
@@ -341,6 +384,7 @@ def test_v1_execution_snapshot_reuses_concurrency_as_requested_batch_size() -> N
 
     assert profile.snapshot_version == 1
     assert profile.batch_size == 3
+    assert profile.selection == TaggerSelectionPolicy(global_threshold=0.55)
 
 
 def test_batch_pipeline_isolates_bad_images_and_shrinks_failed_microbatches(
@@ -348,6 +392,7 @@ def test_batch_pipeline_isolates_bad_images_and_shrinks_failed_microbatches(
 ) -> None:
     class AdaptiveSession:
         provider = "CPUExecutionProvider"
+        prepared_tensor_bytes = 3 * 8 * 8 * 4
 
         def __init__(self) -> None:
             self.batch_calls: list[int] = []
@@ -372,7 +417,7 @@ def test_batch_pipeline_isolates_bad_images_and_shrinks_failed_microbatches(
                         tags=("alice", "blue_hair"),
                         categories=("character", "general"),
                     ),
-                    threshold=0.55,
+                    selection=TaggerSelectionPolicy(global_threshold=0.55),
                     categories=("character", "general"),
                     provider=self.provider,
                     inference_ms=1.0,
@@ -430,6 +475,84 @@ def test_batch_pipeline_isolates_bad_images_and_shrinks_failed_microbatches(
     ]
     assert all(outcome.result is not None for outcome in report.outcomes[:-1])
     assert "无法读取待打标图片" in (report.outcomes[-1].error or "")
+
+
+def test_batch_pipeline_caps_each_prepared_tensor_window(tmp_path: Path) -> None:
+    class MemoryBoundSession:
+        provider = "CPUExecutionProvider"
+        prepared_tensor_bytes = 1024
+
+        def __init__(self) -> None:
+            self.batch_calls: list[int] = []
+
+        def effective_batch_size(self) -> int:
+            return 10
+
+        def record_batch_failure(self, _failed_batch_size: int) -> None:
+            pass
+
+        def preprocess_bytes(self, _payload: bytes) -> np.ndarray:
+            return np.zeros((3, 8, 8), dtype=np.float32)
+
+        def infer_batch(self, prepared):
+            self.batch_calls.append(len(prepared))
+            return [
+                TaggerInferenceResult(
+                    content="blue_hair",
+                    tags=[
+                        TaggerInferenceTag(
+                            name="blue_hair",
+                            category="general",
+                            confidence=0.9,
+                        )
+                    ],
+                    provider=self.provider,
+                    inference_ms=1.0,
+                    batch_size=len(prepared),
+                    batch_inference_ms=1.0,
+                )
+                for _ in prepared
+            ]
+
+    class MemoryBoundRuntime:
+        def __init__(self, session: MemoryBoundSession) -> None:
+            self.session = session
+
+        def bind(self, _profile):
+            return self.session
+
+    image_paths = [tmp_path / f"memory-{index}.png" for index in range(5)]
+    for image_path in image_paths:
+        Image.new("RGB", (16, 16), "white").save(image_path)
+    session = MemoryBoundSession()
+    profile = TaggerExecutionProfile(
+        id="profile",
+        name="Memory profile",
+        installation_id="installation",
+        installation_name="Model",
+        adapter_id="fake",
+        model_version="v1",
+        fingerprint="a" * 64,
+        threshold=0.55,
+        categories=["general"],
+        device=TaggerDevice.CPU,
+        concurrency=1,
+        batch_size=10,
+    )
+
+    report = TaggerBatchPipeline(
+        MemoryBoundRuntime(session),
+        prepared_memory_budget=2048,
+    ).run(
+        profile,
+        [
+            TaggerPipelineInput(key=str(index), image_path=image_path)
+            for index, image_path in enumerate(image_paths)
+        ],
+    )
+
+    assert session.batch_calls == [2, 2, 1]
+    assert all(outcome.result is not None for outcome in report.outcomes)
 
 
 def test_runtime_auto_rebuilds_a_cpu_session_when_cuda_cannot_initialize(

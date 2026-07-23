@@ -1,5 +1,19 @@
 export type TaggerInstallationStatus = "ready" | "invalid" | "missing";
 export type TaggerDevice = "auto" | "cpu" | "cuda" | "directml";
+export type TaggerSelectionMode = "global" | "category" | "model_recommended";
+
+export interface TaggerSelectionPolicy {
+  mode: TaggerSelectionMode;
+  global_threshold: number;
+  category_thresholds: Record<string, number>;
+  max_tags: number | null;
+}
+
+export interface TaggerProfileCapabilities {
+  supported_selection_modes: TaggerSelectionMode[];
+  default_selection: TaggerSelectionPolicy;
+  default_categories: string[];
+}
 
 export interface TaggerFileRecord {
   relative_path: string;
@@ -13,14 +27,17 @@ export interface TaggerInstallation {
   name: string;
   adapter_id: string;
   adapter_name: string;
+  adapter_contract_version: number;
   model_version: string;
   relative_path: string;
   path: string;
   fingerprint: string;
   status: TaggerInstallationStatus;
   issues: string[];
+  warnings: string[];
   tag_count: number;
   categories: Record<string, number>;
+  profile_capabilities: TaggerProfileCapabilities;
   files: TaggerFileRecord[];
   source: {
     source_type: "local_import" | "local_scan";
@@ -35,7 +52,7 @@ export interface TaggerProfile {
   id: string;
   name: string;
   installation_id: string;
-  threshold: number;
+  selection: TaggerSelectionPolicy;
   categories: string[];
   device: TaggerDevice;
   concurrency: number;
@@ -51,7 +68,7 @@ export interface TaggerProfile {
 export interface TaggerProfileInput {
   name: string;
   installation_id: string;
-  threshold: number;
+  selection: TaggerSelectionPolicy;
   categories: string[];
   device: TaggerDevice;
   batch_size: number | null;
@@ -68,6 +85,11 @@ export interface TaggerLibrary {
     devices: TaggerDevice[];
     error: string | null;
   };
-  supported_adapters: Array<{ id: string; name: string; description: string }>;
+  supported_adapters: Array<{
+    id: string;
+    name: string;
+    description: string;
+    contract_version: number;
+  }>;
   scan_issues: string[];
 }

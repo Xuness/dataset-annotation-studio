@@ -77,7 +77,10 @@ export interface AnnotationTraceRequestParameters {
   adapter_id: string | null;
   installation_id: string | null;
   model_version: string | null;
+  selection_mode: string | null;
   threshold: number | null;
+  category_thresholds: Record<string, number> | null;
+  max_tags: number | null;
   categories: string[] | null;
   device: string | null;
   batch_size: number | null;

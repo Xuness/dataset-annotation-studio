@@ -12,6 +12,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { useTaggerActions, useTaggerLibrary } from "../../../features/taggers/hooks";
+import { taggerSelectionModeLabel } from "../../../features/taggers/labels";
 import { openLocalFolder } from "../../../shared/desktop/openLocalFolder";
 import { pickTaggerLibraryFolder, pickTaggerModelFolder } from "../../../shared/desktop/pickFolder";
 import { formatBytes } from "../../../shared/format/bytes";
@@ -124,8 +125,8 @@ export function TaggerSettings({ onClose }: { onClose: () => void }) {
       const profile = await actions.createProfile.mutateAsync({
         name,
         installation_id: selectedInstallation.id,
-        threshold: 0.55,
-        categories: Object.keys(selectedInstallation.categories),
+        selection: selectedInstallation.profile_capabilities.default_selection,
+        categories: selectedInstallation.profile_capabilities.default_categories,
         device: "auto",
         batch_size: null,
       });
@@ -305,6 +306,11 @@ export function TaggerSettings({ onClose }: { onClose: () => void }) {
                         {issue}
                       </p>
                     ))}
+                    {selectedInstallation.warnings.map((warning) => (
+                      <p className="tagger-inline-warning" key={warning}>
+                        {warning}
+                      </p>
+                    ))}
                     <dl>
                       <div>
                         <dt>标签总数</dt>
@@ -374,7 +380,7 @@ export function TaggerSettings({ onClose }: { onClose: () => void }) {
                 <div>
                   <span className="eyebrow">Reusable profiles</span>
                   <h3>打标配置</h3>
-                  <p>阈值、标签类别、执行设备与批大小独立于模型文件，可由任务直接选择。</p>
+                  <p>选择策略、标签类别、执行设备与批大小独立于模型文件，可由任务直接选择。</p>
                 </div>
                 <Button
                   icon={<Plus size={13} />}
@@ -396,7 +402,9 @@ export function TaggerSettings({ onClose }: { onClose: () => void }) {
                   >
                     <strong>{profile.name}</strong>
                     <small>
-                      {profile.ready ? `阈值 ${profile.threshold.toFixed(2)}` : "不可用"}
+                      {profile.ready
+                        ? `${taggerSelectionModeLabel(profile.selection.mode)} · ${profile.selection.global_threshold.toFixed(2)}`
+                        : "不可用"}
                     </small>
                   </button>
                 ))}

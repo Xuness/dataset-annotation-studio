@@ -33,7 +33,10 @@ class TraceRequestParameters(BaseModel):
     adapter_id: str | None = None
     installation_id: str | None = None
     model_version: str | None = None
+    selection_mode: str | None = None
     threshold: float | None = None
+    category_thresholds: dict[str, float] | None = None
+    max_tags: int | None = None
     categories: list[str] | None = None
     device: str | None = None
     batch_size: int | None = None
@@ -341,6 +344,7 @@ def _request_parameters(
                 "adapter_id": _string(snapshot.get("adapter_id")),
                 "installation_id": _string(snapshot.get("installation_id")),
                 "model_version": _string(snapshot.get("model_version")),
+                "selection_mode": "global" if snapshot.get("threshold") is not None else None,
                 "threshold": _number(snapshot.get("threshold")),
                 "categories": _string_list(snapshot.get("categories")),
                 "device": _string(snapshot.get("device")),
@@ -354,7 +358,10 @@ def _request_parameters(
             "adapter_id": profile.adapter_id,
             "installation_id": profile.installation_id,
             "model_version": profile.model_version,
-            "threshold": profile.threshold,
+            "selection_mode": profile.selection.mode.value,
+            "threshold": profile.selection.global_threshold,
+            "category_thresholds": profile.selection.category_thresholds,
+            "max_tags": profile.selection.max_tags,
             "categories": profile.categories,
             "device": profile.device.value,
             "batch_size": profile.batch_size,

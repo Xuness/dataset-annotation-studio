@@ -16,6 +16,7 @@ from dataset_studio.modules.taggers.models import (
 )
 
 _DEFAULT_ENCODED_MEMORY_BUDGET = 256 * 1024 * 1024
+_DEFAULT_PREPARED_MEMORY_BUDGET = 256 * 1024 * 1024
 _DEFAULT_DECODE_PIXEL_BUDGET = 160_000_000
 _MAX_DECODE_WORKERS = 4
 
@@ -27,6 +28,9 @@ class TaggerPipelineStopped(Exception):
 class TaggerBoundSession(Protocol):
     @property
     def provider(self) -> str: ...
+
+    @property
+    def prepared_tensor_bytes(self) -> int: ...
 
     def effective_batch_size(self) -> int: ...
 
@@ -86,17 +90,21 @@ class TaggerBatchPipeline:
         runtime: TaggerRuntimeBinder,
         *,
         encoded_memory_budget: int = _DEFAULT_ENCODED_MEMORY_BUDGET,
+        prepared_memory_budget: int = _DEFAULT_PREPARED_MEMORY_BUDGET,
         decode_pixel_budget: int = _DEFAULT_DECODE_PIXEL_BUDGET,
         max_decode_workers: int = _MAX_DECODE_WORKERS,
     ) -> None:
         if encoded_memory_budget < 1:
             raise ValueError("图片读取内存预算必须大于零。")
+        if prepared_memory_budget < 1:
+            raise ValueError("预处理张量内存预算必须大于零。")
         if decode_pixel_budget < 1:
             raise ValueError("图片解码像素预算必须大于零。")
         if max_decode_workers < 1:
             raise ValueError("图片解码线程数必须大于零。")
         self._runtime = runtime
         self._encoded_memory_budget = encoded_memory_budget
+        self._prepared_memory_budget = prepared_memory_budget
         self._decode_pixel_budget = decode_pixel_budget
         self._max_decode_workers = max_decode_workers
 
@@ -112,6 +120,15 @@ class TaggerBatchPipeline:
         stop_requested = should_stop or (lambda: False)
         self._raise_if_stopped(stop_requested)
         session = self._runtime.bind(profile)
+        if session.prepared_tensor_bytes > self._prepared_memory_budget:
+            raise ValueError(
+                "单张图片的预处理张量已超过流水线内存上限："
+                f"{session.prepared_tensor_bytes} > {self._prepared_memory_budget}"
+            )
+        prepared_window_limit = max(
+            1,
+            self._prepared_memory_budget // session.prepared_tensor_bytes,
+        )
         effective_batch_size = session.effective_batch_size()
         outcomes: dict[str, TaggerPipelineOutcome] = {}
         adaptive_batch_size = effective_batch_size
@@ -119,7 +136,13 @@ class TaggerBatchPipeline:
         cursor = 0
         while cursor < len(inputs):
             self._raise_if_stopped(stop_requested)
-            encoded, cursor = self._read_window(inputs, cursor, outcomes, stop_requested)
+            encoded, cursor = self._read_window(
+                inputs,
+                cursor,
+                outcomes,
+                stop_requested,
+                prepared_window_limit,
+            )
             if not encoded:
                 continue
             prepared = self._preprocess_window(session, encoded, outcomes, stop_requested)
@@ -161,6 +184,7 @@ class TaggerBatchPipeline:
         cursor: int,
         outcomes: dict[str, TaggerPipelineOutcome],
         should_stop: Callable[[], bool],
+        prepared_window_limit: int,
     ) -> tuple[list[_EncodedImage], int]:
         encoded: list[_EncodedImage] = []
         used_bytes = 0
@@ -188,6 +212,8 @@ class TaggerBatchPipeline:
             )
             used_bytes += len(payload)
             cursor += 1
+            if len(encoded) >= prepared_window_limit:
+                break
             if used_bytes >= self._encoded_memory_budget:
                 break
         return encoded, cursor
@@ -223,6 +249,12 @@ class TaggerBatchPipeline:
                     )
                     continue
                 prepared.append(_PreparedImage(request=item.request, pixels=pixels))
+        prepared_bytes = sum(item.pixels.nbytes for item in prepared)
+        if prepared_bytes > self._prepared_memory_budget:
+            raise ValueError(
+                "打标器适配器返回的预处理张量超过流水线内存上限："
+                f"{prepared_bytes} > {self._prepared_memory_budget}"
+            )
         return prepared
 
     def _infer_with_split(

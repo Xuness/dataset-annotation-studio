@@ -25,6 +25,61 @@ class TaggerDevice(StrEnum):
     DIRECTML = "directml"
 
 
+class TaggerSelectionMode(StrEnum):
+    GLOBAL = "global"
+    CATEGORY = "category"
+    MODEL_RECOMMENDED = "model_recommended"
+
+
+class TaggerSelectionPolicy(BaseModel):
+    mode: TaggerSelectionMode = TaggerSelectionMode.GLOBAL
+    global_threshold: float = Field(default=0.55, ge=0.01, le=0.99)
+    category_thresholds: dict[str, float] = Field(default_factory=dict, max_length=32)
+    max_tags: int | None = Field(default=None, ge=1, le=10_000)
+
+    @field_validator("category_thresholds")
+    @classmethod
+    def normalize_category_thresholds(cls, value: dict[str, float]) -> dict[str, float]:
+        normalized: dict[str, float] = {}
+        for raw_category, threshold in value.items():
+            category = raw_category.strip().casefold()
+            if not category:
+                raise ValueError("分类阈值的类别名不能为空。")
+            if category in normalized:
+                raise ValueError("分类阈值的类别名不能重复。")
+            if not 0.01 <= float(threshold) <= 0.99:
+                raise ValueError("分类阈值必须位于 0.01 到 0.99 之间。")
+            normalized[category] = float(threshold)
+        return normalized
+
+
+class TaggerProfileCapabilities(BaseModel):
+    supported_selection_modes: list[TaggerSelectionMode] = Field(min_length=1)
+    default_selection: TaggerSelectionPolicy
+    default_categories: list[str] = Field(min_length=1, max_length=32)
+
+    @field_validator("supported_selection_modes")
+    @classmethod
+    def unique_modes(cls, value: list[TaggerSelectionMode]) -> list[TaggerSelectionMode]:
+        if len(value) != len(set(value)):
+            raise ValueError("打标器支持的选择模式不能重复。")
+        return value
+
+    @field_validator("default_categories")
+    @classmethod
+    def normalize_default_categories(cls, value: list[str]) -> list[str]:
+        normalized = [category.strip().casefold() for category in value if category.strip()]
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("打标器默认类别不能重复。")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_default_mode(self) -> TaggerProfileCapabilities:
+        if self.default_selection.mode not in self.supported_selection_modes:
+            raise ValueError("默认标签选择模式不在打标器支持范围内。")
+        return self
+
+
 class TaggerFileRecord(BaseModel):
     relative_path: str
     size: int = Field(ge=0)
@@ -38,14 +93,17 @@ class TaggerSourceRecord(BaseModel):
 
 
 class TaggerInstallationManifest(BaseModel):
-    manifest_version: Literal[1] = 1
+    manifest_version: Literal[1, 2] = 2
     installation_id: str
     name: str
     adapter_id: str
+    adapter_contract_version: int = Field(default=1, ge=1)
     model_version: str
     fingerprint: str
     tag_count: int = Field(ge=1)
     categories: dict[str, int]
+    profile_capabilities: TaggerProfileCapabilities | None = None
+    warnings: list[str] = Field(default_factory=list)
     files: list[TaggerFileRecord]
     source: TaggerSourceRecord
     created_at: str
@@ -57,14 +115,17 @@ class TaggerInstallation(BaseModel):
     name: str
     adapter_id: str
     adapter_name: str
+    adapter_contract_version: int = Field(default=1, ge=1)
     model_version: str
     relative_path: str
     path: str
     fingerprint: str
     status: TaggerInstallationStatus
     issues: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
     tag_count: int = 0
     categories: dict[str, int] = Field(default_factory=dict)
+    profile_capabilities: TaggerProfileCapabilities
     files: list[TaggerFileRecord] = Field(default_factory=list)
     source: TaggerSourceRecord | None = None
     disk_size: int = 0
@@ -76,6 +137,7 @@ class TaggerAdapterSummary(BaseModel):
     id: str
     name: str
     description: str
+    contract_version: int = Field(ge=1)
 
 
 class TaggerRuntimeInfo(BaseModel):
@@ -89,7 +151,7 @@ class TaggerProfile(BaseModel):
     id: str
     name: str
     installation_id: str
-    threshold: float = Field(ge=0.01, le=0.99)
+    selection: TaggerSelectionPolicy
     categories: list[str]
     device: TaggerDevice = TaggerDevice.AUTO
     concurrency: int = Field(default=1, ge=1, le=8)
@@ -105,13 +167,25 @@ class TaggerProfile(BaseModel):
 class TaggerProfileCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     installation_id: str = Field(min_length=1)
-    threshold: float = Field(default=0.55, ge=0.01, le=0.99)
+    selection: TaggerSelectionPolicy = Field(default_factory=TaggerSelectionPolicy)
     categories: list[str] = Field(default_factory=list, max_length=32)
     device: TaggerDevice = TaggerDevice.AUTO
     concurrency: int = Field(default=1, ge=1, le=8)
     batch_size: int | None = Field(default=None, ge=1, le=32)
 
     _validate_name = field_validator("name")(_non_blank)
+
+    @model_validator(mode="before")
+    @classmethod
+    def upgrade_legacy_threshold(cls, value: object) -> object:
+        if not isinstance(value, dict) or "selection" in value or "threshold" not in value:
+            return value
+        upgraded = dict(value)
+        upgraded["selection"] = {
+            "mode": TaggerSelectionMode.GLOBAL,
+            "global_threshold": upgraded.pop("threshold"),
+        }
+        return upgraded
 
     @field_validator("categories")
     @classmethod
@@ -125,13 +199,25 @@ class TaggerProfileCreate(BaseModel):
 class TaggerProfileUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     installation_id: str | None = Field(default=None, min_length=1)
-    threshold: float | None = Field(default=None, ge=0.01, le=0.99)
+    selection: TaggerSelectionPolicy | None = None
     categories: list[str] | None = Field(default=None, max_length=32)
     device: TaggerDevice | None = None
     concurrency: int | None = Field(default=None, ge=1, le=8)
     batch_size: int | None = Field(default=None, ge=1, le=32)
 
     _validate_name = field_validator("name")(_non_blank)
+
+    @model_validator(mode="before")
+    @classmethod
+    def upgrade_legacy_threshold(cls, value: object) -> object:
+        if not isinstance(value, dict) or "selection" in value or "threshold" not in value:
+            return value
+        upgraded = dict(value)
+        upgraded["selection"] = {
+            "mode": TaggerSelectionMode.GLOBAL,
+            "global_threshold": upgraded.pop("threshold"),
+        }
+        return upgraded
 
     @field_validator("categories")
     @classmethod
@@ -145,16 +231,17 @@ class TaggerProfileUpdate(BaseModel):
 
 
 class TaggerExecutionProfile(BaseModel):
-    snapshot_version: Literal[1, 2] = 2
+    snapshot_version: Literal[1, 2, 3] = 3
     backend: Literal["local_tagger"] = "local_tagger"
     id: str
     name: str
     installation_id: str
     installation_name: str
     adapter_id: str
+    adapter_contract_version: int = Field(default=1, ge=1)
     model_version: str
     fingerprint: str
-    threshold: float = Field(ge=0.01, le=0.99)
+    selection: TaggerSelectionPolicy
     categories: list[str]
     device: TaggerDevice
     concurrency: int = Field(ge=1, le=8)
@@ -171,6 +258,11 @@ class TaggerExecutionProfile(BaseModel):
             # requested inference batch preserves the user's throughput intent;
             # adapters and the runtime still clamp or split unsafe batches.
             upgraded["batch_size"] = int(upgraded.get("concurrency") or 1)
+        if "selection" not in upgraded:
+            upgraded["selection"] = {
+                "mode": TaggerSelectionMode.GLOBAL,
+                "global_threshold": upgraded.pop("threshold", 0.55),
+            }
         return upgraded
 
     @model_validator(mode="after")

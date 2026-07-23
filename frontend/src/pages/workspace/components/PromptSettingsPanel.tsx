@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useAnnotationTrace, usePromptPreview } from "../../../features/assets/hooks";
 import { useSystemPresets } from "../../../features/presets/hooks";
+import { taggerSelectionModeLabel } from "../../../features/taggers/labels";
 import { useUpdateWorkspace } from "../../../features/workspaces/hooks";
 import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import type {
@@ -128,10 +129,10 @@ function AnnotationTraceView({ trace }: { trace: AssetAnnotationTrace }) {
           </dd>
         </div>
         <div>
-          <dt>{localTagger ? "统一阈值" : "最大输出"}</dt>
+          <dt>{localTagger ? "选择策略 / 回退阈值" : "最大输出"}</dt>
           <dd>
             {localTagger
-              ? (parameters.threshold ?? "未记录")
+              ? `${taggerSelectionModeLabel(parameters.selection_mode)} / ${parameters.threshold ?? "未记录"}`
               : parameters.max_output_tokens === null
                 ? "未记录"
                 : `${parameters.max_output_tokens.toLocaleString()} Token`}

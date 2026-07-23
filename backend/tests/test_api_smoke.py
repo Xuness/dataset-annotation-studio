@@ -35,7 +35,14 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
         )
         assert taggers.json()["installations"] == []
         assert taggers.json()["profiles"] == []
-        assert [item["id"] for item in taggers.json()["supported_adapters"]] == ["cl_tagger_v2"]
+        assert [item["id"] for item in taggers.json()["supported_adapters"]] == [
+            "cl_tagger_v2",
+            "wd_tagger_v3",
+            "pixai_tagger_v09",
+            "joytag",
+            "anime_timm_dbv4",
+            "camie_tagger_v2",
+        ]
 
         opened = client.post("/api/v1/workspaces/open", json={"path": str(project)})
         assert opened.status_code == 200

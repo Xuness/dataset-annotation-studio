@@ -15,7 +15,11 @@ from typing import Any, Protocol
 import numpy as np
 from PIL import Image, ImageOps
 
-from dataset_studio.modules.taggers.adapters.base import TaggerAdapter, TaggerVocabulary
+from dataset_studio.modules.taggers.adapters.base import (
+    TaggerAdapter,
+    TaggerRuntimeSpec,
+    TaggerVocabulary,
+)
 from dataset_studio.modules.taggers.models import (
     TaggerDevice,
     TaggerExecutionProfile,
@@ -41,6 +45,10 @@ class _Session(Protocol):
 
     def get_providers(self) -> list[str]: ...
 
+    def get_inputs(self) -> list[Any]: ...
+
+    def get_outputs(self) -> list[Any]: ...
+
 
 class _SessionFactory(Protocol):
     def __call__(self, model_path: Path, providers: list[str]) -> _Session: ...
@@ -49,11 +57,12 @@ class _SessionFactory(Protocol):
 @dataclass(slots=True)
 class _RuntimeEntry:
     installation_id: str
+    directory: Path
     session: _Session
     adapter: TaggerAdapter
     vocabulary: TaggerVocabulary
+    runtime_spec: TaggerRuntimeSpec
     primary_provider: str
-    batch_size_limit: int | None
     adaptive_batch_size: int | None
     batch_size_lock: threading.Lock
     serialize_runs: bool
@@ -72,15 +81,22 @@ class TaggerInferenceSession:
         return self.entry.primary_provider
 
     def effective_batch_size(self) -> int:
+        batch_contract = self.entry.runtime_spec.batch
+        if batch_contract.mode == "fixed":
+            assert batch_contract.fixed_size is not None
+            return batch_contract.fixed_size
         requested = self.profile.batch_size
-        preferred = self.entry.adapter.preferred_batch_size(self.provider)
+        preferred = batch_contract.preferred_size(self.provider)
         batch_size = requested if requested is not None else preferred
-        if self.entry.batch_size_limit is not None:
-            batch_size = min(batch_size, self.entry.batch_size_limit)
+        batch_size = min(batch_size, batch_contract.max_size)
         with self.entry.batch_size_lock:
             if self.entry.adaptive_batch_size is not None:
                 batch_size = min(batch_size, self.entry.adaptive_batch_size)
         return min(32, max(1, batch_size))
+
+    @property
+    def prepared_tensor_bytes(self) -> int:
+        return self.entry.runtime_spec.prepared_tensor_bytes
 
     def record_batch_failure(self, failed_batch_size: int) -> None:
         if failed_batch_size <= 1:
@@ -94,10 +110,18 @@ class TaggerInferenceSession:
         try:
             with Image.open(BytesIO(payload)) as source:
                 image = ImageOps.exif_transpose(source)
-                prepared = self.entry.adapter.preprocess(image)
+                prepared = self.entry.adapter.preprocess(self.entry.directory, image)
         except (OSError, ValueError) as error:
             raise ValueError(f"无法读取待打标图片：{error}") from error
-        return np.asarray(prepared, dtype=np.float32)
+        pixels = np.asarray(prepared)
+        expected_shape = self.entry.runtime_spec.prepared_shape
+        expected_dtype = self.entry.runtime_spec.prepared_dtype
+        if pixels.shape != expected_shape or pixels.dtype != expected_dtype:
+            raise ValueError(
+                "打标器预处理结果违反 RuntimeSpec："
+                f"{pixels.shape} / {pixels.dtype}，预期 {expected_shape} / {expected_dtype}"
+            )
+        return np.ascontiguousarray(pixels)
 
     def infer_batch(
         self,
@@ -105,15 +129,27 @@ class TaggerInferenceSession:
     ) -> list[TaggerInferenceResult | Exception]:
         if not prepared:
             return []
-        if self.entry.batch_size_limit is not None and len(prepared) > self.entry.batch_size_limit:
-            raise ValueError(f"当前模型最多支持 {self.entry.batch_size_limit} 张图片的推理批次。")
-        inputs = self.entry.adapter.collate(prepared)
+        batch_contract = self.entry.runtime_spec.batch
+        if len(prepared) > batch_contract.max_size:
+            raise ValueError(f"当前模型最多支持 {batch_contract.max_size} 张图片的推理批次。")
+        inference_inputs = list(prepared)
+        requested_count = len(inference_inputs)
+        if batch_contract.mode == "fixed":
+            assert batch_contract.fixed_size is not None
+            if requested_count > batch_contract.fixed_size:
+                raise ValueError(
+                    f"当前模型只支持固定批次 {batch_contract.fixed_size}，"
+                    f"但收到了 {requested_count} 张图片。"
+                )
+            while len(inference_inputs) < batch_contract.fixed_size:
+                inference_inputs.append(inference_inputs[-1])
+        inputs = self.entry.adapter.collate(inference_inputs, self.entry.runtime_spec)
         run_guard = self.entry.run_lock if self.entry.serialize_runs else nullcontext()
         started = time.perf_counter()
         try:
             with run_guard:
                 outputs = self.entry.session.run(
-                    list(self.entry.adapter.output_names()),
+                    [output.name for output in self.entry.runtime_spec.outputs],
                     inputs,
                 )
         except Exception as error:
@@ -123,16 +159,17 @@ class TaggerInferenceSession:
         results = self.entry.adapter.postprocess(
             outputs,
             self.entry.vocabulary,
-            threshold=self.profile.threshold,
+            selection=self.profile.selection,
             categories=tuple(self.profile.categories),
             provider=active_provider,
             inference_ms=elapsed_ms,
         )
-        if len(results) != len(prepared):
+        if len(results) != len(inference_inputs):
             raise ValueError(
-                f"打标器返回了 {len(results)} 条结果，但当前批次包含 {len(prepared)} 张图片。"
+                f"打标器返回了 {len(results)} 条结果，但推理批次包含 "
+                f"{len(inference_inputs)} 张图片。"
             )
-        return results
+        return results[:requested_count]
 
     def _validate_active_provider(self) -> str:
         active_providers = self.entry.session.get_providers()
@@ -227,18 +264,24 @@ class TaggerRuntime:
             if existing is not None:
                 self._entries[key] = existing
                 return existing
+            runtime_spec = adapter.runtime_spec(directory)
+            model_path = (directory / runtime_spec.model_file).resolve()
+            if not model_path.is_relative_to(directory) or not model_path.is_file():
+                raise ValueError(f"RuntimeSpec 模型文件不存在或路径越界：{runtime_spec.model_file}")
             session, actual = self._create_session_for_device(
                 profile.device,
-                directory / "model.onnx",
+                model_path,
                 provider_candidates,
             )
+            _validate_session_contract(session, runtime_spec)
             entry = _RuntimeEntry(
                 installation_id=profile.installation_id,
+                directory=directory,
                 session=session,
                 adapter=adapter,
                 vocabulary=adapter.load_vocabulary(directory),
+                runtime_spec=runtime_spec,
                 primary_provider=actual[0],
-                batch_size_limit=adapter.batch_size_limit(directory),
                 adaptive_batch_size=None,
                 batch_size_lock=threading.Lock(),
                 serialize_runs=actual[0] == "DmlExecutionProvider",
@@ -333,6 +376,39 @@ class TaggerRuntime:
             )
         except Exception as error:
             raise ValueError(f"无法加载 ONNX 本地打标器：{error}") from error
+
+
+def _validate_session_contract(session: _Session, spec: TaggerRuntimeSpec) -> None:
+    inputs = session.get_inputs()
+    outputs = session.get_outputs()
+    if len(inputs) != 1:
+        raise ValueError(f"ONNX RuntimeSpec 要求单输入模型，实际输入数为 {len(inputs)}。")
+    expected_outputs = {output.name: output for output in spec.outputs}
+    actual_outputs = {str(output.name): output for output in outputs}
+    if set(actual_outputs) != set(expected_outputs):
+        raise ValueError(
+            "ONNX 输出名称与 RuntimeSpec 不一致："
+            f"预期 {', '.join(expected_outputs)}，实际 {', '.join(actual_outputs)}"
+        )
+    _validate_node_arg(inputs[0], spec.input, "输入")
+    for name, expected in expected_outputs.items():
+        _validate_node_arg(actual_outputs[name], expected, "输出")
+
+
+def _validate_node_arg(actual: Any, expected: Any, label: str) -> None:
+    if str(actual.name) != expected.name:
+        raise ValueError(f"ONNX {label}名称与 RuntimeSpec 不一致：{actual.name} != {expected.name}")
+    expected_type = expected.onnx_type
+    if str(actual.type) != expected_type:
+        raise ValueError(f"ONNX {label}类型与 RuntimeSpec 不一致：{actual.type} != {expected_type}")
+    actual_shape = tuple(
+        int(dimension) if isinstance(dimension, int) and not isinstance(dimension, bool) else None
+        for dimension in actual.shape
+    )
+    if actual_shape != expected.shape:
+        raise ValueError(
+            f"ONNX {label}形状与 RuntimeSpec 不一致：{actual_shape} != {expected.shape}"
+        )
 
 
 def _prepare_cuda_runtime(ort: Any) -> None:

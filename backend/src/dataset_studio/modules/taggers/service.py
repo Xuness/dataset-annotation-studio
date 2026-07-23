@@ -29,9 +29,12 @@ from dataset_studio.modules.taggers.models import (
     TaggerInstallationStatus,
     TaggerLibrary,
     TaggerProfile,
+    TaggerProfileCapabilities,
     TaggerProfileCreate,
     TaggerProfileUpdate,
     TaggerRuntimeInfo,
+    TaggerSelectionMode,
+    TaggerSelectionPolicy,
     TaggerSettingsUpdate,
     TaggerSourceRecord,
 )
@@ -198,21 +201,13 @@ class TaggerService:
             str(row["relative_path"]): str(row["id"])
             for row in self._repository.list_installations()
         }
-        candidates: list[Path] = []
-        for model_path in root.rglob("model.onnx"):
-            relative_parts = model_path.relative_to(root).parts
-            if any(part in {".staging", ".trash"} for part in relative_parts):
-                continue
-            candidate = model_path.parent.resolve()
+        candidates, truncated = self._registry.candidate_directories(root)
+        if truncated:
+            issues.append("模型库候选目录超过 200 个，本次扫描已提前停止。")
+        for candidate in candidates:
             if not candidate.is_relative_to(root):
-                issues.append(f"忽略了模型库外的链接目录：{model_path.parent}")
+                issues.append(f"忽略了模型库外的链接目录：{candidate}")
                 continue
-            candidates.append(candidate)
-            if len(candidates) >= 200:
-                issues.append("模型库候选目录超过 200 个，本次扫描已提前停止。")
-                break
-
-        for candidate in sorted(set(candidates), key=lambda path: str(path).casefold()):
             relative_path = candidate.relative_to(root).as_posix()
             existing_id = known_paths.get(relative_path)
             if existing_id:
@@ -316,14 +311,15 @@ class TaggerService:
     @_catalog_locked
     def create_profile(self, data: TaggerProfileCreate) -> TaggerProfile:
         installation = self._ready_installation(data.installation_id)
-        categories = data.categories or sorted(installation.categories)
+        categories = data.categories or installation.profile_capabilities.default_categories
         self._validate_categories(categories, installation)
+        self._validate_selection(data.selection, installation)
         now = utc_now_iso()
         profile = TaggerProfile(
             id=str(uuid.uuid4()),
             name=data.name.strip(),
             installation_id=installation.id,
-            threshold=data.threshold,
+            selection=data.selection,
             categories=categories,
             device=data.device,
             concurrency=data.concurrency,
@@ -341,18 +337,23 @@ class TaggerService:
     def update_profile(self, profile_id: str, data: TaggerProfileUpdate) -> TaggerProfile:
         current = self.get_profile(profile_id)
         values = data.model_dump(exclude_none=True)
+        if data.selection is not None:
+            values["selection"] = data.selection
         if "batch_size" in data.model_fields_set:
             values["batch_size"] = data.batch_size
         installation_id = str(values.get("installation_id", current.installation_id))
         installation = self._ready_installation(installation_id)
         categories = list(values.get("categories", current.categories))
         self._validate_categories(categories, installation)
+        selection = data.selection or current.selection
+        self._validate_selection(selection, installation)
         updated = current.model_copy(
             update={
                 **values,
                 "name": str(values.get("name", current.name)).strip(),
                 "installation_id": installation_id,
                 "categories": categories,
+                "selection": selection,
                 "updated_at": utc_now_iso(),
             }
         )
@@ -381,9 +382,10 @@ class TaggerService:
             installation_id=installation.id,
             installation_name=installation.name,
             adapter_id=installation.adapter_id,
+            adapter_contract_version=installation.adapter_contract_version,
             model_version=installation.model_version,
             fingerprint=installation.fingerprint,
-            threshold=profile.threshold,
+            selection=profile.selection,
             categories=profile.categories,
             device=profile.device,
             concurrency=profile.concurrency,
@@ -399,6 +401,8 @@ class TaggerService:
             raise ValueError("本地打标器文件在任务创建后发生变化，已拒绝继续执行。")
         if installation.adapter_id != profile.adapter_id:
             raise ValueError("本地打标器适配器与任务快照不一致。")
+        if installation.adapter_contract_version != profile.adapter_contract_version:
+            raise ValueError("本地打标器适配器契约在任务创建后发生变化，已拒绝继续执行。")
         return Path(installation.path), self._registry.get(installation.adapter_id)
 
     @staticmethod
@@ -479,19 +483,34 @@ class TaggerService:
             status = TaggerInstallationStatus.INVALID
         fallback = self._manifest_from_row(row, strict=False)
         manifest = manifest or fallback
+        categories = manifest.categories if manifest else {}
+        profile_capabilities = (
+            manifest.profile_capabilities
+            if manifest and manifest.profile_capabilities is not None
+            else self._legacy_profile_capabilities(
+                str(row["adapter_id"]),
+                directory,
+                categories,
+            )
+        )
         return TaggerInstallation(
             id=str(row["id"]),
             name=str(row["name"]),
             adapter_id=str(row["adapter_id"]),
             adapter_name=self._adapter_name(str(row["adapter_id"])),
+            adapter_contract_version=(
+                manifest.adapter_contract_version if manifest is not None else 1
+            ),
             model_version=str(row["model_version"]),
             relative_path=str(row["relative_path"]),
             path=str(directory),
             fingerprint=str(row["fingerprint"]),
             status=status,
             issues=list(dict.fromkeys(issues)),
+            warnings=manifest.warnings if manifest else [],
             tag_count=manifest.tag_count if manifest else 0,
-            categories=manifest.categories if manifest else {},
+            categories=categories,
+            profile_capabilities=profile_capabilities,
             files=manifest.files if manifest else [],
             source=manifest.source if manifest else None,
             disk_size=sum(file.size for file in manifest.files) if manifest else 0,
@@ -516,12 +535,25 @@ class TaggerService:
         except (json.JSONDecodeError, ValueError):
             categories = []
             issues.append("配置中的标签类别无法识别。")
+        try:
+            raw_selection = row["selection_json"]
+            selection = TaggerSelectionPolicy.model_validate_json(str(raw_selection))
+        except (IndexError, KeyError, ValueError):
+            selection = TaggerSelectionPolicy(
+                mode=TaggerSelectionMode.GLOBAL,
+                global_threshold=float(row["threshold"]),
+            )
+            issues.append("配置中的标签选择策略无法识别。")
         if installation is None:
             issues.append("关联的模型安装已不存在。")
         elif installation.status != TaggerInstallationStatus.READY:
             issues.append("关联的模型安装当前不可用。")
         elif not categories or not set(categories).issubset(installation.categories):
             issues.append("配置中的标签类别与当前模型不兼容。")
+        elif selection.mode not in installation.profile_capabilities.supported_selection_modes:
+            issues.append("配置中的标签选择策略与当前模型不兼容。")
+        elif not set(selection.category_thresholds).issubset(installation.categories):
+            issues.append("配置中的分类阈值与当前模型不兼容。")
         device = TaggerDevice(str(row["device"]))
         if not runtime.available:
             issues.append(runtime.error or "ONNX Runtime 不可用。")
@@ -531,7 +563,7 @@ class TaggerService:
             id=str(row["id"]),
             name=str(row["name"]),
             installation_id=str(row["installation_id"]),
-            threshold=float(row["threshold"]),
+            selection=selection,
             categories=categories,
             device=device,
             concurrency=int(row["concurrency"]),
@@ -577,8 +609,18 @@ class TaggerService:
         source: TaggerSourceRecord,
         created_at: str,
     ) -> TaggerInstallationManifest:
+        capabilities = validated.profile_capabilities
+        unknown_defaults = sorted(set(capabilities.default_categories) - set(validated.categories))
+        if unknown_defaults:
+            raise ValueError("适配器默认配置包含未知类别：" + "、".join(unknown_defaults))
+        unknown_thresholds = sorted(
+            set(capabilities.default_selection.category_thresholds) - set(validated.categories)
+        )
+        if unknown_thresholds:
+            raise ValueError("适配器默认阈值包含未知类别：" + "、".join(unknown_thresholds))
         fingerprint_payload = {
             "adapter_id": validated.adapter_id,
+            "adapter_contract_version": validated.adapter_contract_version,
             "model_version": validated.model_version,
             "files": [
                 {"path": file.relative_path, "size": file.size, "sha256": file.sha256}
@@ -592,10 +634,13 @@ class TaggerService:
             installation_id=installation_id,
             name=name,
             adapter_id=validated.adapter_id,
+            adapter_contract_version=validated.adapter_contract_version,
             model_version=validated.model_version,
             fingerprint=fingerprint,
             tag_count=validated.tag_count,
             categories=validated.categories,
+            profile_capabilities=validated.profile_capabilities,
+            warnings=list(validated.warnings),
             files=files,
             source=source,
             created_at=created_at,
@@ -614,8 +659,16 @@ class TaggerService:
             TaggerProfileCreate(
                 name=name,
                 installation_id=manifest.installation_id,
-                threshold=0.55,
-                categories=sorted(manifest.categories),
+                selection=(
+                    manifest.profile_capabilities.default_selection
+                    if manifest.profile_capabilities is not None
+                    else TaggerSelectionPolicy()
+                ),
+                categories=(
+                    manifest.profile_capabilities.default_categories
+                    if manifest.profile_capabilities is not None
+                    else sorted(manifest.categories)
+                ),
                 device=TaggerDevice.AUTO,
                 concurrency=1,
                 batch_size=None,
@@ -714,7 +767,8 @@ class TaggerService:
             profile.id,
             profile.name,
             profile.installation_id,
-            profile.threshold,
+            profile.selection.global_threshold,
+            profile.selection.model_dump_json(),
             json.dumps(profile.categories, ensure_ascii=False),
             profile.device.value,
             profile.concurrency,
@@ -728,7 +782,8 @@ class TaggerService:
         return (
             profile.name,
             profile.installation_id,
-            profile.threshold,
+            profile.selection.global_threshold,
+            profile.selection.model_dump_json(),
             json.dumps(profile.categories, ensure_ascii=False),
             profile.device.value,
             profile.concurrency,
@@ -746,6 +801,36 @@ class TaggerService:
         unknown = sorted(set(categories) - set(installation.categories))
         if unknown:
             raise ValueError("当前模型不包含这些标签类别：" + "、".join(unknown))
+
+    @staticmethod
+    def _validate_selection(
+        selection: TaggerSelectionPolicy,
+        installation: TaggerInstallation,
+    ) -> None:
+        capabilities = installation.profile_capabilities
+        if selection.mode not in capabilities.supported_selection_modes:
+            raise ValueError(f"当前模型不支持标签选择模式：{selection.mode.value}")
+        unknown = sorted(set(selection.category_thresholds) - set(installation.categories))
+        if unknown:
+            raise ValueError("当前模型不包含这些分类阈值：" + "、".join(unknown))
+
+    def _legacy_profile_capabilities(
+        self,
+        adapter_id: str,
+        directory: Path,
+        categories: dict[str, int],
+    ) -> TaggerProfileCapabilities:
+        try:
+            if directory.is_dir():
+                return self._registry.get(adapter_id).profile_capabilities(directory)
+        except (OSError, ValueError):
+            pass
+        defaults = sorted(categories) or ["unknown"]
+        return TaggerProfileCapabilities(
+            supported_selection_modes=[TaggerSelectionMode.GLOBAL],
+            default_selection=TaggerSelectionPolicy(),
+            default_categories=defaults,
+        )
 
 
 def _safe_segment(value: str) -> str:
