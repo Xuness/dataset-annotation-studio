@@ -160,6 +160,24 @@ def test_scan_api_refuses_to_run_while_job_is_active(tmp_path: Path) -> None:
     assert "任务运行" in response.json()["detail"]
 
 
+def test_remove_recent_api_refuses_while_job_is_active(tmp_path: Path) -> None:
+    _, project_id, _, _, project = _single_item_job(tmp_path)
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+
+    with TestClient(create_app(settings)) as client:
+        client.post(
+            "/api/v1/workspaces/open",
+            json={"path": str(project)},
+        )
+        response = client.delete(f"/api/v1/workspaces/{project_id}/recent")
+        recent = client.get("/api/v1/workspaces").json()
+
+    assert response.status_code == 400
+    assert "任务运行" in response.json()["detail"]
+    assert [workspace["project_id"] for workspace in recent] == [project_id]
+    assert (project / "sample.png").is_file()
+
+
 def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -> None:
     settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
     settings.ensure_directories()

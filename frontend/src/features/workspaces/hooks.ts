@@ -6,6 +6,7 @@ import {
   getWorkspace,
   listWorkspaces,
   openWorkspace,
+  removeRecentWorkspace,
   rescanWorkspace,
   updateWorkspace,
 } from "./api";
@@ -30,6 +31,23 @@ export function useOpenWorkspace() {
     onSuccess: ({ workspace }) => {
       queryClient.setQueryData(workspaceKeys.detail(workspace.project_id), workspace);
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+    },
+  });
+}
+
+export function useRemoveRecentWorkspace() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: removeRecentWorkspace,
+    onSuccess: (_result, projectId) => {
+      queryClient.setQueryData<Awaited<ReturnType<typeof listWorkspaces>>>(
+        workspaceKeys.all,
+        (workspaces) => workspaces?.filter((workspace) => workspace.project_id !== projectId),
+      );
+      queryClient.removeQueries({
+        queryKey: workspaceKeys.detail(projectId),
+        exact: true,
+      });
     },
   });
 }

@@ -187,6 +187,23 @@ def _runtime(tmp_path: Path):
     return container, workspaces, presets, jobs
 
 
+def test_idle_job_scheduler_does_not_scan_recent_workspaces(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    container, workspaces, _, _ = _runtime(tmp_path)
+    project = tmp_path / "idle-dataset"
+    project.mkdir()
+    workspaces.open(str(project))
+
+    def fail_recent_scan():
+        raise AssertionError("idle scheduler must not enumerate recent workspaces")
+
+    monkeypatch.setattr(workspaces, "list_recent", fail_recent_scan)
+
+    AnnotationWorker(container)._schedule_available_items()
+
+
 @pytest.mark.asyncio
 async def test_worker_runs_local_tagger_without_prompt_or_provider(
     tmp_path: Path,

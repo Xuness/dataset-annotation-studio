@@ -5,12 +5,14 @@ import hashlib
 import logging
 import os
 import shutil
+import sqlite3
 import tempfile
 import threading
 from contextlib import suppress
 from pathlib import Path
 from typing import Protocol
 
+from dataset_studio.core.errors import WorkspaceNotFoundError
 from dataset_studio.core.files import file_sha256
 from dataset_studio.modules.exports.models import ExportOperation
 from dataset_studio.modules.exports.repository import ExportRepository
@@ -69,22 +71,43 @@ class ExportWorker:
         LOGGER.info("Export worker stopped.")
 
     def _claim_next(self) -> tuple[str, ExportOperation] | None:
-        for workspace in self._container.workspaces.list_recent():
-            if not workspace.exists:
+        for candidate in self._container.workspaces.worker_candidates("exports"):
+            try:
+                paths, _ = self._container.workspaces.get(candidate.project_id)
+                repository = ExportRepository(paths.database)
+                operation = repository.claim_next_operation()
+            except (WorkspaceNotFoundError, OSError, ValueError, sqlite3.Error) as error:
+                LOGGER.warning(
+                    "Dropping unavailable export workspace %s from the worker queue: %s",
+                    candidate.project_id,
+                    error,
+                )
+                self._container.workspaces.clear_worker_activity(
+                    candidate.project_id,
+                    "exports",
+                    requested_at=candidate.requested_at,
+                )
                 continue
-            paths, _ = self._container.workspaces.get(workspace.project_id)
-            operation = ExportRepository(paths.database).claim_next_operation()
             if operation is not None:
-                return workspace.project_id, operation
+                return candidate.project_id, operation
+            if not repository.active_count():
+                self._container.workspaces.clear_worker_activity(
+                    candidate.project_id,
+                    "exports",
+                    requested_at=candidate.requested_at,
+                )
         return None
 
     def _recover_orphaned(self) -> None:
-        for workspace in self._container.workspaces.list_recent():
-            if not workspace.exists:
+        for project_id in self._container.workspaces.recent_project_ids():
+            try:
+                paths, manifest = self._container.workspaces.get(project_id)
+                repository = ExportRepository(paths.database)
+                recovered = repository.recover_orphaned()
+            except (WorkspaceNotFoundError, OSError, ValueError, sqlite3.Error) as error:
+                LOGGER.warning("Skipping unavailable export workspace %s: %s", project_id, error)
+                self._container.workspaces.clear_worker_activity(project_id, "exports")
                 continue
-            paths, _ = self._container.workspaces.get(workspace.project_id)
-            repository = ExportRepository(paths.database)
-            recovered = repository.recover_orphaned()
             for operation in recovered:
                 destination = Path(operation.destination_path)
                 self._cleanup_operation_temp_files(destination, operation.operation_id)
@@ -95,8 +118,12 @@ class ExportWorker:
                 LOGGER.info(
                     "Marked export %s interrupted in %s.",
                     operation.operation_id,
-                    workspace.name,
+                    manifest.name,
                 )
+            if repository.active_count():
+                self._container.workspaces.mark_worker_activity(project_id, "exports")
+            else:
+                self._container.workspaces.clear_worker_activity(project_id, "exports")
 
     def _process_operation(self, project_id: str, operation_id: str) -> None:
         paths, _ = self._container.workspaces.get(project_id)

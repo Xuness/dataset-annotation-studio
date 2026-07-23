@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import secrets
+import sqlite3
 import uuid
 from collections.abc import Callable
 from pathlib import Path
 
-from dataset_studio.core.errors import StudioError
+from dataset_studio.core.errors import StudioError, WorkspaceNotFoundError
 from dataset_studio.modules.exports.models import (
     ExportCreateRequest,
     ExportOperation,
@@ -87,6 +88,7 @@ class ExportService:
         operation = repository.get(operation_id)
         if operation is None:
             raise RuntimeError("导出任务创建后无法读取。")
+        self._workspaces.mark_worker_activity(project_id, "exports")
         return operation
 
     def list(self, project_id: str, *, limit: int = 100) -> list[ExportOperation]:
@@ -108,6 +110,7 @@ class ExportService:
         operation = repository.get(operation_id)
         if operation is None:
             raise ExportNotFoundError(f"找不到导出任务：{operation_id}")
+        self._workspaces.mark_worker_activity(project_id, "exports")
         return operation
 
     def resume(self, project_id: str, operation_id: str) -> ExportOperation:
@@ -119,6 +122,7 @@ class ExportService:
         operation = repository.get(operation_id)
         if operation is None:
             raise ExportNotFoundError(f"找不到导出任务：{operation_id}")
+        self._workspaces.mark_worker_activity(project_id, "exports")
         return operation
 
     def has_active(self, project_id: str) -> bool:
@@ -139,31 +143,46 @@ class ExportService:
             raise ValueError("当前工作区正在导出数据，请先停止导出任务。")
 
     def active_project_ids(self) -> set[str]:
-        projects: set[str] = set()
-        for workspace in self._workspaces.list_recent():
-            if not workspace.exists:
-                continue
-            paths, _ = self._workspaces.get(workspace.project_id)
-            if ExportRepository(paths.database).active_count():
-                projects.add(workspace.project_id)
-        return projects
+        return {project_id for project_id, _database in self._active_workspace_databases()}
 
     def active_overview(self) -> tuple[int, int]:
-        count = 0
-        projects = self.active_project_ids()
-        for project_id in projects:
-            paths, _ = self._workspaces.get(project_id)
-            count += ExportRepository(paths.database).active_count()
-        return count, len(projects)
+        active_workspaces = self._active_workspace_databases()
+        count = sum(
+            ExportRepository(database).active_count() for _project_id, database in active_workspaces
+        )
+        return count, len(active_workspaces)
 
     def stop_all_workspaces(self) -> int:
         stopped = 0
-        for workspace in self._workspaces.list_recent():
-            if not workspace.exists:
-                continue
-            paths, _ = self._workspaces.get(workspace.project_id)
-            stopped += ExportRepository(paths.database).request_stop_all()
+        for project_id, database in self._active_workspace_databases():
+            project_stopped = ExportRepository(database).request_stop_all()
+            stopped += project_stopped
+            if project_stopped:
+                self._workspaces.mark_worker_activity(project_id, "exports")
         return stopped
+
+    def _active_workspace_databases(self) -> list[tuple[str, Path]]:
+        active: list[tuple[str, Path]] = []
+        for candidate in self._workspaces.worker_candidates("exports"):
+            try:
+                paths, _ = self._workspaces.get(candidate.project_id)
+                has_active = ExportRepository(paths.database).active_count() > 0
+            except (WorkspaceNotFoundError, OSError, ValueError, sqlite3.Error):
+                self._workspaces.clear_worker_activity(
+                    candidate.project_id,
+                    "exports",
+                    requested_at=candidate.requested_at,
+                )
+                continue
+            if has_active:
+                active.append((candidate.project_id, paths.database))
+            else:
+                self._workspaces.clear_worker_activity(
+                    candidate.project_id,
+                    "exports",
+                    requested_at=candidate.requested_at,
+                )
+        return active
 
     def _ensure_can_start(self, project_id: str) -> None:
         if self._has_active_preprocessing(project_id):

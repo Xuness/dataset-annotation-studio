@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sqlite3
 from collections.abc import Callable, Sequence
 from contextlib import suppress
 from pathlib import Path
 from typing import Protocol
 
+from dataset_studio.core.errors import WorkspaceNotFoundError
 from dataset_studio.core.files import atomic_write_text
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
@@ -49,6 +51,8 @@ from dataset_studio.modules.translations.service import (
     TranslationSourceChangedError,
 )
 from dataset_studio.modules.translations.validation import validate_translation_structure
+from dataset_studio.modules.workspaces.paths import WorkspacePaths
+from dataset_studio.modules.workspaces.repository import WorkerWorkspaceCandidate
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 LOGGER = logging.getLogger("dataset_studio.worker")
@@ -106,13 +110,21 @@ class AnnotationWorker:
         LOGGER.info("Task worker stopped.")
 
     def _recover_orphaned_jobs(self) -> None:
-        for workspace in self._container.workspaces.list_recent():
-            if not workspace.exists:
+        for project_id in self._container.workspaces.recent_project_ids():
+            try:
+                paths, manifest = self._container.workspaces.get(project_id)
+                repository = JobLifecycleRepository(paths.database)
+                recovered = repository.recover_orphaned()
+            except (WorkspaceNotFoundError, OSError, ValueError, sqlite3.Error) as error:
+                LOGGER.warning("Skipping unavailable job workspace %s: %s", project_id, error)
+                self._container.workspaces.clear_worker_activity(project_id, "jobs")
                 continue
-            paths, _ = self._container.workspaces.get(workspace.project_id)
-            recovered = JobLifecycleRepository(paths.database).recover_orphaned()
             if recovered:
-                LOGGER.info("Marked %s job(s) interrupted in %s.", recovered, workspace.name)
+                LOGGER.info("Marked %s job(s) interrupted in %s.", recovered, manifest.name)
+            if repository.active_count():
+                self._container.workspaces.mark_worker_activity(project_id, "jobs")
+            else:
+                self._container.workspaces.clear_worker_activity(project_id, "jobs")
 
     def _recover_orphaned_asset_deletions(self) -> None:
         service = getattr(self._container, "asset_deletions", None)
@@ -134,61 +146,86 @@ class AnnotationWorker:
                 )
 
     def _schedule_available_items(self) -> None:
-        for workspace in self._container.workspaces.list_recent():
-            if not workspace.exists:
+        for candidate in self._container.workspaces.worker_candidates("jobs"):
+            try:
+                paths, _ = self._container.workspaces.get(candidate.project_id)
+            except (WorkspaceNotFoundError, OSError, ValueError, sqlite3.Error) as error:
+                LOGGER.warning(
+                    "Dropping unavailable job workspace %s from the worker queue: %s",
+                    candidate.project_id,
+                    error,
+                )
+                self._container.workspaces.clear_worker_activity(
+                    candidate.project_id,
+                    "jobs",
+                    requested_at=candidate.requested_at,
+                )
                 continue
-            paths, _ = self._container.workspaces.get(workspace.project_id)
-            repository = JobExecutionRepository(paths.database)
-            JobLifecycleRepository(paths.database).finalize_jobs()
-            for job in repository.runnable_jobs():
-                backend = ExecutionBackend(str(job.get("execution_backend") or "provider"))
-                profile = load_execution_snapshot(
-                    backend,
-                    job.get("execution_snapshot"),
-                    legacy_provider_snapshot=str(job["provider_snapshot"]),
-                )
-                active_key = f"{backend.value}:{profile.id}"
-                profile_running = sum(
-                    active_profile == active_key
-                    for active_profile in self._active_profiles.values()
-                )
-                if isinstance(profile, TaggerExecutionProfile):
-                    if profile_running:
-                        continue
-                    items = repository.claim_items(
-                        str(job["id"]),
-                        max(_LOCAL_TAGGER_CLAIM_SIZE, profile.batch_size or 0),
-                    )
-                    if not items:
-                        continue
-                    task = asyncio.create_task(
-                        self._process_local_tagger_batch(
-                            workspace.project_id,
-                            paths.database,
-                            paths.root,
-                            paths.runs,
-                            job,
-                            items,
-                            profile,
-                        )
-                    )
-                    self._active.add(task)
-                    self._active_profiles[task] = active_key
+            self._schedule_workspace(candidate, paths)
+
+    def _schedule_workspace(
+        self,
+        candidate: WorkerWorkspaceCandidate,
+        paths: WorkspacePaths,
+    ) -> None:
+        repository = JobExecutionRepository(paths.database)
+        lifecycle = JobLifecycleRepository(paths.database)
+        lifecycle.finalize_jobs()
+        for job in repository.runnable_jobs():
+            backend = ExecutionBackend(str(job.get("execution_backend") or "provider"))
+            profile = load_execution_snapshot(
+                backend,
+                job.get("execution_snapshot"),
+                legacy_provider_snapshot=str(job["provider_snapshot"]),
+            )
+            active_key = f"{backend.value}:{profile.id}"
+            profile_running = sum(
+                active_profile == active_key for active_profile in self._active_profiles.values()
+            )
+            if isinstance(profile, TaggerExecutionProfile):
+                if profile_running:
                     continue
-                available = profile.concurrency - profile_running
-                for item in repository.claim_items(str(job["id"]), available):
-                    task = asyncio.create_task(
-                        self._process_item(
-                            workspace.project_id,
-                            paths.database,
-                            paths.root,
-                            paths.runs,
-                            job,
-                            item,
-                        )
+                items = repository.claim_items(
+                    str(job["id"]),
+                    max(_LOCAL_TAGGER_CLAIM_SIZE, profile.batch_size or 0),
+                )
+                if not items:
+                    continue
+                task = asyncio.create_task(
+                    self._process_local_tagger_batch(
+                        candidate.project_id,
+                        paths.database,
+                        paths.root,
+                        paths.runs,
+                        job,
+                        items,
+                        profile,
                     )
-                    self._active.add(task)
-                    self._active_profiles[task] = active_key
+                )
+                self._active.add(task)
+                self._active_profiles[task] = active_key
+                continue
+            available = profile.concurrency - profile_running
+            for item in repository.claim_items(str(job["id"]), available):
+                task = asyncio.create_task(
+                    self._process_item(
+                        candidate.project_id,
+                        paths.database,
+                        paths.root,
+                        paths.runs,
+                        job,
+                        item,
+                    )
+                )
+                self._active.add(task)
+                self._active_profiles[task] = active_key
+
+        if not lifecycle.active_count():
+            self._container.workspaces.clear_worker_activity(
+                candidate.project_id,
+                "jobs",
+                requested_at=candidate.requested_at,
+            )
 
     def _reap_finished_tasks(self) -> None:
         finished = {task for task in self._active if task.done()}

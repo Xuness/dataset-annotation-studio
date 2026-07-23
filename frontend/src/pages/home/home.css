@@ -381,15 +381,28 @@
   gap: 20px;
 }
 
+.recent-card-shell {
+  position: relative;
+  min-width: 0;
+  min-height: 112px;
+  transition: transform 220ms ease;
+}
+
+.recent-card-shell:hover {
+  transform: translateY(-2px);
+}
+
 .recent-card {
   position: relative;
   display: grid;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 112px;
   grid-template-columns: 7px minmax(0, 1fr) 20px;
   align-items: center;
   gap: 10px;
-  padding: 17px 17px 16px;
+  padding: 17px 42px 16px 17px;
   border: 1px solid color-mix(in srgb, var(--ink-soft) 22%, transparent);
   border-radius: 0;
   text-align: left;
@@ -400,14 +413,12 @@
     background 220ms ease,
     border-color 220ms ease,
     backdrop-filter 220ms ease,
-    box-shadow 220ms ease,
-    transform 220ms ease;
+    box-shadow 220ms ease;
 }
 
 .recent-card:hover {
   border-color: color-mix(in srgb, var(--ink-soft) 42%, transparent);
   background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
-  transform: translateY(-2px);
 }
 
 .recent-card--missing {
@@ -474,6 +485,44 @@
 .recent-card:hover .recent-card__arrow {
   color: color-mix(in srgb, var(--ink) 88%, transparent);
   transform: translateX(3px);
+}
+
+.recent-card__remove {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  z-index: 2;
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  color: color-mix(in srgb, var(--muted) 65%, transparent);
+  background: color-mix(in srgb, var(--surface-sunken) 45%, transparent);
+  cursor: pointer;
+  opacity: 0.52;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    opacity 180ms ease;
+}
+
+.recent-card-shell:hover .recent-card__remove,
+.recent-card__remove:focus-visible {
+  opacity: 1;
+}
+
+.recent-card__remove:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface-raised));
+}
+
+.recent-card__remove:disabled {
+  cursor: wait;
+  opacity: 0.34;
 }
 
 .recent-placeholder {

@@ -55,6 +55,24 @@ def _run_export(workspaces: WorkspaceService, project_id: str, operation_id: str
     ExportWorker(container)._process_operation(project_id, operation_id)
 
 
+def test_idle_export_worker_does_not_scan_recent_workspaces(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspaces, _, _, _ = _services(tmp_path)
+    project = tmp_path / "idle-dataset"
+    project.mkdir()
+    workspaces.open(str(project))
+
+    def fail_recent_scan():
+        raise AssertionError("idle export worker must not enumerate recent workspaces")
+
+    monkeypatch.setattr(workspaces, "list_recent", fail_recent_scan)
+    container = cast(AppContainer, SimpleNamespace(workspaces=workspaces))
+
+    assert ExportWorker(container)._claim_next() is None
+
+
 def test_export_flattens_files_and_force_preserves_annotation_bytes(
     tmp_path: Path,
 ) -> None:

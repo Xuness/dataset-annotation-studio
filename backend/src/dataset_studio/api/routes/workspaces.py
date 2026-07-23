@@ -2,10 +2,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
+from dataset_studio.core.errors import WorkspaceNotFoundError
 from dataset_studio.modules.workspaces.models import (
     ScanResult,
     WorkspaceOpenRequest,
@@ -71,6 +72,27 @@ def open_workspace(request: WorkspaceOpenRequest, container: Container):
 @router.get("/{project_id}", response_model=WorkspaceSummary)
 def get_workspace(project_id: str, container: Container):
     return container.workspaces.get_summary(project_id)
+
+
+@router.delete("/{project_id}/recent", status_code=status.HTTP_204_NO_CONTENT)
+def remove_recent_workspace(project_id: str, container: Container):
+    if container.workspaces.recent_path(project_id) is None:
+        raise WorkspaceNotFoundError(f"最近项目中找不到工作区：{project_id}")
+
+    try:
+        paths, _ = container.workspaces.get(project_id)
+    except (WorkspaceNotFoundError, OSError, ValueError):
+        container.workspaces.remove_recent(project_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    with _scan_guard(
+        container,
+        project_id,
+        "remove-recent",
+        database_path=paths.database,
+    ):
+        container.workspaces.remove_recent(project_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch("/{project_id}", response_model=WorkspaceSummary)

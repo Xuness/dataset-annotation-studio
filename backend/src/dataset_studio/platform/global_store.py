@@ -215,7 +215,52 @@ ADD COLUMN batch_size INTEGER
 CHECK (batch_size IS NULL OR (batch_size >= 1 AND batch_size <= 32));
 """
 
-GLOBAL_SCHEMA_VERSION = 7
+RECENT_WORKSPACE_ACTIVITY_MIGRATION = """
+ALTER TABLE recent_workspaces
+ADD COLUMN hidden_at TEXT;
+
+WITH ranked_workspaces AS (
+    SELECT
+        project_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY root_path COLLATE NOCASE
+            ORDER BY last_opened_at DESC, rowid DESC
+        ) AS duplicate_rank
+    FROM recent_workspaces
+)
+UPDATE recent_workspaces
+SET hidden_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE project_id IN (
+    SELECT project_id
+    FROM ranked_workspaces
+    WHERE duplicate_rank > 1
+);
+
+CREATE UNIQUE INDEX idx_recent_workspaces_visible_root
+ON recent_workspaces(root_path COLLATE NOCASE)
+WHERE hidden_at IS NULL;
+
+CREATE TABLE worker_workspace_activity (
+    project_id TEXT PRIMARY KEY,
+    jobs_requested_at TEXT,
+    exports_requested_at TEXT,
+    FOREIGN KEY (project_id)
+        REFERENCES recent_workspaces(project_id) ON DELETE CASCADE,
+    CHECK (jobs_requested_at IS NOT NULL OR exports_requested_at IS NOT NULL)
+);
+
+INSERT INTO worker_workspace_activity (
+    project_id, jobs_requested_at, exports_requested_at
+)
+SELECT
+    project_id,
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+FROM recent_workspaces
+WHERE hidden_at IS NULL;
+"""
+
+GLOBAL_SCHEMA_VERSION = 8
 GLOBAL_MIGRATIONS = (
     Migration(1, "initial_global_schema", GLOBAL_SCHEMA),
     Migration(2, "provider_request_options", PROVIDER_REQUEST_OPTIONS_MIGRATION),
@@ -224,6 +269,11 @@ GLOBAL_MIGRATIONS = (
     Migration(5, "provider_model_configs", PROVIDER_MODEL_CONFIGS_MIGRATION),
     Migration(6, "local_taggers", LOCAL_TAGGERS_MIGRATION),
     Migration(7, "local_tagger_batching", LOCAL_TAGGER_BATCHING_MIGRATION),
+    Migration(
+        8,
+        "recent_workspace_activity",
+        RECENT_WORKSPACE_ACTIVITY_MIGRATION,
+    ),
 )
 
 

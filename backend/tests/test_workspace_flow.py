@@ -1,14 +1,17 @@
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from PIL import Image
 
+from dataset_studio.api.app import create_app
 from dataset_studio.core.config import Settings
 from dataset_studio.modules.annotations.service import AnnotationService, GeneratedAnnotation
 from dataset_studio.modules.annotations.text import AnnotationEncodingError
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.translations.service import TranslationService
+from dataset_studio.modules.workspaces.paths import WorkspacePaths
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
 from dataset_studio.platform.global_store import initialize_global_database
@@ -51,6 +54,53 @@ def test_workspace_is_portable_and_scans_recursive_assets(tmp_path: Path) -> Non
 
     assert reopened.project_id == summary.project_id
     assert reopened.root_path == str(moved.resolve())
+
+
+def test_remove_recent_api_keeps_workspace_data_and_reopen_restores_entry(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+    project = tmp_path / "dataset"
+    image = project / "sample.png"
+    _write_image(image)
+    paths = WorkspacePaths.from_root(project.resolve(), settings)
+
+    with TestClient(create_app(settings)) as client:
+        opened = client.post("/api/v1/workspaces/open", json={"path": str(project)})
+        project_id = opened.json()["workspace"]["project_id"]
+        removed = client.delete(f"/api/v1/workspaces/{project_id}/recent")
+
+        assert opened.status_code == 200
+        assert removed.status_code == 204
+        assert client.get("/api/v1/workspaces").json() == []
+        assert client.get(f"/api/v1/workspaces/{project_id}").status_code == 200
+        assert image.is_file()
+        assert paths.manifest.is_file()
+        assert paths.database.is_file()
+
+        reopened = client.post("/api/v1/workspaces/open", json={"path": str(project)})
+        recent = client.get("/api/v1/workspaces").json()
+
+    assert reopened.status_code == 200
+    assert reopened.json()["workspace"]["project_id"] == project_id
+    assert [workspace["project_id"] for workspace in recent] == [project_id]
+
+
+def test_remove_recent_clears_idle_worker_candidates(tmp_path: Path) -> None:
+    workspaces, _, _ = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "sample.png")
+    workspace, _ = workspaces.open(str(project))
+    workspaces.mark_worker_activity(workspace.project_id, "jobs")
+    workspaces.mark_worker_activity(workspace.project_id, "exports")
+
+    workspaces.remove_recent(workspace.project_id)
+
+    assert workspaces.list_recent() == []
+    assert workspaces.worker_candidates("jobs") == []
+    assert workspaces.worker_candidates("exports") == []
+    assert workspaces.get(workspace.project_id)[0].database.is_file()
+    assert (project / "sample.png").is_file()
 
 
 def test_annotation_save_delete_and_history(tmp_path: Path) -> None:

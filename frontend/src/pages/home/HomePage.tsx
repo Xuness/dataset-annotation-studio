@@ -1,14 +1,18 @@
 import { useState } from "react";
-import { ArrowRight, Cable, RefreshCw, Settings } from "lucide-react";
+import { ArrowRight, Cable, RefreshCw, Settings, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { useOpenWorkspace, useRecentWorkspaces } from "../../features/workspaces/hooks";
+import {
+  useOpenWorkspace,
+  useRecentWorkspaces,
+  useRemoveRecentWorkspace,
+} from "../../features/workspaces/hooks";
 import { pickWorkspaceFolder } from "../../shared/desktop/pickFolder";
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 import { useAppStore } from "../../shared/store/appStore";
 import { useAppPreferences } from "../../shared/theme/appPreferences";
 import { getThemeDefinition } from "../../shared/theme/themes";
-import { alertDialog } from "../../shared/ui/dialogs";
+import { alertDialog, confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
 import "./home.css";
 
@@ -28,6 +32,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const recent = useRecentWorkspaces();
   const openMutation = useOpenWorkspace();
+  const removeRecentMutation = useRemoveRecentWorkspace();
   const openSettings = useSettingsCenter((state) => state.open);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
   const themeId = useAppPreferences((state) => state.preferences.themeId);
@@ -68,6 +73,26 @@ export function HomePage() {
     }
     setActiveProject(projectId);
     navigate(`/workspace/${projectId}`);
+  }
+
+  async function removeFromRecent(projectId: string, name: string) {
+    const confirmed = await confirmDialog(
+      `只会将“${name}”从最近项目列表中移除。\n\n` +
+        "不会删除数据集、标注、缓存或 .annotation-workspace；" +
+        "以后重新打开该文件夹，它会再次出现在最近项目中。",
+      {
+        title: "从最近项目移除",
+        confirmLabel: "移除",
+        cancelLabel: "取消",
+      },
+    );
+    if (!confirmed) return;
+    setMessage(null);
+    try {
+      await removeRecentMutation.mutateAsync(projectId);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "无法从最近项目中移除。");
+    }
   }
 
   return (
@@ -148,34 +173,49 @@ export function HomePage() {
           ) : recent.data?.length ? (
             <div className="recent-grid">
               {recent.data.slice(0, 3).map((workspace) => (
-                <button
-                  type="button"
-                  className={`recent-card ${workspace.exists ? "" : "recent-card--missing"}`}
-                  data-surface-region="home-recents"
-                  key={workspace.project_id}
-                  title={workspace.root_path}
-                  onClick={() => enterWorkspace(workspace.project_id, workspace.exists)}
-                >
-                  <span className="recent-card__marker" aria-hidden="true" />
-                  <span className="recent-card__body">
-                    <strong>{workspace.name}</strong>
-                    <small>{workspace.root_path}</small>
-                    <span className="recent-card__meta">
-                      {workspace.exists ? (
-                        <>
-                          <span>图像 {workspace.asset_count.toLocaleString("zh-CN")}</span>
-                          <span>已标注 {workspace.annotated_count.toLocaleString("zh-CN")}</span>
-                          <time dateTime={workspace.last_opened_at ?? undefined}>
-                            {formatProjectDate(workspace.last_opened_at)}
-                          </time>
-                        </>
-                      ) : (
-                        <span>文件夹已移动，点击重新定位</span>
-                      )}
+                <article className="recent-card-shell" key={workspace.project_id}>
+                  <button
+                    type="button"
+                    className={`recent-card ${workspace.exists ? "" : "recent-card--missing"}`}
+                    data-surface-region="home-recents"
+                    title={workspace.root_path}
+                    onClick={() => enterWorkspace(workspace.project_id, workspace.exists)}
+                  >
+                    <span className="recent-card__marker" aria-hidden="true" />
+                    <span className="recent-card__body">
+                      <strong>{workspace.name}</strong>
+                      <small>{workspace.root_path}</small>
+                      <span className="recent-card__meta">
+                        {workspace.exists ? (
+                          <>
+                            <span>图像 {workspace.asset_count.toLocaleString("zh-CN")}</span>
+                            <span>已标注 {workspace.annotated_count.toLocaleString("zh-CN")}</span>
+                            <time dateTime={workspace.last_opened_at ?? undefined}>
+                              {formatProjectDate(workspace.last_opened_at)}
+                            </time>
+                          </>
+                        ) : (
+                          <span>文件夹已移动，点击重新定位</span>
+                        )}
+                      </span>
                     </span>
-                  </span>
-                  <ArrowRight className="recent-card__arrow" size={16} aria-hidden="true" />
-                </button>
+                    <ArrowRight className="recent-card__arrow" size={16} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="recent-card__remove"
+                    data-surface-region="home-recents"
+                    aria-label={`从最近项目移除 ${workspace.name}`}
+                    title="从最近项目移除（不会删除文件）"
+                    disabled={
+                      removeRecentMutation.isPending &&
+                      removeRecentMutation.variables === workspace.project_id
+                    }
+                    onClick={() => void removeFromRecent(workspace.project_id, workspace.name)}
+                  >
+                    <X size={13} aria-hidden="true" />
+                  </button>
+                </article>
               ))}
             </div>
           ) : (

@@ -20,7 +20,11 @@ from dataset_studio.modules.workspaces.models import (
     WorkspaceSummary,
 )
 from dataset_studio.modules.workspaces.paths import WorkspacePaths
-from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
+from dataset_studio.modules.workspaces.repository import (
+    WorkerActivityKind,
+    WorkerWorkspaceCandidate,
+    WorkspaceRegistry,
+)
 from dataset_studio.modules.workspaces.schema import initialize_workspace_database
 
 
@@ -86,6 +90,12 @@ class WorkspaceService:
                 try:
                     manifest = self._load_manifest(paths)
                     self._ensure_database(paths.database)
+                    if manifest.project_id != str(row["project_id"]):
+                        self._registry.upsert(
+                            manifest,
+                            root,
+                            str(row["last_opened_at"]),
+                        )
                     summaries.append(self._summary(paths, manifest, str(row["last_opened_at"])))
                     continue
                 except (OSError, ValueError, json.JSONDecodeError):
@@ -116,6 +126,42 @@ class WorkspaceService:
     def get_summary(self, project_id: str) -> WorkspaceSummary:
         paths, manifest = self.get(project_id)
         return self._summary(paths, manifest, None)
+
+    def recent_project_ids(self) -> list[str]:
+        return self._registry.list_recent_project_ids()
+
+    def recent_path(self, project_id: str) -> Path | None:
+        return self._registry.recent_path(project_id)
+
+    def remove_recent(self, project_id: str) -> None:
+        if not self._registry.hide_recent(project_id):
+            raise WorkspaceNotFoundError(f"最近项目中找不到工作区：{project_id}")
+
+    def mark_worker_activity(
+        self,
+        project_id: str,
+        kind: WorkerActivityKind,
+    ) -> None:
+        self._registry.mark_worker_activity(project_id, kind)
+
+    def worker_candidates(
+        self,
+        kind: WorkerActivityKind,
+    ) -> list[WorkerWorkspaceCandidate]:
+        return self._registry.list_worker_candidates(kind)
+
+    def clear_worker_activity(
+        self,
+        project_id: str,
+        kind: WorkerActivityKind,
+        *,
+        requested_at: str | None = None,
+    ) -> bool:
+        return self._registry.clear_worker_activity(
+            project_id,
+            kind,
+            requested_at=requested_at,
+        )
 
     def rescan(self, project_id: str) -> tuple[WorkspaceSummary, ScanResult]:
         paths, manifest = self.get(project_id)

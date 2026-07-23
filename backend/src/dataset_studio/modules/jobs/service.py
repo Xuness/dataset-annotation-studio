@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import uuid
 from pathlib import Path
 
-from dataset_studio.core.errors import JobNotFoundError, PresetNotFoundError
+from dataset_studio.core.errors import (
+    JobNotFoundError,
+    PresetNotFoundError,
+    WorkspaceNotFoundError,
+)
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
@@ -204,6 +209,7 @@ class JobService:
             retry_limit=retry_limit,
             asset_ids=asset_ids,
         )
+        self._workspaces.mark_worker_activity(project_id, "jobs")
         return self.get(project_id, job_id, include_items=include_items)
 
     def _resolve_translation_prompt(
@@ -266,11 +272,15 @@ class JobService:
         repository = JobLifecycleRepository(paths.database)
         if not repository.request_stop(job_id):
             raise JobNotFoundError("任务不存在或已经结束。")
+        self._workspaces.mark_worker_activity(project_id, "jobs")
         return self.get(project_id, job_id, include_items=include_items)
 
     def stop_all(self, project_id: str) -> int:
         paths, _ = self._workspaces.get(project_id)
-        return JobLifecycleRepository(paths.database).request_stop_all()
+        stopped = JobLifecycleRepository(paths.database).request_stop_all()
+        if stopped:
+            self._workspaces.mark_worker_activity(project_id, "jobs")
+        return stopped
 
     def has_active(self, project_id: str) -> bool:
         paths, _ = self._workspaces.get(project_id)
@@ -293,10 +303,9 @@ class JobService:
         count = 0
         annotation_count = 0
         translation_count = 0
-        projects = self.active_project_ids()
-        for project_id in projects:
-            paths, _ = self._workspaces.get(project_id)
-            connection = connect(paths.database)
+        active_workspaces = self._active_workspace_databases()
+        for _project_id, database in active_workspaces:
+            connection = connect(database)
             try:
                 rows = connection.execute(
                     """
@@ -317,27 +326,17 @@ class JobService:
                     annotation_count += item_count
         return ActiveJobsOverview(
             count=count,
-            project_count=len(projects),
+            project_count=len(active_workspaces),
             annotation_job_count=annotation_count,
             translation_job_count=translation_count,
         )
 
     def active_project_ids(self) -> set[str]:
-        projects: set[str] = set()
-        for workspace in self._workspaces.list_recent():
-            if not workspace.exists:
-                continue
-            paths, _ = self._workspaces.get(workspace.project_id)
-            if JobLifecycleRepository(paths.database).active_count():
-                projects.add(workspace.project_id)
-        return projects
+        return {project_id for project_id, _database in self._active_workspace_databases()}
 
     def is_tagger_installation_active(self, installation_id: str) -> bool:
-        for workspace in self._workspaces.list_recent():
-            if not workspace.exists:
-                continue
-            paths, _ = self._workspaces.get(workspace.project_id)
-            connection = connect(paths.database)
+        for _project_id, database in self._active_workspace_databases():
+            connection = connect(database)
             try:
                 rows = connection.execute(
                     """
@@ -362,10 +361,11 @@ class JobService:
 
     def stop_all_workspaces(self) -> int:
         stopped = 0
-        for workspace in self._workspaces.list_recent():
-            if workspace.exists:
-                paths, _ = self._workspaces.get(workspace.project_id)
-                stopped += JobLifecycleRepository(paths.database).request_stop_all()
+        for project_id, database in self._active_workspace_databases():
+            project_stopped = JobLifecycleRepository(database).request_stop_all()
+            stopped += project_stopped
+            if project_stopped:
+                self._workspaces.mark_worker_activity(project_id, "jobs")
         return stopped
 
     def resume(self, project_id: str, job_id: str, *, include_items: bool = True) -> JobDetail:
@@ -374,6 +374,7 @@ class JobService:
             raise JobNotFoundError(f"找不到任务：{job_id}")
         if not JobLifecycleRepository(paths.database).resume(job_id):
             raise ValueError("只有已停止或意外中断的任务可以继续。")
+        self._workspaces.mark_worker_activity(project_id, "jobs")
         return self.get(project_id, job_id, include_items=include_items)
 
     def retry_failed(
@@ -388,7 +389,31 @@ class JobService:
             raise JobNotFoundError(f"找不到任务：{job_id}")
         if not JobLifecycleRepository(paths.database).resume(job_id, failed_only=True):
             raise ValueError("只有已经结束且仍含失败项的任务可以仅重试失败项。")
+        self._workspaces.mark_worker_activity(project_id, "jobs")
         return self.get(project_id, job_id, include_items=include_items)
+
+    def _active_workspace_databases(self) -> list[tuple[str, Path]]:
+        active: list[tuple[str, Path]] = []
+        for candidate in self._workspaces.worker_candidates("jobs"):
+            try:
+                paths, _ = self._workspaces.get(candidate.project_id)
+                has_active = JobLifecycleRepository(paths.database).active_count() > 0
+            except (WorkspaceNotFoundError, OSError, ValueError, sqlite3.Error):
+                self._workspaces.clear_worker_activity(
+                    candidate.project_id,
+                    "jobs",
+                    requested_at=candidate.requested_at,
+                )
+                continue
+            if has_active:
+                active.append((candidate.project_id, paths.database))
+            else:
+                self._workspaces.clear_worker_activity(
+                    candidate.project_id,
+                    "jobs",
+                    requested_at=candidate.requested_at,
+                )
+        return active
 
     def manually_accept(
         self,

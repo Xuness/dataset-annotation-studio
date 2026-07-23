@@ -21,6 +21,12 @@ export function getWorkspace(projectId: string): Promise<WorkspaceSummary> {
   return apiRequest(`/api/v1/workspaces/${projectId}`);
 }
 
+export function removeRecentWorkspace(projectId: string): Promise<void> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/recent`, {
+    method: "DELETE",
+  });
+}
+
 export function rescanWorkspace(projectId: string): Promise<ScanResult> {
   return apiRequest(`/api/v1/workspaces/${projectId}/scan`, { method: "POST" });
 }

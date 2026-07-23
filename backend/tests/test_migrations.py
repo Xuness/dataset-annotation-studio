@@ -132,7 +132,89 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     }
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4, 5, 6, 7]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
+
+
+def test_recent_workspace_activity_migration_hides_duplicate_roots(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "global.sqlite3"
+    migrate_database(database, GLOBAL_MIGRATIONS[:7])
+    connection = connect(database)
+    try:
+        connection.executemany(
+            """
+            INSERT INTO recent_workspaces (
+                project_id, name, root_path, created_at, last_opened_at
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    "older",
+                    "Older",
+                    r"E:\Dataset",
+                    "2026-01-01T00:00:00Z",
+                    "2026-01-02T00:00:00Z",
+                ),
+                (
+                    "newer",
+                    "Newer",
+                    r"e:\dataset",
+                    "2026-01-01T00:00:00Z",
+                    "2026-01-03T00:00:00Z",
+                ),
+            ],
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    initialize_global_database(database)
+
+    connection = connect(database)
+    try:
+        rows = connection.execute(
+            """
+            SELECT project_id, hidden_at
+            FROM recent_workspaces
+            ORDER BY project_id
+            """
+        ).fetchall()
+        activity_columns = {
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info('worker_workspace_activity')"
+            ).fetchall()
+        }
+        activity_projects = [
+            str(row["project_id"])
+            for row in connection.execute(
+                "SELECT project_id FROM worker_workspace_activity ORDER BY project_id"
+            ).fetchall()
+        ]
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                """
+                INSERT INTO recent_workspaces (
+                    project_id, name, root_path, created_at, last_opened_at, hidden_at
+                ) VALUES (
+                    'duplicate', 'Duplicate', 'E:\\DATASET',
+                    '2026-01-01T00:00:00Z', '2026-01-04T00:00:00Z', NULL
+                )
+                """
+            )
+    finally:
+        connection.close()
+
+    by_project = {str(row["project_id"]): row["hidden_at"] for row in rows}
+    assert by_project["older"] is not None
+    assert by_project["newer"] is None
+    assert activity_columns == {
+        "project_id",
+        "jobs_requested_at",
+        "exports_requested_at",
+    }
+    assert activity_projects == ["newer"]
 
 
 def test_local_tagger_batching_migration_preserves_profiles_and_allows_auto(
