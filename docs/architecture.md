@@ -18,6 +18,7 @@ flowchart LR
     Worker["持久化任务 Worker"] --> Core
     Worker --> Provider["模型供应商适配器"]
     Worker --> Tagger["本地 Tagger Runtime"]
+    Worker --> HuggingFace["Hugging Face 审核下载源"]
     Core --> Project["项目文件夹与项目 SQLite"]
     Core --> Global["全局预设 / Tagger SQLite 与系统凭据存储"]
     Tagger --> ModelLibrary["本机受管模型库"]
@@ -44,7 +45,7 @@ flowchart LR
 - `modules/prompts`：User Prompt 与选定 JSON 字段的纯函数组合。
 - `modules/presets`：全局 System Prompt / 模型连接聚合的持久化；API 密钥通过 `SecretStore` 隔离。
 - `modules/providers`：供应商协议类型、单模型参数、统一 `ModelProvider` 协议、各供应商适配器，以及惰性共享的 Codex Runtime。
-- `modules/taggers`：本地模型适配器注册、受管安装、完整性清单、可复用打标配置与惰性 ONNX Runtime；不依赖页面或任务仓储。
+- `modules/taggers`：本地模型适配器注册、受管安装、完整性清单、审核下载计划、全局下载队列、可复用打标配置与惰性 ONNX Runtime；不依赖页面或项目任务仓储。
 - `modules/jobs`：标注/翻译任务创建、通用执行后端与配置快照、查询投影、原子认领、尝试记录、单图调用追踪和 Worker。
 - `modules/preprocessing`：计划、图像渲染、恢复记录和撤销编排。
 - `modules/exports`：导出范围快照、活动标注校验、扁平文件名冲突检查、持久化进度和可停止/继续的复制 Worker。
@@ -116,11 +117,19 @@ OpenRouter 目录仍使用其扩展元数据；两个协议各自由适配器映
 复制到 `.staging/`，在复制过程中计算 SHA-256，写入版本化 `installation.json` 后原子提升为正式安装。
 模型列表的日常读取只比较清单中的路径、大小和修改时间；显式“完整校验”会重新解析模型并计算全部文件哈希。
 
-首个适配器 `cl_tagger_v2` 采用严格、失败关闭的文件契约：要求 `model.onnx`、
-`model.onnx.data`、`model_vocabulary.json` 与 `model_metadata.json`，校验 `pixel_values`
-输入、`logits` 输出、384×384 float32 张量、标签数量和外部权重位置。每个安装可以建立多份全局配置，独立保存
-阈值、输出类别、执行设备和并发数。创建任务时会冻结安装指纹与完整配置；模型文件后来发生变化时，旧任务不会
-静默改用新权重，而是拒绝执行并要求重新创建任务。
+设置页的“Hugging Face 下载”只展示适配器内置的审核计划。每个计划固定 40 位 commit revision、精确远端路径、
+目标相对路径、文件大小和 SHA-256；下载器不会递归拉取仓库或猜测目录结构。全局 SQLite 保存下载计划快照和
+队列状态，Worker 同一时间只传输一个模型。文件进入模型库内的 `.downloads/<task-id>/`，支持暂停、失败和进程
+中断后的续传；全部文件再次校验并通过适配器验证后，`payload/` 才会原子提升为正式安装。已存在且文件集合完全
+匹配的本地安装会被识别为同一审核版本，不会重复下载。
+
+Hugging Face Token 保存在系统凭据库；解析顺序为应用凭据、`HF_TOKEN`、本机 Hugging Face 登录和匿名访问。
+代理支持跟随环境变量、自定义 HTTP(S) 地址和明确直连，自定义地址同样存放在系统凭据库。下载清单和任务表不
+保存 Token 或代理凭据。当前适配器覆盖 CL Tagger v2、WD Tagger v3、PixAI Tagger v0.9、JoyTag、
+AnimeTimm DBv4 与 Camie Tagger v2，且各自拥有独立的目录契约与下载计划。
+
+每个安装可以建立多份全局配置，独立保存阈值、输出类别、执行设备和批大小。创建任务时会冻结安装指纹与完整
+配置；模型文件后来发生变化时，旧任务不会静默改用新权重，而是拒绝执行并要求重新创建任务。
 
 Runtime 只在 Worker 真正处理本地任务时加载 ONNX Session，并用单项 LRU 约束常驻大模型数量。后端只安装一个
 `onnxruntime-gpu[cuda,cudnn]` ORT wheel，不与 CPU wheel 并存；当前锁定 CUDA 12 兼容系列，并由 extras 提供
@@ -162,9 +171,10 @@ Codex 连接由官方 Python SDK 驱动：SDK 源码固定到 OpenAI `3f74f00295
 `TaggerAdapterRegistry` 注册。适配器返回明确的受管文件集合；模型管理服务、任务快照、Runtime 缓存和前端配置
 不需要理解模型仓库的原始布局。
 
-远端下载在首版中没有路由、实现或界面入口。`modules/taggers/sources` 仅保留不可变的
-`TaggerDownloadPlan` / `TaggerModelSource` 边界；未来如接入 Hugging Face，必须由具体适配器声明固定 revision、
-精确远端路径和目标相对路径，再复用现有 staging 与校验流程，不能递归下载未知仓库并猜测文件结构。
+若模型存在可公开复现的固定发布版本，适配器可以额外返回 `TaggerDownloadPlan`。计划必须声明完整 commit
+revision、每个文件的远端/本地映射、大小与 SHA-256；`TaggerModelSource` 只负责把该不可变计划物化到私有
+staging，统一安装器负责适配器验证、清单和原子发布。新增下载源应复用持久化任务与安装器边界，不能把仓库布局
+推断、凭据处理或正式目录写入下沉到具体适配器。
 
 ### 新校验与统计
 

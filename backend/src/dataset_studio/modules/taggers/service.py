@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
-import re
 import shutil
 import sqlite3
 import threading
@@ -14,15 +12,17 @@ from functools import wraps
 from pathlib import Path
 from typing import Concatenate, ParamSpec, TypeVar
 
+from filelock import FileLock, Timeout
+
 from dataset_studio.core.config import Settings
 from dataset_studio.core.errors import TaggerNotFoundError
 from dataset_studio.core.files import atomic_write_text
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.taggers.adapters.base import TaggerAdapter, ValidatedTaggerModel
+from dataset_studio.modules.taggers.installer import MANIFEST_NAME, TaggerInstaller
 from dataset_studio.modules.taggers.models import (
     TaggerDevice,
     TaggerExecutionProfile,
-    TaggerFileRecord,
     TaggerImportRequest,
     TaggerInstallation,
     TaggerInstallationManifest,
@@ -40,9 +40,11 @@ from dataset_studio.modules.taggers.models import (
 )
 from dataset_studio.modules.taggers.registry import TaggerAdapterRegistry
 from dataset_studio.modules.taggers.repository import TaggerRepository
+from dataset_studio.modules.taggers.sources.base import (
+    TaggerDownloadPlan,
+    TaggerMaterializedModel,
+)
 
-MANIFEST_NAME = "installation.json"
-_SAFE_SEGMENT = re.compile(r"[^0-9A-Za-z._-]+")
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
@@ -69,6 +71,9 @@ class TaggerService:
         self._repository = repository
         self._registry = registry or TaggerAdapterRegistry()
         self._catalog_lock = threading.RLock()
+        self._catalog_state = threading.local()
+        self._has_blocking_downloads: Callable[[], bool] = lambda: False
+        self._installer = TaggerInstaller(repository, self._registry, self.model_root)
         self.model_root().mkdir(parents=True, exist_ok=True)
 
     @property
@@ -77,9 +82,31 @@ class TaggerService:
 
     @contextmanager
     def catalog_guard(self) -> Iterator[None]:
-        """Serialize catalog mutations and local job snapshot creation in this API process."""
+        """Serialize catalog mutation across API and worker processes."""
         with self._catalog_lock:
-            yield
+            depth = int(getattr(self._catalog_state, "depth", 0))
+            if depth:
+                self._catalog_state.depth = depth + 1
+                try:
+                    yield
+                finally:
+                    self._catalog_state.depth = depth
+                return
+            root = self.model_root()
+            lock_path = root / ".locks" / "catalog.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with FileLock(lock_path, timeout=30):
+                    self._catalog_state.depth = 1
+                    try:
+                        yield
+                    finally:
+                        self._catalog_state.depth = 0
+            except Timeout as error:
+                raise ValueError("本地打标器模型库正由另一个进程更新，请稍后重试。") from error
+
+    def set_download_activity_check(self, callback: Callable[[], bool]) -> None:
+        self._has_blocking_downloads = callback
 
     def model_root(self) -> Path:
         configured = self._repository.get_model_root()
@@ -120,6 +147,8 @@ class TaggerService:
         current = self.model_root()
         if root == current:
             return self.library()
+        if self._has_blocking_downloads():
+            raise ValueError("仍有未完成或可恢复的模型下载，请先完成或清理下载任务。")
         if self._repository.list_installations():
             raise ValueError("模型库中已有安装；请先删除或手动迁移模型后再更改模型库位置。")
         if root.exists() and not root.is_dir():
@@ -134,63 +163,21 @@ class TaggerService:
         if not source.is_absolute():
             raise ValueError("导入路径必须是绝对路径。")
         source = source.resolve()
-        adapter, validated = self._registry.detect(source)
-        root = self.model_root()
-        root.mkdir(parents=True, exist_ok=True)
-        installation_id = str(uuid.uuid4())
-        safe_version = _safe_segment(validated.model_version)
-        target = (root / adapter.id / f"{safe_version}-{installation_id[:8]}").resolve()
-        staging = (root / ".staging" / installation_id).resolve()
-        if not target.is_relative_to(root) or not staging.is_relative_to(root):
-            raise ValueError("无法在模型库内创建安全的安装目录。")
-        if target.exists() or staging.exists():
-            raise ValueError("模型安装目录发生冲突，请重试。")
-
-        total_size = sum((source / name).stat().st_size for name in validated.managed_files)
-        free_space = shutil.disk_usage(root).free
-        if free_space < total_size + 64 * 1024 * 1024:
-            raise ValueError("模型库可用空间不足，无法复制所选模型。")
-
-        name = (data.name or f"{adapter.name} {validated.model_version}").strip()
-        now = utc_now_iso()
-        try:
-            staging.mkdir(parents=True)
-            files = [
-                self._copy_and_hash(source, staging, relative_path)
-                for relative_path in validated.managed_files
-            ]
-            copied_validation = adapter.validate(staging)
-            manifest = self._build_manifest(
-                installation_id=installation_id,
-                name=name,
-                validated=copied_validation,
-                files=files,
-                source=TaggerSourceRecord(
-                    source_type="local_import",
-                    original_path=str(source),
-                ),
-                created_at=now,
-            )
-            atomic_write_text(
-                staging / MANIFEST_NAME,
-                manifest.model_dump_json(indent=2) + "\n",
-            )
-            target.parent.mkdir(parents=True, exist_ok=True)
-            os.replace(staging, target)
-            relative_path = target.relative_to(root).as_posix()
-            try:
-                self._repository.insert_installation(
-                    self._installation_values(manifest, relative_path, now)
-                )
-            except BaseException:
-                shutil.rmtree(target, ignore_errors=True)
-                raise
-        finally:
-            if staging.exists():
-                shutil.rmtree(staging, ignore_errors=True)
-
+        manifest = self._installer.import_local(source, requested_name=data.name)
         self._create_default_profile(manifest)
         return self.library()
+
+    @_catalog_locked
+    def install_downloaded(
+        self,
+        materialized: TaggerMaterializedModel,
+        plan: TaggerDownloadPlan,
+    ) -> TaggerInstallation:
+        manifest = self._installer.install_materialized(materialized, plan)
+        self._create_default_profile(manifest)
+        row = self._repository.get_installation(manifest.installation_id)
+        assert row is not None
+        return self._installation_from_row(row, self.model_root())
 
     @_catalog_locked
     def rescan(self) -> TaggerLibrary:
@@ -219,7 +206,11 @@ class TaggerService:
                 adapter, validated = self._registry.detect(candidate)
                 manifest = self._adopt_directory(candidate, adapter, validated)
                 self._repository.insert_installation(
-                    self._installation_values(manifest, relative_path, manifest.created_at)
+                    self._installer.installation_values(
+                        manifest,
+                        relative_path,
+                        manifest.created_at,
+                    )
                 )
                 self._create_default_profile(manifest)
             except (OSError, sqlite3.Error, ValueError) as error:
@@ -239,8 +230,8 @@ class TaggerService:
         validated = adapter.validate(directory)
         previous = self._manifest_from_row(row)
         assert previous is not None
-        files = [self._hash_file(directory, name) for name in validated.managed_files]
-        manifest = self._build_manifest(
+        files = [self._installer.hash_file(directory, name) for name in validated.managed_files]
+        manifest = self._installer.build_manifest(
             installation_id=installation_id,
             name=str(row["name"]),
             validated=validated,
@@ -584,8 +575,8 @@ class TaggerService:
     ) -> TaggerInstallationManifest:
         now = utc_now_iso()
         installation_id = str(uuid.uuid4())
-        files = [self._hash_file(directory, name) for name in validated.managed_files]
-        manifest = self._build_manifest(
+        files = [self._installer.hash_file(directory, name) for name in validated.managed_files]
+        manifest = self._installer.build_manifest(
             installation_id=installation_id,
             name=f"{adapter.name} {validated.model_version}",
             validated=validated,
@@ -598,54 +589,6 @@ class TaggerService:
             manifest.model_dump_json(indent=2) + "\n",
         )
         return manifest
-
-    def _build_manifest(
-        self,
-        *,
-        installation_id: str,
-        name: str,
-        validated: ValidatedTaggerModel,
-        files: list[TaggerFileRecord],
-        source: TaggerSourceRecord,
-        created_at: str,
-    ) -> TaggerInstallationManifest:
-        capabilities = validated.profile_capabilities
-        unknown_defaults = sorted(set(capabilities.default_categories) - set(validated.categories))
-        if unknown_defaults:
-            raise ValueError("适配器默认配置包含未知类别：" + "、".join(unknown_defaults))
-        unknown_thresholds = sorted(
-            set(capabilities.default_selection.category_thresholds) - set(validated.categories)
-        )
-        if unknown_thresholds:
-            raise ValueError("适配器默认阈值包含未知类别：" + "、".join(unknown_thresholds))
-        fingerprint_payload = {
-            "adapter_id": validated.adapter_id,
-            "adapter_contract_version": validated.adapter_contract_version,
-            "model_version": validated.model_version,
-            "files": [
-                {"path": file.relative_path, "size": file.size, "sha256": file.sha256}
-                for file in files
-            ],
-        }
-        fingerprint = hashlib.sha256(
-            json.dumps(fingerprint_payload, sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest()
-        return TaggerInstallationManifest(
-            installation_id=installation_id,
-            name=name,
-            adapter_id=validated.adapter_id,
-            adapter_contract_version=validated.adapter_contract_version,
-            model_version=validated.model_version,
-            fingerprint=fingerprint,
-            tag_count=validated.tag_count,
-            categories=validated.categories,
-            profile_capabilities=validated.profile_capabilities,
-            warnings=list(validated.warnings),
-            files=files,
-            source=source,
-            created_at=created_at,
-            validated_at=utc_now_iso(),
-        )
 
     def _create_default_profile(self, manifest: TaggerInstallationManifest) -> None:
         base_name = f"{manifest.name} 默认配置"
@@ -676,52 +619,6 @@ class TaggerService:
         )
 
     @staticmethod
-    def _copy_and_hash(
-        source_root: Path,
-        target_root: Path,
-        relative_path: str,
-    ) -> TaggerFileRecord:
-        source = (source_root / relative_path).resolve()
-        target = (target_root / relative_path).resolve()
-        if not source.is_relative_to(source_root) or source.is_symlink() or not source.is_file():
-            raise ValueError(f"模型文件路径不安全：{relative_path}")
-        if not target.is_relative_to(target_root):
-            raise ValueError(f"模型文件目标路径不安全：{relative_path}")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        digest = hashlib.sha256()
-        with source.open("rb") as reader, target.open("xb") as writer:
-            while chunk := reader.read(8 * 1024 * 1024):
-                writer.write(chunk)
-                digest.update(chunk)
-            writer.flush()
-            os.fsync(writer.fileno())
-        shutil.copystat(source, target, follow_symlinks=False)
-        stat = target.stat()
-        return TaggerFileRecord(
-            relative_path=relative_path,
-            size=stat.st_size,
-            modified_ns=stat.st_mtime_ns,
-            sha256=digest.hexdigest(),
-        )
-
-    @staticmethod
-    def _hash_file(root: Path, relative_path: str) -> TaggerFileRecord:
-        path = (root / relative_path).resolve()
-        if not path.is_relative_to(root) or path.is_symlink() or not path.is_file():
-            raise ValueError(f"模型文件路径不安全：{relative_path}")
-        digest = hashlib.sha256()
-        with path.open("rb") as handle:
-            while chunk := handle.read(8 * 1024 * 1024):
-                digest.update(chunk)
-        stat = path.stat()
-        return TaggerFileRecord(
-            relative_path=relative_path,
-            size=stat.st_size,
-            modified_ns=stat.st_mtime_ns,
-            sha256=digest.hexdigest(),
-        )
-
-    @staticmethod
     def _installation_path(root: Path, relative_path: str) -> Path:
         directory = (root / relative_path).resolve()
         if directory == root or not directory.is_relative_to(root):
@@ -742,24 +639,6 @@ class TaggerService:
             if strict:
                 raise ValueError("全局数据库中的安装清单无法识别。") from None
             return None
-
-    @staticmethod
-    def _installation_values(
-        manifest: TaggerInstallationManifest,
-        relative_path: str,
-        updated_at: str,
-    ) -> tuple[object, ...]:
-        return (
-            manifest.installation_id,
-            manifest.name,
-            manifest.adapter_id,
-            manifest.model_version,
-            relative_path,
-            manifest.fingerprint,
-            manifest.model_dump_json(),
-            manifest.created_at,
-            updated_at,
-        )
 
     @staticmethod
     def _profile_insert_values(profile: TaggerProfile) -> tuple[object, ...]:
@@ -831,8 +710,3 @@ class TaggerService:
             default_selection=TaggerSelectionPolicy(),
             default_categories=defaults,
         )
-
-
-def _safe_segment(value: str) -> str:
-    normalized = _SAFE_SEGMENT.sub("-", value.strip()).strip(".-")
-    return normalized[:60] or "model"

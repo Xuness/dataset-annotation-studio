@@ -5,13 +5,19 @@ from PIL import Image
 
 from dataset_studio.api.app import create_app
 from dataset_studio.core.config import Settings
+from dataset_studio.platform.secrets import KeyringSecretStore
 
 
-def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
+def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> None:
     project = tmp_path / "dataset"
     project.mkdir()
     Image.new("RGB", (64, 32), "white").save(project / "sample.webp")
     settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+    monkeypatch.setattr(KeyringSecretStore, "get", lambda _self, _key: None)
+    monkeypatch.setattr(
+        "dataset_studio.modules.taggers.downloads.service.resolve_huggingface_login_token",
+        lambda _token: (None, "anonymous"),
+    )
 
     with TestClient(create_app(settings)) as client:
         health = client.get("/health")
@@ -43,6 +49,11 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
             "anime_timm_dbv4",
             "camie_tagger_v2",
         ]
+        download_center = client.get("/api/v1/taggers/downloads")
+        assert download_center.status_code == 200
+        assert len(download_center.json()["offers"]) == 6
+        assert download_center.json()["tasks"] == []
+        assert download_center.json()["huggingface"]["token_source"] == "anonymous"
 
         opened = client.post("/api/v1/workspaces/open", json={"path": str(project)})
         assert opened.status_code == 200

@@ -31,7 +31,7 @@ from dataset_studio.modules.taggers.models import (
     TaggerSelectionMode,
     TaggerSelectionPolicy,
 )
-from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan
+from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan, TaggerRemoteFile
 
 _REQUIRED_FILES = ("model.onnx", "top_tags.txt", "config.json")
 _EXPECTED_TAG_COUNT = 5_813
@@ -170,4 +170,37 @@ class JoyTagAdapter:
         )
 
     def download_plans(self) -> tuple[TaggerDownloadPlan, ...]:
-        return ()
+        return (
+            TaggerDownloadPlan(
+                plan_id="joytag:v1_onnx",
+                adapter_id=self.id,
+                name="JoyTag · ONNX",
+                model_version="v1-onnx",
+                description="JoyTag 的官方 ONNX 导出与完整标签表。",
+                source_id="fancyfeast/joytag",
+                revision="6b7f16331a6ccf0fdce37d5a9564715f6e772b22",
+                source_url="https://huggingface.co/fancyfeast/joytag",
+                gated=False,
+                provenance="author",
+                files=(
+                    TaggerRemoteFile(
+                        remote_path="model.onnx",
+                        relative_path="model.onnx",
+                        size=366_116_154,
+                        sha256="f85b7130e6e549b5b0822537007b7482e8c4c8e754c8d9a5bee08e27050e1097",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="top_tags.txt",
+                        relative_path="top_tags.txt",
+                        size=76_752,
+                        sha256="32b1963a234af848643b2bbf47d8eff1f1c7889406810c57b980f41b2b9e01d0",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="config.json",
+                        relative_path="config.json",
+                        size=330,
+                        sha256="b53ee29a8f0d6353331f455fd640c70ef45e5bd979b656f7b9983cffa3724562",
+                    ),
+                ),
+            ),
+        )

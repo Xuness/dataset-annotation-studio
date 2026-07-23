@@ -31,7 +31,7 @@ from dataset_studio.modules.taggers.models import (
     TaggerSelectionMode,
     TaggerSelectionPolicy,
 )
-from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan
+from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan, TaggerRemoteFile
 
 _REQUIRED_FILES = (
     "model.onnx",
@@ -204,7 +204,58 @@ class PixAITaggerV09Adapter:
         )
 
     def download_plans(self) -> tuple[TaggerDownloadPlan, ...]:
-        return ()
+        return (
+            TaggerDownloadPlan(
+                plan_id="pixai_tagger_v09:v0_9_onnx",
+                adapter_id=self.id,
+                name="PixAI Tagger v0.9 · ONNX",
+                model_version="v0.9-onnx",
+                description="经审核的 PixAI Tagger v0.9 社区 ONNX 转换包。",
+                source_id="deepghs/pixai-tagger-v0.9-onnx",
+                revision="d8cf666911a2c3d10d586d7823259192313c7eb7",
+                source_url="https://huggingface.co/deepghs/pixai-tagger-v0.9-onnx",
+                gated=False,
+                provenance="community",
+                files=(
+                    TaggerRemoteFile(
+                        remote_path="model.onnx",
+                        relative_path="model.onnx",
+                        size=1_271_365_854,
+                        sha256="a8d479098b5e23f253543c93df42391736abbb77c21c2efd3a513b9cda7b3657",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="selected_tags.csv",
+                        relative_path="selected_tags.csv",
+                        size=596_868,
+                        sha256="76b5dd39354a7a4d9baefb94d63b44a09a4934ee15303b7eb86c38f2128eb68a",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="meta.json",
+                        relative_path="meta.json",
+                        size=202,
+                        sha256="21bc9deefbab8c07173bc5dfa1254cf7772325bc4384262314f8cb59147caf2d",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="preprocess.json",
+                        relative_path="preprocess.json",
+                        size=557,
+                        sha256="5f8303626704053724fa7ac19cd269f57f5f843b6cca314276c8c4d48d335975",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="categories.json",
+                        relative_path="categories.json",
+                        size=128,
+                        sha256="71283e231ddcca180643e9e103d193a84dd032a7dc9b996c5bfdaad845ed6695",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="thresholds.csv",
+                        relative_path="thresholds.csv",
+                        size=55,
+                        sha256="675e7df423bb3e70da30d95f293db6ae1fe5f77e71c975699522da60698fbf18",
+                    ),
+                ),
+            ),
+        )
 
 
 def _load_category_names(path: Path) -> dict[int, str]:

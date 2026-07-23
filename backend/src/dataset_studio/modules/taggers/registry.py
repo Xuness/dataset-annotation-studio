@@ -10,6 +10,7 @@ from dataset_studio.modules.taggers.adapters.joytag import JoyTagAdapter
 from dataset_studio.modules.taggers.adapters.pixai_tagger_v09 import PixAITaggerV09Adapter
 from dataset_studio.modules.taggers.adapters.wd_tagger_v3 import WDTaggerV3Adapter
 from dataset_studio.modules.taggers.models import TaggerAdapterSummary
+from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan
 
 
 class TaggerAdapterRegistry:
@@ -25,6 +26,13 @@ class TaggerAdapterRegistry:
         self._adapters = {adapter.id: adapter for adapter in configured}
         if len(self._adapters) != len(configured):
             raise ValueError("本地打标器适配器 ID 不能重复。")
+        plans = tuple(plan for adapter in configured for plan in adapter.download_plans())
+        self._download_plans = {plan.plan_id: plan for plan in plans}
+        if len(self._download_plans) != len(plans):
+            raise ValueError("本地打标器下载计划 ID 不能重复。")
+        for plan in plans:
+            if plan.adapter_id not in self._adapters:
+                raise ValueError(f"下载计划引用了未知适配器：{plan.adapter_id}")
 
     def list(self) -> list[TaggerAdapterSummary]:
         return [
@@ -42,6 +50,15 @@ class TaggerAdapterRegistry:
             return self._adapters[adapter_id]
         except KeyError as error:
             raise ValueError(f"当前版本不支持打标器适配器：{adapter_id}") from error
+
+    def download_plans(self) -> tuple[TaggerDownloadPlan, ...]:
+        return tuple(self._download_plans.values())
+
+    def get_download_plan(self, plan_id: str) -> TaggerDownloadPlan:
+        try:
+            return self._download_plans[plan_id]
+        except KeyError as error:
+            raise ValueError(f"当前版本不支持打标器下载计划：{plan_id}") from error
 
     def detect(self, directory: Path) -> tuple[TaggerAdapter, ValidatedTaggerModel]:
         detected = [adapter for adapter in self._adapters.values() if adapter.detect(directory)]
@@ -66,7 +83,10 @@ class TaggerAdapterRegistry:
         for marker in markers:
             for marker_path in root.rglob(marker):
                 relative_parts = marker_path.relative_to(root).parts
-                if any(part in {".staging", ".trash"} for part in relative_parts):
+                if any(
+                    part in {".downloads", ".locks", ".staging", ".trash"}
+                    for part in relative_parts
+                ):
                     continue
                 candidates.add(marker_path.parent.resolve())
                 if len(candidates) >= limit:

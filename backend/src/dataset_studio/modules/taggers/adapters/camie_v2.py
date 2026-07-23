@@ -32,7 +32,7 @@ from dataset_studio.modules.taggers.models import (
     TaggerSelectionMode,
     TaggerSelectionPolicy,
 )
-from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan
+from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan, TaggerRemoteFile
 
 _REQUIRED_FILES = (
     "camie-tagger-v2.onnx",
@@ -254,7 +254,40 @@ class CamieV2Adapter:
         )
 
     def download_plans(self) -> tuple[TaggerDownloadPlan, ...]:
-        return ()
+        return (
+            TaggerDownloadPlan(
+                plan_id="camie_tagger_v2:v2_1_0_0",
+                adapter_id=self.id,
+                name="Camie Tagger v2",
+                model_version="v2-1.0.0",
+                description="Camie Tagger v2 的精炼预测 ONNX 权重与标签元数据。",
+                source_id="Camais03/camie-tagger-v2",
+                revision="7d40c1b85b86ab4f607b2caf26b1b50c99db743e",
+                source_url="https://huggingface.co/Camais03/camie-tagger-v2",
+                gated=False,
+                provenance="author",
+                files=(
+                    TaggerRemoteFile(
+                        remote_path="camie-tagger-v2.onnx",
+                        relative_path="camie-tagger-v2.onnx",
+                        size=788_983_561,
+                        sha256="ab0aaf253e3d546090001bec9bebc776c354ab6800f442ab9167af87b4a953ac",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="camie-tagger-v2-metadata.json",
+                        relative_path="camie-tagger-v2-metadata.json",
+                        size=7_771_946,
+                        sha256="de9f962eb0fd86b7e30d0af4e8c7990205200d70e955d8ecae60f87d14eae66b",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="config.json",
+                        relative_path="config.json",
+                        size=527,
+                        sha256="4fcb331e5b98c7b99649114a26ef677ed1aaeff0623da4693a74bce1ff99a433",
+                    ),
+                ),
+            ),
+        )
 
 
 def _load_metadata(directory: Path) -> dict[str, object]:

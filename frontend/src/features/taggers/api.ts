@@ -1,5 +1,10 @@
 import { apiRequest } from "../../shared/api/client";
 import type {
+  HuggingFaceConnectionSettings,
+  HuggingFaceConnectionTest,
+  HuggingFaceSettingsUpdate,
+  TaggerDownloadCenter,
+  TaggerDownloadTask,
   TaggerInstallation,
   TaggerLibrary,
   TaggerProfile,
@@ -55,4 +60,40 @@ export function updateTaggerProfile(
 
 export function deleteTaggerProfile(id: string): Promise<TaggerLibrary> {
   return apiRequest(`/api/v1/taggers/profiles/${id}`, { method: "DELETE" });
+}
+
+export function getTaggerDownloadCenter(): Promise<TaggerDownloadCenter> {
+  return apiRequest("/api/v1/taggers/downloads");
+}
+
+export function createTaggerDownload(planId: string): Promise<TaggerDownloadTask> {
+  return apiRequest("/api/v1/taggers/downloads", {
+    method: "POST",
+    body: JSON.stringify({ plan_id: planId }),
+  });
+}
+
+export function pauseTaggerDownload(id: string): Promise<TaggerDownloadTask> {
+  return apiRequest(`/api/v1/taggers/downloads/${id}/pause`, { method: "POST" });
+}
+
+export function resumeTaggerDownload(id: string): Promise<TaggerDownloadTask> {
+  return apiRequest(`/api/v1/taggers/downloads/${id}/resume`, { method: "POST" });
+}
+
+export function deleteTaggerDownload(id: string): Promise<TaggerDownloadCenter> {
+  return apiRequest(`/api/v1/taggers/downloads/${id}`, { method: "DELETE" });
+}
+
+export function updateHuggingFaceSettings(
+  input: HuggingFaceSettingsUpdate,
+): Promise<HuggingFaceConnectionSettings> {
+  return apiRequest("/api/v1/taggers/huggingface", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function testHuggingFaceConnection(): Promise<HuggingFaceConnectionTest> {
+  return apiRequest("/api/v1/taggers/huggingface/test", { method: "POST" });
 }

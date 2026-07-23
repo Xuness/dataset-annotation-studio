@@ -118,11 +118,45 @@ describe("settings overview sections", () => {
     );
   });
 
-  test("shows the local-only tagger library and runtime state", async () => {
+  test("shows the local tagger library and audited Hugging Face catalog", async () => {
+    const user = userEvent.setup();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        jsonResponse({
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.endsWith("/api/v1/taggers/downloads")) {
+          return jsonResponse({
+            offers: [
+              {
+                plan_id: "cl_tagger_v2:v2_01a",
+                adapter_id: "cl_tagger_v2",
+                adapter_name: "CL Tagger v2",
+                name: "CL Tagger v2 v2.01a",
+                model_version: "v2.01a",
+                description: "固定审核版本",
+                repo_id: "cella110n/cl_tagger_v2",
+                revision: "b57909b8e9c63f71e208a26473e7aabdf45ed6b6",
+                source_url: "https://huggingface.co/cella110n/cl_tagger_v2",
+                gated: true,
+                provenance: "author",
+                download_size: 2_200_000_000,
+                file_count: 4,
+                installed_installation_id: null,
+                installed_installation_name: null,
+                active_download_id: null,
+              },
+            ],
+            tasks: [],
+            huggingface: {
+              token_source: "anonymous",
+              has_saved_token: false,
+              proxy_mode: "environment",
+              has_custom_proxy: false,
+              proxy_display: null,
+            },
+          });
+        }
+        return jsonResponse({
           model_root: "C:\\AppData\\DatasetAnnotationStudio\\models\\taggers",
           disk_size: 0,
           installations: [],
@@ -135,8 +169,8 @@ describe("settings overview sections", () => {
           },
           supported_adapters: [{ id: "cl_tagger_v2", name: "CL Tagger v2", description: "test" }],
           scan_issues: [],
-        }),
-      ),
+        });
+      }),
     );
 
     render(
@@ -148,8 +182,10 @@ describe("settings overview sections", () => {
     expect(await screen.findByText("ONNX Runtime 已就绪")).toBeTruthy();
     expect(screen.getByText("CPUExecutionProvider")).toBeTruthy();
     expect(screen.getByRole("button", { name: "导入本地模型" })).toBeTruthy();
-    expect(screen.getByText(/当前版本仅支持本地导入/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Hugging Face/i })).toBeNull();
+    await user.click(screen.getByRole("tab", { name: "Hugging Face 下载" }));
+    expect(await screen.findByText("可下载模型")).toBeTruthy();
+    expect(screen.getByText("CL Tagger v2 v2.01a")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "下载并安装" })).toBeTruthy();
   });
 
   test("shows live service diagnostics and copies a privacy-safe summary", async () => {

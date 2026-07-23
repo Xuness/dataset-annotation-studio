@@ -35,7 +35,7 @@ from dataset_studio.modules.taggers.models import (
     TaggerSelectionMode,
     TaggerSelectionPolicy,
 )
-from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan
+from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan, TaggerRemoteFile
 
 _REQUIRED_FILES = (
     "model.onnx",
@@ -235,7 +235,64 @@ class AnimeTimmAdapter:
         )
 
     def download_plans(self) -> tuple[TaggerDownloadPlan, ...]:
-        return ()
+        return (
+            TaggerDownloadPlan(
+                plan_id="anime_timm_dbv4:caformer_b36_full",
+                adapter_id=self.id,
+                name="AnimeTimm DBv4 · CaFormer B36",
+                model_version="caformer_b36.dbv4-full",
+                description="AnimeTimm DBv4 完整标签版 CaFormer B36 ONNX 权重。",
+                source_id="animetimm/caformer_b36.dbv4-full",
+                revision="aac0699c88553d50eb673b41a81d8222936b22b2",
+                source_url="https://huggingface.co/animetimm/caformer_b36.dbv4-full",
+                gated=True,
+                provenance="author",
+                files=(
+                    TaggerRemoteFile(
+                        remote_path="model.onnx",
+                        relative_path="model.onnx",
+                        size=536_982_484,
+                        sha256="3ba9566baed11d3cd3dd96e4cd87f0c93a92f1a4fd62b8c2a425e0d55f41c065",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="selected_tags.csv",
+                        relative_path="selected_tags.csv",
+                        size=3_389_712,
+                        sha256="d99cf8cc1293bb7c7671b425d25e5f3688f6937f191ab6957de93acfefdb0e55",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="config.json",
+                        relative_path="config.json",
+                        size=267_687,
+                        sha256="7d37124c2cee13d743a8843a42f623d6e626b625e4eea5876cec7fea06f9270f",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="meta.json",
+                        relative_path="meta.json",
+                        size=318_663,
+                        sha256="fac38b3843c8015e258d29cef4776971775854000c44a30668f7c92d74306719",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="preprocess.json",
+                        relative_path="preprocess.json",
+                        size=2_125,
+                        sha256="60c3baca177a4be5513c7bd167c60411393d8af0e0463d6bf2ba3cb43db1a74a",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="categories.json",
+                        relative_path="categories.json",
+                        size=189,
+                        sha256="9c02d594bba377da15a414c4ccca513959d3fb3e79d350032fabebd347f39916",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="thresholds.csv",
+                        relative_path="thresholds.csv",
+                        size=292,
+                        sha256="ce56bc9339e84e755a1facda2aee8356c602d3e9cf03a750f9538e9b37753aaa",
+                    ),
+                ),
+            ),
+        )
 
 
 def _config_input_size(config: dict[str, object]) -> int:

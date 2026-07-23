@@ -64,6 +64,7 @@ export function getActiveJobs(): Promise<{
   preprocessing_count: number;
   export_count: number;
   asset_deletion_count: number;
+  tagger_download_count: number;
 }> {
   return apiRequest("/api/v1/jobs/active");
 }

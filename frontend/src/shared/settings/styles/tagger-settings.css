@@ -1,3 +1,40 @@
+.tagger-settings-shell {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.tagger-settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-sunken);
+}
+
+.tagger-settings-tabs button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+
+.tagger-settings-tabs button:hover {
+  color: var(--ink-soft);
+}
+
+.tagger-settings-tabs button.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+
 .tagger-settings {
   min-height: 0;
   overflow: auto;
@@ -462,6 +499,300 @@
   font-size: var(--text-xs);
 }
 
+.tagger-download-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.tagger-hf-connection,
+.tagger-download-catalog,
+.tagger-download-tasks {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+}
+
+.tagger-hf-connection {
+  padding: 13px;
+}
+
+.tagger-hf-connection > header,
+.tagger-download-catalog > header,
+.tagger-download-tasks > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tagger-hf-connection h3,
+.tagger-download-catalog h3,
+.tagger-download-tasks h3 {
+  margin: 3px 0 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+.tagger-hf-connection header p,
+.tagger-download-catalog header p,
+.tagger-download-tasks header p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-hf-identity {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  color: var(--sage);
+  background: var(--sage-soft);
+  font-size: var(--text-2xs);
+}
+
+.tagger-hf-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(150px, 0.7fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 13px;
+}
+
+.tagger-hf-form .form-field {
+  margin: 0;
+}
+
+.tagger-hf-connection > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.tagger-hf-connection > footer > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tagger-hf-connection > footer small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-download-catalog > header,
+.tagger-download-tasks > header {
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tagger-download-catalog > header > small,
+.tagger-download-tasks > header > small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.tagger-download-offers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 9px;
+}
+
+.tagger-download-offers > article {
+  display: grid;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.tagger-download-offers article > header,
+.tagger-download-offers article > footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tagger-download-offers h4 {
+  margin: 2px 0 0;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.tagger-download-offers header small,
+.tagger-download-offers > article > p,
+.tagger-download-offers code {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-download-offers > article > p {
+  min-height: 38px;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+.tagger-download-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.tagger-download-badges span {
+  padding: 2px 5px;
+  color: var(--warning);
+  background: var(--warning-soft);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+
+.tagger-download-offers dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0 0 8px;
+  background: var(--line);
+}
+
+.tagger-download-offers dl > div {
+  padding: 6px 7px;
+  background: var(--surface-raised);
+}
+
+.tagger-download-offers dt {
+  color: var(--faint);
+  font-size: var(--text-2xs);
+}
+
+.tagger-download-offers dd {
+  overflow: hidden;
+  margin: 2px 0 0;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagger-download-offers > article > code {
+  overflow: hidden;
+  margin-bottom: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagger-download-offers article > footer {
+  align-self: end;
+  align-items: center;
+}
+
+.tagger-download-tasks > div {
+  display: grid;
+  gap: 7px;
+  padding: 9px;
+}
+
+.tagger-download-tasks article {
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.tagger-download-tasks article.is-error {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+}
+
+.tagger-download-tasks article > header,
+.tagger-download-tasks article > header > div,
+.tagger-download-tasks article > footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tagger-download-tasks article > header {
+  justify-content: space-between;
+}
+
+.tagger-download-tasks article > header > div > svg {
+  color: var(--accent);
+}
+
+.tagger-download-tasks article.is-error > header > div > svg {
+  color: var(--danger);
+}
+
+.tagger-download-tasks article > header > div > div {
+  display: grid;
+  gap: 2px;
+}
+
+.tagger-download-tasks article strong {
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.tagger-download-tasks article small,
+.tagger-download-tasks article > header > span {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-download-tasks progress {
+  width: 100%;
+  height: 5px;
+  margin: 9px 0 5px;
+  border: 0;
+  background: var(--surface-sunken);
+}
+
+.tagger-download-tasks progress::-webkit-progress-bar {
+  background: var(--surface-sunken);
+}
+
+.tagger-download-tasks progress::-webkit-progress-value {
+  background: var(--accent);
+}
+
+.tagger-download-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-download-tasks article > code {
+  display: block;
+  overflow: hidden;
+  margin-top: 6px;
+  color: var(--faint);
+  font-size: var(--text-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagger-download-tasks article > p {
+  margin: 7px 0 0;
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
+
+.tagger-download-tasks article > footer {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
 @media (max-width: 940px) {
   .tagger-manager-grid {
     grid-template-columns: 1fr;
@@ -474,5 +805,15 @@
   .tagger-library-location > div:last-child {
     grid-column: 1 / -1;
     justify-content: flex-end;
+  }
+
+  .tagger-hf-form,
+  .tagger-download-offers {
+    grid-template-columns: 1fr;
+  }
+
+  .tagger-hf-connection > footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

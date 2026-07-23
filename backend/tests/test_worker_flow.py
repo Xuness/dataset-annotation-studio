@@ -43,6 +43,8 @@ from dataset_studio.modules.providers.config import (
 )
 from dataset_studio.modules.providers.models import ProviderResponse
 from dataset_studio.modules.statistics.service import StatisticsService
+from dataset_studio.modules.taggers.downloads.repository import TaggerDownloadRepository
+from dataset_studio.modules.taggers.downloads.service import TaggerDownloadService
 from dataset_studio.modules.taggers.models import (
     TaggerDevice,
     TaggerExecutionProfile,
@@ -167,8 +169,15 @@ def _runtime(tmp_path: Path):
     workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
     annotations = AnnotationService(workspaces)
     translations = TranslationService(workspaces)
-    presets = PresetService(PresetRepository(global_database), MemorySecrets())
+    secrets = MemorySecrets()
+    presets = PresetService(PresetRepository(global_database), secrets)
     taggers = TaggerService(settings, TaggerRepository(global_database))
+    tagger_downloads = TaggerDownloadService(
+        TaggerDownloadRepository(global_database),
+        taggers,
+        secrets,
+    )
+    taggers.set_download_activity_check(tagger_downloads.repository.has_blocking_tasks)
     jobs = JobService(workspaces, presets, annotations, translations, taggers)
     assets = AssetService(workspaces)
     container = AppContainer(
@@ -186,6 +195,7 @@ def _runtime(tmp_path: Path):
         statistics=StatisticsService(workspaces),
         codex=CodexRuntime(),
         taggers=taggers,
+        tagger_downloads=tagger_downloads,
         tagger_runtime=TaggerRuntime(taggers),
     )
     return container, workspaces, presets, jobs

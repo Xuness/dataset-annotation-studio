@@ -11,10 +11,11 @@ from dataset_studio.modules.jobs.service import JobService
 from dataset_studio.modules.jobs.traces import AnnotationTraceService
 from dataset_studio.modules.preprocessing.service import PreprocessService
 from dataset_studio.modules.presets.repository import PresetRepository
-from dataset_studio.modules.presets.secrets import KeyringSecretStore
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.providers.codex_runtime import CodexRuntime
 from dataset_studio.modules.statistics.service import StatisticsService
+from dataset_studio.modules.taggers.downloads.repository import TaggerDownloadRepository
+from dataset_studio.modules.taggers.downloads.service import TaggerDownloadService
 from dataset_studio.modules.taggers.repository import TaggerRepository
 from dataset_studio.modules.taggers.runtime import TaggerRuntime
 from dataset_studio.modules.taggers.service import TaggerService
@@ -22,6 +23,7 @@ from dataset_studio.modules.translations.service import TranslationService
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
 from dataset_studio.platform.global_store import initialize_global_database
+from dataset_studio.platform.secrets import KeyringSecretStore
 
 
 @dataclass(slots=True)
@@ -40,6 +42,7 @@ class AppContainer:
     statistics: StatisticsService
     codex: CodexRuntime
     taggers: TaggerService
+    tagger_downloads: TaggerDownloadService
     tagger_runtime: TaggerRuntime
 
     @classmethod
@@ -52,8 +55,15 @@ class AppContainer:
         translations = TranslationService(workspaces)
         assets = AssetService(workspaces)
         asset_deletions = AssetDeletionService(workspaces)
-        presets = PresetService(PresetRepository(global_database), KeyringSecretStore())
+        secrets = KeyringSecretStore()
+        presets = PresetService(PresetRepository(global_database), secrets)
         taggers = TaggerService(settings, TaggerRepository(global_database))
+        tagger_downloads = TaggerDownloadService(
+            TaggerDownloadRepository(global_database),
+            taggers,
+            secrets,
+        )
+        taggers.set_download_activity_check(tagger_downloads.repository.has_blocking_tasks)
         jobs = JobService(workspaces, presets, annotations, translations, taggers)
         codex = CodexRuntime()
         tagger_runtime = TaggerRuntime(taggers)
@@ -86,6 +96,7 @@ class AppContainer:
             statistics=StatisticsService(workspaces),
             codex=codex,
             taggers=taggers,
+            tagger_downloads=tagger_downloads,
             tagger_runtime=tagger_runtime,
         )
 

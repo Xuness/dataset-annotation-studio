@@ -88,12 +88,26 @@ class TaggerFileRecord(BaseModel):
 
 
 class TaggerSourceRecord(BaseModel):
-    source_type: Literal["local_import", "local_scan"]
+    source_type: Literal["local_import", "local_scan", "huggingface"]
     original_path: str | None = None
+    plan_id: str | None = None
+    repo_id: str | None = None
+    revision: str | None = None
+
+    @model_validator(mode="after")
+    def validate_source_fields(self) -> TaggerSourceRecord:
+        if self.source_type == "huggingface":
+            if not self.plan_id or not self.repo_id or not self.revision:
+                raise ValueError("Hugging Face 安装来源缺少下载计划、仓库或 revision。")
+            if len(self.revision) != 40:
+                raise ValueError("Hugging Face 安装来源 revision 无效。")
+        elif self.plan_id is not None or self.repo_id is not None or self.revision is not None:
+            raise ValueError("本地安装来源不能包含 Hugging Face 字段。")
+        return self
 
 
 class TaggerInstallationManifest(BaseModel):
-    manifest_version: Literal[1, 2] = 2
+    manifest_version: Literal[1, 2, 3] = 3
     installation_id: str
     name: str
     adapter_id: str

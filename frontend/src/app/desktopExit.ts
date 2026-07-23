@@ -7,6 +7,7 @@ export interface ActiveDesktopJobs {
   preprocessing_count: number;
   export_count: number;
   asset_deletion_count: number;
+  tagger_download_count: number;
 }
 
 interface WarningDialogOptions {
@@ -26,7 +27,12 @@ export interface DesktopExitDependencies {
 export type DesktopExitResult = "cancelled" | "blocked" | "exiting";
 
 function stoppableJobCount(active: ActiveDesktopJobs): number {
-  return active.annotation_job_count + active.translation_job_count + active.export_count;
+  return (
+    active.annotation_job_count +
+    active.translation_job_count +
+    active.export_count +
+    active.tagger_download_count
+  );
 }
 
 function hasBlockingFileOperation(active: ActiveDesktopJobs): boolean {
@@ -65,7 +71,7 @@ export async function runDesktopExit(
     const stoppableJobs = stoppableJobCount(active);
     if (stoppableJobs) {
       const accepted = await dependencies.confirm(
-        `还有 ${stoppableJobs} 个标注、翻译或导出任务尚未结束。关闭软件会安全停止任务并保留断点，仍要退出吗？`,
+        `还有 ${stoppableJobs} 个标注、翻译、导出或模型下载任务尚未结束。关闭软件会安全停止任务并保留断点，仍要退出吗？`,
         { title: "停止任务并退出", kind: "warning" },
       );
       if (!accepted) return "cancelled";

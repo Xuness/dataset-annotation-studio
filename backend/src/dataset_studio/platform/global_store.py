@@ -271,7 +271,56 @@ SET selection_json =
     ',"category_thresholds":{},"max_tags":null}';
 """
 
-GLOBAL_SCHEMA_VERSION = 9
+LOCAL_TAGGER_DOWNLOADS_MIGRATION = """
+CREATE TABLE local_tagger_hf_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    proxy_mode TEXT NOT NULL
+        CHECK (proxy_mode IN ('environment', 'custom', 'direct')),
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE local_tagger_downloads (
+    id TEXT PRIMARY KEY,
+    plan_id TEXT NOT NULL,
+    plan_snapshot_json TEXT NOT NULL,
+    adapter_id TEXT NOT NULL,
+    repo_id TEXT NOT NULL,
+    revision TEXT NOT NULL CHECK (length(revision) = 40),
+    model_root TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (
+        status IN (
+            'queued', 'resolving', 'downloading', 'verifying', 'installing',
+            'completed', 'paused', 'failed', 'interrupted'
+        )
+    ),
+    bytes_total INTEGER NOT NULL CHECK (bytes_total > 0),
+    bytes_downloaded INTEGER NOT NULL DEFAULT 0 CHECK (bytes_downloaded >= 0),
+    files_total INTEGER NOT NULL CHECK (files_total > 0),
+    files_completed INTEGER NOT NULL DEFAULT 0 CHECK (files_completed >= 0),
+    current_file TEXT,
+    speed_bps REAL CHECK (speed_bps IS NULL OR speed_bps >= 0),
+    stop_requested INTEGER NOT NULL DEFAULT 0 CHECK (stop_requested IN (0, 1)),
+    worker_id TEXT,
+    installation_id TEXT,
+    error_code TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    completed_at TEXT,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (installation_id)
+        REFERENCES local_tagger_installations(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_local_tagger_downloads_created
+ON local_tagger_downloads(created_at DESC);
+
+CREATE UNIQUE INDEX idx_local_tagger_downloads_active_plan
+ON local_tagger_downloads(plan_id)
+WHERE status IN ('queued', 'resolving', 'downloading', 'verifying', 'installing');
+"""
+
+GLOBAL_SCHEMA_VERSION = 10
 GLOBAL_MIGRATIONS = (
     Migration(1, "initial_global_schema", GLOBAL_SCHEMA),
     Migration(2, "provider_request_options", PROVIDER_REQUEST_OPTIONS_MIGRATION),
@@ -289,6 +338,11 @@ GLOBAL_MIGRATIONS = (
         9,
         "local_tagger_selection_policy",
         LOCAL_TAGGER_SELECTION_POLICY_MIGRATION,
+    ),
+    Migration(
+        10,
+        "local_tagger_downloads",
+        LOCAL_TAGGER_DOWNLOADS_MIGRATION,
     ),
 )
 

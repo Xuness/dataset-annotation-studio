@@ -25,7 +25,7 @@ from dataset_studio.modules.taggers.models import (
     TaggerSelectionMode,
     TaggerSelectionPolicy,
 )
-from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan
+from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan, TaggerRemoteFile
 
 _REQUIRED_FILES = (
     "model.onnx",
@@ -236,9 +236,46 @@ class CLTaggerV2Adapter:
         )
 
     def download_plans(self) -> tuple[TaggerDownloadPlan, ...]:
-        # Remote plans are intentionally absent in v1. A future audited source can
-        # add exact revisions and file paths here without changing model management.
-        return ()
+        return (
+            TaggerDownloadPlan(
+                plan_id="cl_tagger_v2:v2_01a",
+                adapter_id=self.id,
+                name="CL Tagger v2.01a",
+                model_version="v2-unknown",
+                description="高标签量的 CL Tagger v2.01a 单模型 ONNX 版本。",
+                source_id="cella110n/cl_tagger_v2",
+                revision="b57909b8e9c63f71e208a26473e7aabdf45ed6b6",
+                source_url="https://huggingface.co/cella110n/cl_tagger_v2",
+                gated=True,
+                provenance="author",
+                files=(
+                    TaggerRemoteFile(
+                        remote_path="v2_01a/model.onnx",
+                        relative_path="model.onnx",
+                        size=791_773,
+                        sha256="12581711ccf803f914129b9e87932a4cf93c80c3382b7c63305e67afdcc2a02f",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="v2_01a/model.onnx.data",
+                        relative_path="model.onnx.data",
+                        size=2_211_645_300,
+                        sha256="d9f162b7c8127790879f17fb87bc643a1c803bc17bcce44ab021fca65b2dafff",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="v2_01a/model_vocabulary.json",
+                        relative_path="model_vocabulary.json",
+                        size=14_594_140,
+                        sha256="4966d2779825a8a4c4e46644fa8e2741824622929bdb21dbe4f9c18df2ebcf95",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="v2_01a/model_metadata.json",
+                        relative_path="model_metadata.json",
+                        size=112,
+                        sha256="821b60a1f03d8cd93de6c46c226dc8460def96e72597c72dac5c5058557808d2",
+                    ),
+                ),
+            ),
+        )
 
 
 def _read_json_object(path: Path, label: str) -> dict[str, object]:

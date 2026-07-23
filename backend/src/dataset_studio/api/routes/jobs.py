@@ -22,6 +22,7 @@ def active_jobs(container: Container):
     preprocessing_count, _ = container.preprocessing.active_overview()
     export_count, _ = container.exports.active_overview()
     asset_deletion_count, _ = container.asset_deletions.active_overview()
+    tagger_download_count = container.tagger_downloads.active_count()
     active_projects = (
         container.jobs.active_project_ids()
         | container.preprocessing.active_project_ids(preprocessing_only=True)
@@ -29,20 +30,31 @@ def active_jobs(container: Container):
         | container.asset_deletions.active_project_ids()
     )
     return ActiveJobsOverview(
-        count=jobs.count + preprocessing_count + export_count + asset_deletion_count,
+        count=(
+            jobs.count
+            + preprocessing_count
+            + export_count
+            + asset_deletion_count
+            + tagger_download_count
+        ),
         project_count=len(active_projects),
         annotation_job_count=jobs.annotation_job_count,
         translation_job_count=jobs.translation_job_count,
         preprocessing_count=preprocessing_count,
         export_count=export_count,
         asset_deletion_count=asset_deletion_count,
+        tagger_download_count=tagger_download_count,
     )
 
 
 @global_router.post("/stop-all")
 def stop_all_workspace_jobs(container: Container):
     return {
-        "stopped": (container.jobs.stop_all_workspaces() + container.exports.stop_all_workspaces())
+        "stopped": (
+            container.jobs.stop_all_workspaces()
+            + container.exports.stop_all_workspaces()
+            + container.tagger_downloads.pause_all()
+        )
     }
 
 

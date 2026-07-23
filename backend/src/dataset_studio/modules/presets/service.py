@@ -19,13 +19,13 @@ from dataset_studio.modules.presets.models import (
     TranslationPromptPresetUpdate,
 )
 from dataset_studio.modules.presets.repository import PresetRepository
-from dataset_studio.modules.presets.secrets import SecretStore
 from dataset_studio.modules.providers.config import (
     ProviderExecutionProfile,
     ProviderModelConfig,
     ProviderProtocolOptions,
     ProviderType,
 )
+from dataset_studio.platform.secrets import SecretStore
 
 _PROTOCOL_OPTIONS_ADAPTER = TypeAdapter(ProviderProtocolOptions)
 

@@ -27,7 +27,7 @@ from dataset_studio.modules.taggers.models import (
     TaggerSelectionMode,
     TaggerSelectionPolicy,
 )
-from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan
+from dataset_studio.modules.taggers.sources.base import TaggerDownloadPlan, TaggerRemoteFile
 
 _REQUIRED_FILES = ("model.onnx", "selected_tags.csv", "config.json")
 _CATEGORY_NAMES = {0: "general", 4: "character", 9: "rating"}
@@ -189,7 +189,40 @@ class WDTaggerV3Adapter:
         )
 
     def download_plans(self) -> tuple[TaggerDownloadPlan, ...]:
-        return ()
+        return (
+            TaggerDownloadPlan(
+                plan_id="wd_tagger_v3:swinv2_base_window8_256",
+                adapter_id=self.id,
+                name="WD Tagger v3 · SwinV2",
+                model_version="v3-swinv2_base_window8_256",
+                description="社区常用的 WD Tagger v3 SwinV2 ONNX 权重。",
+                source_id="SmilingWolf/wd-swinv2-tagger-v3",
+                revision="627aef95638667ddcaa3ac8ae625e88ea5b02f51",
+                source_url="https://huggingface.co/SmilingWolf/wd-swinv2-tagger-v3",
+                gated=False,
+                provenance="author",
+                files=(
+                    TaggerRemoteFile(
+                        remote_path="model.onnx",
+                        relative_path="model.onnx",
+                        size=467_460_978,
+                        sha256="e6774bff34d43bd49f75a47db4ef217dce701c9847b546523eb85ff6dbba1db1",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="selected_tags.csv",
+                        relative_path="selected_tags.csv",
+                        size=308_468,
+                        sha256="298633d94d0031d2081c0893f29c82eab7f0df00b08483ba8f29d1e979441217",
+                    ),
+                    TaggerRemoteFile(
+                        remote_path="config.json",
+                        relative_path="config.json",
+                        size=637,
+                        sha256="ddcdd28facc40ee8d0ef4b16ee3e7c70e4d7b156aff7b0f2ccc180e617eda795",
+                    ),
+                ),
+            ),
+        )
 
 
 def _config_image_size(config: dict[str, object]) -> int | None:

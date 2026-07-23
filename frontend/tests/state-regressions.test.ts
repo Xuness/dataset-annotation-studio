@@ -765,6 +765,7 @@ function desktopJobs(overrides: Partial<ActiveDesktopJobs> = {}): ActiveDesktopJ
     preprocessing_count: 0,
     export_count: 0,
     asset_deletion_count: 0,
+    tagger_download_count: 0,
     ...overrides,
   };
 }
@@ -850,7 +851,11 @@ test("desktop exit safely stops resumable jobs before terminating the applicatio
         activeChecks += 1;
         calls.push(`get-active:${activeChecks}`);
         return activeChecks < 3
-          ? desktopJobs({ annotation_job_count: 1, export_count: 1 })
+          ? desktopJobs({
+              annotation_job_count: 1,
+              export_count: 1,
+              tagger_download_count: 1,
+            })
           : desktopJobs();
       },
       confirm: async () => {

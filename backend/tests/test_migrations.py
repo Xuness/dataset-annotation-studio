@@ -132,7 +132,41 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     }
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+
+def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> None:
+    database = tmp_path / "global.sqlite3"
+    migrate_database(database, GLOBAL_MIGRATIONS[:9])
+
+    initialize_global_database(database)
+
+    connection = connect(database)
+    try:
+        tables = {
+            row["name"]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        indexes = {
+            row["name"]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index'"
+            ).fetchall()
+        }
+        versions = [
+            row["version"]
+            for row in connection.execute(
+                "SELECT version FROM schema_migrations ORDER BY version"
+            ).fetchall()
+        ]
+    finally:
+        connection.close()
+
+    assert {"local_tagger_hf_settings", "local_tagger_downloads"}.issubset(tables)
+    assert "idx_local_tagger_downloads_active_plan" in indexes
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 
 def test_recent_workspace_activity_migration_hides_duplicate_roots(

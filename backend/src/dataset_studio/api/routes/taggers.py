@@ -4,6 +4,14 @@ from fastapi import APIRouter, Depends, status
 
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
+from dataset_studio.modules.taggers.downloads.models import (
+    HuggingFaceConnectionSettings,
+    HuggingFaceConnectionTest,
+    HuggingFaceSettingsUpdate,
+    TaggerDownloadCenter,
+    TaggerDownloadCreate,
+    TaggerDownloadTask,
+)
 from dataset_studio.modules.taggers.models import (
     TaggerImportRequest,
     TaggerInstallation,
@@ -65,3 +73,50 @@ def update_profile(profile_id: str, data: TaggerProfileUpdate, container: Contai
 @router.delete("/profiles/{profile_id}", response_model=TaggerLibrary)
 def delete_profile(profile_id: str, container: Container):
     return container.taggers.delete_profile(profile_id)
+
+
+@router.get("/downloads", response_model=TaggerDownloadCenter)
+def get_download_center(container: Container):
+    return container.tagger_downloads.center()
+
+
+@router.post(
+    "/downloads",
+    response_model=TaggerDownloadTask,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_download(data: TaggerDownloadCreate, container: Container):
+    return container.tagger_downloads.create(data)
+
+
+@router.post("/downloads/{task_id}/pause", response_model=TaggerDownloadTask)
+def pause_download(task_id: str, container: Container):
+    return container.tagger_downloads.pause(task_id)
+
+
+@router.post("/downloads/{task_id}/resume", response_model=TaggerDownloadTask)
+def resume_download(task_id: str, container: Container):
+    return container.tagger_downloads.resume(task_id)
+
+
+@router.delete("/downloads/{task_id}", response_model=TaggerDownloadCenter)
+def delete_download(task_id: str, container: Container):
+    return container.tagger_downloads.delete(task_id)
+
+
+@router.get("/huggingface", response_model=HuggingFaceConnectionSettings)
+def get_huggingface_settings(container: Container):
+    return container.tagger_downloads.connection_settings()
+
+
+@router.patch("/huggingface", response_model=HuggingFaceConnectionSettings)
+def update_huggingface_settings(
+    data: HuggingFaceSettingsUpdate,
+    container: Container,
+):
+    return container.tagger_downloads.update_connection_settings(data)
+
+
+@router.post("/huggingface/test", response_model=HuggingFaceConnectionTest)
+def test_huggingface_connection(container: Container):
+    return container.tagger_downloads.test_connection()
