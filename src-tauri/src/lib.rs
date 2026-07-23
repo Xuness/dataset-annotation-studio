@@ -8,6 +8,7 @@ use tauri_plugin_shell::{process::CommandChild, ShellExt};
 
 mod background;
 mod clipboard;
+mod desktop;
 
 #[cfg(not(debug_assertions))]
 #[derive(Default)]
@@ -35,24 +36,37 @@ fn terminate_service(child: CommandChild) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let builder = tauri::Builder::default()
+    let builder =
+        tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            desktop::show_main_window(app);
+        }));
+
+    let builder = builder
         .invoke_handler(tauri::generate_handler![
             clipboard::write_clipboard_text_with_history,
             background::install_custom_background,
-            background::clear_custom_background
+            background::clear_custom_background,
+            desktop::exit_application
         ])
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_shell::init());
+        .plugin(tauri_plugin_shell::init())
+        .on_window_event(desktop::handle_window_event);
 
     #[cfg(not(debug_assertions))]
-    let builder = builder.manage(ServiceProcess::default()).setup(|app| {
-        let (mut events, child) = app.shell().sidecar("dataset-studio-service")?.spawn()?;
-        *app.state::<ServiceProcess>()
-            .0
-            .lock()
-            .expect("service lock poisoned") = Some(child);
-        tauri::async_runtime::spawn(async move { while events.recv().await.is_some() {} });
+    let builder = builder.manage(ServiceProcess::default());
+
+    let builder = builder.setup(|app| {
+        desktop::setup(app)?;
+        #[cfg(not(debug_assertions))]
+        {
+            let (mut events, child) = app.shell().sidecar("dataset-studio-service")?.spawn()?;
+            *app.state::<ServiceProcess>()
+                .0
+                .lock()
+                .expect("service lock poisoned") = Some(child);
+            tauri::async_runtime::spawn(async move { while events.recv().await.is_some() {} });
+        }
         Ok(())
     });
 

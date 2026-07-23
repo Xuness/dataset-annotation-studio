@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
+import {
+  DESKTOP_EXIT_REQUESTED_EVENT,
+  EXIT_APPLICATION_COMMAND,
+  runDesktopExit,
+  type ActiveDesktopJobs,
+  type DesktopExitDependencies,
+} from "../src/app/desktopExit.ts";
 import { providerCredentialCacheToken } from "../src/features/presets/queryKeys.ts";
 import { reconcilePersistedContent } from "../src/pages/workspace/components/annotationEditorState.ts";
 import {
@@ -137,6 +144,7 @@ test("desktop capabilities allow opening verified local folders", () => {
   );
   assert.equal(capability.permissions.includes("core:window:allow-maximize"), true);
   assert.equal(capability.permissions.includes("core:window:allow-unmaximize"), true);
+  assert.equal(capability.permissions.includes("core:window:allow-destroy"), false);
 });
 
 test("preprocess scope controls use eager route-independent styles", () => {
@@ -748,4 +756,151 @@ test("workspace material opacity is independent from scene visibility", () => {
     resolveAppearance(defaults).theme.material.workspaceSurfaceOpacity,
     resolveAppearance(customized).theme.material.workspaceSurfaceOpacity,
   );
+});
+
+function desktopJobs(overrides: Partial<ActiveDesktopJobs> = {}): ActiveDesktopJobs {
+  return {
+    annotation_job_count: 0,
+    translation_job_count: 0,
+    preprocessing_count: 0,
+    export_count: 0,
+    asset_deletion_count: 0,
+    ...overrides,
+  };
+}
+
+function desktopExitDependencies(
+  overrides: Partial<DesktopExitDependencies> = {},
+): DesktopExitDependencies {
+  return {
+    confirm: async () => true,
+    message: async () => undefined,
+    getActiveJobs: async () => desktopJobs(),
+    stopAllWorkspaceJobs: async () => undefined,
+    delay: async () => undefined,
+    exitApplication: async () => undefined,
+    ...overrides,
+  };
+}
+
+test("desktop exit leaves an unsaved window running when discard is rejected", async () => {
+  const calls: string[] = [];
+  const result = await runDesktopExit(
+    true,
+    desktopExitDependencies({
+      confirm: async () => {
+        calls.push("confirm-discard");
+        return false;
+      },
+      getActiveJobs: async () => {
+        calls.push("get-active");
+        return desktopJobs();
+      },
+      exitApplication: async () => {
+        calls.push("exit");
+      },
+    }),
+  );
+
+  assert.equal(result, "cancelled");
+  assert.deepEqual(calls, ["confirm-discard"]);
+});
+
+test("desktop lifecycle bridge names stay aligned with the Rust host", () => {
+  const desktopHost = readFileSync(
+    new URL("../../src-tauri/src/desktop.rs", import.meta.url),
+    "utf8",
+  );
+  const tauriEntry = readFileSync(new URL("../../src-tauri/src/lib.rs", import.meta.url), "utf8");
+
+  assert.match(
+    desktopHost,
+    new RegExp(`EXIT_REQUESTED_EVENT: &str = "${DESKTOP_EXIT_REQUESTED_EVENT}"`),
+  );
+  assert.match(desktopHost, new RegExp(`fn ${EXIT_APPLICATION_COMMAND}\\(`));
+  assert.match(tauriEntry, new RegExp(`desktop::${EXIT_APPLICATION_COMMAND}`));
+});
+
+test("desktop exit blocks while preprocessing is writing files", async () => {
+  const calls: string[] = [];
+  const result = await runDesktopExit(
+    false,
+    desktopExitDependencies({
+      getActiveJobs: async () => desktopJobs({ preprocessing_count: 1 }),
+      message: async () => {
+        calls.push("blocked-message");
+      },
+      exitApplication: async () => {
+        calls.push("exit");
+      },
+    }),
+  );
+
+  assert.equal(result, "blocked");
+  assert.deepEqual(calls, ["blocked-message"]);
+});
+
+test("desktop exit safely stops resumable jobs before terminating the application", async () => {
+  const calls: string[] = [];
+  let activeChecks = 0;
+  const result = await runDesktopExit(
+    false,
+    desktopExitDependencies({
+      getActiveJobs: async () => {
+        activeChecks += 1;
+        calls.push(`get-active:${activeChecks}`);
+        return activeChecks < 3
+          ? desktopJobs({ annotation_job_count: 1, export_count: 1 })
+          : desktopJobs();
+      },
+      confirm: async () => {
+        calls.push("confirm-stop");
+        return true;
+      },
+      stopAllWorkspaceJobs: async () => {
+        calls.push("stop-all");
+      },
+      delay: async () => {
+        calls.push("delay");
+      },
+      exitApplication: async () => {
+        calls.push("exit");
+      },
+    }),
+  );
+
+  assert.equal(result, "exiting");
+  assert.deepEqual(calls, [
+    "get-active:1",
+    "confirm-stop",
+    "stop-all",
+    "delay",
+    "get-active:2",
+    "delay",
+    "get-active:3",
+    "exit",
+  ]);
+});
+
+test("desktop exit requires a second confirmation when job state cannot be verified", async () => {
+  const calls: string[] = [];
+  const result = await runDesktopExit(
+    false,
+    desktopExitDependencies({
+      getActiveJobs: async () => {
+        calls.push("get-active");
+        throw new Error("service unavailable");
+      },
+      confirm: async () => {
+        calls.push("confirm-force");
+        return true;
+      },
+      exitApplication: async () => {
+        calls.push("exit");
+      },
+    }),
+  );
+
+  assert.equal(result, "exiting");
+  assert.deepEqual(calls, ["get-active", "confirm-force", "exit"]);
 });
