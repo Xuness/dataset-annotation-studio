@@ -251,6 +251,10 @@ def test_worker_installs_verified_materialization_and_marks_offer_installed(
     assert installation.source.plan_id == _PLAN.plan_id
     assert installation.source.revision == _PLAN.revision
     assert len(library.profiles) == 1
+    assert taggers._repository.delete_profile(library.profiles[0].id)
+    taggers.ensure_default_profile(installation.id)
+    taggers.ensure_default_profile(installation.id)
+    assert len(taggers.library().profiles) == 1
     center = downloads.center()
     assert center.offers[0].installed_installation_id == installation.id
     assert not downloads.staging_path(completed).exists()
@@ -267,7 +271,7 @@ def test_worker_honors_pause_requested_during_preflight(
     assert row is not None
     assert downloads.active_count() == 1
     assert downloads.pause_all() == 1
-    assert downloads.active_count() == 0
+    assert downloads.active_count() == 1
 
     worker = TaggerDownloadWorker(SimpleNamespace(taggers=taggers, tagger_downloads=downloads))
     worker._process(row)
@@ -275,6 +279,66 @@ def test_worker_honors_pause_requested_during_preflight(
     paused = downloads.repository.get(task.id)
     assert paused is not None
     assert paused["status"] == TaggerDownloadStatus.PAUSED.value
+    assert downloads.active_count() == 0
+
+
+def test_download_cleanup_failure_keeps_task_record_for_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, downloads, _ = _services(tmp_path, monkeypatch)
+    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+    downloads.pause(task.id)
+
+    def fail_cleanup(_row) -> None:
+        raise OSError("simulated cleanup failure")
+
+    monkeypatch.setattr(downloads, "cleanup_staging", fail_cleanup)
+    with pytest.raises(OSError, match="simulated cleanup failure"):
+        downloads.delete(task.id)
+
+    assert downloads.repository.get(task.id) is not None
+
+
+def test_download_staging_rejects_a_linked_download_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, downloads, _ = _services(tmp_path, monkeypatch)
+    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+    row = downloads.repository.get(task.id)
+    assert row is not None
+    external = tmp_path / "external-downloads"
+    external.mkdir()
+    downloads_root = Path(str(row["model_root"])) / ".downloads"
+    try:
+        downloads_root.symlink_to(external, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"当前环境不能创建符号链接：{error}")
+
+    with pytest.raises(ValueError, match="符号链接或目录联接"):
+        downloads.staging_path(row)
+
+
+def test_completed_download_is_not_reclassified_when_staging_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    taggers, downloads, _ = _services(tmp_path, monkeypatch)
+    monkeypatch.setattr(downloads, "source", FakeHuggingFaceSource)
+    task = downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+    row = downloads.repository.claim_next("test-worker")
+    assert row is not None
+
+    def fail_cleanup(_row) -> None:
+        raise RuntimeError("simulated cleanup failure")
+
+    monkeypatch.setattr(downloads, "cleanup_staging", fail_cleanup)
+    TaggerDownloadWorker(SimpleNamespace(taggers=taggers, tagger_downloads=downloads))._process(row)
+
+    completed = downloads.repository.get(task.id)
+    assert completed is not None
+    assert completed["status"] == TaggerDownloadStatus.COMPLETED.value
 
 
 def test_orphaned_download_can_resume_after_worker_restart(

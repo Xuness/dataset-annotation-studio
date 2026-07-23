@@ -29,17 +29,17 @@ export function useAnnotationHistory(projectId: string, assetId: string | null, 
   });
 }
 
-function useInvalidateAnnotation(projectId: string, assetId: string) {
+function useInvalidateAnnotation(projectId: string) {
   const queryClient = useQueryClient();
   return () => {
-    void queryClient.invalidateQueries({ queryKey: annotationKeys.detail(projectId, assetId) });
+    void queryClient.invalidateQueries({ queryKey: annotationKeys.project(projectId) });
     void queryClient.invalidateQueries({
-      queryKey: annotationHistoryKeys.detail(projectId, assetId),
+      queryKey: annotationHistoryKeys.project(projectId),
     });
     void queryClient.invalidateQueries({
-      queryKey: annotationTraceKeys.detail(projectId, assetId),
+      queryKey: annotationTraceKeys.project(projectId),
     });
-    void queryClient.invalidateQueries({ queryKey: translationKeys.asset(projectId, assetId) });
+    void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
     void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
     void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
     void queryClient.invalidateQueries({ queryKey: statisticsKeys.project(projectId) });
@@ -47,15 +47,21 @@ function useInvalidateAnnotation(projectId: string, assetId: string) {
 }
 
 export function useSaveAnnotation(projectId: string, assetId: string) {
-  const invalidate = useInvalidateAnnotation(projectId, assetId);
+  const invalidate = useInvalidateAnnotation(projectId);
   return useMutation({
-    mutationFn: (content: string) => saveAnnotation(projectId, assetId, content),
+    mutationFn: ({
+      content,
+      expectedModifiedAt,
+    }: {
+      content: string;
+      expectedModifiedAt: string | null;
+    }) => saveAnnotation(projectId, assetId, content, expectedModifiedAt),
     onSuccess: invalidate,
   });
 }
 
 export function useDeleteAnnotation(projectId: string, assetId: string) {
-  const invalidate = useInvalidateAnnotation(projectId, assetId);
+  const invalidate = useInvalidateAnnotation(projectId);
   return useMutation({
     mutationFn: () => deleteAnnotation(projectId, assetId),
     onSuccess: invalidate,
@@ -70,6 +76,9 @@ export function useDeleteAnnotations(projectId: string) {
       void queryClient.invalidateQueries({ queryKey: annotationKeys.project(projectId) });
       void queryClient.invalidateQueries({
         queryKey: annotationHistoryKeys.project(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: annotationTraceKeys.project(projectId),
       });
       void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
       void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });

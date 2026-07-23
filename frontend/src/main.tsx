@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter } from "react-router-dom";
 
 import { App } from "./app/App";
+import { AppErrorBoundary } from "./app/AppErrorBoundary";
 import { initializeAppPreferences } from "./shared/theme/appPreferences";
 import "./styles/global.css";
 
@@ -22,9 +23,11 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <HashRouter>
-        <App />
-      </HashRouter>
+      <AppErrorBoundary>
+        <HashRouter>
+          <App />
+        </HashRouter>
+      </AppErrorBoundary>
     </QueryClientProvider>
   </StrictMode>,
 );

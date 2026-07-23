@@ -40,7 +40,17 @@ class AnnotationDocument(BaseModel):
 
 
 class AnnotationUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     content: str
+    expected_modified_at: str | None
+
+    @field_validator("expected_modified_at")
+    @classmethod
+    def validate_expected_modified_at(cls, value: str | None) -> str | None:
+        if value is not None and not value.isdigit():
+            raise ValueError("标注版本必须是有效的文件修改时间。")
+        return value
 
 
 class AnnotationBatchDeleteRequest(BaseModel):

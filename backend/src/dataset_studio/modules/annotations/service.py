@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
-from dataset_studio.core.errors import AssetNotFoundError
+from dataset_studio.core.errors import (
+    AssetNotFoundError,
+    FileRollbackError,
+    ResourceConflictError,
+)
 from dataset_studio.core.files import atomic_copy_file, atomic_write_text
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
@@ -21,13 +26,30 @@ from dataset_studio.modules.annotations.models import (
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
 from dataset_studio.modules.annotations.text import read_annotation_text
 from dataset_studio.modules.assets.repository import AssetRepository
+from dataset_studio.modules.output_resources import (
+    OutputResourceClaim,
+    annotation_output_resource_key,
+    hold_output_resources,
+)
 from dataset_studio.modules.workspaces.service import WorkspaceService
+
+_EXPECTED_VERSION_UNSET = object()
 
 
 @dataclass(frozen=True, slots=True)
 class GeneratedAnnotation:
     asset_id: str
     content: str
+    expected_modified_at: str | None | object = _EXPECTED_VERSION_UNSET
+    lease_owner_id: str | None = None
+
+
+class AnnotationBatchRollbackError(FileRollbackError):
+    """Raised when a failed batch cannot restore every touched file."""
+
+
+class AnnotationRollbackError(FileRollbackError):
+    """Raised when a failed single write cannot restore its previous file."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +58,8 @@ class _PreparedAnnotation:
     content: str
     path: Path
     validation: ValidationResult
+    expected_modified_at: str | None | object
+    lease_owner_id: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,8 +105,23 @@ class AnnotationService:
             modified_at=str(annotation_path.stat().st_mtime_ns),
         )
 
-    def save(self, project_id: str, asset_id: str, content: str) -> AnnotationDocument:
-        return self._save(project_id, asset_id, content, source="manual_edit")
+    def save(
+        self,
+        project_id: str,
+        asset_id: str,
+        content: str,
+        *,
+        expected_modified_at: str | None | object = _EXPECTED_VERSION_UNSET,
+    ) -> AnnotationDocument:
+        return self._save(
+            project_id,
+            asset_id,
+            content,
+            source="manual_edit",
+            expected_modified_at=expected_modified_at,
+            lease_owner_id=None,
+            allow_shared=True,
+        )
 
     def save_generated(
         self,
@@ -91,6 +130,8 @@ class AnnotationService:
         content: str,
         *,
         manually_accepted: bool = False,
+        expected_modified_at: str | None | object = _EXPECTED_VERSION_UNSET,
+        lease_owner_id: str | None = None,
     ) -> AnnotationDocument:
         return self._save(
             project_id,
@@ -98,6 +139,9 @@ class AnnotationService:
             content,
             source="manual_accept" if manually_accepted else "model_response",
             manually_accepted=manually_accepted,
+            expected_modified_at=expected_modified_at,
+            lease_owner_id=lease_owner_id,
+            allow_shared=False,
         )
 
     def save_generated_batch(
@@ -133,9 +177,54 @@ class AnnotationService:
                 content=annotation.content,
                 path=self._annotation_path(paths.root, assets[annotation.asset_id]),
                 validation=validate_tag_balance(annotation.content),
+                expected_modified_at=annotation.expected_modified_at,
+                lease_owner_id=annotation.lease_owner_id,
             )
             for annotation in annotations
         ]
+        path_keys = [self._path_key(item.path) for item in prepared]
+        if len(path_keys) != len(set(path_keys)):
+            raise ValueError("批量生成结果包含共享同一个标注文件的素材，已拒绝写入。")
+        claims = [
+            OutputResourceClaim(
+                annotation_output_resource_key(
+                    str(assets[item.asset_id]["annotation_relative_path"])
+                ),
+                item.lease_owner_id,
+            )
+            for item in prepared
+        ]
+        with hold_output_resources(paths.database, claims):
+            self._save_generated_batch_locked(
+                paths.database,
+                assets,
+                prepared,
+            )
+
+    def _save_generated_batch_locked(
+        self,
+        database_path: Path,
+        assets: Mapping[str, sqlite3.Row],
+        prepared: Sequence[_PreparedAnnotation],
+    ) -> None:
+        for item in prepared:
+            owner_ids = self._annotation_owner_ids(
+                database_path,
+                str(assets[item.asset_id]["annotation_relative_path"]),
+            )
+            if len(owner_ids) > 1:
+                raise ValueError(
+                    "图片与其他素材共享同一个 TXT，不能自动生成标注；"
+                    "请先重命名同名但扩展名不同的图片并重新扫描。"
+                )
+            actual_modified_at = str(item.path.stat().st_mtime_ns) if item.path.is_file() else None
+            if (
+                item.expected_modified_at is not _EXPECTED_VERSION_UNSET
+                and item.expected_modified_at != actual_modified_at
+            ):
+                raise ResourceConflictError(
+                    "标注在任务执行期间被其他操作修改，模型结果未覆盖新内容。"
+                )
         backups: dict[Path, Path] = {}
         written_paths: set[Path] = set()
         modified_ns: dict[str, int] = {}
@@ -149,7 +238,7 @@ class AnnotationService:
                 atomic_write_text(item.path, item.content)
                 written_paths.add(item.path)
                 modified_ns[item.asset_id] = item.path.stat().st_mtime_ns
-            with transaction(paths.database) as database:
+            with transaction(database_path) as database:
                 for item in prepared:
                     self._insert_revision(
                         database,
@@ -179,7 +268,7 @@ class AnnotationService:
                 except OSError as rollback_error:
                     rollback_errors.append(rollback_error)
             if rollback_errors:
-                raise RuntimeError(
+                raise AnnotationBatchRollbackError(
                     f"批量标注写入失败，且有 {len(rollback_errors)} 个文件无法回滚。"
                 ) from error
             raise
@@ -195,10 +284,65 @@ class AnnotationService:
         *,
         source: str,
         manually_accepted: bool = False,
+        expected_modified_at: str | None | object = _EXPECTED_VERSION_UNSET,
+        lease_owner_id: str | None,
+        allow_shared: bool,
     ) -> AnnotationDocument:
         paths, _ = self._workspaces.get(project_id)
         asset = self._asset(paths.database, asset_id)
         annotation_path = self._annotation_path(paths.root, asset)
+        annotation_relative_path = str(asset["annotation_relative_path"])
+        claim = OutputResourceClaim(
+            annotation_output_resource_key(annotation_relative_path),
+            lease_owner_id,
+        )
+        with hold_output_resources(paths.database, [claim]):
+            return self._save_locked(
+                project_id,
+                paths.database,
+                asset_id,
+                annotation_relative_path,
+                annotation_path,
+                content,
+                source=source,
+                manually_accepted=manually_accepted,
+                expected_modified_at=expected_modified_at,
+                allow_shared=allow_shared,
+            )
+
+    def _save_locked(
+        self,
+        project_id: str,
+        database_path: Path,
+        asset_id: str,
+        annotation_relative_path: str,
+        annotation_path: Path,
+        content: str,
+        *,
+        source: str,
+        manually_accepted: bool,
+        expected_modified_at: str | None | object,
+        allow_shared: bool,
+    ) -> AnnotationDocument:
+        owner_ids = self._annotation_owner_ids(
+            database_path,
+            annotation_relative_path,
+        )
+        if not allow_shared and len(owner_ids) > 1:
+            raise ValueError(
+                "图片与其他素材共享同一个 TXT，不能自动写入标注；"
+                "请先重命名同名但扩展名不同的图片并重新扫描。"
+            )
+        actual_modified_at = (
+            str(annotation_path.stat().st_mtime_ns) if annotation_path.is_file() else None
+        )
+        if (
+            expected_modified_at is not _EXPECTED_VERSION_UNSET
+            and expected_modified_at != actual_modified_at
+        ):
+            raise ResourceConflictError(
+                "标注已被其他操作修改，当前草稿未写入。请刷新后核对新内容再保存。"
+            )
         validation = validate_tag_balance(content)
         backup: Path | None = None
         if annotation_path.is_file():
@@ -207,28 +351,34 @@ class AnnotationService:
         status = AnnotationStatus.MANUALLY_ACCEPTED if manually_accepted else validation.status
         try:
             atomic_write_text(annotation_path, content)
-            with transaction(paths.database) as connection:
-                self._insert_revision(
-                    connection,
-                    asset_id,
-                    content,
-                    source=source,
-                    validation=validation,
-                )
-                self._update_annotation_status(
-                    connection,
-                    asset_id,
-                    status.value,
-                    annotation_path.stat().st_mtime_ns,
-                )
-        except BaseException:
-            if backup is not None and backup.is_file():
-                os.replace(backup, annotation_path)
-            else:
-                annotation_path.unlink(missing_ok=True)
+            modified_ns = annotation_path.stat().st_mtime_ns
+            with transaction(database_path) as connection:
+                for owner_id in owner_ids:
+                    self._insert_revision(
+                        connection,
+                        owner_id,
+                        content,
+                        source=source,
+                        validation=validation,
+                    )
+                    self._update_annotation_status(
+                        connection,
+                        owner_id,
+                        status.value,
+                        modified_ns,
+                    )
+        except BaseException as error:
+            try:
+                if backup is not None and backup.is_file():
+                    os.replace(backup, annotation_path)
+                else:
+                    annotation_path.unlink(missing_ok=True)
+            except OSError:
+                raise AnnotationRollbackError("标注写入失败，且原文件未能自动恢复。") from error
             raise
         if backup is not None:
-            backup.unlink(missing_ok=True)
+            with suppress(OSError):
+                backup.unlink(missing_ok=True)
         document = self.get(project_id, asset_id)
         if manually_accepted:
             return document.model_copy(update={"status": AnnotationStatus.MANUALLY_ACCEPTED})
@@ -273,6 +423,11 @@ class AnnotationService:
         prepared: list[_PreparedAnnotationDeletion] = []
         prepared_paths: set[str] = set()
         affected_asset_ids: set[str] = set()
+        status_asset_ids = set(normalized_ids)
+        for asset_id in normalized_ids:
+            annotation_path = self._annotation_path(paths.root, assets[asset_id])
+            if not annotation_path.is_file():
+                status_asset_ids.update(owners_by_path[self._path_key(annotation_path)])
         try:
             for asset_id in normalized_ids:
                 annotation_path = self._annotation_path(paths.root, assets[asset_id])
@@ -303,7 +458,7 @@ class AnnotationService:
                     for item in prepared
                     for owner_id in item.owner_ids
                 }
-                for asset_id in normalized_ids:
+                for asset_id in sorted(status_asset_ids):
                     snapshot = snapshots.get(asset_id)
                     if snapshot is not None:
                         previous, previous_validation = snapshot
@@ -409,11 +564,35 @@ class AnnotationService:
 
     @staticmethod
     def _annotation_path(root: Path, asset) -> Path:
-        path = (root / str(asset["annotation_relative_path"])).resolve()
-        if not path.is_relative_to(root.resolve()):
+        workspace_root = root.resolve()
+        candidate = workspace_root / str(asset["annotation_relative_path"])
+        if candidate.is_symlink():
+            raise ValueError("标注文件不能是符号链接。")
+        path = candidate.resolve()
+        if not path.is_relative_to(workspace_root):
             raise AssetNotFoundError("标注路径超出当前工作区。")
         return path
 
     @staticmethod
     def _path_key(path: Path) -> str:
         return path.resolve().as_posix().casefold()
+
+    @staticmethod
+    def _annotation_owner_ids(
+        database_path: Path,
+        annotation_relative_path: str,
+    ) -> tuple[str, ...]:
+        connection = connect(database_path)
+        try:
+            rows = connection.execute(
+                """
+                SELECT id
+                FROM assets
+                WHERE is_present = 1 AND annotation_relative_path = ?
+                ORDER BY relative_path COLLATE NOCASE
+                """,
+                (annotation_relative_path,),
+            ).fetchall()
+            return tuple(str(row["id"]) for row in rows)
+        finally:
+            connection.close()

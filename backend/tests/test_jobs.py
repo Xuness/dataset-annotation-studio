@@ -17,7 +17,9 @@ from dataset_studio.modules.jobs.models import (
     JobScope,
     JobStatus,
 )
+from dataset_studio.modules.jobs.output_resources import job_output_resource_key
 from dataset_studio.modules.jobs.service import JobService
+from dataset_studio.modules.output_resources import annotation_output_resource_key
 from dataset_studio.modules.presets.models import (
     ProviderProfileCreate,
     SystemPresetCreate,
@@ -50,7 +52,7 @@ class MemorySecrets:
         self.values.pop(key, None)
 
 
-def _single_item_job(tmp_path: Path):
+def _single_item_job(tmp_path: Path, *, extra_assets: int = 0):
     settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
     settings.ensure_directories()
     global_database = settings.app_data_dir / "global.sqlite3"
@@ -62,6 +64,8 @@ def _single_item_job(tmp_path: Path):
     project = tmp_path / "dataset"
     project.mkdir()
     Image.new("RGB", (32, 32), "white").save(project / "sample.png")
+    for index in range(extra_assets):
+        Image.new("RGB", (32, 32), "white").save(project / f"sample-{index:03d}.png")
     workspace, _ = workspaces.open(str(project))
     system = presets.create_system(
         SystemPresetCreate(name="XML", system_prompt="Return balanced tags.")
@@ -141,6 +145,66 @@ def test_orphan_recovery_finishes_running_attempt(tmp_path: Path) -> None:
     assert attempt["status"] == "interrupted"
     assert "应用在请求完成前退出" in attempt["error_message"]
     assert attempt["finished_at"] is not None
+
+
+def test_output_lease_serializes_jobs_targeting_the_same_file(tmp_path: Path) -> None:
+    jobs, project_id, first_job, database, _ = _single_item_job(tmp_path)
+    second_job = jobs.create(
+        project_id,
+        JobCreateRequest(
+            provider_profile_id=first_job.provider_profile_id,
+            scope=JobScope.ALL,
+        ),
+    )
+    execution = JobExecutionRepository(database)
+
+    first_claim = execution.claim_items(first_job.id, 1)
+    assert len(first_claim) == 1
+    assert execution.claim_items(second_job.id, 1) == []
+
+    connection = connect(database)
+    try:
+        lease_count = connection.execute("SELECT COUNT(*) FROM output_resource_leases").fetchone()[
+            0
+        ]
+    finally:
+        connection.close()
+    assert lease_count == 1
+
+    execution.finish_item(str(first_claim[0]["id"]), JobItemStatus.SKIPPED)
+    second_claim = execution.claim_items(second_job.id, 1)
+    assert len(second_claim) == 1
+
+
+def test_output_claim_pages_past_resources_held_by_another_job(tmp_path: Path) -> None:
+    jobs, project_id, first_job, database, _ = _single_item_job(
+        tmp_path,
+        extra_assets=64,
+    )
+    second_job = jobs.create(
+        project_id,
+        JobCreateRequest(
+            provider_profile_id=first_job.provider_profile_id,
+            scope=JobScope.ALL,
+        ),
+    )
+    execution = JobExecutionRepository(database)
+
+    assert len(execution.claim_items(first_job.id, 64)) == 64
+    second_claim = execution.claim_items(second_job.id, 1)
+
+    assert len(second_claim) == 1
+    assert second_claim[0]["relative_path"] == "sample.png"
+
+
+def test_translation_and_annotation_jobs_share_the_same_physical_resource_key() -> None:
+    translation_key = job_output_resource_key(
+        "translation",
+        '{"target_language":"zh-CN"}',
+        "nested/sample.txt",
+    )
+
+    assert translation_key == annotation_output_resource_key("nested/sample.zh-CN.txt")
 
 
 def test_scan_api_refuses_to_run_while_job_is_active(tmp_path: Path) -> None:

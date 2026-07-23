@@ -117,6 +117,9 @@ class TaggerBatchPipeline:
     ) -> TaggerPipelineReport:
         if not inputs:
             raise ValueError("本地打标批次不能为空。")
+        keys = [item.key for item in inputs]
+        if len(keys) != len(set(keys)):
+            raise ValueError("本地打标批次包含重复的输入标识。")
         stop_requested = should_stop or (lambda: False)
         self._raise_if_stopped(stop_requested)
         session = self._runtime.bind(profile)
@@ -192,8 +195,23 @@ class TaggerBatchPipeline:
             self._raise_if_stopped(should_stop)
             request = inputs[cursor]
             try:
-                payload = request.image_path.read_bytes()
+                size = request.image_path.stat().st_size
+                if size > self._encoded_memory_budget:
+                    raise ValueError(
+                        f"图片文件超过单批读取上限：{size} > {self._encoded_memory_budget} 字节"
+                    )
+                if encoded and used_bytes + size > self._encoded_memory_budget:
+                    break
+                payload = _read_bounded_payload(
+                    request.image_path,
+                    self._encoded_memory_budget - used_bytes,
+                )
                 source_pixels = _image_pixel_count(payload)
+                if source_pixels > self._decode_pixel_budget:
+                    raise ValueError(
+                        "图片解码尺寸超过单图安全上限："
+                        f"{source_pixels} > {self._decode_pixel_budget} 像素"
+                    )
             except (OSError, ValueError) as error:
                 outcomes[request.key] = TaggerPipelineOutcome(
                     key=request.key,
@@ -201,8 +219,6 @@ class TaggerBatchPipeline:
                 )
                 cursor += 1
                 continue
-            if encoded and used_bytes + len(payload) > self._encoded_memory_budget:
-                break
             encoded.append(
                 _EncodedImage(
                     request=request,
@@ -314,8 +330,19 @@ def _image_pixel_count(payload: bytes) -> int:
     try:
         with Image.open(BytesIO(payload)) as image:
             width, height = image.size
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, Image.DecompressionBombError) as error:
         raise ValueError(str(error) or "图片格式无效。") from error
     if width < 1 or height < 1:
         raise ValueError("图片尺寸无效。")
     return width * height
+
+
+def _read_bounded_payload(path: Path, budget: int) -> bytes:
+    size = path.stat().st_size
+    if size > budget:
+        raise ValueError(f"图片文件超过单批读取上限：{size} > {budget} 字节")
+    with path.open("rb") as stream:
+        payload = stream.read(budget + 1)
+    if len(payload) > budget:
+        raise ValueError(f"图片文件超过单批读取上限：>{budget} 字节")
+    return payload

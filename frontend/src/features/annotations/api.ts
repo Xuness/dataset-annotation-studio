@@ -16,10 +16,11 @@ export function saveAnnotation(
   projectId: string,
   assetId: string,
   content: string,
+  expectedModifiedAt: string | null,
 ): Promise<AnnotationDocument> {
   return apiRequest(annotationPath(projectId, assetId), {
     method: "PUT",
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, expected_modified_at: expectedModifiedAt }),
   });
 }
 

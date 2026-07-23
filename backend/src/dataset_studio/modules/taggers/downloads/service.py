@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import time
 import uuid
 from dataclasses import asdict
@@ -235,10 +236,12 @@ class TaggerDownloadService:
         return self._task_from_row(row)
 
     def delete(self, task_id: str) -> TaggerDownloadCenter:
-        row = self._repository.delete(task_id)
+        row = self._repository.delete(
+            task_id,
+            before_delete=self.cleanup_staging,
+        )
         if row is None:
             raise TaggerNotFoundError(f"找不到打标器下载任务：{task_id}")
-        self.cleanup_staging(row)
         return self.center()
 
     def source(self) -> HuggingFaceModelSource:
@@ -288,8 +291,20 @@ class TaggerDownloadService:
 
     def staging_path(self, row) -> Path:
         root = Path(str(row["model_root"])).resolve()
-        staging_root = (root / ".downloads").resolve()
-        staging = (staging_root / str(row["id"])).resolve()
+        staging_root_candidate = root / ".downloads"
+        if self._is_directory_link(staging_root_candidate):
+            raise ValueError("下载暂存根目录不能是符号链接或目录联接。")
+        if staging_root_candidate.exists() and not staging_root_candidate.is_dir():
+            raise ValueError("下载暂存根路径不是文件夹。")
+        staging_root = staging_root_candidate.resolve()
+        if not staging_root.is_relative_to(root):
+            raise ValueError("下载暂存根目录超出模型库。")
+        staging_candidate = staging_root / str(row["id"])
+        if self._is_directory_link(staging_candidate):
+            raise ValueError("下载任务暂存目录不能是符号链接或目录联接。")
+        if staging_candidate.exists() and not staging_candidate.is_dir():
+            raise ValueError("下载任务暂存路径不是文件夹。")
+        staging = staging_candidate.resolve()
         if staging.parent != staging_root:
             raise ValueError("下载任务暂存路径无效。")
         return staging
@@ -298,6 +313,18 @@ class TaggerDownloadService:
         staging = self.staging_path(row)
         if staging.exists():
             shutil.rmtree(staging)
+
+    @staticmethod
+    def _is_directory_link(path: Path) -> bool:
+        is_junction = getattr(path, "is_junction", None)
+        if path.is_symlink() or (is_junction is not None and is_junction()):
+            return True
+        try:
+            attributes = int(getattr(path.lstat(), "st_file_attributes", 0))
+        except OSError:
+            return False
+        reparse_flag = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+        return bool(reparse_flag and attributes & reparse_flag)
 
     @staticmethod
     def serialize_plan(plan: TaggerDownloadPlan) -> str:

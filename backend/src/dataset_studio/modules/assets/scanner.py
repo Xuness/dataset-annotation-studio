@@ -97,6 +97,11 @@ class AssetScanner:
         unmatched_by_hash,
         present_ids: set[str],
     ) -> tuple[AssetRecord, bool]:
+        resolved_image_path = image_path.resolve()
+        if not resolved_image_path.is_relative_to(paths.root.resolve()):
+            raise ValueError("图片不能是指向工作区外部的符号链接。")
+        if resolved_image_path.is_relative_to(paths.internal.resolve()):
+            raise ValueError("图片不能指向工作区内部状态目录。")
         relative_path = image_path.relative_to(paths.root).as_posix()
         stat = image_path.stat()
         existing = existing_by_path.get(relative_path)
@@ -159,6 +164,10 @@ class AssetScanner:
 
         annotation_path = image_path.with_suffix(".txt")
         metadata_path = image_path.with_suffix(".json")
+        if annotation_path.is_symlink():
+            raise ValueError("同名标注文件不能是符号链接。")
+        if metadata_path.is_symlink():
+            raise ValueError("同名元数据文件不能是符号链接。")
         annotation_status, annotation_modified_ns = AssetScanner._annotation_state(
             annotation_path, annotation_state_source
         )

@@ -59,6 +59,7 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
   const [mode, setMode] = useState<EditorMode>("source");
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
+  const [savedModifiedAt, setSavedModifiedAt] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState(readFontSize);
   const [showHistory, setShowHistory] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -86,9 +87,11 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
     if (annotation.data) {
       setContent(annotation.data.content);
       setSavedContent(annotation.data.content);
+      setSavedModifiedAt(annotation.data.modified_at);
     } else if (!assetId) {
       setContent("");
       setSavedContent("");
+      setSavedModifiedAt(null);
     }
   }, [annotation.data, assetId]);
 
@@ -128,9 +131,13 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
     const submittedContent = content;
     setActionError(null);
     try {
-      const result = await save.mutateAsync(submittedContent);
+      const result = await save.mutateAsync({
+        content: submittedContent,
+        expectedModifiedAt: savedModifiedAt,
+      });
       setContent((current) => reconcilePersistedContent(current, submittedContent, result.content));
       setSavedContent(result.content);
+      setSavedModifiedAt(result.modified_at);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : "保存标注失败。");
     }
@@ -150,6 +157,7 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
       await remove.mutateAsync();
       setContent((current) => reconcilePersistedContent(current, contentBeforeDelete, ""));
       setSavedContent("");
+      setSavedModifiedAt(null);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : "删除标注失败。");
     }

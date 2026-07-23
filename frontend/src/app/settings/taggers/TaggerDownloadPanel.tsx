@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useTaggerDownloadActions, useTaggerDownloadCenter } from "../../../features/taggers/hooks";
 import type {
@@ -64,12 +64,16 @@ export function TaggerDownloadPanel() {
   const [proxyMode, setProxyMode] = useState<HuggingFaceProxyMode>("environment");
   const [proxyUrl, setProxyUrl] = useState("");
   const [token, setToken] = useState("");
+  const connectionInitialized = useRef(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const data = center.data;
 
   useEffect(() => {
-    if (data) setProxyMode(data.huggingface.proxy_mode);
+    if (data && !connectionInitialized.current) {
+      connectionInitialized.current = true;
+      setProxyMode(data.huggingface.proxy_mode);
+    }
   }, [data]);
 
   const latestTaskByPlan = useMemo(() => {
@@ -82,19 +86,24 @@ export function TaggerDownloadPanel() {
     return tasks;
   }, [data?.tasks]);
 
-  async function run(action: () => Promise<unknown>, success: string) {
+  async function run<Result>(
+    action: () => Promise<Result>,
+    success: string | ((result: Result) => string),
+  ): Promise<boolean> {
     setError(null);
     setMessage(null);
     try {
-      await action();
-      setMessage(success);
+      const result = await action();
+      setMessage(typeof success === "function" ? success(result) : success);
+      return true;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Hugging Face 下载操作失败。");
+      return false;
     }
   }
 
   async function saveConnection() {
-    await run(
+    const saved = await run(
       () =>
         actions.saveHuggingFace.mutateAsync({
           proxy_mode: proxyMode,
@@ -103,8 +112,34 @@ export function TaggerDownloadPanel() {
         }),
       "Hugging Face 连接设置已保存。",
     );
+    if (!saved) return;
     setToken("");
     setProxyUrl("");
+  }
+
+  async function clearSavedToken() {
+    if (!data) return;
+    const cleared = await run(
+      () =>
+        actions.saveHuggingFace.mutateAsync({
+          proxy_mode: data.huggingface.proxy_mode,
+          clear_token: true,
+        }),
+      "应用保存的 Token 已清除。",
+    );
+    if (cleared) setToken("");
+  }
+
+  async function clearSavedProxy() {
+    const cleared = await run(
+      () =>
+        actions.saveHuggingFace.mutateAsync({
+          proxy_mode: proxyMode,
+          clear_proxy: true,
+        }),
+      "自定义代理已清除。",
+    );
+    if (cleared) setProxyUrl("");
   }
 
   async function removeTask(task: TaggerDownloadTask) {
@@ -144,6 +179,8 @@ export function TaggerDownloadPanel() {
     actions.pause.isPending ||
     actions.resume.isPending ||
     actions.remove.isPending;
+  const connectionDraftDirty =
+    proxyMode !== data.huggingface.proxy_mode || Boolean(token.trim()) || Boolean(proxyUrl.trim());
 
   return (
     <div className="tagger-download-panel">
@@ -209,51 +246,48 @@ export function TaggerDownloadPanel() {
           <div>
             {data.huggingface.has_saved_token ? (
               <Button
-                disabled={actions.saveHuggingFace.isPending}
-                onClick={() =>
-                  void run(
-                    () =>
-                      actions.saveHuggingFace.mutateAsync({
-                        proxy_mode: proxyMode,
-                        clear_token: true,
-                      }),
-                    "应用保存的 Token 已清除。",
-                  )
-                }
+                disabled={actions.saveHuggingFace.isPending || connectionDraftDirty}
+                title={connectionDraftDirty ? "请先保存或撤销当前连接设置草稿" : undefined}
+                onClick={() => void clearSavedToken()}
               >
                 清除 Token
               </Button>
             ) : null}
             {data.huggingface.has_custom_proxy ? (
               <Button
-                disabled={actions.saveHuggingFace.isPending || proxyMode === "custom"}
-                title={proxyMode === "custom" ? "请先切换到环境或直连模式" : undefined}
-                onClick={() =>
-                  void run(
-                    () =>
-                      actions.saveHuggingFace.mutateAsync({
-                        proxy_mode: proxyMode,
-                        clear_proxy: true,
-                      }),
-                    "自定义代理已清除。",
-                  )
+                disabled={
+                  actions.saveHuggingFace.isPending ||
+                  proxyMode === "custom" ||
+                  Boolean(token.trim())
                 }
+                title={
+                  proxyMode === "custom"
+                    ? "请先切换到环境或直连模式"
+                    : token.trim()
+                      ? "请先保存或清空 Token 草稿"
+                      : undefined
+                }
+                onClick={() => void clearSavedProxy()}
               >
                 清除代理
               </Button>
             ) : null}
             <Button
               icon={actions.testHuggingFace.isPending ? <Spinner /> : <RefreshCw size={13} />}
-              disabled={actions.testHuggingFace.isPending}
+              disabled={actions.testHuggingFace.isPending || connectionDraftDirty}
+              title={connectionDraftDirty ? "请先保存连接设置，再测试已保存的配置" : undefined}
               onClick={() =>
-                void run(async () => {
-                  const result = await actions.testHuggingFace.mutateAsync();
-                  if (!result.connected) throw new Error(result.message);
-                  setMessage(`${result.message} 延迟 ${result.latency_ms} ms。`);
-                }, "Hugging Face 连接测试通过。")
+                void run(
+                  async () => {
+                    const result = await actions.testHuggingFace.mutateAsync();
+                    if (!result.connected) throw new Error(result.message);
+                    return result;
+                  },
+                  (result) => `${result.message} 延迟 ${result.latency_ms} ms。`,
+                )
               }
             >
-              测试连接
+              测试已保存连接
             </Button>
             <Button
               tone="primary"

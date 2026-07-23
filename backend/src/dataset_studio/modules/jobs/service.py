@@ -28,6 +28,10 @@ from dataset_studio.modules.jobs.models import (
 from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
 from dataset_studio.modules.jobs.query_repository import JobQueryRepository
 from dataset_studio.modules.jobs.repository import JobCreationRepository
+from dataset_studio.modules.output_resources import (
+    annotation_output_resource_key,
+    translation_output_relative_path,
+)
 from dataset_studio.modules.presets.models import TranslationPromptPreset
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.taggers.models import TaggerExecutionProfile
@@ -487,7 +491,7 @@ class JobService:
             if not unique_ids:
                 rows = connection.execute(
                     f"""
-                    SELECT id, relative_path FROM assets
+                    SELECT id, relative_path, annotation_relative_path FROM assets
                     WHERE {" AND ".join(clauses)}
                     ORDER BY relative_path
                     """
@@ -500,13 +504,37 @@ class JobService:
                     rows.extend(
                         connection.execute(
                             f"""
-                            SELECT id, relative_path FROM assets
+                            SELECT id, relative_path, annotation_relative_path FROM assets
                             WHERE {" AND ".join(clauses)} AND id IN ({placeholders})
                             """,
                             batch,
                         ).fetchall()
                     )
                 rows.sort(key=lambda row: str(row["relative_path"]).casefold())
+            owner_counts: dict[str, int] = {}
+            for owner in connection.execute(
+                """
+                SELECT annotation_relative_path
+                FROM assets
+                WHERE is_present = 1
+                """
+            ):
+                key = annotation_output_resource_key(str(owner["annotation_relative_path"]))
+                owner_counts[key] = owner_counts.get(key, 0) + 1
+            ambiguous = [
+                str(row["relative_path"])
+                for row in rows
+                if owner_counts[
+                    annotation_output_resource_key(str(row["annotation_relative_path"]))
+                ]
+                > 1
+            ]
+            if ambiguous:
+                examples = "、".join(ambiguous[:3])
+                raise ValueError(
+                    "所选范围包含共享同一个 TXT 的图片"
+                    f"（例如 {examples}）。请先重命名同名但扩展名不同的图片并重新扫描。"
+                )
             return [str(row["id"]) for row in rows]
         finally:
             connection.close()
@@ -555,43 +583,84 @@ class JobService:
                     ).fetchall()
                 )
             rows.sort(key=lambda row: str(row["relative_path"]).casefold())
-            annotation_owners = {
-                str(owner["annotation_relative_path"]).casefold(): str(owner["id"])
-                for owner in connection.execute(
-                    """
-                    SELECT id, annotation_relative_path
-                    FROM assets
-                    WHERE is_present = 1
-                    """
-                )
-            }
+            annotation_owner_counts: dict[str, int] = {}
+            for owner in connection.execute(
+                """
+                SELECT annotation_relative_path
+                FROM assets
+                WHERE is_present = 1
+                """
+            ):
+                key = annotation_output_resource_key(str(owner["annotation_relative_path"]))
+                annotation_owner_counts[key] = annotation_owner_counts.get(key, 0) + 1
         finally:
             connection.close()
 
         selected: list[str] = []
+        selected_outputs: dict[str, str] = {}
+        ambiguous_sources: list[str] = []
+        conflicting_outputs: list[str] = []
+        unsafe_outputs: list[str] = []
         root = workspace_root.resolve()
         for row in rows:
             annotation_path = (root / str(row["annotation_relative_path"])).resolve()
             if not annotation_path.is_relative_to(root) or not annotation_path.is_file():
                 continue
-            translation_path = annotation_path.with_name(f"{annotation_path.stem}.{language}.txt")
-            translation_relative_path = translation_path.relative_to(root).as_posix()
-            owner_id = annotation_owners.get(translation_relative_path.casefold())
-            if owner_id is not None and owner_id != str(row["id"]):
+            source_key = annotation_output_resource_key(str(row["annotation_relative_path"]))
+            if annotation_owner_counts.get(source_key, 0) > 1:
+                ambiguous_sources.append(str(row["relative_path"]))
                 continue
-            if policy == ExistingTranslationPolicy.OVERWRITE:
-                selected.append(str(row["id"]))
+            translation_relative_path = translation_output_relative_path(
+                str(row["annotation_relative_path"]),
+                language,
+            )
+            translation_path = root / translation_relative_path
+            if translation_path.is_symlink():
+                unsafe_outputs.append(str(row["relative_path"]))
                 continue
-            if not translation_path.is_file():
-                selected.append(str(row["id"]))
+            output_key = annotation_output_resource_key(translation_relative_path)
+            if output_key != source_key and output_key in annotation_owner_counts:
+                conflicting_outputs.append(str(row["relative_path"]))
                 continue
-            if policy == ExistingTranslationPolicy.SKIP:
+            if policy == ExistingTranslationPolicy.OVERWRITE or not translation_path.is_file():
+                should_select = True
+            elif policy == ExistingTranslationPolicy.SKIP:
+                should_select = False
+            else:
+                recorded_hash = row["source_annotation_hash"]
+                if recorded_hash is None:
+                    should_select = True
+                else:
+                    source_content = annotation_path.read_text(
+                        encoding="utf-8",
+                        errors="strict",
+                    )
+                    should_select = str(recorded_hash) != TranslationService.content_hash(
+                        source_content
+                    )
+            if not should_select:
                 continue
-            recorded_hash = row["source_annotation_hash"]
-            if recorded_hash is None:
-                selected.append(str(row["id"]))
+            previous = selected_outputs.get(output_key)
+            if previous is not None:
+                ambiguous_sources.extend((previous, str(row["relative_path"])))
                 continue
-            source_content = annotation_path.read_text(encoding="utf-8", errors="replace")
-            if str(recorded_hash) != TranslationService.content_hash(source_content):
-                selected.append(str(row["id"]))
+            selected_outputs[output_key] = str(row["relative_path"])
+            selected.append(str(row["id"]))
+        if ambiguous_sources:
+            examples = "、".join(list(dict.fromkeys(ambiguous_sources))[:3])
+            raise ValueError(
+                "所选范围包含共享同一个源标注或译文输出的图片"
+                f"（例如 {examples}）。请先重命名同名但扩展名不同的图片并重新扫描。"
+            )
+        if conflicting_outputs:
+            examples = "、".join(list(dict.fromkeys(conflicting_outputs))[:3])
+            raise ValueError(
+                "所选范围的译文输出会覆盖另一张图片的活动标注"
+                f"（例如 {examples}）。请调整目标语言或重命名冲突文件后重新扫描。"
+            )
+        if unsafe_outputs:
+            examples = "、".join(list(dict.fromkeys(unsafe_outputs))[:3])
+            raise ValueError(
+                f"所选范围的译文输出是符号链接（例如 {examples}）。请移除这些链接文件后重新扫描。"
+            )
         return selected

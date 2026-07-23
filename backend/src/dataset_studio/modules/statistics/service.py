@@ -26,18 +26,24 @@ class StatisticsService:
         try:
             rows = connection.execute(
                 """
-                SELECT annotation_relative_path
+                SELECT DISTINCT annotation_relative_path
                 FROM assets
                 WHERE is_present = 1 AND annotation_status != 'missing'
-                ORDER BY relative_path COLLATE NOCASE
+                ORDER BY annotation_relative_path COLLATE NOCASE
                 """
             ).fetchall()
         finally:
             connection.close()
 
         def documents():
+            workspace_root = root.resolve()
             for row in rows:
-                path = root / str(row["annotation_relative_path"])
+                candidate = workspace_root / str(row["annotation_relative_path"])
+                if candidate.is_symlink():
+                    continue
+                path = candidate.resolve()
+                if not path.is_relative_to(workspace_root):
+                    continue
                 try:
                     yield path.read_text(encoding="utf-8")
                 except (OSError, UnicodeError):

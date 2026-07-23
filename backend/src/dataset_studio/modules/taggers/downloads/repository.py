@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 from dataset_studio.core.sqlite import connect, transaction
@@ -269,7 +270,6 @@ class TaggerDownloadRepository:
                 SELECT COUNT(*) AS count
                 FROM local_tagger_downloads
                 WHERE status IN ({placeholders})
-                  AND stop_requested = 0
                 """,
                 _ACTIVE_VALUES,
             ).fetchone()
@@ -455,7 +455,12 @@ class TaggerDownloadRepository:
                 (now,),
             ).rowcount
 
-    def delete(self, task_id: str):
+    def delete(
+        self,
+        task_id: str,
+        *,
+        before_delete: Callable[[sqlite3.Row], None] | None = None,
+    ):
         with transaction(self._database_path) as connection:
             row = connection.execute(
                 "SELECT * FROM local_tagger_downloads WHERE id = ?",
@@ -465,6 +470,8 @@ class TaggerDownloadRepository:
                 return None
             if TaggerDownloadStatus(str(row["status"])) in ACTIVE_DOWNLOAD_STATUSES:
                 raise ValueError("运行中的下载任务不能清理。")
+            if before_delete is not None:
+                before_delete(row)
             connection.execute("DELETE FROM local_tagger_downloads WHERE id = ?", (task_id,))
             return row
 

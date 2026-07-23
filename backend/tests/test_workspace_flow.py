@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -6,10 +7,23 @@ from PIL import Image
 
 from dataset_studio.api.app import create_app
 from dataset_studio.core.config import Settings
-from dataset_studio.modules.annotations.service import AnnotationService, GeneratedAnnotation
+from dataset_studio.core.errors import ResourceConflictError
+from dataset_studio.modules.annotations.service import (
+    AnnotationBatchRollbackError,
+    AnnotationService,
+    GeneratedAnnotation,
+)
 from dataset_studio.modules.annotations.text import AnnotationEncodingError
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.assets.service import AssetService
+from dataset_studio.modules.jobs.models import JobScope
+from dataset_studio.modules.jobs.service import JobService
+from dataset_studio.modules.output_resources import (
+    OutputResourceClaim,
+    annotation_output_resource_key,
+    hold_output_resources,
+)
+from dataset_studio.modules.statistics.service import StatisticsService
 from dataset_studio.modules.translations.service import TranslationService
 from dataset_studio.modules.workspaces.paths import WorkspacePaths
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
@@ -288,6 +302,44 @@ def test_annotation_batch_failure_rolls_back_every_file_and_revision(
     assert annotations.history(summary.project_id, second.id) == []
 
 
+def test_annotation_batch_reports_incomplete_file_rollback(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    summary, _ = workspaces.open(str(project))
+    asset = assets.list_assets(summary.project_id).items[0]
+    annotations.save_generated(
+        summary.project_id,
+        asset.id,
+        "<caption>previous</caption>",
+    )
+
+    def fail_revision(*_args, **_kwargs):
+        raise RuntimeError("simulated database failure")
+
+    original_replace = os.replace
+
+    def fail_restore(source, target):
+        if Path(source).suffix == ".backup" and Path(target) == project / "image.txt":
+            raise OSError("simulated rollback failure")
+        return original_replace(source, target)
+
+    monkeypatch.setattr(annotations, "_insert_revision", fail_revision)
+    monkeypatch.setattr(
+        "dataset_studio.modules.annotations.service.os.replace",
+        fail_restore,
+    )
+
+    with pytest.raises(AnnotationBatchRollbackError, match="无法回滚"):
+        annotations.save_generated_batch(
+            summary.project_id,
+            [GeneratedAnnotation(asset.id, "<caption>replacement</caption>")],
+        )
+
+
 def test_annotation_delete_failure_restores_file(tmp_path: Path, monkeypatch) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
@@ -358,6 +410,163 @@ def test_annotation_delete_requires_all_owners_of_shared_sidecar(tmp_path: Path)
         item.annotation_status.value == "missing"
         for item in assets.list_assets(summary.project_id).items
     )
+
+
+def test_shared_sidecar_manual_save_updates_every_owner_and_blocks_generation(
+    tmp_path: Path,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "same.jpg")
+    _write_image(project / "same.png", (90, 130))
+    summary, _ = workspaces.open(str(project))
+    indexed = assets.list_assets(summary.project_id).items
+
+    saved = annotations.save(
+        summary.project_id,
+        indexed[0].id,
+        "<caption>shared</caption>",
+        expected_modified_at=None,
+    )
+
+    assert saved.exists
+    assert all(
+        annotations.get(summary.project_id, item.id).content == "<caption>shared</caption>"
+        for item in indexed
+    )
+    assert all(len(annotations.history(summary.project_id, item.id)) == 1 for item in indexed)
+    assert StatisticsService(workspaces).tag_frequency(summary.project_id).document_count == 1
+    with pytest.raises(ValueError, match="共享同一个 TXT"):
+        annotations.save_generated(
+            summary.project_id,
+            indexed[0].id,
+            "<caption>generated</caption>",
+        )
+    with pytest.raises(ValueError, match="共享同一个标注文件"):
+        annotations.save_generated_batch(
+            summary.project_id,
+            [
+                GeneratedAnnotation(indexed[0].id, "<caption>first</caption>"),
+                GeneratedAnnotation(indexed[1].id, "<caption>second</caption>"),
+            ],
+        )
+    paths, _ = workspaces.get(summary.project_id)
+    with pytest.raises(ValueError, match="共享同一个 TXT"):
+        JobService._select_annotation_assets(
+            paths.database,
+            JobScope.ALL,
+            [],
+            overwrite_existing=True,
+        )
+
+
+def test_missing_shared_sidecar_reconciles_every_owner_on_delete(tmp_path: Path) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "same.jpg")
+    _write_image(project / "same.png", (90, 130))
+    (project / "same.txt").write_text("<caption>shared</caption>", encoding="utf-8")
+    summary, _ = workspaces.open(str(project))
+    indexed = assets.list_assets(summary.project_id).items
+    (project / "same.txt").unlink()
+
+    result = annotations.delete_many(summary.project_id, [indexed[0].id])
+
+    assert result.deleted_count == 0
+    assert result.missing_count == 1
+    assert all(
+        item.annotation_status.value == "missing"
+        for item in assets.list_assets(summary.project_id).items
+    )
+
+
+def test_annotation_save_rejects_a_stale_editor_version(tmp_path: Path) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "sample.png")
+    summary, _ = workspaces.open(str(project))
+    asset = assets.list_assets(summary.project_id).items[0]
+    initial = annotations.save(
+        summary.project_id,
+        asset.id,
+        "<caption>initial</caption>",
+        expected_modified_at=None,
+    )
+    (project / "sample.txt").write_text("<caption>external</caption>", encoding="utf-8")
+
+    with pytest.raises(ResourceConflictError, match="任务执行期间"):
+        annotations.save_generated_batch(
+            summary.project_id,
+            [
+                GeneratedAnnotation(
+                    asset.id,
+                    "<caption>stale model output</caption>",
+                    expected_modified_at=initial.modified_at,
+                )
+            ],
+        )
+    with pytest.raises(ResourceConflictError, match="其他操作修改"):
+        annotations.save(
+            summary.project_id,
+            asset.id,
+            "<caption>stale draft</caption>",
+            expected_modified_at=initial.modified_at,
+        )
+
+    assert (project / "sample.txt").read_text(encoding="utf-8") == "<caption>external</caption>"
+
+
+def test_annotation_save_respects_an_active_output_resource_lease(tmp_path: Path) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "sample.png")
+    summary, _ = workspaces.open(str(project))
+    asset = assets.list_assets(summary.project_id).items[0]
+    paths, _ = workspaces.get(summary.project_id)
+    claim = OutputResourceClaim(annotation_output_resource_key("sample.txt"))
+
+    with (
+        hold_output_resources(paths.database, [claim]),
+        pytest.raises(ResourceConflictError, match="写入"),
+    ):
+        annotations.save(
+            summary.project_id,
+            asset.id,
+            "<caption>blocked</caption>",
+            expected_modified_at=None,
+        )
+
+    saved = annotations.save(
+        summary.project_id,
+        asset.id,
+        "<caption>after lease</caption>",
+        expected_modified_at=None,
+    )
+    assert saved.content == "<caption>after lease</caption>"
+
+
+def test_annotation_read_rejects_a_sidecar_replaced_by_a_symbolic_link(
+    tmp_path: Path,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "sample.png")
+    summary, _ = workspaces.open(str(project))
+    asset = assets.list_assets(summary.project_id).items[0]
+    annotations.save(summary.project_id, asset.id, "<caption>inside</caption>")
+    annotation_path = project / "sample.txt"
+    annotation_path.unlink()
+    external = tmp_path / "external.txt"
+    external.write_text("<caption>outside</caption>", encoding="utf-8")
+    try:
+        annotation_path.symlink_to(external)
+    except OSError as error:
+        pytest.skip(f"当前环境不能创建符号链接：{error}")
+
+    with pytest.raises(ValueError, match="符号链接"):
+        annotations.get(summary.project_id, asset.id)
+
+    assert StatisticsService(workspaces).tag_frequency(summary.project_id).document_count == 0
 
 
 def test_asset_folder_tree_and_filter_use_subtree_boundaries(tmp_path: Path) -> None:

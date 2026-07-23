@@ -99,12 +99,12 @@ class AssetService:
 
     def list_folders(self, project_id: str) -> AssetFolderListResponse:
         paths, manifest = self._workspaces.get(project_id)
-        records = AssetRepository(paths.database).list_present_records()
+        relative_paths = AssetRepository(paths.database).list_present_paths()
         direct_counts: dict[str, int] = {"": 0}
         descendant_counts: dict[str, int] = {"": 0}
 
-        for record in records:
-            parent = PurePosixPath(str(record["relative_path"])).parent
+        for relative_path in relative_paths:
+            parent = PurePosixPath(relative_path).parent
             folder_path = "" if parent == PurePosixPath(".") else parent.as_posix()
             direct_counts[folder_path] = direct_counts.get(folder_path, 0) + 1
             descendant_counts[""] += 1

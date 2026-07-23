@@ -7,6 +7,7 @@ from pathlib import Path
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.jobs.models import JobItemStatus, JobStatus
+from dataset_studio.modules.jobs.output_resources import job_output_resource_key
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,33 +54,96 @@ class JobExecutionRepository:
             return []
         with transaction(self._database_path) as connection:
             job = connection.execute(
-                "SELECT stop_requested FROM jobs WHERE id = ?", (job_id,)
+                """
+                SELECT stop_requested, kind, configuration_snapshot
+                FROM jobs
+                WHERE id = ?
+                """,
+                (job_id,),
             ).fetchone()
             if job is None or bool(job["stop_requested"]):
                 return []
-            rows = connection.execute(
-                """
-                SELECT ji.*, a.relative_path, a.annotation_relative_path
-                FROM job_items ji
-                JOIN assets a ON a.id = ji.asset_id
-                WHERE ji.job_id = ? AND ji.status = 'pending'
-                ORDER BY a.relative_path COLLATE NOCASE
-                LIMIT ?
-                """,
-                (job_id, limit),
-            ).fetchall()
             now = utc_now_iso()
-            for row in rows:
-                connection.execute(
-                    "UPDATE job_items SET status = ?, updated_at = ? WHERE id = ?",
-                    (JobItemStatus.RUNNING.value, now, row["id"]),
-                )
-            if rows:
+            claimed: list[dict[str, object]] = []
+            page_size = max(64, min(limit * 4, 1000))
+            last_path: str | None = None
+            last_item_id = ""
+            while len(claimed) < limit:
+                if last_path is None:
+                    rows = connection.execute(
+                        """
+                        SELECT ji.*, a.relative_path, a.annotation_relative_path
+                        FROM job_items ji
+                        JOIN assets a ON a.id = ji.asset_id
+                        WHERE ji.job_id = ? AND ji.status = 'pending'
+                        ORDER BY a.relative_path COLLATE NOCASE, ji.id
+                        LIMIT ?
+                        """,
+                        (job_id, page_size),
+                    ).fetchall()
+                else:
+                    rows = connection.execute(
+                        """
+                        SELECT ji.*, a.relative_path, a.annotation_relative_path
+                        FROM job_items ji
+                        JOIN assets a ON a.id = ji.asset_id
+                        WHERE ji.job_id = ? AND ji.status = 'pending'
+                          AND (
+                            a.relative_path COLLATE NOCASE > ?
+                            OR (
+                              a.relative_path COLLATE NOCASE = ?
+                              AND ji.id > ?
+                            )
+                          )
+                        ORDER BY a.relative_path COLLATE NOCASE, ji.id
+                        LIMIT ?
+                        """,
+                        (job_id, last_path, last_path, last_item_id, page_size),
+                    ).fetchall()
+                if not rows:
+                    break
+                for row in rows:
+                    item_id = str(row["id"])
+                    resource_key = job_output_resource_key(
+                        str(job["kind"]),
+                        str(job["configuration_snapshot"]),
+                        str(row["annotation_relative_path"]),
+                    )
+                    acquired = connection.execute(
+                        """
+                        INSERT OR IGNORE INTO output_resource_leases (
+                            resource_key, job_item_id, acquired_at
+                        ) VALUES (?, ?, ?)
+                        """,
+                        (resource_key, item_id, now),
+                    ).rowcount
+                    if not acquired:
+                        continue
+                    changed = connection.execute(
+                        """
+                        UPDATE job_items
+                        SET status = ?, updated_at = ?
+                        WHERE id = ? AND status = 'pending'
+                        """,
+                        (JobItemStatus.RUNNING.value, now, item_id),
+                    ).rowcount
+                    if not changed:
+                        connection.execute(
+                            "DELETE FROM output_resource_leases WHERE job_item_id = ?",
+                            (item_id,),
+                        )
+                        continue
+                    claimed.append(dict(row))
+                    if len(claimed) >= limit:
+                        break
+                last_path = str(rows[-1]["relative_path"])
+                last_item_id = str(rows[-1]["id"])
+            if claimed:
                 connection.execute(
                     "UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?",
                     (JobStatus.RUNNING.value, now, job_id),
                 )
-            return [dict(row) for row in rows]
+            return claimed
 
     def start_attempt(
         self,
@@ -228,6 +292,10 @@ class JobExecutionRepository:
                     item_id,
                 ),
             )
+            connection.execute(
+                "DELETE FROM output_resource_leases WHERE job_item_id = ?",
+                (item_id,),
+            )
 
     def finish_batch(
         self,
@@ -273,6 +341,10 @@ class JobExecutionRepository:
                         now,
                         item.item_id,
                     ),
+                )
+                connection.execute(
+                    "DELETE FROM output_resource_leases WHERE job_item_id = ?",
+                    (item.item_id,),
                 )
 
     def is_stop_requested(self, job_id: str) -> bool:

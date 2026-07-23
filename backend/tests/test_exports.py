@@ -343,7 +343,7 @@ def test_export_api_uses_persistent_active_state_and_blocks_annotation_edits(
 
         blocked_edit = client.put(
             f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation",
-            json={"content": "changed"},
+            json={"content": "changed", "expected_modified_at": None},
         )
         assert blocked_edit.status_code == 400
         assert "正在导出" in blocked_edit.json()["detail"]

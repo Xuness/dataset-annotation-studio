@@ -1,5 +1,7 @@
 export const DESKTOP_EXIT_REQUESTED_EVENT = "desktop-exit-requested";
 export const EXIT_APPLICATION_COMMAND = "exit_application";
+const EXIT_STOP_POLL_INTERVAL_MS = 250;
+const EXIT_STOP_TIMEOUT_MS = 60_000;
 
 export interface ActiveDesktopJobs {
   annotation_job_count: number;
@@ -78,8 +80,9 @@ export async function runDesktopExit(
 
       await dependencies.stopAllWorkspaceJobs();
       let remaining = active;
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        await dependencies.delay(250);
+      const maxAttempts = Math.ceil(EXIT_STOP_TIMEOUT_MS / EXIT_STOP_POLL_INTERVAL_MS);
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        await dependencies.delay(EXIT_STOP_POLL_INTERVAL_MS);
         remaining = await dependencies.getActiveJobs();
         if (!hasStoppableJobs(remaining)) break;
       }

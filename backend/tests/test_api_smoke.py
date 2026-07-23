@@ -135,9 +135,15 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
 
         saved_annotation = client.put(
             f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation",
-            json={"content": "<caption>temporary</caption>"},
+            json={"content": "<caption>temporary</caption>", "expected_modified_at": None},
         )
         assert saved_annotation.status_code == 200
+        stale_annotation = client.put(
+            f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation",
+            json={"content": "<caption>stale</caption>", "expected_modified_at": None},
+        )
+        assert stale_annotation.status_code == 409
+        assert "其他操作修改" in stale_annotation.json()["detail"]
         batch_deleted = client.post(
             f"/api/v1/workspaces/{project_id}/annotations/delete",
             json={"asset_ids": [asset_id]},

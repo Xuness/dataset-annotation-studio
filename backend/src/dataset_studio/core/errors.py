@@ -20,3 +20,11 @@ class JobNotFoundError(StudioError):
 
 class TaggerNotFoundError(StudioError):
     """Raised when a local tagger installation or profile no longer exists."""
+
+
+class ResourceConflictError(ValueError):
+    """Raised when a write would overwrite a newer or actively owned resource."""
+
+
+class FileRollbackError(RuntimeError):
+    """Raised when a failed file transaction cannot restore its prior state."""

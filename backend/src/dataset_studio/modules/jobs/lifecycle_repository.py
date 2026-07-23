@@ -89,6 +89,15 @@ class JobLifecycleRepository:
                 )
             connection.execute(
                 """
+                DELETE FROM output_resource_leases
+                WHERE job_item_id IN (
+                    SELECT id FROM job_items WHERE job_id = ?
+                )
+                """,
+                (job_id,),
+            )
+            connection.execute(
+                """
                 UPDATE jobs
                 SET status = 'queued', stop_requested = 0, completed_at = NULL, updated_at = ?
                 WHERE id = ?
@@ -100,6 +109,7 @@ class JobLifecycleRepository:
     def recover_orphaned(self) -> int:
         now = utc_now_iso()
         with transaction(self._database_path) as connection:
+            connection.execute("DELETE FROM output_resource_leases")
             running_jobs = connection.execute(
                 "SELECT id FROM jobs WHERE status IN ('running', 'stopping')"
             ).fetchall()

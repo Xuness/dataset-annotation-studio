@@ -201,6 +201,10 @@ class TaggerService:
                 # Rescan only discovers catalog entries. Existing installations
                 # use the cheap manifest/stat check in library(); rehashing a
                 # multi-gigabyte model is reserved for explicit validation.
+                try:
+                    self.ensure_default_profile(existing_id)
+                except (OSError, sqlite3.Error, ValueError) as error:
+                    issues.append(f"{relative_path}：{error}")
                 continue
             try:
                 adapter, validated = self._registry.detect(candidate)
@@ -288,6 +292,16 @@ class TaggerService:
 
     def has_installation(self, installation_id: str) -> bool:
         return self._repository.get_installation(installation_id) is not None
+
+    @_catalog_locked
+    def ensure_default_profile(self, installation_id: str) -> None:
+        row = self._repository.get_installation(installation_id)
+        if row is None:
+            raise TaggerNotFoundError(f"找不到本地打标器模型：{installation_id}")
+        manifest = self._manifest_from_row(row)
+        if manifest is None:
+            raise ValueError("本地打标器安装清单无效，无法创建默认配置。")
+        self._create_default_profile(manifest)
 
     def get_profile(self, profile_id: str) -> TaggerProfile:
         row = self._repository.get_profile(profile_id)
@@ -591,8 +605,11 @@ class TaggerService:
         return manifest
 
     def _create_default_profile(self, manifest: TaggerInstallationManifest) -> None:
+        profiles = self._repository.list_profiles()
+        if any(str(row["installation_id"]) == manifest.installation_id for row in profiles):
+            return
         base_name = f"{manifest.name} 默认配置"
-        existing = {str(row["name"]).casefold() for row in self._repository.list_profiles()}
+        existing = {str(row["name"]).casefold() for row in profiles}
         name = base_name
         suffix = 2
         while name.casefold() in existing:

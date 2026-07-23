@@ -9,10 +9,15 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Protocol
 
-from dataset_studio.core.errors import WorkspaceNotFoundError
+from dataset_studio.core.errors import (
+    FileRollbackError,
+    ResourceConflictError,
+    WorkspaceNotFoundError,
+)
 from dataset_studio.core.files import atomic_write_text
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
+from dataset_studio.modules.annotations.text import AnnotationEncodingError
 from dataset_studio.modules.assets.deletions.service import AssetDeletionService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.execution_repository import (
@@ -183,7 +188,7 @@ class AnnotationWorker:
                 active_profile == active_key for active_profile in self._active_profiles.values()
             )
             if isinstance(profile, TaggerExecutionProfile):
-                if profile_running:
+                if profile_running or self._has_active_local_tagger():
                     continue
                 items = repository.claim_items(
                     str(job["id"]),
@@ -226,6 +231,10 @@ class AnnotationWorker:
                 "jobs",
                 requested_at=candidate.requested_at,
             )
+
+    def _has_active_local_tagger(self) -> bool:
+        prefix = f"{ExecutionBackend.LOCAL_TAGGER.value}:"
+        return any(key.startswith(prefix) for key in self._active_profiles.values())
 
     def _reap_finished_tasks(self) -> None:
         finished = {task for task in self._active if task.done()}
@@ -334,6 +343,7 @@ class AnnotationWorker:
             return
 
         backend = ExecutionBackend(str(job.get("execution_backend") or "provider"))
+        kind = JobKind(str(job["kind"]))
         execution_profile = load_execution_snapshot(
             backend,
             job.get("execution_snapshot"),
@@ -350,6 +360,19 @@ class AnnotationWorker:
                 execution_profile,
             )
             return
+        if kind == JobKind.ANNOTATION and not bool(job["overwrite_existing"]):
+            annotation_path = (workspace_root / str(item["annotation_relative_path"])).resolve()
+            if not annotation_path.is_relative_to(workspace_root.resolve()):
+                repository.finish_item(
+                    item_id,
+                    JobItemStatus.FAILED,
+                    error="任务输出路径超出当前工作区。",
+                    validation_status="invalid_path",
+                )
+                return
+            if annotation_path.is_file():
+                repository.finish_item(item_id, JobItemStatus.SKIPPED)
+                return
         profile = execution_profile
         try:
             credential = self._container.presets.get_provider_credential(profile)
@@ -358,15 +381,24 @@ class AnnotationWorker:
             return
 
         system_snapshot = json.loads(str(job["system_prompt_snapshot"]))
-        kind = JobKind(str(job["kind"]))
         source_content: str | None = None
         source_hash: str | None = None
+        expected_output_modified_at: str | None = None
         translation_configuration: dict[str, object] = {}
         if kind == JobKind.TRANSLATION:
             translation_configuration = json.loads(str(job["configuration_snapshot"]))
             language = str(translation_configuration["target_language"])
             policy = str(translation_configuration["translation_policy"])
-            source = self._container.translations.read_source(project_id, asset_id)
+            try:
+                source = self._container.translations.read_source(project_id, asset_id)
+            except AnnotationEncodingError:
+                repository.finish_item(
+                    item_id,
+                    JobItemStatus.FAILED,
+                    error="源标注不是有效的 UTF-8，无法翻译。",
+                    validation_status="source_invalid",
+                )
+                return
             if source is None:
                 repository.finish_item(
                     item_id,
@@ -383,10 +415,28 @@ class AnnotationWorker:
             ):
                 repository.finish_item(item_id, JobItemStatus.SKIPPED)
                 return
+            translation_document = self._container.translations.get(
+                project_id,
+                asset_id,
+                language,
+            )
+            expected_output_modified_at = translation_document.modified_at
             source_content, source_hash = source
             image_path = None
             user_prompt = translation_user_prompt(language, source_content)
         else:
+            annotation_path = (workspace_root / str(item["annotation_relative_path"])).resolve()
+            if not annotation_path.is_relative_to(workspace_root.resolve()):
+                repository.finish_item(
+                    item_id,
+                    JobItemStatus.FAILED,
+                    error="任务输出路径超出当前工作区。",
+                    validation_status="invalid_path",
+                )
+                return
+            expected_output_modified_at = (
+                str(annotation_path.stat().st_mtime_ns) if annotation_path.is_file() else None
+            )
             image_path = self._container.assets.image_path(project_id, asset_id)
             metadata = self._container.assets.metadata(project_id, asset_id)
             selected_fields = json.loads(str(job["json_fields_snapshot"]))
@@ -501,6 +551,8 @@ class AnnotationWorker:
                             provider_profile_id=profile.id,
                             provider_profile_name=profile.name,
                             model=profile.model_id,
+                            expected_modified_at=expected_output_modified_at,
+                            lease_owner_id=item_id,
                         )
                     else:
                         annotation_path = workspace_root / str(item["annotation_relative_path"])
@@ -523,6 +575,8 @@ class AnnotationWorker:
                             project_id,
                             asset_id,
                             response.content,
+                            expected_modified_at=expected_output_modified_at,
+                            lease_owner_id=item_id,
                         )
                     repository.finish_attempt(
                         attempt_id,
@@ -562,6 +616,50 @@ class AnnotationWorker:
                     JobItemStatus.FAILED,
                     error=last_error,
                     validation_status="source_changed",
+                )
+                return
+            except ResourceConflictError as error:
+                last_error = str(error)
+                repository.finish_attempt(
+                    attempt_id,
+                    status="output_changed",
+                    response_content=response.content,
+                    error_message=last_error,
+                    provider_payload_path=payload_path,
+                    input_tokens=response.input_tokens,
+                    output_tokens=response.output_tokens,
+                    cache_read_tokens=response.cache_read_tokens,
+                    cache_write_tokens=response.cache_write_tokens,
+                    reasoning_tokens=response.reasoning_tokens,
+                    finish_reason=response.finish_reason,
+                )
+                repository.finish_item(
+                    item_id,
+                    JobItemStatus.FAILED,
+                    error=last_error,
+                    validation_status="output_changed",
+                )
+                return
+            except FileRollbackError as error:
+                last_error = str(error)
+                repository.finish_attempt(
+                    attempt_id,
+                    status="rollback_failed",
+                    response_content=response.content,
+                    error_message=last_error,
+                    provider_payload_path=payload_path,
+                    input_tokens=response.input_tokens,
+                    output_tokens=response.output_tokens,
+                    cache_read_tokens=response.cache_read_tokens,
+                    cache_write_tokens=response.cache_write_tokens,
+                    reasoning_tokens=response.reasoning_tokens,
+                    finish_reason=response.finish_reason,
+                )
+                repository.finish_item(
+                    item_id,
+                    JobItemStatus.FAILED,
+                    error=last_error,
+                    validation_status="rollback_failed",
                 )
                 return
             except JobStopped:

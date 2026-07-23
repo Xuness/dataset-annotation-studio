@@ -3,7 +3,9 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+import dataset_studio.modules.translations.service as translation_service
 from dataset_studio.core.config import Settings
+from dataset_studio.core.errors import ResourceConflictError
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
@@ -25,7 +27,10 @@ from dataset_studio.modules.providers.config import (
     ProviderType,
 )
 from dataset_studio.modules.translations.models import TranslationStatus
-from dataset_studio.modules.translations.service import TranslationService
+from dataset_studio.modules.translations.service import (
+    TranslationService,
+    TranslationSourceChangedError,
+)
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
 from dataset_studio.platform.global_store import initialize_global_database
@@ -96,12 +101,74 @@ def test_translation_sidecar_tracks_source_version_and_preserves_existing_file(
         '<caption mood="quiet">外部编辑</caption>',
         encoding="utf-8",
     )
+    with pytest.raises(ResourceConflictError, match="任务执行期间"):
+        translations.save_generated(
+            project_id,
+            asset.id,
+            "zh-CN",
+            '<caption mood="quiet">旧模型结果</caption>',
+            expected_source_hash=source_hash,
+            expected_modified_at=saved.modified_at,
+        )
     assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.UNTRACKED
 
     annotations.save(project_id, asset.id, '<caption mood="quiet">a larger garden</caption>')
     stale = translations.get(project_id, asset.id, "zh-CN")
     assert stale.status == TranslationStatus.STALE
     assert stale.source_hash != stale.current_source_hash
+
+
+def test_translation_rolls_back_when_source_changes_during_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        _,
+        project_id,
+        assets,
+        _,
+        annotations,
+        translations,
+    ) = _translation_services(tmp_path, ("sample.png",))
+    asset = assets[0]
+    annotations.save(project_id, asset.id, "<caption>source</caption>")
+    source_hash = translations.read_source(project_id, asset.id)[1]
+    source_path = tmp_path / "dataset" / "sample.txt"
+
+    original_write = translation_service.atomic_write_text
+
+    def change_source_after_write(path: Path, content: str) -> None:
+        original_write(path, content)
+        source_path.write_text("<caption>changed</caption>", encoding="utf-8")
+
+    monkeypatch.setattr(translation_service, "atomic_write_text", change_source_after_write)
+
+    with pytest.raises(TranslationSourceChangedError, match="提交期间"):
+        translations.save_generated(
+            project_id,
+            asset.id,
+            "zh-CN",
+            "<caption>译文</caption>",
+            expected_source_hash=source_hash,
+        )
+
+    assert not (tmp_path / "dataset" / "sample.zh-CN.txt").exists()
+
+
+def test_translation_rejects_a_symbolic_link_output(tmp_path: Path) -> None:
+    project, project_id, assets, _, annotations, translations = _translation_services(tmp_path)
+    asset = assets[0]
+    annotations.save(project_id, asset.id, "<caption>source</caption>")
+    external = tmp_path / "external-translation.txt"
+    external.write_text("<caption>outside</caption>", encoding="utf-8")
+    translation_path = project / "sample.zh-CN.txt"
+    try:
+        translation_path.symlink_to(external)
+    except OSError as error:
+        pytest.skip(f"当前环境不能创建符号链接：{error}")
+
+    with pytest.raises(ValueError, match="符号链接"):
+        translations.get(project_id, asset.id, "zh-CN")
 
 
 def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path: Path) -> None:

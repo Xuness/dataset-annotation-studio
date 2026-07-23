@@ -6,8 +6,10 @@ from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
+from dataset_studio.core.errors import FileRollbackError, ResourceConflictError
 from dataset_studio.core.files import atomic_write_text
 from dataset_studio.modules.annotations.service import (
+    AnnotationBatchRollbackError,
     AnnotationService,
     GeneratedAnnotation,
 )
@@ -35,6 +37,7 @@ class StartedTaggerItem:
     attempt_id: str
     attempt_number: int
     request: dict[str, object]
+    expected_annotation_modified_at: str | None
 
     @property
     def item_id(self) -> str:
@@ -179,10 +182,19 @@ class LocalTaggerBatchCommitter:
             )
         for item, error in failed:
             message = str(error) or type(error).__name__
+            if isinstance(error, ResourceConflictError):
+                attempt_status = "output_changed"
+                validation_status = "output_changed"
+            elif isinstance(error, FileRollbackError):
+                attempt_status = "rollback_failed"
+                validation_status = "rollback_failed"
+            else:
+                attempt_status = "internal_error"
+                validation_status = "write_failed"
             attempt_completions.append(
                 AttemptCompletion(
                     attempt_id=item.started.attempt_id,
-                    status="internal_error",
+                    status=attempt_status,
                     response_content=item.result.content,
                     error_message=message,
                     provider_payload_path=item.artifact_path,
@@ -194,7 +206,7 @@ class LocalTaggerBatchCommitter:
                     item_id=item.started.item_id,
                     status=JobItemStatus.FAILED,
                     error=message,
-                    validation_status="write_failed",
+                    validation_status=validation_status,
                 )
             )
         repository.finish_batch(attempt_completions, item_completions)
@@ -378,12 +390,16 @@ class LocalTaggerBatchCommitter:
             GeneratedAnnotation(
                 asset_id=item.started.asset_id,
                 content=item.result.content,
+                expected_modified_at=item.started.expected_annotation_modified_at,
+                lease_owner_id=item.started.item_id,
             )
             for item in successful
         ]
         try:
             self._annotations.save_generated_batch(project_id, annotations)
             return list(successful), []
+        except AnnotationBatchRollbackError as error:
+            return [], [(item, error) for item in successful]
         except Exception:
             # The batch writer has already rolled back every file and DB row.
             # Retry individually so one bad target does not discard unrelated work.
@@ -395,6 +411,8 @@ class LocalTaggerBatchCommitter:
                         project_id,
                         item.started.asset_id,
                         item.result.content,
+                        expected_modified_at=item.started.expected_annotation_modified_at,
+                        lease_owner_id=item.started.item_id,
                     )
                 except Exception as error:
                     failed.append((item, error))

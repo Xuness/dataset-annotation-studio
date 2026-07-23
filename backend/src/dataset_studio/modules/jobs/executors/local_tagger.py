@@ -69,7 +69,7 @@ class LocalTaggerJobExecutor:
             return
 
         overwrite_existing = bool(job["overwrite_existing"])
-        candidates: list[tuple[dict[str, object], Path]] = []
+        candidates: list[tuple[dict[str, object], Path, str | None]] = []
         precompleted: list[ItemCompletion] = []
         for item in items:
             item_id = str(item["id"])
@@ -95,12 +95,15 @@ class LocalTaggerJobExecutor:
             if annotation_path.is_file() and not overwrite_existing:
                 precompleted.append(ItemCompletion(item_id=item_id, status=JobItemStatus.SKIPPED))
                 continue
-            candidates.append((item, image_path))
+            expected_modified_at = (
+                str(annotation_path.stat().st_mtime_ns) if annotation_path.is_file() else None
+            )
+            candidates.append((item, image_path, expected_modified_at))
         repository.finish_batch([], precompleted)
         if not candidates:
             return
 
-        attempts = repository.start_attempts([str(item["id"]) for item, _ in candidates])
+        attempts = repository.start_attempts([str(item["id"]) for item, _, _ in candidates])
         started = [
             StartedTaggerItem(
                 item=item,
@@ -108,8 +111,9 @@ class LocalTaggerJobExecutor:
                 attempt_id=attempts[str(item["id"])][0],
                 attempt_number=attempts[str(item["id"])][1],
                 request=request_snapshot(profile, image_path),
+                expected_annotation_modified_at=expected_modified_at,
             )
-            for item, image_path in candidates
+            for item, image_path, expected_modified_at in candidates
         ]
         try:
             report = await asyncio.to_thread(

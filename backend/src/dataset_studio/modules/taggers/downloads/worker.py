@@ -80,8 +80,9 @@ class TaggerDownloadWorker:
 
             installed = service.find_matching_installation(plan)
             if installed is not None:
+                self._container.taggers.ensure_default_profile(installed.id)
                 repository.complete(task_id, installed.id)
-                service.cleanup_staging(row)
+                self._cleanup_completed_staging(service, row, task_id)
                 return
 
             source = service.source()
@@ -122,8 +123,10 @@ class TaggerDownloadWorker:
                         materialized,
                         plan,
                     )
+                else:
+                    self._container.taggers.ensure_default_profile(installed.id)
             repository.complete(task_id, installed.id)
-            service.cleanup_staging(row)
+            self._cleanup_completed_staging(service, row, task_id)
         except TaggerDownloadStopped:
             if repository.is_stop_requested(task_id):
                 repository.mark_paused(task_id)
@@ -143,6 +146,21 @@ class TaggerDownloadWorker:
                 task_id,
                 code="internal_error",
                 message=f"内部错误：{str(error) or type(error).__name__}",
+            )
+
+    @staticmethod
+    def _cleanup_completed_staging(
+        service: TaggerDownloadService,
+        row,
+        task_id: str,
+    ) -> None:
+        try:
+            service.cleanup_staging(row)
+        except Exception:
+            LOGGER.warning(
+                "Download %s completed, but its staging directory could not be cleaned.",
+                task_id,
+                exc_info=True,
             )
 
 

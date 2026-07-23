@@ -7,6 +7,7 @@ import pytest
 from PIL import Image
 from pydantic import ValidationError
 
+import dataset_studio.modules.taggers.pipeline as tagger_pipeline
 from dataset_studio.core.config import Settings
 from dataset_studio.modules.jobs.models import ExecutionBackend, JobCreateRequest, JobKind
 from dataset_studio.modules.taggers.adapters.base import (
@@ -553,6 +554,148 @@ def test_batch_pipeline_caps_each_prepared_tensor_window(tmp_path: Path) -> None
 
     assert session.batch_calls == [2, 2, 1]
     assert all(outcome.result is not None for outcome in report.outcomes)
+
+
+def test_batch_pipeline_rejects_single_images_outside_resource_budgets(
+    tmp_path: Path,
+) -> None:
+    class GuardedSession:
+        provider = "CPUExecutionProvider"
+        prepared_tensor_bytes = 3 * 8 * 8 * 4
+
+        def __init__(self) -> None:
+            self.preprocess_calls = 0
+
+        def effective_batch_size(self) -> int:
+            return 1
+
+        def record_batch_failure(self, _failed_batch_size: int) -> None:
+            pass
+
+        def preprocess_bytes(self, _payload: bytes) -> np.ndarray:
+            self.preprocess_calls += 1
+            return np.zeros((3, 8, 8), dtype=np.float32)
+
+        def infer_batch(self, _prepared):
+            raise AssertionError("超限图片不应进入推理。")
+
+    class GuardedRuntime:
+        def __init__(self, session: GuardedSession) -> None:
+            self.session = session
+
+        def bind(self, _profile):
+            return self.session
+
+    image_path = tmp_path / "guarded.png"
+    Image.new("RGB", (16, 16), "white").save(image_path)
+    profile = TaggerExecutionProfile(
+        id="profile",
+        name="Guarded profile",
+        installation_id="installation",
+        installation_name="Model",
+        adapter_id="fake",
+        model_version="v1",
+        fingerprint="a" * 64,
+        threshold=0.55,
+        categories=["general"],
+        device=TaggerDevice.CPU,
+        concurrency=1,
+        batch_size=1,
+    )
+    session = GuardedSession()
+    input_item = TaggerPipelineInput(key="image", image_path=image_path)
+
+    encoded_report = TaggerBatchPipeline(
+        GuardedRuntime(session),
+        encoded_memory_budget=image_path.stat().st_size - 1,
+    ).run(profile, [input_item])
+    pixel_report = TaggerBatchPipeline(
+        GuardedRuntime(session),
+        decode_pixel_budget=100,
+    ).run(profile, [input_item])
+
+    assert "读取上限" in (encoded_report.outcomes[0].error or "")
+    assert "解码尺寸" in (pixel_report.outcomes[0].error or "")
+    assert session.preprocess_calls == 0
+
+
+def test_batch_pipeline_does_not_read_a_file_before_it_fits_the_window(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class WindowSession:
+        provider = "CPUExecutionProvider"
+        prepared_tensor_bytes = 3 * 8 * 8 * 4
+
+        def effective_batch_size(self) -> int:
+            return 1
+
+        def record_batch_failure(self, _failed_batch_size: int) -> None:
+            pass
+
+        def preprocess_bytes(self, _payload: bytes) -> np.ndarray:
+            return np.zeros((3, 8, 8), dtype=np.float32)
+
+        def infer_batch(self, prepared):
+            return [
+                TaggerInferenceResult(
+                    content="blue_hair",
+                    tags=[],
+                    provider=self.provider,
+                    inference_ms=1.0,
+                    batch_size=1,
+                    batch_inference_ms=1.0,
+                )
+                for _ in prepared
+            ]
+
+    class WindowRuntime:
+        def __init__(self, session: WindowSession) -> None:
+            self.session = session
+
+        def bind(self, _profile):
+            return self.session
+
+    first = tmp_path / "first.png"
+    second = tmp_path / "second.png"
+    Image.new("RGB", (16, 16), "white").save(first)
+    Image.new("RGB", (16, 16), "black").save(second)
+    session = WindowSession()
+    runtime = WindowRuntime(session)
+    profile = TaggerExecutionProfile(
+        id="profile",
+        name="Window profile",
+        installation_id="installation",
+        installation_name="Model",
+        adapter_id="fake",
+        model_version="v1",
+        fingerprint="a" * 64,
+        threshold=0.55,
+        categories=["general"],
+        device=TaggerDevice.CPU,
+        concurrency=1,
+        batch_size=1,
+    )
+    original_read = tagger_pipeline._read_bounded_payload
+    reads: list[Path] = []
+
+    def tracked_read(path: Path, budget: int) -> bytes:
+        reads.append(path)
+        return original_read(path, budget)
+
+    monkeypatch.setattr(tagger_pipeline, "_read_bounded_payload", tracked_read)
+    TaggerBatchPipeline(
+        runtime,
+        encoded_memory_budget=max(first.stat().st_size, second.stat().st_size),
+    ).run(
+        profile,
+        [
+            TaggerPipelineInput(key="first", image_path=first),
+            TaggerPipelineInput(key="second", image_path=second),
+        ],
+    )
+
+    assert reads == [first, second]
 
 
 def test_runtime_auto_rebuilds_a_cpu_session_when_cuda_cannot_initialize(

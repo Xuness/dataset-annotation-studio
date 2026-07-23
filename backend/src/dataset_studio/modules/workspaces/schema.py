@@ -317,7 +317,27 @@ CREATE INDEX idx_asset_delete_files_operation_phase
 ON asset_delete_files(operation_id, phase, position);
 """
 
-WORKSPACE_SCHEMA_VERSION = 9
+OUTPUT_RESOURCE_LEASES_MIGRATION = """
+CREATE INDEX idx_assets_annotation_relative_path
+ON assets(is_present, annotation_relative_path);
+
+CREATE TABLE output_resource_leases (
+    resource_key TEXT PRIMARY KEY,
+    job_item_id TEXT UNIQUE,
+    operation_id TEXT,
+    acquired_at TEXT NOT NULL,
+    CHECK (
+        (job_item_id IS NOT NULL AND operation_id IS NULL)
+        OR (job_item_id IS NULL AND operation_id IS NOT NULL)
+    ),
+    FOREIGN KEY(job_item_id) REFERENCES job_items(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_output_resource_leases_operation
+ON output_resource_leases(operation_id);
+"""
+
+WORKSPACE_SCHEMA_VERSION = 10
 WORKSPACE_MIGRATIONS = (
     Migration(1, "initial_workspace_schema", WORKSPACE_SCHEMA),
     Migration(2, "image_metadata_version", IMAGE_METADATA_VERSION_MIGRATION),
@@ -328,6 +348,7 @@ WORKSPACE_MIGRATIONS = (
     Migration(7, "preprocess_recovery_journal", PREPROCESS_RECOVERY_JOURNAL_MIGRATION),
     Migration(8, "job_execution_backend", JOB_EXECUTION_BACKEND_MIGRATION),
     Migration(9, "asset_deletions", ASSET_DELETIONS_MIGRATION),
+    Migration(10, "output_resource_leases", OUTPUT_RESOURCE_LEASES_MIGRATION),
 )
 
 

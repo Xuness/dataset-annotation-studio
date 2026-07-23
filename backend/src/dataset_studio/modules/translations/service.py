@@ -3,9 +3,14 @@ from __future__ import annotations
 import hashlib
 import os
 import uuid
+from contextlib import suppress
 from pathlib import Path
 
-from dataset_studio.core.errors import AssetNotFoundError
+from dataset_studio.core.errors import (
+    AssetNotFoundError,
+    FileRollbackError,
+    ResourceConflictError,
+)
 from dataset_studio.core.files import atomic_copy_file, atomic_write_text
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
@@ -14,6 +19,11 @@ from dataset_studio.modules.annotations.text import (
     read_annotation_text_strict,
 )
 from dataset_studio.modules.assets.repository import AssetRepository
+from dataset_studio.modules.output_resources import (
+    OutputResourceClaim,
+    annotation_output_resource_key,
+    hold_output_resources,
+)
 from dataset_studio.modules.translations.languages import LANGUAGE_PATTERN
 from dataset_studio.modules.translations.models import (
     TranslationDocument,
@@ -21,6 +31,8 @@ from dataset_studio.modules.translations.models import (
 )
 from dataset_studio.modules.translations.validation import validate_translation_structure
 from dataset_studio.modules.workspaces.service import WorkspaceService
+
+_EXPECTED_VERSION_UNSET = object()
 
 
 class TranslationSourceChangedError(ValueError):
@@ -51,6 +63,8 @@ class TranslationService:
         asset = self._asset(paths.database, asset_id)
         annotation_path = self._annotation_path(paths.root, asset)
         translation_path = self._translation_path(annotation_path, language)
+        if translation_path.is_symlink():
+            raise ValueError("译文文件不能是符号链接。")
         relative_path = translation_path.relative_to(paths.root).as_posix()
         source_invalid = False
         try:
@@ -135,12 +149,58 @@ class TranslationService:
         provider_profile_name: str | None = None,
         model: str | None = None,
         manually_accepted: bool = False,
+        expected_modified_at: str | None | object = _EXPECTED_VERSION_UNSET,
+        lease_owner_id: str | None = None,
     ) -> TranslationDocument:
         language = self.normalize_language(language)
         paths, _ = self._workspaces.get(project_id)
         asset = self._asset(paths.database, asset_id)
         annotation_path = self._annotation_path(paths.root, asset)
-        source = self.read_source(project_id, asset_id)
+        translation_path = self._translation_path(annotation_path, language)
+        if translation_path.is_symlink():
+            raise ValueError("译文文件不能是符号链接。")
+        relative_path = translation_path.relative_to(paths.root).as_posix()
+        if self._annotation_path_conflict(paths.database, asset_id, relative_path):
+            raise ValueError("目标译文路径是另一张图片的活动标注，拒绝覆盖。")
+        claim = OutputResourceClaim(
+            annotation_output_resource_key(relative_path),
+            lease_owner_id,
+        )
+        with hold_output_resources(paths.database, [claim]):
+            return self._save_generated_locked(
+                project_id,
+                asset_id,
+                language,
+                content,
+                expected_source_hash=expected_source_hash,
+                provider_profile_id=provider_profile_id,
+                provider_profile_name=provider_profile_name,
+                model=model,
+                manually_accepted=manually_accepted,
+                expected_modified_at=expected_modified_at,
+                database_path=paths.database,
+                translation_path=translation_path,
+                relative_path=relative_path,
+            )
+
+    def _save_generated_locked(
+        self,
+        project_id: str,
+        asset_id: str,
+        language: str,
+        content: str,
+        *,
+        expected_source_hash: str,
+        provider_profile_id: str | None,
+        provider_profile_name: str | None,
+        model: str | None,
+        manually_accepted: bool,
+        expected_modified_at: str | None | object,
+        database_path: Path,
+        translation_path: Path,
+        relative_path: str,
+    ) -> TranslationDocument:
+        source = self._read_source_for_commit(project_id, asset_id)
         if source is None:
             raise TranslationSourceChangedError("源标注已不存在，未写入译文。")
         source_content, source_hash = source
@@ -153,10 +213,14 @@ class TranslationService:
         if manually_accepted and not valid:
             validation_status = "manually_accepted"
 
-        translation_path = self._translation_path(annotation_path, language)
-        relative_path = translation_path.relative_to(paths.root).as_posix()
-        if self._annotation_path_conflict(paths.database, asset_id, relative_path):
-            raise ValueError("目标译文路径是另一张图片的活动标注，拒绝覆盖。")
+        actual_modified_at = (
+            str(translation_path.stat().st_mtime_ns) if translation_path.is_file() else None
+        )
+        if (
+            expected_modified_at is not _EXPECTED_VERSION_UNSET
+            and expected_modified_at != actual_modified_at
+        ):
+            raise ResourceConflictError("译文在任务执行期间被其他操作修改，模型结果未覆盖新内容。")
         backup: Path | None = None
         if translation_path.is_file():
             backup = translation_path.with_name(
@@ -165,8 +229,11 @@ class TranslationService:
             atomic_copy_file(translation_path, backup)
         try:
             atomic_write_text(translation_path, content)
+            current_source = self._read_source_for_commit(project_id, asset_id)
+            if current_source is None or current_source[1] != source_hash:
+                raise TranslationSourceChangedError("源标注在译文提交期间发生变化，未写入旧译文。")
             now = utc_now_iso()
-            with transaction(paths.database) as connection:
+            with transaction(database_path) as connection:
                 connection.execute(
                     """
                     INSERT INTO annotation_translations (
@@ -199,15 +266,31 @@ class TranslationService:
                         now,
                     ),
                 )
-        except BaseException:
-            if backup is not None and backup.is_file():
-                os.replace(backup, translation_path)
-            else:
-                translation_path.unlink(missing_ok=True)
+        except BaseException as error:
+            try:
+                if backup is not None and backup.is_file():
+                    os.replace(backup, translation_path)
+                else:
+                    translation_path.unlink(missing_ok=True)
+            except OSError:
+                raise FileRollbackError("译文写入失败，且原文件未能自动恢复。") from error
             raise
         if backup is not None:
-            backup.unlink(missing_ok=True)
+            with suppress(OSError):
+                backup.unlink(missing_ok=True)
         return self.get(project_id, asset_id, language)
+
+    def _read_source_for_commit(
+        self,
+        project_id: str,
+        asset_id: str,
+    ) -> tuple[str, str] | None:
+        try:
+            return self.read_source(project_id, asset_id)
+        except AnnotationEncodingError as error:
+            raise TranslationSourceChangedError(
+                "源标注在翻译期间变成了无效的 UTF-8，未写入旧译文。"
+            ) from error
 
     def should_translate(
         self,
@@ -310,7 +393,11 @@ class TranslationService:
 
     @staticmethod
     def _annotation_path(root: Path, asset) -> Path:
-        path = (root / str(asset["annotation_relative_path"])).resolve()
-        if not path.is_relative_to(root.resolve()):
+        workspace_root = root.resolve()
+        candidate = workspace_root / str(asset["annotation_relative_path"])
+        if candidate.is_symlink():
+            raise ValueError("标注文件不能是符号链接。")
+        path = candidate.resolve()
+        if not path.is_relative_to(workspace_root):
             raise AssetNotFoundError("标注路径超出当前工作区。")
         return path

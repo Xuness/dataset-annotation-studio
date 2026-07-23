@@ -24,7 +24,7 @@ from dataset_studio.api.routes import (
     workspaces,
 )
 from dataset_studio.core.config import Settings, settings
-from dataset_studio.core.errors import StudioError
+from dataset_studio.core.errors import ResourceConflictError, StudioError
 from dataset_studio.modules.providers.models import ProviderRequestError
 
 
@@ -63,6 +63,10 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     @app.exception_handler(ValueError)
     async def value_error_handler(_request: Request, error: ValueError):
         return JSONResponse(status_code=400, content={"detail": str(error)})
+
+    @app.exception_handler(ResourceConflictError)
+    async def resource_conflict_handler(_request: Request, error: ResourceConflictError):
+        return JSONResponse(status_code=409, content={"detail": str(error)})
 
     @app.exception_handler(ProviderRequestError)
     async def provider_request_error_handler(_request: Request, error: ProviderRequestError):

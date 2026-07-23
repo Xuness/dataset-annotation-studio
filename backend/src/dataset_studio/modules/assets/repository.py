@@ -314,6 +314,21 @@ class AssetRepository:
         finally:
             connection.close()
 
+    def list_present_paths(self) -> list[str]:
+        connection = connect(self._database_path)
+        try:
+            rows = connection.execute(
+                """
+                SELECT relative_path
+                FROM assets
+                WHERE is_present = 1
+                ORDER BY relative_path COLLATE NOCASE
+                """
+            ).fetchall()
+            return [str(row["relative_path"]) for row in rows]
+        finally:
+            connection.close()
+
     def count_summary(self) -> tuple[int, int, int]:
         connection = connect(self._database_path)
         try:
