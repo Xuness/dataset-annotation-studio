@@ -1,12 +1,25 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { CheckCircle2, CircleAlert, FileQuestion, Search } from "lucide-react";
+import {
+  CheckCircle2,
+  CircleAlert,
+  FileQuestion,
+  History,
+  Search,
+  Trash2,
+  Unlink,
+} from "lucide-react";
 
 import { thumbnailUrl } from "../../../features/assets/api";
-import type { AssetFilterStatus, AssetSummary } from "../../../shared/api/types";
+import type {
+  AssetFilterStatus,
+  AssetFolderSummary,
+  AssetSummary,
+} from "../../../shared/api/types";
 import { formatBytes } from "../../../shared/format/bytes";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { StatusDot } from "../../../shared/ui/StatusDot";
+import { AssetFolderTree } from "./AssetFolderTree";
 
 type StatusFilter = AssetFilterStatus | null;
 
@@ -20,6 +33,9 @@ interface AssetBrowserProps {
   search: string;
   statusFilter: StatusFilter;
   statusCounts: Record<string, number>;
+  folders: AssetFolderSummary[];
+  selectedFolderPath: string;
+  foldersLoading: boolean;
   recursive: boolean;
   hasMore: boolean;
   loading: boolean;
@@ -27,12 +43,17 @@ interface AssetBrowserProps {
   selectAllPending: boolean;
   allMatchingSelected: boolean;
   error: string | null;
+  bulkActionPending: boolean;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: StatusFilter) => void;
+  onFolderSelect: (path: string) => Promise<boolean>;
   onSelect: (assetId: string) => Promise<boolean>;
   onSetChecked: (assetIds: string[], checked: boolean) => void;
   onToggleAll: () => void;
   onRecursiveChange: (value: boolean) => void;
+  onDeleteCheckedAnnotations: () => void;
+  onDeleteCheckedAssets: () => void;
+  onOpenDeletionHistory: () => void;
   onLoadMore: () => void;
 }
 
@@ -61,6 +82,9 @@ export function AssetBrowser({
   search,
   statusFilter,
   statusCounts,
+  folders,
+  selectedFolderPath,
+  foldersLoading,
   recursive,
   hasMore,
   loading,
@@ -68,12 +92,17 @@ export function AssetBrowser({
   selectAllPending,
   allMatchingSelected,
   error,
+  bulkActionPending,
   onSearchChange,
   onStatusChange,
+  onFolderSelect,
   onSelect,
   onSetChecked,
   onToggleAll,
   onRecursiveChange,
+  onDeleteCheckedAnnotations,
+  onDeleteCheckedAssets,
+  onOpenDeletionHistory,
   onLoadMore,
 }: AssetBrowserProps) {
   const filters = mode === "review" ? reviewFilters : assetFilters;
@@ -97,7 +126,7 @@ export function AssetBrowser({
 
   useEffect(() => {
     rangeAnchorIdRef.current = null;
-  }, [mode, projectId, search, statusFilter]);
+  }, [mode, projectId, search, selectedFolderPath, statusFilter]);
 
   function toggleChecked(assetId: string, shiftKey: boolean) {
     const targetIndex = assets.findIndex((asset) => asset.id === assetId);
@@ -203,16 +232,35 @@ export function AssetBrowser({
           <span className="eyebrow">{mode === "review" ? "Review Queue" : "Dataset"}</span>
           <strong>{total} 张图片</strong>
         </div>
-        <label className="switch-label" title="扫描所有子文件夹">
-          <input
-            type="checkbox"
-            checked={recursive}
-            onChange={(event) => onRecursiveChange(event.target.checked)}
-          />
-          <span />
-          递归
-        </label>
+        <div className="asset-browser__header-actions">
+          <button
+            type="button"
+            className="asset-browser__history"
+            title="素材删除与恢复记录"
+            aria-label="素材删除与恢复记录"
+            onClick={onOpenDeletionHistory}
+          >
+            <History size={14} />
+          </button>
+          <label className="switch-label" title="扫描所有子文件夹">
+            <input
+              type="checkbox"
+              checked={recursive}
+              onChange={(event) => onRecursiveChange(event.target.checked)}
+            />
+            <span />
+            递归
+          </label>
+        </div>
       </div>
+
+      <AssetFolderTree
+        projectId={projectId}
+        folders={folders}
+        selectedPath={selectedFolderPath}
+        loading={foldersLoading}
+        onSelect={onFolderSelect}
+      />
 
       <label className="search-field">
         <Search size={14} />
@@ -225,7 +273,7 @@ export function AssetBrowser({
 
       <div className="asset-filters">
         {filters.map(({ value, label, icon: Icon }) => {
-          const count = value ? (statusCounts[value] ?? 0) : total;
+          const count = value ? (statusCounts[value] ?? 0) : (statusCounts.all ?? total);
           return (
             <button
               key={label}
@@ -239,25 +287,46 @@ export function AssetBrowser({
       </div>
 
       <div className="asset-selection-toolbar">
-        <button
-          type="button"
-          className="asset-selection-toolbar__toggle"
-          aria-pressed={allMatchingSelected}
-          disabled={loading || selectAllPending || total === 0}
-          onClick={onToggleAll}
-        >
-          <span className={`asset-check ${allMatchingSelected ? "is-checked" : ""}`}>
-            {allMatchingSelected ? "✓" : ""}
+        <div className="asset-selection-toolbar__summary">
+          <button
+            type="button"
+            className="asset-selection-toolbar__toggle"
+            aria-pressed={allMatchingSelected}
+            disabled={loading || selectAllPending || total === 0}
+            onClick={onToggleAll}
+          >
+            <span className={`asset-check ${allMatchingSelected ? "is-checked" : ""}`}>
+              {allMatchingSelected ? "✓" : ""}
+            </span>
+            {selectAllPending ? "正在全选…" : allMatchingSelected ? "取消全选" : "全选"}
+          </button>
+          <span className="asset-selection-toolbar__count">已选 {checkedAssetIds.length}</span>
+          <span
+            className="asset-selection-toolbar__hint"
+            title="按住 Shift 点击可连续选择或取消；方向键切换图片，Ctrl+A 全选当前筛选"
+          >
+            Shift 连选
           </span>
-          {selectAllPending ? "正在全选…" : allMatchingSelected ? "取消全选" : "全选"}
-        </button>
-        <span className="asset-selection-toolbar__count">已选 {checkedAssetIds.length}</span>
-        <span
-          className="asset-selection-toolbar__hint"
-          title="按住 Shift 点击可连续选择或取消；方向键切换图片，Ctrl+A 全选当前筛选"
-        >
-          Shift 连选
-        </span>
+        </div>
+        <div className="asset-selection-toolbar__actions">
+          <button
+            type="button"
+            disabled={!checkedAssetIds.length || bulkActionPending}
+            onClick={onDeleteCheckedAnnotations}
+          >
+            <Unlink size={13} />
+            删标注
+          </button>
+          <button
+            type="button"
+            className="is-danger"
+            disabled={!checkedAssetIds.length || bulkActionPending}
+            onClick={onDeleteCheckedAssets}
+          >
+            <Trash2 size={13} />
+            删素材
+          </button>
+        </div>
       </div>
 
       <div

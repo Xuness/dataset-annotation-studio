@@ -29,19 +29,23 @@ class ExportService:
         *,
         has_active_jobs: Callable[[str], bool] | None = None,
         has_active_preprocessing: Callable[[str], bool] | None = None,
+        has_active_asset_deletions: Callable[[str], bool] | None = None,
     ) -> None:
         self._workspaces = workspaces
         self._has_active_jobs = has_active_jobs or (lambda _project_id: False)
         self._has_active_preprocessing = has_active_preprocessing or (lambda _project_id: False)
+        self._has_active_asset_deletions = has_active_asset_deletions or (lambda _project_id: False)
 
     def set_activity_checks(
         self,
         *,
         has_active_jobs: Callable[[str], bool],
         has_active_preprocessing: Callable[[str], bool],
+        has_active_asset_deletions: Callable[[str], bool],
     ) -> None:
         self._has_active_jobs = has_active_jobs
         self._has_active_preprocessing = has_active_preprocessing
+        self._has_active_asset_deletions = has_active_asset_deletions
 
     def preview(self, project_id: str, request: ExportRequest) -> ExportPreview:
         paths, _ = self._workspaces.get(project_id)
@@ -166,6 +170,8 @@ class ExportService:
             raise ValueError("当前工作区正在扫描或预处理图片，请等待操作完成。")
         if self._has_active_jobs(project_id):
             raise ValueError("当前工作区仍有标注或翻译任务运行，请先停止任务再导出。")
+        if self._has_active_asset_deletions(project_id):
+            raise ValueError("当前工作区正在删除或恢复素材，请等待操作完成。")
         if self.has_active(project_id):
             raise ValueError("当前项目已有导出任务正在进行。")
 

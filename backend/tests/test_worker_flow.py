@@ -10,6 +10,7 @@ from PIL import Image
 from dataset_studio.api.container import AppContainer
 from dataset_studio.core.config import Settings
 from dataset_studio.modules.annotations.service import AnnotationService
+from dataset_studio.modules.assets.deletions.service import AssetDeletionService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.exports.service import ExportService
 from dataset_studio.modules.jobs.models import (
@@ -170,6 +171,7 @@ def _runtime(tmp_path: Path):
         settings=settings,
         workspaces=workspaces,
         assets=assets,
+        asset_deletions=AssetDeletionService(workspaces),
         annotations=annotations,
         translations=translations,
         presets=presets,

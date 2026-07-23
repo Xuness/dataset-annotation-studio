@@ -2,7 +2,7 @@
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
   padding: 0 11px;
   background: color-mix(in srgb, var(--surface) 97%, transparent);
 }
@@ -21,6 +21,140 @@
   font-size: 15px;
   font-weight: 400;
   letter-spacing: 0.05em;
+}
+
+.asset-browser__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.asset-browser__history {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.asset-browser__history:hover {
+  color: var(--ink);
+  background: var(--surface-soft);
+}
+
+.asset-folder-tree {
+  min-height: 0;
+  margin-bottom: 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-sunken) 86%, transparent);
+}
+
+.asset-folder-tree > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 8px 5px;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.asset-folder-tree > header small {
+  color: var(--faint);
+  font-size: var(--text-2xs);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.asset-folder-tree__list {
+  max-height: 142px;
+  overflow: auto;
+  padding: 0 4px 5px;
+}
+
+.asset-folder-tree__loading {
+  display: grid;
+  min-height: 48px;
+  place-items: center;
+}
+
+.asset-folder-tree__row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  padding-left: calc(var(--folder-depth) * 13px);
+  border-radius: 4px;
+}
+
+.asset-folder-tree__row:hover,
+.asset-folder-tree__row.is-selected {
+  background: var(--surface-soft);
+}
+
+.asset-folder-tree__row.is-selected {
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.asset-folder-tree__toggle,
+.asset-folder-tree__select {
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.asset-folder-tree__toggle {
+  display: grid;
+  width: 18px;
+  height: 25px;
+  place-items: center;
+  padding: 0;
+}
+
+.asset-folder-tree__toggle:disabled {
+  cursor: default;
+}
+
+.asset-folder-tree__toggle svg {
+  transition: transform var(--transition);
+}
+
+.asset-folder-tree__toggle svg.is-expanded {
+  transform: rotate(90deg);
+}
+
+.asset-folder-tree__select {
+  display: grid;
+  min-width: 0;
+  height: 27px;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 2px;
+  text-align: left;
+}
+
+.asset-folder-tree__select span {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-folder-tree__row.is-selected .asset-folder-tree__select span {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.asset-folder-tree__select small {
+  color: var(--faint);
+  font-size: var(--text-2xs);
 }
 
 .switch-label {
@@ -134,14 +268,20 @@
 }
 
 .asset-selection-toolbar {
-  display: flex;
+  display: grid;
   min-width: 0;
-  align-items: center;
   gap: 7px;
   padding: 7px 0;
   border-bottom: 1px solid var(--workspace-divider);
   color: var(--muted);
   font-size: var(--text-xs);
+}
+
+.asset-selection-toolbar__summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
 }
 
 .asset-selection-toolbar__toggle {
@@ -168,6 +308,40 @@
 .asset-selection-toolbar__hint {
   color: var(--muted);
   white-space: nowrap;
+}
+
+.asset-selection-toolbar__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.asset-selection-toolbar__actions button {
+  display: inline-flex;
+  min-height: 27px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: var(--surface-raised);
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+
+.asset-selection-toolbar__actions button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.asset-selection-toolbar__actions button.is-danger {
+  color: var(--danger);
+}
+
+.asset-selection-toolbar__actions button:disabled {
+  cursor: default;
+  opacity: 0.42;
 }
 
 .asset-list {

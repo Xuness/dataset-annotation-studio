@@ -29,7 +29,7 @@ from dataset_studio.modules.preprocessing.recovery import (
     RecoveryFileOperations,
 )
 from dataset_studio.modules.preprocessing.repository import PreprocessRepository
-from dataset_studio.modules.translations.service import LANGUAGE_PATTERN
+from dataset_studio.modules.translations.languages import LANGUAGE_PATTERN
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
@@ -40,10 +40,12 @@ class PreprocessService:
         *,
         has_active_jobs: Callable[[str], bool] | None = None,
         has_active_exports: Callable[[str], bool] | None = None,
+        has_active_asset_deletions: Callable[[str], bool] | None = None,
     ) -> None:
         self._workspaces = workspaces
         self._has_active_jobs = has_active_jobs or (lambda _project_id: False)
         self._has_active_exports = has_active_exports or (lambda _project_id: False)
+        self._has_active_asset_deletions = has_active_asset_deletions or (lambda _project_id: False)
         self._scanner = AssetScanner()
         self._recovery = PreprocessRecoveryCoordinator(
             workspaces,
@@ -547,6 +549,8 @@ class PreprocessService:
             raise ValueError("当前工作区仍有标注或翻译任务运行，请先停止任务再修改图片文件。")
         if self._has_active_exports(project_id):
             raise ValueError("当前工作区正在导出数据，请先停止导出任务再修改图片文件。")
+        if self._has_active_asset_deletions(project_id):
+            raise ValueError("当前工作区正在删除或恢复素材，请等待操作完成。")
 
     @contextmanager
     def guard_workspace(self, project_id: str, operation_id: str):

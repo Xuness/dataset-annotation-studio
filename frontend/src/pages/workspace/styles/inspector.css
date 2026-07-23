@@ -167,6 +167,12 @@
   white-space: nowrap;
 }
 
+.inspector-delete-asset {
+  width: 100%;
+  justify-content: center;
+  margin-top: 12px;
+}
+
 .inspector-section--path p {
   margin: 0;
   overflow-wrap: anywhere;

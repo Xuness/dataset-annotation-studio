@@ -15,6 +15,7 @@ interface InspectorPanelProps {
   projectId: string;
   workspace: WorkspaceSummary;
   asset: AssetSummary | null;
+  onDeleteAsset: (assetId: string) => void;
 }
 
 const tabs: Array<{ id: InspectorTab; label: string; icon: typeof ChartNoAxesColumn }> = [
@@ -23,7 +24,12 @@ const tabs: Array<{ id: InspectorTab; label: string; icon: typeof ChartNoAxesCol
   { id: "metadata", label: "元数据", icon: Braces },
 ];
 
-export function InspectorPanel({ projectId, workspace, asset }: InspectorPanelProps) {
+export function InspectorPanel({
+  projectId,
+  workspace,
+  asset,
+  onDeleteAsset,
+}: InspectorPanelProps) {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<InspectorTab>(() =>
     searchParams.get("panel") === "prompt" ? "prompt" : "overview",
@@ -66,7 +72,12 @@ export function InspectorPanel({ projectId, workspace, asset }: InspectorPanelPr
       </div>
       <div className="inspector-panel__content">
         {activeTab === "overview" ? (
-          <OverviewPanel projectId={projectId} workspace={workspace} asset={asset} />
+          <OverviewPanel
+            projectId={projectId}
+            workspace={workspace}
+            asset={asset}
+            onDeleteAsset={onDeleteAsset}
+          />
         ) : null}
         {activeTab === "prompt" ? (
           <PromptSettingsPanel projectId={projectId} workspace={workspace} asset={asset} />

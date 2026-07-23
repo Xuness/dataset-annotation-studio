@@ -12,6 +12,7 @@ vi.mock("@tanstack/react-virtual", () => ({
 }));
 
 import { AssetBrowser } from "../../src/pages/workspace/components/AssetBrowser";
+import { AssetFolderTree } from "../../src/pages/workspace/components/AssetFolderTree";
 import type { AssetSummary } from "../../src/shared/api/types";
 
 const asset: AssetSummary = {
@@ -48,6 +49,24 @@ describe("asset browser rows", () => {
         search=""
         statusFilter={null}
         statusCounts={{}}
+        folders={[
+          {
+            path: "",
+            parent_path: null,
+            name: "dataset",
+            direct_asset_count: 0,
+            descendant_asset_count: 1,
+          },
+          {
+            path: "portraits",
+            parent_path: "",
+            name: "portraits",
+            direct_asset_count: 1,
+            descendant_asset_count: 1,
+          },
+        ]}
+        selectedFolderPath=""
+        foldersLoading={false}
         recursive={false}
         hasMore={false}
         loading={false}
@@ -55,12 +74,17 @@ describe("asset browser rows", () => {
         selectAllPending={false}
         allMatchingSelected={false}
         error={null}
+        bulkActionPending={false}
         onSearchChange={() => undefined}
         onStatusChange={() => undefined}
+        onFolderSelect={async () => true}
         onSelect={onSelect}
         onSetChecked={onSetChecked}
         onToggleAll={() => undefined}
         onRecursiveChange={() => undefined}
+        onDeleteCheckedAnnotations={() => undefined}
+        onDeleteCheckedAssets={() => undefined}
+        onOpenDeletionHistory={() => undefined}
         onLoadMore={() => undefined}
       />,
     );
@@ -75,5 +99,38 @@ describe("asset browser rows", () => {
 
     await user.click(openButton);
     expect(onSelect).toHaveBeenCalledWith("asset-1");
+  });
+
+  test("folder rows select a subtree without changing asset checkbox state", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn(async () => true);
+
+    render(
+      <AssetFolderTree
+        projectId="project-a"
+        selectedPath=""
+        loading={false}
+        folders={[
+          {
+            path: "",
+            parent_path: null,
+            name: "dataset",
+            direct_asset_count: 0,
+            descendant_asset_count: 2,
+          },
+          {
+            path: "portraits",
+            parent_path: "",
+            name: "portraits",
+            direct_asset_count: 2,
+            descendant_asset_count: 2,
+          },
+        ]}
+        onSelect={onSelect}
+      />,
+    );
+
+    await user.click(screen.getByTitle("portraits"));
+    expect(onSelect).toHaveBeenCalledWith("portraits");
   });
 });

@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from PIL import Image, ImageOps
 
 from dataset_studio.core.errors import AssetNotFoundError
 from dataset_studio.modules.assets.models import (
+    AssetFolderListResponse,
+    AssetFolderSummary,
     AssetIdListResponse,
     AssetListResponse,
     MetadataDocument,
@@ -36,6 +38,17 @@ def _collect_json_fields(value: object, prefix: str = "") -> list[str]:
     return fields
 
 
+def normalize_folder_path(value: str) -> str:
+    if not value:
+        return ""
+    if "\\" in value:
+        raise ValueError("目录路径必须使用工作区相对路径。")
+    folder = PurePosixPath(value)
+    if folder.is_absolute() or any(part in {"", ".", ".."} for part in folder.parts):
+        raise ValueError("目录路径必须位于当前工作区内。")
+    return folder.as_posix()
+
+
 class AssetService:
     def __init__(self, workspaces: WorkspaceService) -> None:
         self._workspaces = workspaces
@@ -46,13 +59,16 @@ class AssetService:
         *,
         search: str = "",
         annotation_status: str | None = None,
+        folder_path: str = "",
         offset: int = 0,
         limit: int = 200,
     ) -> AssetListResponse:
         paths, _ = self._workspaces.get(project_id)
+        normalized_folder = normalize_folder_path(folder_path)
         items, total, status_counts = AssetRepository(paths.database).list_assets(
             search=search,
             annotation_status=annotation_status,
+            folder_path=normalized_folder,
             offset=max(offset, 0),
             limit=min(max(limit, 1), 10_000),
         )
@@ -70,13 +86,62 @@ class AssetService:
         *,
         search: str = "",
         annotation_status: str | None = None,
+        folder_path: str = "",
     ) -> AssetIdListResponse:
         paths, _ = self._workspaces.get(project_id)
+        normalized_folder = normalize_folder_path(folder_path)
         ids = AssetRepository(paths.database).list_asset_ids(
             search=search,
             annotation_status=annotation_status,
+            folder_path=normalized_folder,
         )
         return AssetIdListResponse(ids=ids, total=len(ids))
+
+    def list_folders(self, project_id: str) -> AssetFolderListResponse:
+        paths, manifest = self._workspaces.get(project_id)
+        records = AssetRepository(paths.database).list_present_records()
+        direct_counts: dict[str, int] = {"": 0}
+        descendant_counts: dict[str, int] = {"": 0}
+
+        for record in records:
+            parent = PurePosixPath(str(record["relative_path"])).parent
+            folder_path = "" if parent == PurePosixPath(".") else parent.as_posix()
+            direct_counts[folder_path] = direct_counts.get(folder_path, 0) + 1
+            descendant_counts[""] += 1
+            if not folder_path:
+                continue
+            current = PurePosixPath(folder_path)
+            while current != PurePosixPath("."):
+                key = current.as_posix()
+                descendant_counts[key] = descendant_counts.get(key, 0) + 1
+                direct_counts.setdefault(key, 0)
+                current = current.parent
+
+        items = [
+            AssetFolderSummary(
+                path="",
+                parent_path=None,
+                name=manifest.name,
+                direct_asset_count=direct_counts[""],
+                descendant_asset_count=descendant_counts[""],
+            )
+        ]
+        for folder_path in sorted(
+            (path for path in descendant_counts if path),
+            key=lambda value: (value.casefold(), value),
+        ):
+            folder = PurePosixPath(folder_path)
+            parent = folder.parent
+            items.append(
+                AssetFolderSummary(
+                    path=folder_path,
+                    parent_path="" if parent == PurePosixPath(".") else parent.as_posix(),
+                    name=folder.name,
+                    direct_asset_count=direct_counts.get(folder_path, 0),
+                    descendant_asset_count=descendant_counts[folder_path],
+                )
+            )
+        return AssetFolderListResponse(items=items)
 
     def image_path(self, project_id: str, asset_id: str) -> Path:
         paths, _ = self._workspaces.get(project_id)

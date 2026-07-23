@@ -11,7 +11,7 @@ import {
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useAssetIds, useInfiniteAssets } from "../../features/assets/hooks";
+import { useAssetFolders, useAssetIds, useInfiniteAssets } from "../../features/assets/hooks";
 import {
   useRescanWorkspace,
   useUpdateWorkspace,
@@ -23,6 +23,7 @@ import { useAppStore } from "../../shared/store/appStore";
 import { Button } from "../../shared/ui/Button";
 import { alertDialog, confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
+import { AssetDeletionDialog } from "./components/AssetDeletionDialog";
 import { AssetBrowser } from "./components/AssetBrowser";
 import { ImageStage } from "./components/ImageStage";
 import { InspectorPanel } from "./components/InspectorPanel";
@@ -34,6 +35,7 @@ import {
   useWorkspaceLayout,
   WORKSPACE_LAYOUT_LIMITS,
 } from "./hooks/useWorkspaceLayout";
+import { useAssetDestructiveActions } from "./hooks/useAssetDestructiveActions";
 import "./workspace.css";
 
 const AnnotationEditor = lazy(() =>
@@ -61,14 +63,31 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const [statusFilter, setStatusFilter] = useState<AssetFilterStatus | null>(
     mode === "review" ? "needs_review" : null,
   );
+  const [folderPath, setFolderPath] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
+  const [editorRevision, setEditorRevision] = useState(0);
   const workspaceBodyRef = useRef<HTMLDivElement>(null);
   const mediaColumnRef = useRef<HTMLDivElement>(null);
   const { layout, setLayout } = useWorkspaceLayout(projectId);
 
-  const assetQuery = useMemo(() => ({ search, status: statusFilter }), [search, statusFilter]);
+  const assetQuery = useMemo(
+    () => ({ search, status: statusFilter, folderPath }),
+    [folderPath, search, statusFilter],
+  );
   const assets = useInfiniteAssets(projectId, assetQuery);
   const matchingAssetIds = useAssetIds(projectId, assetQuery);
+  const folders = useAssetFolders(projectId);
+  const discardEditorDraft = useCallback(() => {
+    setEditorDirty(false);
+    setEditorRevision((current) => current + 1);
+  }, []);
+  const assetActions = useAssetDestructiveActions({
+    projectId,
+    contextKey: `${projectId}:${mode}`,
+    selectedAssetId,
+    editorDirty,
+    discardEditorDraft,
+  });
   const assetItems = useMemo(
     () => assets.data?.pages.flatMap((page) => page.items) ?? [],
     [assets.data?.pages],
@@ -98,8 +117,21 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     setActiveProject(projectId);
     setSearch("");
     setStatusFilter(mode === "review" ? "needs_review" : null);
+    setFolderPath("");
     setEditorDirty(false);
+    setEditorRevision(0);
   }, [mode, projectId, setActiveProject]);
+
+  useEffect(() => {
+    if (
+      editorDirty ||
+      !folders.data ||
+      folders.data.items.some((folder) => folder.path === folderPath)
+    ) {
+      return;
+    }
+    setFolderPath("");
+  }, [editorDirty, folderPath, folders.data]);
 
   useEffect(() => {
     const body = workspaceBodyRef.current;
@@ -145,6 +177,25 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
       return true;
     },
     [editorDirty, selectAsset],
+  );
+
+  const requestFolderSelect = useCallback(
+    async (nextFolderPath: string): Promise<boolean> => {
+      if (nextFolderPath === folderPath) return true;
+      if (editorDirty) {
+        const confirmed = await confirmDialog("当前标注尚未保存，切换目录会丢弃未保存的修改。", {
+          title: "尚未保存",
+          tone: "danger",
+          confirmLabel: "丢弃并切换",
+          cancelLabel: "继续编辑",
+        });
+        if (!confirmed) return false;
+        discardEditorDraft();
+      }
+      setFolderPath(nextFolderPath);
+      return true;
+    },
+    [discardEditorDraft, editorDirty, folderPath],
   );
 
   const toggleAllMatchingAssets = useCallback(async () => {
@@ -224,19 +275,27 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         search={search}
         statusFilter={statusFilter}
         statusCounts={assetResult?.status_counts ?? {}}
+        folders={folders.data?.items ?? []}
+        selectedFolderPath={folderPath}
+        foldersLoading={folders.isLoading}
         hasMore={Boolean(assets.hasNextPage)}
         loading={assets.isLoading}
         loadingMore={assets.isFetchingNextPage}
         selectAllPending={matchingAssetIds.isFetching}
         allMatchingSelected={allMatchingSelected}
         error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
+        bulkActionPending={assetActions.annotationDeletePending}
         onLoadMore={loadMoreAssets}
         recursive={workspace.data.settings.recursive_scan}
         onSearchChange={setSearch}
         onStatusChange={setStatusFilter}
+        onFolderSelect={requestFolderSelect}
         onSelect={requestSelectAsset}
         onSetChecked={setAssetsChecked}
         onToggleAll={() => void toggleAllMatchingAssets()}
+        onDeleteCheckedAnnotations={() => void assetActions.deleteCheckedAnnotations()}
+        onDeleteCheckedAssets={assetActions.openCheckedAssetDeletion}
+        onOpenDeletionHistory={assetActions.openDeletionHistory}
         onRecursiveChange={(recursive_scan) =>
           updateWorkspace.mutate(
             { recursive_scan },
@@ -313,7 +372,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
           }
         >
           <AnnotationEditor
-            key={selectedAssetId ?? "no-asset"}
+            key={`${selectedAssetId ?? "no-asset"}:${editorRevision}`}
             projectId={projectId}
             assetId={selectedAssetId}
             onDirtyChange={setEditorDirty}
@@ -352,7 +411,21 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
           }))
         }
       />
-      <InspectorPanel projectId={projectId} workspace={workspace.data} asset={selectedAsset} />
+      <InspectorPanel
+        projectId={projectId}
+        workspace={workspace.data}
+        asset={selectedAsset}
+        onDeleteAsset={assetActions.openAssetDeletion}
+      />
+      <AssetDeletionDialog
+        projectId={projectId}
+        open={assetActions.deletionDialog.open}
+        assetIds={assetActions.deletionDialog.assetIds}
+        initialView={assetActions.deletionDialog.initialView}
+        beforeExecute={assetActions.beforeDeleteAssets}
+        onDeleted={assetActions.handleAssetsDeleted}
+        onClose={assetActions.closeDeletionDialog}
+      />
     </WorkspaceFrame>
   );
 }

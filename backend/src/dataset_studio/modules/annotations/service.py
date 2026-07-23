@@ -12,6 +12,7 @@ from dataset_studio.core.files import atomic_copy_file, atomic_write_text
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.annotations.models import (
+    AnnotationBatchDeleteResult,
     AnnotationDocument,
     AnnotationRevision,
     AnnotationStatus,
@@ -34,6 +35,15 @@ class _PreparedAnnotation:
     asset_id: str
     content: str
     path: Path
+    validation: ValidationResult
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedAnnotationDeletion:
+    path: Path
+    tombstone: Path
+    owner_ids: tuple[str, ...]
+    content: str
     validation: ValidationResult
 
 
@@ -225,41 +235,111 @@ class AnnotationService:
         return document
 
     def delete(self, project_id: str, asset_id: str) -> AnnotationDocument:
+        self.delete_many(project_id, [asset_id])
+        return self.get(project_id, asset_id)
+
+    def delete_many(
+        self,
+        project_id: str,
+        asset_ids: Sequence[str],
+    ) -> AnnotationBatchDeleteResult:
+        normalized_ids = list(dict.fromkeys(asset_id for asset_id in asset_ids if asset_id))
+        if not normalized_ids:
+            raise ValueError("至少需要选择一个素材。")
         paths, _ = self._workspaces.get(project_id)
-        asset = self._asset(paths.database, asset_id)
-        annotation_path = self._annotation_path(paths.root, asset)
-        tombstone: Path | None = None
-        previous: str | None = None
-        previous_validation: ValidationResult | None = None
-        if annotation_path.is_file():
-            previous, previous_validation = read_annotation_text(annotation_path)
-            tombstone = annotation_path.with_name(
-                f".{annotation_path.name}.{uuid.uuid4().hex}.deleted"
-            )
-            os.replace(annotation_path, tombstone)
+        repository = AssetRepository(paths.database)
+        assets = repository.get_assets(normalized_ids)
+        missing_assets = [asset_id for asset_id in normalized_ids if asset_id not in assets]
+        if missing_assets:
+            raise AssetNotFoundError(f"找不到素材：{missing_assets[0]}")
+
+        selected_ids = set(normalized_ids)
+        owners_by_path: dict[str, list[str]] = {}
+        for row in repository.list_present_records():
+            annotation_path = self._annotation_path(paths.root, row)
+            owners_by_path.setdefault(self._path_key(annotation_path), []).append(str(row["id"]))
+        for asset_id in normalized_ids:
+            annotation_path = self._annotation_path(paths.root, assets[asset_id])
+            unselected_owners = [
+                owner_id
+                for owner_id in owners_by_path[self._path_key(annotation_path)]
+                if owner_id not in selected_ids
+            ]
+            if unselected_owners and annotation_path.is_file():
+                raise ValueError(
+                    "所选图片与未选图片共享同一个标注文件；请同时选择这些图片后再删除标注。"
+                )
+
+        prepared: list[_PreparedAnnotationDeletion] = []
+        prepared_paths: set[str] = set()
+        affected_asset_ids: set[str] = set()
         try:
-            with transaction(paths.database) as connection:
-                if previous is not None and previous_validation is not None:
-                    self._insert_revision(
-                        connection,
-                        asset_id,
-                        previous,
-                        source="deleted_snapshot",
+            for asset_id in normalized_ids:
+                annotation_path = self._annotation_path(paths.root, assets[asset_id])
+                path_key = self._path_key(annotation_path)
+                if path_key in prepared_paths or not annotation_path.is_file():
+                    continue
+                previous, previous_validation = read_annotation_text(annotation_path)
+                tombstone = annotation_path.with_name(
+                    f".{annotation_path.name}.{uuid.uuid4().hex}.deleted"
+                )
+                os.replace(annotation_path, tombstone)
+                owner_ids = tuple(owners_by_path[path_key])
+                prepared.append(
+                    _PreparedAnnotationDeletion(
+                        path=annotation_path,
+                        tombstone=tombstone,
+                        owner_ids=owner_ids,
+                        content=previous,
                         validation=previous_validation,
                     )
-                self._update_annotation_status(
-                    connection,
-                    asset_id,
-                    AnnotationStatus.MISSING.value,
-                    None,
                 )
-        except BaseException:
-            if tombstone is not None and tombstone.is_file():
-                os.replace(tombstone, annotation_path)
+                prepared_paths.add(path_key)
+                affected_asset_ids.update(owner_ids)
+
+            with transaction(paths.database) as connection:
+                snapshots = {
+                    owner_id: (item.content, item.validation)
+                    for item in prepared
+                    for owner_id in item.owner_ids
+                }
+                for asset_id in normalized_ids:
+                    snapshot = snapshots.get(asset_id)
+                    if snapshot is not None:
+                        previous, previous_validation = snapshot
+                        self._insert_revision(
+                            connection,
+                            asset_id,
+                            previous,
+                            source="deleted_snapshot",
+                            validation=previous_validation,
+                        )
+                    self._update_annotation_status(
+                        connection,
+                        asset_id,
+                        AnnotationStatus.MISSING.value,
+                        None,
+                    )
+        except BaseException as error:
+            rollback_errors: list[OSError] = []
+            for item in reversed(prepared):
+                try:
+                    if item.tombstone.is_file():
+                        os.replace(item.tombstone, item.path)
+                except OSError as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if rollback_errors:
+                raise RuntimeError("批量删除标注失败，且部分文件未能自动恢复。") from error
             raise
-        if tombstone is not None:
-            tombstone.unlink(missing_ok=True)
-        return self.get(project_id, asset_id)
+        for item in prepared:
+            with suppress(OSError):
+                item.tombstone.unlink(missing_ok=True)
+        return AnnotationBatchDeleteResult(
+            requested_count=len(normalized_ids),
+            deleted_count=len(affected_asset_ids),
+            missing_count=len(normalized_ids) - len(affected_asset_ids),
+            asset_ids=normalized_ids,
+        )
 
     def history(self, project_id: str, asset_id: str) -> list[AnnotationRevision]:
         paths, _ = self._workspaces.get(project_id)
@@ -333,3 +413,7 @@ class AnnotationService:
         if not path.is_relative_to(root.resolve()):
             raise AssetNotFoundError("标注路径超出当前工作区。")
         return path
+
+    @staticmethod
+    def _path_key(path: Path) -> str:
+        return path.resolve().as_posix().casefold()

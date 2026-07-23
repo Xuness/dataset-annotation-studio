@@ -1,0 +1,247 @@
+.asset-deletion-backdrop {
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.asset-deletion-backdrop::backdrop {
+  background: rgb(5 7 9 / 68%);
+  backdrop-filter: blur(5px);
+}
+
+.asset-deletion-dialog {
+  display: grid;
+  max-height: min(760px, calc(100vh - 32px));
+  grid-template-rows: auto auto minmax(220px, 1fr) auto auto;
+}
+
+.asset-deletion-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 13px;
+}
+
+.asset-deletion-dialog h2 {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.asset-deletion-dialog > header > button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.asset-deletion-dialog > nav {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.asset-deletion-dialog > nav button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.asset-deletion-dialog > nav button.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+
+.asset-deletion-dialog__body {
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 20px;
+}
+
+.asset-deletion-dialog__lead {
+  margin: 0 0 15px;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+
+.asset-deletion-dialog__lead code {
+  margin: 0 4px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.asset-deletion-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.asset-deletion-summary article {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 7px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.asset-deletion-summary article svg {
+  grid-row: 1 / 3;
+  color: var(--muted);
+}
+
+.asset-deletion-summary article strong {
+  font-size: 15px;
+}
+
+.asset-deletion-summary article span {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.asset-deletion-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 8px 0 0;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.asset-deletion-message svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.asset-deletion-message.is-warning {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.asset-deletion-message.is-error {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.asset-deletion-dialog__empty {
+  display: grid;
+  min-height: 210px;
+  place-content: center;
+  justify-items: center;
+  gap: 9px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.asset-deletion-dialog__empty p {
+  margin: 0;
+}
+
+.asset-deletion-dialog__empty.is-error {
+  color: var(--danger);
+}
+
+.asset-deletion-history {
+  display: grid;
+  gap: 9px;
+}
+
+.asset-deletion-history > article {
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.asset-deletion-history > article > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.asset-deletion-history > article > header strong,
+.asset-deletion-history > article > header small {
+  display: block;
+}
+
+.asset-deletion-history > article > header small,
+.asset-deletion-history > article > small,
+.asset-deletion-history > article > p {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.asset-deletion-history > article > header span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface-raised);
+  font-size: var(--text-2xs);
+}
+
+.asset-deletion-history > article > header span.is-completed {
+  color: var(--accent);
+}
+
+.asset-deletion-history > article > header span.is-recovery_required,
+.asset-deletion-history > article > header span.is-failed {
+  color: var(--danger);
+}
+
+.asset-deletion-history > article > p {
+  margin: 8px 0;
+}
+
+.asset-deletion-history .button {
+  margin-top: 10px;
+}
+
+.asset-deletion-dialog__notice {
+  margin: 0 20px 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: var(--text-xs);
+}
+
+.asset-deletion-dialog > .asset-deletion-message {
+  margin: 0 20px 10px;
+}
+
+.asset-deletion-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 13px 20px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 620px) {
+  .asset-deletion-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

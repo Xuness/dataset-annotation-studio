@@ -1,6 +1,7 @@
 export * from "./contracts/annotations";
 export * from "./contracts/workspaces";
 export * from "./contracts/assets";
+export * from "./contracts/assetDeletions";
 export * from "./contracts/translations";
 export * from "./contracts/statistics";
 export * from "./contracts/presets";

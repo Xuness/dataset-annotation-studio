@@ -60,6 +60,18 @@ class AssetIdListResponse(BaseModel):
     total: int
 
 
+class AssetFolderSummary(BaseModel):
+    path: str
+    parent_path: str | None
+    name: str
+    direct_asset_count: int
+    descendant_asset_count: int
+
+
+class AssetFolderListResponse(BaseModel):
+    items: list[AssetFolderSummary]
+
+
 class MetadataDocument(BaseModel):
     exists: bool
     path: str | None = None

@@ -39,8 +39,8 @@ export function useCloseGuard(): void {
             if (!discard) return;
           }
           const active = await getActiveJobs();
-          if (active.preprocessing_count) {
-            await message("图片预处理或撤销正在写入文件，请等待操作完成后再关闭软件。", {
+          if (active.preprocessing_count || active.asset_deletion_count) {
+            await message("图片预处理、素材删除或恢复正在写入文件，请等待操作完成后再关闭软件。", {
               title: "暂时无法关闭",
               kind: "warning",
             });

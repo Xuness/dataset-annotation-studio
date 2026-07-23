@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import re
 import uuid
 from pathlib import Path
 
@@ -15,14 +14,13 @@ from dataset_studio.modules.annotations.text import (
     read_annotation_text_strict,
 )
 from dataset_studio.modules.assets.repository import AssetRepository
+from dataset_studio.modules.translations.languages import LANGUAGE_PATTERN
 from dataset_studio.modules.translations.models import (
     TranslationDocument,
     TranslationStatus,
 )
 from dataset_studio.modules.translations.validation import validate_translation_structure
 from dataset_studio.modules.workspaces.service import WorkspaceService
-
-LANGUAGE_PATTERN = re.compile(r"^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$")
 
 
 class TranslationSourceChangedError(ValueError):

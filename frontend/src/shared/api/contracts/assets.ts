@@ -31,6 +31,18 @@ export interface AssetIdListResponse {
   total: number;
 }
 
+export interface AssetFolderSummary {
+  path: string;
+  parent_path: string | null;
+  name: string;
+  direct_asset_count: number;
+  descendant_asset_count: number;
+}
+
+export interface AssetFolderListResponse {
+  items: AssetFolderSummary[];
+}
+
 export interface MetadataDocument {
   exists: boolean;
   path: string | null;

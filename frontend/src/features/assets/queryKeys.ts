@@ -7,6 +7,7 @@ export const assetKeys = {
   infinite: (projectId: string, query: AssetQuery, pageSize: number) =>
     ["assets", projectId, "infinite", query, pageSize] as const,
   ids: (projectId: string, query: AssetQuery) => ["assets", projectId, "ids", query] as const,
+  folders: (projectId: string) => ["assets", projectId, "folders"] as const,
 };
 
 export const promptPreviewKeys = {

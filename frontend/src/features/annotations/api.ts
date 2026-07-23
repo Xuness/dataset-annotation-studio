@@ -1,5 +1,9 @@
 import { apiRequest } from "../../shared/api/client";
-import type { AnnotationDocument, AnnotationRevision } from "../../shared/api/types";
+import type {
+  AnnotationBatchDeleteResult,
+  AnnotationDocument,
+  AnnotationRevision,
+} from "../../shared/api/types";
 
 const annotationPath = (projectId: string, assetId: string) =>
   `/api/v1/workspaces/${projectId}/assets/${assetId}/annotation`;
@@ -21,6 +25,16 @@ export function saveAnnotation(
 
 export function deleteAnnotation(projectId: string, assetId: string): Promise<AnnotationDocument> {
   return apiRequest(annotationPath(projectId, assetId), { method: "DELETE" });
+}
+
+export function deleteAnnotations(
+  projectId: string,
+  assetIds: string[],
+): Promise<AnnotationBatchDeleteResult> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/annotations/delete`, {
+    method: "POST",
+    body: JSON.stringify({ asset_ids: assetIds }),
+  });
 }
 
 export function getAnnotationHistory(

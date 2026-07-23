@@ -5,6 +5,7 @@ import {
   getMetadata,
   getPromptPreview,
   listAssetIds,
+  listAssetFolders,
   listAssets,
   type AssetQuery,
 } from "./api";
@@ -38,6 +39,14 @@ export function useAssetIds(projectId: string, query: AssetQuery) {
     queryFn: () => listAssetIds(projectId, query),
     enabled: false,
     staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
+export function useAssetFolders(projectId: string) {
+  return useQuery({
+    queryKey: assetKeys.folders(projectId),
+    queryFn: () => listAssetFolders(projectId),
+    enabled: Boolean(projectId),
   });
 }
 

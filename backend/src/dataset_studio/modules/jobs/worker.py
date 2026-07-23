@@ -11,6 +11,7 @@ from typing import Protocol
 from dataset_studio.core.files import atomic_write_text
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
+from dataset_studio.modules.assets.deletions.service import AssetDeletionService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.execution_repository import (
     ItemCompletion,
@@ -60,6 +61,7 @@ class AnnotationWorkerContainer(Protocol):
     translations: TranslationService
     assets: AssetService
     annotations: AnnotationService
+    asset_deletions: AssetDeletionService
     preprocessing: PreprocessService
     codex: CodexRuntime
     tagger_runtime: TaggerRuntime
@@ -86,6 +88,7 @@ class AnnotationWorker:
                 "Recovered %s interrupted preprocessing operation(s).",
                 recovered_preprocessing,
             )
+        self._recover_orphaned_asset_deletions()
         self._recover_orphaned_jobs()
         LOGGER.info("Task worker is ready.")
         while not stopped.is_set():
@@ -110,6 +113,25 @@ class AnnotationWorker:
             recovered = JobLifecycleRepository(paths.database).recover_orphaned()
             if recovered:
                 LOGGER.info("Marked %s job(s) interrupted in %s.", recovered, workspace.name)
+
+    def _recover_orphaned_asset_deletions(self) -> None:
+        service = getattr(self._container, "asset_deletions", None)
+        if service is None:
+            return
+        for workspace in self._container.workspaces.list_recent():
+            if not workspace.exists:
+                continue
+            with self._container.preprocessing.guard_workspace(
+                workspace.project_id,
+                "recover-asset-deletions",
+            ):
+                recovered = service.recover_orphaned(workspace.project_id)
+            if recovered:
+                LOGGER.info(
+                    "Recovered %s interrupted asset deletion(s) in %s.",
+                    recovered,
+                    workspace.name,
+                )
 
     def _schedule_available_items(self) -> None:
         for workspace in self._container.workspaces.list_recent():

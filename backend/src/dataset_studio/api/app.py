@@ -10,6 +10,7 @@ from dataset_studio import __version__
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.routes import (
     annotations,
+    asset_deletions,
     assets,
     exports,
     jobs,
@@ -74,7 +75,9 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     api_prefix = "/api/v1"
     app.include_router(workspaces.router, prefix=api_prefix)
     app.include_router(assets.router, prefix=api_prefix)
+    app.include_router(asset_deletions.router, prefix=api_prefix)
     app.include_router(annotations.router, prefix=api_prefix)
+    app.include_router(annotations.batch_router, prefix=api_prefix)
     app.include_router(translations.router, prefix=api_prefix)
     app.include_router(presets.router, prefix=api_prefix)
     app.include_router(providers.router, prefix=api_prefix)

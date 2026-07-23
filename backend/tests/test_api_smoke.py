@@ -103,6 +103,53 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path) -> None:
             "total": 1,
         }
 
+        folders = client.get(f"/api/v1/workspaces/{project_id}/assets/folders")
+        assert folders.status_code == 200
+        assert folders.json()["items"] == [
+            {
+                "path": "",
+                "parent_path": None,
+                "name": "dataset",
+                "direct_asset_count": 1,
+                "descendant_asset_count": 1,
+            }
+        ]
+
+        saved_annotation = client.put(
+            f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation",
+            json={"content": "<caption>temporary</caption>"},
+        )
+        assert saved_annotation.status_code == 200
+        batch_deleted = client.post(
+            f"/api/v1/workspaces/{project_id}/annotations/delete",
+            json={"asset_ids": [asset_id]},
+        )
+        assert batch_deleted.status_code == 200
+        assert batch_deleted.json()["deleted_count"] == 1
+
+        deletion_preview = client.post(
+            f"/api/v1/workspaces/{project_id}/asset-deletions/preview",
+            json={"asset_ids": [asset_id]},
+        )
+        assert deletion_preview.status_code == 200
+        deleted_asset = client.post(
+            f"/api/v1/workspaces/{project_id}/asset-deletions/execute",
+            json={
+                "request": {"asset_ids": [asset_id]},
+                "preview_token": deletion_preview.json()["preview_token"],
+            },
+        )
+        assert deleted_asset.status_code == 200
+        assert deleted_asset.json()["status"] == "completed"
+        assert client.get(f"/api/v1/workspaces/{project_id}/assets").json()["total"] == 0
+        restored_asset = client.post(
+            f"/api/v1/workspaces/{project_id}/asset-deletions/operations/"
+            f"{deleted_asset.json()['id']}/undo"
+        )
+        assert restored_asset.status_code == 200
+        assert restored_asset.json()["status"] == "undone"
+        assert client.get(f"/api/v1/workspaces/{project_id}/assets").json()["total"] == 1
+
         preprocess_request = {
             "asset_ids": [],
             "resize": {

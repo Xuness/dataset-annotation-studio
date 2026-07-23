@@ -7,6 +7,7 @@ from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
 from dataset_studio.core.errors import PresetNotFoundError
 from dataset_studio.modules.assets.models import (
+    AssetFolderListResponse,
     AssetIdListResponse,
     AssetListResponse,
     MetadataDocument,
@@ -24,6 +25,7 @@ def list_assets(
     container: Container,
     search: str = "",
     status: str | None = None,
+    folder_path: str = "",
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=200, ge=1, le=10_000),
 ):
@@ -31,6 +33,7 @@ def list_assets(
         project_id,
         search=search,
         annotation_status=status,
+        folder_path=folder_path,
         offset=offset,
         limit=limit,
     )
@@ -42,12 +45,19 @@ def list_asset_ids(
     container: Container,
     search: str = "",
     status: str | None = None,
+    folder_path: str = "",
 ):
     return container.assets.list_asset_ids(
         project_id,
         search=search,
         annotation_status=status,
+        folder_path=folder_path,
     )
+
+
+@router.get("/folders", response_model=AssetFolderListResponse)
+def list_asset_folders(project_id: str, container: Container):
+    return container.assets.list_folders(project_id)
 
 
 @router.get("/{asset_id}/image")

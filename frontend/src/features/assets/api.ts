@@ -1,6 +1,7 @@
 import { apiAssetUrl, apiRequest } from "../../shared/api/client";
 import type {
   AssetAnnotationTrace,
+  AssetFolderListResponse,
   AssetIdListResponse,
   AssetListResponse,
   MetadataDocument,
@@ -10,6 +11,7 @@ import type {
 export interface AssetQuery {
   search?: string;
   status?: string | null;
+  folderPath?: string;
   offset?: number;
   limit?: number;
 }
@@ -18,6 +20,7 @@ export function listAssets(projectId: string, query: AssetQuery): Promise<AssetL
   const parameters = new URLSearchParams();
   if (query.search) parameters.set("search", query.search);
   if (query.status) parameters.set("status", query.status);
+  if (query.folderPath) parameters.set("folder_path", query.folderPath);
   parameters.set("offset", String(query.offset ?? 0));
   parameters.set("limit", String(query.limit ?? 10_000));
   return apiRequest(`/api/v1/workspaces/${projectId}/assets?${parameters}`);
@@ -27,7 +30,12 @@ export function listAssetIds(projectId: string, query: AssetQuery): Promise<Asse
   const parameters = new URLSearchParams();
   if (query.search) parameters.set("search", query.search);
   if (query.status) parameters.set("status", query.status);
+  if (query.folderPath) parameters.set("folder_path", query.folderPath);
   return apiRequest(`/api/v1/workspaces/${projectId}/assets/ids?${parameters}`);
+}
+
+export function listAssetFolders(projectId: string): Promise<AssetFolderListResponse> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/assets/folders`);
 }
 
 export function getMetadata(projectId: string, assetId: string): Promise<MetadataDocument> {

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class AnnotationStatus(StrEnum):
@@ -41,6 +41,27 @@ class AnnotationDocument(BaseModel):
 
 class AnnotationUpdate(BaseModel):
     content: str
+
+
+class AnnotationBatchDeleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_ids: list[str]
+
+    @field_validator("asset_ids")
+    @classmethod
+    def normalize_asset_ids(cls, value: list[str]) -> list[str]:
+        normalized = list(dict.fromkeys(asset_id for asset_id in value if asset_id))
+        if not normalized:
+            raise ValueError("至少需要选择一个素材。")
+        return normalized
+
+
+class AnnotationBatchDeleteResult(BaseModel):
+    requested_count: int
+    deleted_count: int
+    missing_count: int
+    asset_ids: list[str]
 
 
 class AnnotationRevision(BaseModel):

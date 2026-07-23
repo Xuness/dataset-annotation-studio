@@ -152,10 +152,12 @@ class AssetRepository:
         *,
         search: str = "",
         annotation_status: str | None = None,
+        folder_path: str = "",
         offset: int = 0,
         limit: int = 200,
     ) -> tuple[list[AssetSummary], int, dict[str, int]]:
-        where, parameters = self._asset_filter(search, annotation_status)
+        where, parameters = self._asset_filter(search, annotation_status, folder_path)
+        scope_where, scope_parameters = self._asset_filter(search, None, folder_path)
         connection = connect(self._database_path)
         try:
             total = int(
@@ -185,12 +187,13 @@ class AssetRepository:
                 [*parameters, limit, offset],
             ).fetchall()
             count_rows = connection.execute(
-                """
+                f"""
                 SELECT annotation_status, COUNT(*) AS count
                 FROM assets
-                WHERE is_present = 1
+                WHERE {scope_where}
                 GROUP BY annotation_status
-                """
+                """,
+                scope_parameters,
             ).fetchall()
             status_counts = {str(row["annotation_status"]): int(row["count"]) for row in count_rows}
             failed_count = int(
@@ -198,10 +201,12 @@ class AssetRepository:
                     f"""
                     SELECT COUNT(*)
                     FROM assets
-                    WHERE is_present = 1 AND {UNRESOLVED_GENERATION_FAILURE_SQL}
-                    """
+                    WHERE {scope_where} AND {UNRESOLVED_GENERATION_FAILURE_SQL}
+                    """,
+                    scope_parameters,
                 ).fetchone()[0]
             )
+            status_counts["all"] = sum(int(row["count"]) for row in count_rows)
             status_counts["failed"] = failed_count
             status_counts["needs_review"] = failed_count + sum(
                 status_counts.get(status, 0) for status in REVIEW_ANNOTATION_STATUSES
@@ -215,8 +220,9 @@ class AssetRepository:
         *,
         search: str = "",
         annotation_status: str | None = None,
+        folder_path: str = "",
     ) -> list[str]:
-        where, parameters = self._asset_filter(search, annotation_status)
+        where, parameters = self._asset_filter(search, annotation_status, folder_path)
         connection = connect(self._database_path)
         try:
             rows = connection.execute(
@@ -233,9 +239,19 @@ class AssetRepository:
             connection.close()
 
     @staticmethod
-    def _asset_filter(search: str, annotation_status: str | None) -> tuple[str, list[object]]:
+    def _asset_filter(
+        search: str,
+        annotation_status: str | None,
+        folder_path: str = "",
+    ) -> tuple[str, list[object]]:
         clauses = ["is_present = 1"]
         parameters: list[object] = []
+        if folder_path:
+            escaped_folder = (
+                folder_path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            clauses.append("relative_path LIKE ? ESCAPE '\\'")
+            parameters.append(f"{escaped_folder}/%")
         if search:
             clauses.append("relative_path LIKE ? ESCAPE '\\'")
             escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -258,6 +274,43 @@ class AssetRepository:
             return connection.execute(
                 "SELECT * FROM assets WHERE id = ? AND is_present = 1", (asset_id,)
             ).fetchone()
+        finally:
+            connection.close()
+
+    def get_assets(self, asset_ids: list[str]) -> dict[str, sqlite3.Row]:
+        if not asset_ids:
+            return {}
+        rows: list[sqlite3.Row] = []
+        connection = connect(self._database_path)
+        try:
+            for start in range(0, len(asset_ids), 500):
+                batch = asset_ids[start : start + 500]
+                placeholders = ", ".join("?" for _ in batch)
+                rows.extend(
+                    connection.execute(
+                        f"""
+                        SELECT *
+                        FROM assets
+                        WHERE id IN ({placeholders}) AND is_present = 1
+                        """,
+                        batch,
+                    ).fetchall()
+                )
+        finally:
+            connection.close()
+        return {str(row["id"]): row for row in rows}
+
+    def list_present_records(self) -> list[sqlite3.Row]:
+        connection = connect(self._database_path)
+        try:
+            return connection.execute(
+                """
+                SELECT *
+                FROM assets
+                WHERE is_present = 1
+                ORDER BY relative_path COLLATE NOCASE
+                """
+            ).fetchall()
         finally:
             connection.close()
 

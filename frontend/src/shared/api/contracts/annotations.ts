@@ -32,3 +32,10 @@ export interface AnnotationRevision {
   created_at: string;
   content: string;
 }
+
+export interface AnnotationBatchDeleteResult {
+  requested_count: number;
+  deleted_count: number;
+  missing_count: number;
+  asset_ids: string[];
+}

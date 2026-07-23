@@ -1,14 +1,18 @@
+import { Trash2 } from "lucide-react";
+
 import { useTagFrequency } from "../../../features/statistics/hooks";
 import type { AssetSummary, WorkspaceSummary } from "../../../shared/api/types";
+import { Button } from "../../../shared/ui/Button";
 import "../styles/statistics.css";
 
 interface OverviewPanelProps {
   projectId: string;
   workspace: WorkspaceSummary;
   asset: AssetSummary | null;
+  onDeleteAsset: (assetId: string) => void;
 }
 
-export function OverviewPanel({ projectId, workspace, asset }: OverviewPanelProps) {
+export function OverviewPanel({ projectId, workspace, asset, onDeleteAsset }: OverviewPanelProps) {
   const statistics = useTagFrequency(projectId);
   const progress = workspace.asset_count
     ? Math.round((workspace.annotated_count / workspace.asset_count) * 100)
@@ -93,6 +97,16 @@ export function OverviewPanel({ projectId, workspace, asset }: OverviewPanelProp
         ) : (
           <p className="quiet-copy">选择图片后显示文件详情。</p>
         )}
+        {asset ? (
+          <Button
+            className="inspector-delete-asset"
+            tone="danger"
+            icon={<Trash2 size={13} />}
+            onClick={() => onDeleteAsset(asset.id)}
+          >
+            删除当前素材
+          </Button>
+        ) : null}
       </section>
 
       <section className="inspector-section inspector-section--path">

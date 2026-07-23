@@ -11,7 +11,7 @@ from PIL import Image, ImageOps
 from dataset_studio.core.files import file_sha256
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.preprocessing.models import OutputFormat, PreprocessRequest
-from dataset_studio.modules.translations.service import LANGUAGE_PATTERN
+from dataset_studio.modules.translations.languages import LANGUAGE_PATTERN
 
 _RENAME_FIELD_PATTERN = re.compile(r"\{(name|index)\}")
 _WINDOWS_RESERVED_NAMES = {

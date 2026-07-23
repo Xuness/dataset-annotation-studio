@@ -4,7 +4,13 @@ import { annotationTraceKeys, assetKeys } from "../assets/queryKeys";
 import { statisticsKeys } from "../statistics/queryKeys";
 import { translationKeys } from "../translations/queryKeys";
 import { workspaceKeys } from "../workspaces/queryKeys";
-import { deleteAnnotation, getAnnotation, getAnnotationHistory, saveAnnotation } from "./api";
+import {
+  deleteAnnotation,
+  deleteAnnotations,
+  getAnnotation,
+  getAnnotationHistory,
+  saveAnnotation,
+} from "./api";
 import { annotationHistoryKeys, annotationKeys } from "./queryKeys";
 
 export function useAnnotation(projectId: string, assetId: string | null) {
@@ -53,5 +59,22 @@ export function useDeleteAnnotation(projectId: string, assetId: string) {
   return useMutation({
     mutationFn: () => deleteAnnotation(projectId, assetId),
     onSuccess: invalidate,
+  });
+}
+
+export function useDeleteAnnotations(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (assetIds: string[]) => deleteAnnotations(projectId, assetIds),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: annotationKeys.project(projectId) });
+      void queryClient.invalidateQueries({
+        queryKey: annotationHistoryKeys.project(projectId),
+      });
+      void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
+      void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
+      void queryClient.invalidateQueries({ queryKey: statisticsKeys.project(projectId) });
+    },
   });
 }

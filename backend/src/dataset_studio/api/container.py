@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from dataset_studio.core.config import Settings
 from dataset_studio.modules.annotations.service import AnnotationService
+from dataset_studio.modules.assets.deletions.service import AssetDeletionService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.exports.service import ExportService
 from dataset_studio.modules.jobs.service import JobService
@@ -28,6 +29,7 @@ class AppContainer:
     settings: Settings
     workspaces: WorkspaceService
     assets: AssetService
+    asset_deletions: AssetDeletionService
     annotations: AnnotationService
     translations: TranslationService
     presets: PresetService
@@ -49,6 +51,7 @@ class AppContainer:
         annotations = AnnotationService(workspaces)
         translations = TranslationService(workspaces)
         assets = AssetService(workspaces)
+        asset_deletions = AssetDeletionService(workspaces)
         presets = PresetService(PresetRepository(global_database), KeyringSecretStore())
         taggers = TaggerService(settings, TaggerRepository(global_database))
         jobs = JobService(workspaces, presets, annotations, translations, taggers)
@@ -59,17 +62,20 @@ class AppContainer:
             workspaces,
             has_active_jobs=jobs.has_active,
             has_active_exports=exports.has_active,
+            has_active_asset_deletions=asset_deletions.has_active,
         )
         exports.set_activity_checks(
             has_active_jobs=jobs.has_active,
             has_active_preprocessing=lambda project_id: (
                 project_id in preprocessing.active_project_ids(preprocessing_only=True)
             ),
+            has_active_asset_deletions=asset_deletions.has_active,
         )
         return cls(
             settings=settings,
             workspaces=workspaces,
             assets=assets,
+            asset_deletions=asset_deletions,
             annotations=annotations,
             translations=translations,
             presets=presets,

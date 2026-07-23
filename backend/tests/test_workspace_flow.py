@@ -256,6 +256,89 @@ def test_annotation_delete_failure_restores_file(tmp_path: Path, monkeypatch) ->
     assert (project / "image.txt").read_text(encoding="utf-8") == "<caption>keep me</caption>"
 
 
+def test_annotation_batch_delete_is_atomic(tmp_path: Path, monkeypatch) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "first.png")
+    _write_image(project / "second.png")
+    (project / "first.txt").write_text("<caption>first</caption>", encoding="utf-8")
+    (project / "second.txt").write_text("<caption>second</caption>", encoding="utf-8")
+    summary, _ = workspaces.open(str(project))
+    indexed = assets.list_assets(summary.project_id).items
+    original_update = annotations._update_annotation_status
+    update_count = 0
+
+    def fail_second_update(*args, **kwargs):
+        nonlocal update_count
+        update_count += 1
+        if update_count == 2:
+            raise RuntimeError("simulated batch delete failure")
+        return original_update(*args, **kwargs)
+
+    monkeypatch.setattr(annotations, "_update_annotation_status", fail_second_update)
+    with pytest.raises(RuntimeError, match="simulated batch delete failure"):
+        annotations.delete_many(summary.project_id, [item.id for item in indexed])
+
+    assert (project / "first.txt").read_text(encoding="utf-8") == "<caption>first</caption>"
+    assert (project / "second.txt").read_text(encoding="utf-8") == "<caption>second</caption>"
+    assert all(
+        item.annotation_status.value == "valid"
+        for item in assets.list_assets(summary.project_id).items
+    )
+
+
+def test_annotation_delete_requires_all_owners_of_shared_sidecar(tmp_path: Path) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "same.jpg")
+    _write_image(project / "same.png", (90, 130))
+    (project / "same.txt").write_text("<caption>shared</caption>", encoding="utf-8")
+    summary, _ = workspaces.open(str(project))
+    indexed = assets.list_assets(summary.project_id).items
+
+    with pytest.raises(ValueError, match="共享同一个标注文件"):
+        annotations.delete_many(summary.project_id, [indexed[0].id])
+
+    result = annotations.delete_many(summary.project_id, [item.id for item in indexed])
+
+    assert result.deleted_count == 2
+    assert result.missing_count == 0
+    assert not (project / "same.txt").exists()
+    assert all(
+        item.annotation_status.value == "missing"
+        for item in assets.list_assets(summary.project_id).items
+    )
+
+
+def test_asset_folder_tree_and_filter_use_subtree_boundaries(tmp_path: Path) -> None:
+    workspaces, assets, _ = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "root.png")
+    _write_image(project / "foo" / "direct.png")
+    _write_image(project / "foo" / "nested" / "deep.png")
+    _write_image(project / "foobar" / "other.png")
+    summary, _ = workspaces.open(str(project))
+
+    folders = {item.path: item for item in assets.list_folders(summary.project_id).items}
+    assert folders[""].direct_asset_count == 1
+    assert folders[""].descendant_asset_count == 4
+    assert folders["foo"].direct_asset_count == 1
+    assert folders["foo"].descendant_asset_count == 2
+    assert folders["foo/nested"].parent_path == "foo"
+    assert folders["foobar"].descendant_asset_count == 1
+
+    in_foo = assets.list_assets(summary.project_id, folder_path="foo")
+    assert [item.relative_path for item in in_foo.items] == [
+        "foo/direct.png",
+        "foo/nested/deep.png",
+    ]
+    assert in_foo.status_counts["all"] == 2
+    assert in_foo.status_counts["missing"] == 2
+    assert assets.list_asset_ids(summary.project_id, folder_path="foo").total == 2
+    with pytest.raises(ValueError, match="当前工作区"):
+        assets.list_assets(summary.project_id, folder_path="../outside")
+
+
 def test_new_duplicate_does_not_steal_existing_asset_identity(tmp_path: Path) -> None:
     workspaces, assets, _ = _services(tmp_path)
     project = tmp_path / "dataset"

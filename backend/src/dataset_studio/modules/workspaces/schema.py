@@ -260,7 +260,64 @@ CREATE INDEX idx_jobs_execution_profile
 ON jobs(execution_backend, execution_profile_id, status);
 """
 
-WORKSPACE_SCHEMA_VERSION = 8
+ASSET_DELETIONS_MIGRATION = """
+CREATE TABLE asset_delete_operations (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    asset_count INTEGER NOT NULL,
+    file_count INTEGER NOT NULL,
+    image_count INTEGER NOT NULL,
+    annotation_count INTEGER NOT NULL,
+    translation_count INTEGER NOT NULL,
+    metadata_count INTEGER NOT NULL,
+    shared_sidecar_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT,
+    undone_at TEXT,
+    error_message TEXT
+);
+
+CREATE INDEX idx_asset_delete_operations_status
+ON asset_delete_operations(status, created_at);
+
+CREATE TABLE asset_delete_items (
+    id TEXT PRIMARY KEY,
+    operation_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    asset_id TEXT NOT NULL,
+    relative_path TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    FOREIGN KEY(operation_id) REFERENCES asset_delete_operations(id),
+    FOREIGN KEY(asset_id) REFERENCES assets(id),
+    UNIQUE(operation_id, asset_id),
+    UNIQUE(operation_id, position)
+);
+
+CREATE INDEX idx_asset_delete_items_operation
+ON asset_delete_items(operation_id, position);
+
+CREATE TABLE asset_delete_files (
+    id TEXT PRIMARY KEY,
+    operation_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    source_relative_path TEXT NOT NULL,
+    recovery_relative_path TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    byte_size INTEGER NOT NULL,
+    modified_ns INTEGER NOT NULL,
+    phase TEXT NOT NULL DEFAULT 'planned',
+    FOREIGN KEY(operation_id) REFERENCES asset_delete_operations(id),
+    UNIQUE(operation_id, source_relative_path),
+    UNIQUE(operation_id, position)
+);
+
+CREATE INDEX idx_asset_delete_files_operation_phase
+ON asset_delete_files(operation_id, phase, position);
+"""
+
+WORKSPACE_SCHEMA_VERSION = 9
 WORKSPACE_MIGRATIONS = (
     Migration(1, "initial_workspace_schema", WORKSPACE_SCHEMA),
     Migration(2, "image_metadata_version", IMAGE_METADATA_VERSION_MIGRATION),
@@ -270,6 +327,7 @@ WORKSPACE_MIGRATIONS = (
     Migration(6, "export_operations", EXPORT_OPERATIONS_MIGRATION),
     Migration(7, "preprocess_recovery_journal", PREPROCESS_RECOVERY_JOURNAL_MIGRATION),
     Migration(8, "job_execution_backend", JOB_EXECUTION_BACKEND_MIGRATION),
+    Migration(9, "asset_deletions", ASSET_DELETIONS_MIGRATION),
 )
 
 
