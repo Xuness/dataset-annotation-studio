@@ -169,4 +169,3 @@ class HuggingFaceConnectionTest(BaseModel):
 class TaggerDownloadCenter(BaseModel):
     offers: list[TaggerDownloadOffer]
     tasks: list[TaggerDownloadTask]
-    huggingface: HuggingFaceConnectionSettings

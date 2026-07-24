@@ -150,15 +150,20 @@ describe("settings overview sections", () => {
               },
             ],
             tasks: [],
-            huggingface: {
-              token_source: "anonymous",
-              has_saved_token: false,
-              proxy_mode: "environment",
-              has_custom_proxy: false,
-              proxy_display: null,
-              credential_store_available: true,
-              credential_store_error: null,
-            },
+          });
+        }
+        if (url.endsWith("/api/v1/taggers/downloads/tasks")) {
+          return jsonResponse([]);
+        }
+        if (url.endsWith("/api/v1/taggers/huggingface")) {
+          return jsonResponse({
+            token_source: "anonymous",
+            has_saved_token: false,
+            proxy_mode: "environment",
+            has_custom_proxy: false,
+            proxy_display: null,
+            credential_store_available: true,
+            credential_store_error: null,
           });
         }
         return jsonResponse({

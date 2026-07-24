@@ -92,6 +92,34 @@ If it is unavailable, the application reports an actionable error instead of wri
 plaintext credentials. `HF_TOKEN`, a local Hugging Face login, and environment proxy
 variables remain available for model downloads.
 
+## Wayland and WebKitGTK graphics compatibility
+
+Linux uses the compositor's native window decorations and an opaque, reduced-compositing
+theme path. Large backdrop blurs and animated modal surfaces are disabled automatically;
+Windows and macOS keep the existing custom title bar and visual effects.
+
+If WebKitGTK still shows an invisible or black window, select one compatibility mode
+before starting Tauri. Start with the narrowest mode that matches the system:
+
+```bash
+# NVIDIA explicit-sync workaround
+DATASET_STUDIO_LINUX_GRAPHICS=nvidia-sync pnpm dev
+
+# Disable only WebKitGTK's DMABUF renderer
+DATASET_STUDIO_LINUX_GRAPHICS=dmabuf-off pnpm dev
+
+# Last resort: disable DMABUF and accelerated compositing
+DATASET_STUDIO_LINUX_GRAPHICS=software pnpm dev
+```
+
+`default` (or an unset variable) changes no WebKitGTK graphics environment variables.
+The selected flags are applied before the Tauri webview is created, and an explicitly
+pre-set `WEBKIT_*` or NVIDIA variable is never overwritten. The `software` mode can
+reduce rendering performance, so it should be used only after the narrower modes fail.
+
+For a niri report, record the niri, WebKitGTK, Mesa/NVIDIA driver, and kernel versions,
+whether the session is native Wayland, and which compatibility mode changes the result.
+
 ## Filesystem and desktop notes
 
 - The selected dataset directory must be writable. Recovery files, SQLite state, and
@@ -102,8 +130,9 @@ variables remain available for model downloads.
 - Closing the main window on Linux requests a safe application exit instead of relying
   on a potentially invisible tray icon. Active file writes and resumable jobs are
   checked before exit.
-- The borderless Tauri window needs real desktop testing under both GNOME/Wayland and
-  KDE. Until that matrix is complete, Linux remains marked experimental.
+- The native-decorated Tauri window still needs real desktop testing under niri,
+  GNOME/Wayland, and KDE. Until that matrix is complete, Linux remains marked
+  experimental.
 - The local API and Vite development server use ports `8765` and `5173`. Stop the
   conflicting process if startup reports that either port is occupied.
 

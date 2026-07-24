@@ -12,7 +12,12 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { useTaggerDownloadActions, useTaggerDownloadCenter } from "../../../features/taggers/hooks";
+import {
+  useHuggingFaceSettings,
+  useTaggerDownloadActions,
+  useTaggerDownloadCenter,
+  useTaggerDownloadTasks,
+} from "../../../features/taggers/hooks";
 import type {
   HuggingFaceProxyMode,
   HuggingFaceTokenSource,
@@ -61,6 +66,8 @@ function formatDuration(seconds: number | null): string {
 
 export function TaggerDownloadPanel() {
   const center = useTaggerDownloadCenter();
+  const tasksQuery = useTaggerDownloadTasks(Boolean(center.data));
+  const connection = useHuggingFaceSettings();
   const actions = useTaggerDownloadActions();
   const [proxyMode, setProxyMode] = useState<HuggingFaceProxyMode>("environment");
   const [proxyUrl, setProxyUrl] = useState("");
@@ -69,23 +76,25 @@ export function TaggerDownloadPanel() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const data = center.data;
+  const connectionData = connection.data;
+  const tasks = useMemo(() => tasksQuery.data ?? data?.tasks ?? [], [data?.tasks, tasksQuery.data]);
 
   useEffect(() => {
-    if (data && !connectionInitialized.current) {
+    if (connectionData && !connectionInitialized.current) {
       connectionInitialized.current = true;
-      setProxyMode(data.huggingface.proxy_mode);
+      setProxyMode(connectionData.proxy_mode);
     }
-  }, [data]);
+  }, [connectionData]);
 
   const latestTaskByPlan = useMemo(() => {
-    const tasks = new Map<string, TaggerDownloadTask>();
-    for (const task of data?.tasks ?? []) {
-      if (!tasks.has(task.plan_id) && task.status !== "completed") {
-        tasks.set(task.plan_id, task);
+    const latest = new Map<string, TaggerDownloadTask>();
+    for (const task of tasks) {
+      if (!latest.has(task.plan_id) && task.status !== "completed") {
+        latest.set(task.plan_id, task);
       }
     }
-    return tasks;
-  }, [data?.tasks]);
+    return latest;
+  }, [tasks]);
 
   async function run<Result>(
     action: () => Promise<Result>,
@@ -119,11 +128,11 @@ export function TaggerDownloadPanel() {
   }
 
   async function clearSavedToken() {
-    if (!data) return;
+    if (!connectionData) return;
     const cleared = await run(
       () =>
         actions.saveHuggingFace.mutateAsync({
-          proxy_mode: data.huggingface.proxy_mode,
+          proxy_mode: connectionData.proxy_mode,
           clear_token: true,
         }),
       "应用保存的 Token 已清除。",
@@ -177,18 +186,19 @@ export function TaggerDownloadPanel() {
     );
   }
 
-  if (center.isLoading) {
+  if (center.isLoading || connection.isLoading) {
     return (
       <div className="tagger-settings__loading">
         <Spinner label="读取 Hugging Face 模型目录" />
       </div>
     );
   }
-  if (center.isError || !data) {
+  if (center.isError || connection.isError || tasksQuery.isError || !data || !connectionData) {
+    const queryError = center.error ?? connection.error ?? tasksQuery.error;
     return (
       <div className="tagger-settings__loading">
         <p className="form-error">
-          {center.error instanceof Error ? center.error.message : "无法读取下载中心。"}
+          {queryError instanceof Error ? queryError.message : "无法读取下载中心。"}
         </p>
       </div>
     );
@@ -200,7 +210,7 @@ export function TaggerDownloadPanel() {
     actions.resume.isPending ||
     actions.remove.isPending;
   const connectionDraftDirty =
-    proxyMode !== data.huggingface.proxy_mode || Boolean(token.trim()) || Boolean(proxyUrl.trim());
+    proxyMode !== connectionData.proxy_mode || Boolean(token.trim()) || Boolean(proxyUrl.trim());
 
   return (
     <div className="tagger-download-panel">
@@ -213,12 +223,12 @@ export function TaggerDownloadPanel() {
           </div>
           <span className="tagger-hf-identity">
             <KeyRound size={13} />
-            {TOKEN_SOURCE_LABELS[data.huggingface.token_source]}
+            {TOKEN_SOURCE_LABELS[connectionData.token_source]}
           </span>
         </header>
-        {!data.huggingface.credential_store_available ? (
+        {!connectionData.credential_store_available ? (
           <p className="form-error">
-            {data.huggingface.credential_store_error ??
+            {connectionData.credential_store_error ??
               "系统凭据库不可用；仍可使用 HF_TOKEN、本机登录与环境代理。"}
           </p>
         ) : null}
@@ -229,8 +239,8 @@ export function TaggerDownloadPanel() {
               type="password"
               autoComplete="off"
               value={token}
-              disabled={!data.huggingface.credential_store_available}
-              placeholder={data.huggingface.has_saved_token ? "已保存；留空保持不变" : "hf_…"}
+              disabled={!connectionData.credential_store_available}
+              placeholder={connectionData.has_saved_token ? "已保存；留空保持不变" : "hf_…"}
               onChange={(event) => setToken(event.target.value)}
             />
           </label>
@@ -244,7 +254,7 @@ export function TaggerDownloadPanel() {
                 <option
                   value={value}
                   key={value}
-                  disabled={value === "custom" && !data.huggingface.credential_store_available}
+                  disabled={value === "custom" && !connectionData.credential_store_available}
                 >
                   {label}
                 </option>
@@ -255,9 +265,9 @@ export function TaggerDownloadPanel() {
             <span>自定义代理</span>
             <input
               value={proxyUrl}
-              disabled={proxyMode !== "custom" || !data.huggingface.credential_store_available}
+              disabled={proxyMode !== "custom" || !connectionData.credential_store_available}
               placeholder={
-                data.huggingface.has_custom_proxy ? "已保存；留空保持不变" : "http://127.0.0.1:7890"
+                connectionData.has_custom_proxy ? "已保存；留空保持不变" : "http://127.0.0.1:7890"
               }
               onChange={(event) => setProxyUrl(event.target.value)}
             />
@@ -265,17 +275,17 @@ export function TaggerDownloadPanel() {
         </div>
         <footer>
           <div>
-            {data.huggingface.proxy_display ? (
+            {connectionData.proxy_display ? (
               <small>
                 <Network size={12} />
-                当前代理：{data.huggingface.proxy_display}
+                当前代理：{connectionData.proxy_display}
               </small>
             ) : (
               <small>当前模式未显示代理地址</small>
             )}
           </div>
           <div>
-            {data.huggingface.has_saved_token ? (
+            {connectionData.has_saved_token ? (
               <Button
                 disabled={actions.saveHuggingFace.isPending || connectionDraftDirty}
                 title={connectionDraftDirty ? "请先保存或撤销当前连接设置草稿" : undefined}
@@ -284,7 +294,7 @@ export function TaggerDownloadPanel() {
                 清除 Token
               </Button>
             ) : null}
-            {data.huggingface.has_custom_proxy ? (
+            {connectionData.has_custom_proxy ? (
               <Button
                 disabled={
                   actions.saveHuggingFace.isPending ||
@@ -324,7 +334,7 @@ export function TaggerDownloadPanel() {
               tone="primary"
               disabled={
                 actions.saveHuggingFace.isPending ||
-                (!data.huggingface.credential_store_available && proxyMode === "custom")
+                (!connectionData.credential_store_available && proxyMode === "custom")
               }
               onClick={() => void saveConnection()}
             >
@@ -416,10 +426,10 @@ export function TaggerDownloadPanel() {
             <h3>下载任务</h3>
             <p>同一时间只传输一个模型；暂停、失败或应用重启后均可续传。</p>
           </div>
-          <small>{data.tasks.length}</small>
+          <small>{tasks.length}</small>
         </header>
         <div>
-          {data.tasks.map((task) => {
+          {tasks.map((task) => {
             const progress = Math.min(100, (task.bytes_downloaded / task.bytes_total) * 100);
             const isError = task.status === "failed" || task.status === "interrupted";
             return (
@@ -496,7 +506,7 @@ export function TaggerDownloadPanel() {
               </article>
             );
           })}
-          {!data.tasks.length ? (
+          {!tasks.length ? (
             <p className="tagger-empty-copy">尚无下载任务。选择一个审核版本开始下载。</p>
           ) : null}
         </div>

@@ -88,7 +88,13 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
         assert download_center.status_code == 200
         assert len(download_center.json()["offers"]) == 6
         assert download_center.json()["tasks"] == []
-        assert download_center.json()["huggingface"]["token_source"] == "anonymous"
+        assert set(download_center.json()) == {"offers", "tasks"}
+        download_tasks = client.get("/api/v1/taggers/downloads/tasks")
+        assert download_tasks.status_code == 200
+        assert download_tasks.json() == []
+        huggingface = client.get("/api/v1/taggers/huggingface")
+        assert huggingface.status_code == 200
+        assert huggingface.json()["token_source"] == "anonymous"
 
         opened = client.post("/api/v1/workspaces/open", json={"path": str(project)})
         assert opened.status_code == 200

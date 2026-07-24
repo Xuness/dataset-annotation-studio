@@ -28,9 +28,18 @@ export function DialogHost() {
     const initialFocusSelector =
       current.kind === "confirm" ? "[data-dialog-cancel]" : "[data-dialog-confirm]";
     dialog.querySelector<HTMLButtonElement>(initialFocusSelector)?.focus();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
   }, [current]);
 
   if (!current) return null;
+
+  function settleCurrent(value: boolean) {
+    const dialog = dialogRef.current;
+    if (dialog?.open) dialog.close();
+    settle(current.id, value);
+  }
 
   const isConfirm = current.kind === "confirm";
   const title = current.title ?? (isConfirm ? "请确认" : "提示");
@@ -48,13 +57,13 @@ export function DialogHost() {
       aria-describedby={messageId}
       onCancel={(event) => {
         event.preventDefault();
-        settle(current.id, false);
+        settleCurrent(false);
       }}
       onKeyDown={(event) => {
         event.stopPropagation();
         if (event.key === "Escape") {
           event.preventDefault();
-          settle(current.id, false);
+          settleCurrent(false);
         }
       }}
       onMouseDown={(event) => {
@@ -65,7 +74,7 @@ export function DialogHost() {
           event.clientX > bounds.right ||
           event.clientY < bounds.top ||
           event.clientY > bounds.bottom;
-        if (outsideDialog) settle(current.id, false);
+        if (outsideDialog) settleCurrent(false);
       }}
     >
       <div className="dialog">
@@ -75,14 +84,14 @@ export function DialogHost() {
         </p>
         <div className="dialog__actions">
           {isConfirm ? (
-            <Button data-dialog-cancel="" onClick={() => settle(current.id, false)}>
+            <Button data-dialog-cancel="" onClick={() => settleCurrent(false)}>
               {current.cancelLabel ?? "取消"}
             </Button>
           ) : null}
           <Button
             data-dialog-confirm=""
             tone={current.tone === "danger" ? "danger" : "primary"}
-            onClick={() => settle(current.id, true)}
+            onClick={() => settleCurrent(true)}
           >
             {current.confirmLabel ?? (isConfirm ? "确认" : "知道了")}
           </Button>

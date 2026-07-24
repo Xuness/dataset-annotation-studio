@@ -1,15 +1,12 @@
 .settings-center-backdrop {
-  width: min(960px, calc(100% - 48px));
-  max-width: none;
-  max-height: calc(100% - 48px);
-  padding: 0;
-  overflow: visible;
-  border: 0;
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
   color: var(--ink);
-  background: transparent;
-}
-
-.settings-center-backdrop::backdrop {
   background: var(--modal-backdrop);
   backdrop-filter: blur(7px);
   animation: dialog-fade 160ms ease;
@@ -17,7 +14,7 @@
 
 .settings-center {
   display: grid;
-  width: 100%;
+  width: min(960px, 100%);
   height: min(820px, calc(100vh - 48px));
   min-height: min(620px, calc(100vh - 48px));
   max-height: calc(100vh - 48px);

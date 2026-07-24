@@ -12,7 +12,9 @@ import {
   deleteTaggerDownload,
   deleteTaggerInstallation,
   deleteTaggerProfile,
+  getHuggingFaceSettings,
   getTaggerDownloadCenter,
+  getTaggerDownloadTasks,
   getTaggerLibrary,
   importLocalTagger,
   pauseTaggerDownload,
@@ -39,26 +41,42 @@ const ACTIVE_DOWNLOAD_STATUSES = new Set<TaggerDownloadStatus>([
 ]);
 
 export function useTaggerDownloadCenter() {
-  const queryClient = useQueryClient();
-  const query = useQuery({
+  return useQuery({
     queryKey: taggerKeys.downloads,
     queryFn: getTaggerDownloadCenter,
+  });
+}
+
+export function useTaggerDownloadTasks(enabled: boolean) {
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: taggerKeys.downloadTasks,
+    queryFn: getTaggerDownloadTasks,
+    enabled,
     refetchInterval: (query) =>
-      query.state.data?.tasks.some((task) => ACTIVE_DOWNLOAD_STATUSES.has(task.status))
-        ? 1_000
-        : false,
+      query.state.data?.some((task) => ACTIVE_DOWNLOAD_STATUSES.has(task.status)) ? 1_000 : false,
   });
   const completedSignature =
-    query.data?.tasks
-      .filter((task) => task.status === "completed")
+    query.data
+      ?.filter((task) => task.status === "completed")
       .map((task) => `${task.id}:${task.installation_id ?? ""}`)
       .join("|") ?? "";
   useEffect(() => {
     if (completedSignature) {
-      void queryClient.invalidateQueries({ queryKey: taggerKeys.library });
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: taggerKeys.library }),
+        queryClient.invalidateQueries({ queryKey: taggerKeys.downloads, exact: true }),
+      ]);
     }
   }, [completedSignature, queryClient]);
   return query;
+}
+
+export function useHuggingFaceSettings() {
+  return useQuery({
+    queryKey: taggerKeys.huggingFace,
+    queryFn: getHuggingFaceSettings,
+  });
 }
 
 export function useTaggerActions() {
@@ -89,15 +107,22 @@ export function useTaggerActions() {
 
 export function useTaggerDownloadActions() {
   const queryClient = useQueryClient();
-  const refresh = () => queryClient.invalidateQueries({ queryKey: taggerKeys.all });
+  const refreshDownloads = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: taggerKeys.downloads, exact: true }),
+      queryClient.invalidateQueries({ queryKey: taggerKeys.downloadTasks }),
+    ]);
   return {
-    create: useMutation({ mutationFn: createTaggerDownload, onSuccess: refresh }),
-    pause: useMutation({ mutationFn: pauseTaggerDownload, onSuccess: refresh }),
-    resume: useMutation({ mutationFn: resumeTaggerDownload, onSuccess: refresh }),
-    remove: useMutation({ mutationFn: deleteTaggerDownload, onSuccess: refresh }),
+    create: useMutation({ mutationFn: createTaggerDownload, onSuccess: refreshDownloads }),
+    pause: useMutation({ mutationFn: pauseTaggerDownload, onSuccess: refreshDownloads }),
+    resume: useMutation({ mutationFn: resumeTaggerDownload, onSuccess: refreshDownloads }),
+    remove: useMutation({ mutationFn: deleteTaggerDownload, onSuccess: refreshDownloads }),
     saveHuggingFace: useMutation({
       mutationFn: (input: HuggingFaceSettingsUpdate) => updateHuggingFaceSettings(input),
-      onSuccess: refresh,
+      onSuccess: () =>
+        queryClient.invalidateQueries({
+          queryKey: taggerKeys.huggingFace,
+        }),
     }),
     testHuggingFace: useMutation({ mutationFn: testHuggingFaceConnection }),
   };

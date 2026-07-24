@@ -15,6 +15,10 @@ import {
   createDesktopFullscreenToggle,
   isFullscreenShortcut,
 } from "../src/shared/desktop/useDesktopWindowBehavior.ts";
+import {
+  detectRuntimePlatform,
+  usesNativeWindowDecorations,
+} from "../src/shared/desktop/runtimePlatform.ts";
 import { DEFAULT_INTERFACE_SCALE } from "../src/shared/desktop/useInterfaceScale.ts";
 import { DEFAULT_WORKSPACE_LAYOUT } from "../src/pages/workspace/hooks/useWorkspaceLayout.ts";
 import {
@@ -71,6 +75,16 @@ test("fullscreen shortcut accepts only an unmodified first F11 press", () => {
   assert.equal(isFullscreenShortcut({ ...f11, repeat: true }), false);
   assert.equal(isFullscreenShortcut({ ...f11, ctrlKey: true }), false);
   assert.equal(isFullscreenShortcut({ ...f11, key: "F10" }), false);
+});
+
+test("runtime platform detection keeps native decorations on Linux", () => {
+  assert.equal(
+    detectRuntimePlatform("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15", "Linux x86_64"),
+    "linux",
+  );
+  assert.equal(detectRuntimePlatform("Mozilla/5.0 (Windows NT 10.0; Win64; x64)"), "windows");
+  assert.equal(usesNativeWindowDecorations("linux"), true);
+  assert.equal(usesNativeWindowDecorations("windows"), false);
 });
 
 test("fresh interface geometry uses the curated local baseline", () => {
@@ -820,6 +834,26 @@ test("desktop lifecycle bridge names stay aligned with the Rust host", () => {
   );
   assert.match(desktopHost, new RegExp(`fn ${EXIT_APPLICATION_COMMAND}\\(`));
   assert.match(tauriEntry, new RegExp(`desktop::${EXIT_APPLICATION_COMMAND}`));
+});
+
+test("large application panels do not create nested native dialogs", () => {
+  const settingsCenter = readFileSync(
+    new URL("../src/app/settings/SettingsCenter.tsx", import.meta.url),
+    "utf8",
+  );
+  const assetDeletion = readFileSync(
+    new URL("../src/pages/workspace/components/AssetDeletionDialog.tsx", import.meta.url),
+    "utf8",
+  );
+  const dialogHost = readFileSync(
+    new URL("../src/shared/ui/DialogHost.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(settingsCenter, /<dialog|showModal\(/);
+  assert.doesNotMatch(assetDeletion, /<dialog|showModal\(/);
+  assert.match(dialogHost, /<dialog/);
+  assert.match(dialogHost, /dialog\.close\(\);\s+settle\(/);
 });
 
 test("desktop exit blocks while preprocessing is writing files", async () => {

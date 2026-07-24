@@ -5,9 +5,11 @@ import { HashRouter } from "react-router-dom";
 
 import { App } from "./app/App";
 import { AppErrorBoundary } from "./app/AppErrorBoundary";
+import { initializeRuntimePlatform } from "./shared/desktop/runtimePlatform";
 import { initializeAppPreferences } from "./shared/theme/appPreferences";
 import "./styles/global.css";
 
+initializeRuntimePlatform();
 initializeAppPreferences();
 
 const queryClient = new QueryClient({

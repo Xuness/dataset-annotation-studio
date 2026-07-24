@@ -192,5 +192,4 @@ export interface HuggingFaceConnectionTest {
 export interface TaggerDownloadCenter {
   offers: TaggerDownloadOffer[];
   tasks: TaggerDownloadTask[];
-  huggingface: HuggingFaceConnectionSettings;
 }

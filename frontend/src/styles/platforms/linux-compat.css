@@ -1,0 +1,92 @@
+/*
+ * WebKitGTK can lose or black out large composited surfaces on some Wayland
+ * compositor/driver combinations. Linux keeps the same layout and theme
+ * palette, but uses opaque surfaces and avoids full-window blur layers.
+ */
+:root[data-runtime-platform="linux"] .desktop-shell--tauri {
+  grid-template-rows: minmax(0, 1fr) !important;
+  background: var(--app-backdrop);
+  transition: none;
+}
+
+:root[data-runtime-platform="linux"] .desktop-shell--tauri::before,
+:root[data-runtime-platform="linux"] .desktop-shell--tauri::after {
+  display: none;
+}
+
+:root[data-runtime-platform="linux"] :where(.settings-center-backdrop, .asset-deletion-backdrop) {
+  backdrop-filter: none !important;
+  animation: none !important;
+}
+
+:root[data-runtime-platform="linux"] .settings-center {
+  background: var(--work-surface) !important;
+  backdrop-filter: none !important;
+  animation: none !important;
+}
+
+:root[data-runtime-platform="linux"] .asset-deletion-dialog,
+:root[data-runtime-platform="linux"] .dialog {
+  background: var(--surface) !important;
+  animation: none !important;
+}
+
+:root[data-runtime-platform="linux"] .dialog-backdrop::backdrop {
+  animation: none !important;
+}
+
+:root[data-runtime-platform="linux"] :where(.home-page, .home-gallery-scene) {
+  animation: none !important;
+}
+
+:root[data-runtime-platform="linux"] .home-gallery-scene,
+:root[data-runtime-platform="linux"] .workspace-atmosphere::before,
+:root[data-runtime-platform="linux"] .workspace-scene-surface::before {
+  filter: none !important;
+}
+
+:root[data-runtime-platform="linux"]
+  :where(
+    .home-topbar,
+    .home-entry,
+    .recent-card,
+    .recent-placeholder,
+    .workspace-page [data-surface-region],
+    .presets-topbar,
+    .presets-navigation,
+    .preset-list
+  ) {
+  backdrop-filter: none !important;
+}
+
+:root[data-runtime-platform="linux"] .home-topbar {
+  background: var(--surface-sunken) !important;
+}
+
+:root[data-runtime-platform="linux"] :where(.home-entry, .recent-card, .recent-placeholder) {
+  background: var(--surface-raised) !important;
+}
+
+:root[data-runtime-platform="linux"]
+  .workspace-page
+  :where([data-surface-region="navigation"], [data-surface-region="chrome"]) {
+  background: var(--work-sunken) !important;
+}
+
+:root[data-runtime-platform="linux"]
+  .workspace-page
+  :where(
+    [data-surface-region="primary-sidebar"],
+    [data-surface-region="content"],
+    [data-surface-region="secondary-sidebar"]
+  ) {
+  background: var(--work-surface) !important;
+}
+
+:root[data-runtime-platform="linux"] .workspace-page [data-surface-region="canvas"] {
+  background: var(--work-canvas) !important;
+}
+
+:root[data-runtime-platform="linux"] :where(.presets-topbar, .presets-navigation, .preset-list) {
+  background: var(--work-surface) !important;
+}

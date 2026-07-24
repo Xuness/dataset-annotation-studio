@@ -66,6 +66,10 @@ export function getTaggerDownloadCenter(): Promise<TaggerDownloadCenter> {
   return apiRequest("/api/v1/taggers/downloads");
 }
 
+export function getTaggerDownloadTasks(): Promise<TaggerDownloadTask[]> {
+  return apiRequest("/api/v1/taggers/downloads/tasks");
+}
+
 export function createTaggerDownload(input: {
   planId: string;
   licenseAccepted: boolean;
@@ -89,6 +93,10 @@ export function resumeTaggerDownload(id: string): Promise<TaggerDownloadTask> {
 
 export function deleteTaggerDownload(id: string): Promise<TaggerDownloadCenter> {
   return apiRequest(`/api/v1/taggers/downloads/${id}`, { method: "DELETE" });
+}
+
+export function getHuggingFaceSettings(): Promise<HuggingFaceConnectionSettings> {
+  return apiRequest("/api/v1/taggers/huggingface");
 }
 
 export function updateHuggingFaceSettings(

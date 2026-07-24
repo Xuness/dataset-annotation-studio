@@ -133,6 +133,12 @@ API 与批处理产品。
 Secret Service。应用不会退回到明文凭据文件。Hugging Face 下载仍可使用 `HF_TOKEN`
 或本机 `hf auth login` 登录。
 
+### Linux 或 niri 下窗口偶发黑屏
+
+Linux 会自动使用原生窗口边框和低合成视觉路径。若 WebKitGTK 仍出现黑屏，可按
+[Linux 源码指南](docs/linux.md#wayland-and-webkitgtk-graphics-compatibility) 依次尝试
+`nvidia-sync`、`dmabuf-off` 或 `software` 图形兼容档位。
+
 ### 本地模型只显示 CPU
 
 默认源码环境安装 CPU Runtime。需要 NVIDIA CUDA 时，重新执行 CUDA extra 同步命令并

@@ -38,6 +38,11 @@ fn request_application_exit<R: Runtime>(app: &AppHandle<R>) {
 }
 
 pub(crate) fn setup<R: Runtime>(app: &App<R>) -> tauri::Result<()> {
+    #[cfg(target_os = "linux")]
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+        window.set_decorations(true)?;
+    }
+
     let show_item =
         MenuItem::with_id(app, SHOW_MENU_ID, "打开 Dataset Studio", true, None::<&str>)?;
     let exit_item = MenuItem::with_id(app, EXIT_MENU_ID, "退出", true, None::<&str>)?;

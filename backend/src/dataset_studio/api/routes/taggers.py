@@ -89,6 +89,11 @@ def create_download(data: TaggerDownloadCreate, container: Container):
     return container.tagger_downloads.create(data)
 
 
+@router.get("/downloads/tasks", response_model=list[TaggerDownloadTask])
+def get_download_tasks(container: Container):
+    return container.tagger_downloads.tasks()
+
+
 @router.post("/downloads/{task_id}/pause", response_model=TaggerDownloadTask)
 def pause_download(task_id: str, container: Container):
     return container.tagger_downloads.pause(task_id)

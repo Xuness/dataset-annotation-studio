@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArchiveRestore,
   CircleAlert,
@@ -17,6 +17,7 @@ import {
 import type { AssetDeleteOperation } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
+import { ModalLayer } from "../../../shared/ui/ModalLayer";
 import { Spinner } from "../../../shared/ui/Spinner";
 
 interface AssetDeletionDialogProps {
@@ -48,7 +49,6 @@ export function AssetDeletionDialog({
   beforeExecute,
   onDeleted,
 }: AssetDeletionDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [view, setView] = useState(initialView);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -66,12 +66,6 @@ export function AssetDeletionDialog({
     resetPreview();
     if (initialView === "preview" && assetIds.length) previewDeletion(assetIds);
   }, [assetIds, assetIdsKey, initialView, open, previewDeletion, resetPreview]);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!open || !dialog) return;
-    if (!dialog.open) dialog.showModal();
-  }, [open]);
 
   if (!open) return null;
 
@@ -120,174 +114,177 @@ export function AssetDeletionDialog({
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="asset-deletion-backdrop"
-      aria-labelledby="asset-deletion-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        close();
-      }}
+    <ModalLayer
+      open={open}
+      onClose={close}
+      backdropClassName="asset-deletion-backdrop"
+      panelClassName="asset-deletion-dialog"
+      labelledBy="asset-deletion-title"
+      initialFocusSelector="[data-asset-deletion-close]"
     >
-      <section className="asset-deletion-dialog">
-        <header>
-          <div>
-            <span className="eyebrow">Recoverable deletion</span>
-            <h2 id="asset-deletion-title">素材删除与恢复</h2>
-          </div>
-          <button type="button" aria-label="关闭" disabled={busy} onClick={close}>
-            <X size={17} />
-          </button>
-        </header>
+      <header>
+        <div>
+          <span className="eyebrow">Recoverable deletion</span>
+          <h2 id="asset-deletion-title">素材删除与恢复</h2>
+        </div>
+        <button
+          type="button"
+          data-asset-deletion-close=""
+          aria-label="关闭"
+          disabled={busy}
+          onClick={close}
+        >
+          <X size={17} />
+        </button>
+      </header>
 
-        <nav aria-label="素材删除面板">
-          {assetIds.length ? (
-            <button
-              type="button"
-              className={view === "preview" ? "is-active" : ""}
-              onClick={() => setView("preview")}
-            >
-              删除预览
-            </button>
-          ) : null}
+      <nav aria-label="素材删除面板">
+        {assetIds.length ? (
           <button
             type="button"
-            className={view === "history" ? "is-active" : ""}
-            onClick={() => setView("history")}
+            className={view === "preview" ? "is-active" : ""}
+            onClick={() => setView("preview")}
           >
-            恢复记录
+            删除预览
           </button>
-        </nav>
-
-        <div className="asset-deletion-dialog__body">
-          {view === "preview" ? (
-            actions.preview.isPending ? (
-              <div className="asset-deletion-dialog__empty">
-                <Spinner label="核对文件范围" />
-                <p>正在校验图片和旁车文件…</p>
-              </div>
-            ) : actions.preview.isError ? (
-              <div className="asset-deletion-dialog__empty is-error">
-                <CircleAlert size={22} />
-                <p>
-                  {actions.preview.error instanceof Error
-                    ? actions.preview.error.message
-                    : "无法生成删除预览。"}
-                </p>
-              </div>
-            ) : preview ? (
-              <>
-                <p className="asset-deletion-dialog__lead">
-                  即将处理 <strong>{preview.asset_count}</strong> 张图片。文件会先移入
-                  <code>.annotation-workspace/recovery</code>，可从恢复记录撤销；不会删除空目录。
-                </p>
-                <div className="asset-deletion-summary">
-                  <article>
-                    <Image size={16} />
-                    <strong>{preview.image_count}</strong>
-                    <span>图片</span>
-                  </article>
-                  <article>
-                    <FileText size={16} />
-                    <strong>{preview.annotation_count}</strong>
-                    <span>标注</span>
-                  </article>
-                  <article>
-                    <ArchiveRestore size={16} />
-                    <strong>{preview.translation_count}</strong>
-                    <span>译文</span>
-                  </article>
-                  <article>
-                    <FileJson size={16} />
-                    <strong>{preview.metadata_count}</strong>
-                    <span>JSON</span>
-                  </article>
-                </div>
-                {preview.warnings.map((warning) => (
-                  <p className="asset-deletion-message is-warning" key={warning}>
-                    <CircleAlert size={14} />
-                    {warning}
-                  </p>
-                ))}
-                {preview.blocking_issues.map((issue) => (
-                  <p className="asset-deletion-message is-error" key={issue}>
-                    <CircleAlert size={14} />
-                    {issue}
-                  </p>
-                ))}
-              </>
-            ) : null
-          ) : operations.isLoading ? (
-            <div className="asset-deletion-dialog__empty">
-              <Spinner label="读取恢复记录" />
-            </div>
-          ) : operations.data?.length ? (
-            <div className="asset-deletion-history">
-              {operations.data.map((operation) => (
-                <article key={operation.id}>
-                  <header>
-                    <div>
-                      <strong>{operation.asset_count} 张图片</strong>
-                      <small>{new Date(operation.created_at).toLocaleString()}</small>
-                    </div>
-                    <span className={`is-${operation.status}`}>
-                      {STATUS_LABELS[operation.status]}
-                    </span>
-                  </header>
-                  <p>
-                    共 {operation.file_count} 个文件 · 标注 {operation.annotation_count} · 译文{" "}
-                    {operation.translation_count} · JSON {operation.metadata_count}
-                  </p>
-                  {operation.shared_sidecar_count ? (
-                    <small>{operation.shared_sidecar_count} 个共享旁车已保留</small>
-                  ) : null}
-                  {operation.error_message ? (
-                    <p className="asset-deletion-message is-error">{operation.error_message}</p>
-                  ) : null}
-                  {operation.status === "completed" ? (
-                    <Button
-                      icon={actions.undo.isPending ? <Spinner /> : <RotateCcw size={13} />}
-                      disabled={busy}
-                      onClick={() => void undo(operation)}
-                    >
-                      恢复这次删除
-                    </Button>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="asset-deletion-dialog__empty">
-              <ArchiveRestore size={23} />
-              <p>当前还没有素材删除记录。</p>
-            </div>
-          )}
-        </div>
-
-        {notice ? <p className="asset-deletion-dialog__notice">{notice}</p> : null}
-        {actionError ? (
-          <p className="asset-deletion-message is-error">
-            <CircleAlert size={14} />
-            {actionError}
-          </p>
         ) : null}
+        <button
+          type="button"
+          className={view === "history" ? "is-active" : ""}
+          onClick={() => setView("history")}
+        >
+          恢复记录
+        </button>
+      </nav>
 
-        <footer>
-          <Button disabled={busy} onClick={close}>
-            关闭
+      <div className="asset-deletion-dialog__body">
+        {view === "preview" ? (
+          actions.preview.isPending ? (
+            <div className="asset-deletion-dialog__empty">
+              <Spinner label="核对文件范围" />
+              <p>正在校验图片和旁车文件…</p>
+            </div>
+          ) : actions.preview.isError ? (
+            <div className="asset-deletion-dialog__empty is-error">
+              <CircleAlert size={22} />
+              <p>
+                {actions.preview.error instanceof Error
+                  ? actions.preview.error.message
+                  : "无法生成删除预览。"}
+              </p>
+            </div>
+          ) : preview ? (
+            <>
+              <p className="asset-deletion-dialog__lead">
+                即将处理 <strong>{preview.asset_count}</strong> 张图片。文件会先移入
+                <code>.annotation-workspace/recovery</code>，可从恢复记录撤销；不会删除空目录。
+              </p>
+              <div className="asset-deletion-summary">
+                <article>
+                  <Image size={16} />
+                  <strong>{preview.image_count}</strong>
+                  <span>图片</span>
+                </article>
+                <article>
+                  <FileText size={16} />
+                  <strong>{preview.annotation_count}</strong>
+                  <span>标注</span>
+                </article>
+                <article>
+                  <ArchiveRestore size={16} />
+                  <strong>{preview.translation_count}</strong>
+                  <span>译文</span>
+                </article>
+                <article>
+                  <FileJson size={16} />
+                  <strong>{preview.metadata_count}</strong>
+                  <span>JSON</span>
+                </article>
+              </div>
+              {preview.warnings.map((warning) => (
+                <p className="asset-deletion-message is-warning" key={warning}>
+                  <CircleAlert size={14} />
+                  {warning}
+                </p>
+              ))}
+              {preview.blocking_issues.map((issue) => (
+                <p className="asset-deletion-message is-error" key={issue}>
+                  <CircleAlert size={14} />
+                  {issue}
+                </p>
+              ))}
+            </>
+          ) : null
+        ) : operations.isLoading ? (
+          <div className="asset-deletion-dialog__empty">
+            <Spinner label="读取恢复记录" />
+          </div>
+        ) : operations.data?.length ? (
+          <div className="asset-deletion-history">
+            {operations.data.map((operation) => (
+              <article key={operation.id}>
+                <header>
+                  <div>
+                    <strong>{operation.asset_count} 张图片</strong>
+                    <small>{new Date(operation.created_at).toLocaleString()}</small>
+                  </div>
+                  <span className={`is-${operation.status}`}>
+                    {STATUS_LABELS[operation.status]}
+                  </span>
+                </header>
+                <p>
+                  共 {operation.file_count} 个文件 · 标注 {operation.annotation_count} · 译文{" "}
+                  {operation.translation_count} · JSON {operation.metadata_count}
+                </p>
+                {operation.shared_sidecar_count ? (
+                  <small>{operation.shared_sidecar_count} 个共享旁车已保留</small>
+                ) : null}
+                {operation.error_message ? (
+                  <p className="asset-deletion-message is-error">{operation.error_message}</p>
+                ) : null}
+                {operation.status === "completed" ? (
+                  <Button
+                    icon={actions.undo.isPending ? <Spinner /> : <RotateCcw size={13} />}
+                    disabled={busy}
+                    onClick={() => void undo(operation)}
+                  >
+                    恢复这次删除
+                  </Button>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="asset-deletion-dialog__empty">
+            <ArchiveRestore size={23} />
+            <p>当前还没有素材删除记录。</p>
+          </div>
+        )}
+      </div>
+
+      {notice ? <p className="asset-deletion-dialog__notice">{notice}</p> : null}
+      {actionError ? (
+        <p className="asset-deletion-message is-error">
+          <CircleAlert size={14} />
+          {actionError}
+        </p>
+      ) : null}
+
+      <footer>
+        <Button disabled={busy} onClick={close}>
+          关闭
+        </Button>
+        {view === "preview" ? (
+          <Button
+            tone="danger"
+            icon={actions.execute.isPending ? <Spinner /> : <Trash2 size={14} />}
+            disabled={!canExecute}
+            onClick={() => void executeDeletion()}
+          >
+            移入恢复区
           </Button>
-          {view === "preview" ? (
-            <Button
-              tone="danger"
-              icon={actions.execute.isPending ? <Spinner /> : <Trash2 size={14} />}
-              disabled={!canExecute}
-              onClick={() => void executeDeletion()}
-            >
-              移入恢复区
-            </Button>
-          ) : null}
-        </footer>
-      </section>
-    </dialog>
+        ) : null}
+      </footer>
+    </ModalLayer>
   );
 }

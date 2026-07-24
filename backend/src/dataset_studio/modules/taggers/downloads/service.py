@@ -63,8 +63,7 @@ class TaggerDownloadService:
 
     def center(self) -> TaggerDownloadCenter:
         library = self._taggers.library()
-        rows = self._repository.list()
-        tasks = [self._task_from_row(row) for row in rows]
+        tasks = self.tasks()
         active_by_plan = {
             task.plan_id: task.id
             for task in reversed(tasks)
@@ -83,8 +82,10 @@ class TaggerDownloadService:
         return TaggerDownloadCenter(
             offers=offers,
             tasks=tasks,
-            huggingface=self.connection_settings(),
         )
+
+    def tasks(self) -> list[TaggerDownloadTask]:
+        return [self._task_from_row(row) for row in self._repository.list()]
 
     def connection_settings(self) -> HuggingFaceConnectionSettings:
         credential_store_error: str | None = None

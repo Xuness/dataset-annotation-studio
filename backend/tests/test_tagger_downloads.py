@@ -69,8 +69,10 @@ _PLAN = TaggerDownloadPlan(
 class MemorySecrets:
     def __init__(self) -> None:
         self.values: dict[str, str] = {}
+        self.get_calls: list[str] = []
 
     def get(self, key: str) -> str | None:
+        self.get_calls.append(key)
         return self.values.get(key)
 
     def set(self, key: str, value: str) -> None:
@@ -209,6 +211,22 @@ def test_download_requires_explicit_model_license_acceptance(
 
     with pytest.raises(ValueError, match="许可证"):
         downloads.create(TaggerDownloadCreate(plan_id=_PLAN.plan_id))
+
+
+def test_download_snapshots_do_not_read_the_secret_store(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, downloads, secrets = _services(tmp_path, monkeypatch)
+
+    assert downloads.center().model_dump().keys() == {"offers", "tasks"}
+    assert downloads.tasks() == []
+    assert secrets.get_calls == []
+
+    settings = downloads.connection_settings()
+
+    assert settings.proxy_mode == HuggingFaceProxyMode.ENVIRONMENT
+    assert len(secrets.get_calls) == 2
 
 
 def test_download_task_pause_resume_and_cleanup_are_durable(

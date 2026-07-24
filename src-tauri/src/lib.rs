@@ -10,6 +10,59 @@ mod background;
 mod clipboard;
 mod desktop;
 
+const LINUX_GRAPHICS_MODE_ENV: &str = "DATASET_STUDIO_LINUX_GRAPHICS";
+
+#[derive(Debug, Default, PartialEq, Eq)]
+enum LinuxGraphicsMode {
+    #[default]
+    Default,
+    NvidiaSync,
+    DmabufOff,
+    Software,
+}
+
+fn parse_linux_graphics_mode(value: Option<&str>) -> LinuxGraphicsMode {
+    match value.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
+        None | Some("") | Some("default") => LinuxGraphicsMode::Default,
+        Some("nvidia-sync") => LinuxGraphicsMode::NvidiaSync,
+        Some("dmabuf-off") => LinuxGraphicsMode::DmabufOff,
+        Some("software") => LinuxGraphicsMode::Software,
+        Some(value) => {
+            eprintln!("Dataset Studio: ignoring unknown {LINUX_GRAPHICS_MODE_ENV} value {value:?}");
+            LinuxGraphicsMode::Default
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn set_env_if_missing(name: &str, value: &str) {
+    if std::env::var_os(name).is_none() {
+        std::env::set_var(name, value);
+    }
+}
+
+fn configure_linux_graphics_environment() {
+    let mode = parse_linux_graphics_mode(std::env::var(LINUX_GRAPHICS_MODE_ENV).ok().as_deref());
+
+    #[cfg(target_os = "linux")]
+    match mode {
+        LinuxGraphicsMode::Default => {}
+        LinuxGraphicsMode::NvidiaSync => {
+            set_env_if_missing("__NV_DISABLE_EXPLICIT_SYNC", "1");
+        }
+        LinuxGraphicsMode::DmabufOff => {
+            set_env_if_missing("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+        LinuxGraphicsMode::Software => {
+            set_env_if_missing("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+            set_env_if_missing("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    let _ = mode;
+}
+
 #[cfg(not(debug_assertions))]
 #[derive(Default)]
 struct ServiceProcess(Mutex<Option<CommandChild>>);
@@ -36,6 +89,8 @@ fn terminate_service(child: CommandChild) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    configure_linux_graphics_environment();
+
     let builder =
         tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             desktop::show_main_window(app);
@@ -87,4 +142,30 @@ pub fn run() {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_linux_graphics_mode, LinuxGraphicsMode};
+
+    #[test]
+    fn linux_graphics_modes_are_explicit_and_unknown_values_are_safe() {
+        assert_eq!(parse_linux_graphics_mode(None), LinuxGraphicsMode::Default);
+        assert_eq!(
+            parse_linux_graphics_mode(Some("nvidia-sync")),
+            LinuxGraphicsMode::NvidiaSync
+        );
+        assert_eq!(
+            parse_linux_graphics_mode(Some("DMABUF-OFF")),
+            LinuxGraphicsMode::DmabufOff
+        );
+        assert_eq!(
+            parse_linux_graphics_mode(Some(" software ")),
+            LinuxGraphicsMode::Software
+        );
+        assert_eq!(
+            parse_linux_graphics_mode(Some("unexpected")),
+            LinuxGraphicsMode::Default
+        );
+    }
 }

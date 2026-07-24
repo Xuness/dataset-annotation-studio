@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minus, Square, X } from "lucide-react";
 
 import appIconUrl from "../../assets/app-icon.png";
+import { usesNativeWindowDecorations } from "./runtimePlatform";
 import "./desktop-titlebar.css";
 
 function runWindowAction(action: () => Promise<void>) {
@@ -10,7 +11,7 @@ function runWindowAction(action: () => Promise<void>) {
 }
 
 export function DesktopTitlebar() {
-  if (!isTauri()) return null;
+  if (!isTauri() || usesNativeWindowDecorations()) return null;
 
   const appWindow = getCurrentWindow();
 
