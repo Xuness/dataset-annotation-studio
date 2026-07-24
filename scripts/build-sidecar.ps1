@@ -30,7 +30,7 @@ if ($Running) {
 New-Item -ItemType Directory -Force -Path $Binaries | Out-Null
 New-Item -ItemType Directory -Force -Path $WorkPath | Out-Null
 
-& uv run --project (Join-Path $Root "backend") --extra $Runtime pyinstaller `
+& uv run --project (Join-Path $Root "backend") --extra $Runtime --exact pyinstaller `
     --noconfirm `
     --clean `
     --onefile `

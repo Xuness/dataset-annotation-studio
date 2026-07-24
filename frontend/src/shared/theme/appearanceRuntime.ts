@@ -2,6 +2,10 @@ import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import {
+  filterTransparentRegionsForWindowDecorations,
+  usesNativeDesktopWindowDecorations,
+} from "../desktop/runtimePlatform";
+import {
   APP_SURFACE_REGIONS,
   resolveAppearance,
   resolveSurfaceTransparency,
@@ -53,8 +57,9 @@ export function applyPreferences(preferences: AppPreferences) {
     "--workspace-surface-opacity",
     `${resolved.theme.material.workspaceSurfaceOpacity * 100}%`,
   );
-  root.dataset.transparentRegions = APP_SURFACE_REGIONS.filter(
-    (region) => surfaceTransparency[region],
+  root.dataset.transparentRegions = filterTransparentRegionsForWindowDecorations(
+    APP_SURFACE_REGIONS.filter((region) => surfaceTransparency[region]),
+    usesNativeDesktopWindowDecorations(isTauri()),
   ).join(" ");
   root
     .querySelector<HTMLMetaElement>('meta[name="theme-color"]')

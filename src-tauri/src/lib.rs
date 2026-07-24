@@ -12,13 +12,24 @@ mod desktop;
 
 const LINUX_GRAPHICS_MODE_ENV: &str = "DATASET_STUDIO_LINUX_GRAPHICS";
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum LinuxGraphicsMode {
     #[default]
     Default,
     NvidiaSync,
     DmabufOff,
     Software,
+}
+
+impl LinuxGraphicsMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::NvidiaSync => "nvidia-sync",
+            Self::DmabufOff => "dmabuf-off",
+            Self::Software => "software",
+        }
+    }
 }
 
 fn parse_linux_graphics_mode(value: Option<&str>) -> LinuxGraphicsMode {
@@ -41,9 +52,7 @@ fn set_env_if_missing(name: &str, value: &str) {
     }
 }
 
-fn configure_linux_graphics_environment() {
-    let mode = parse_linux_graphics_mode(std::env::var(LINUX_GRAPHICS_MODE_ENV).ok().as_deref());
-
+fn configure_linux_graphics_environment(mode: LinuxGraphicsMode) {
     #[cfg(target_os = "linux")]
     match mode {
         LinuxGraphicsMode::Default => {}
@@ -61,6 +70,27 @@ fn configure_linux_graphics_environment() {
 
     #[cfg(not(target_os = "linux"))]
     let _ = mode;
+}
+
+fn runtime_platform_name() -> &'static str {
+    if cfg!(target_os = "linux") {
+        "linux"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else {
+        "other"
+    }
+}
+
+fn runtime_initialization_script(mode: LinuxGraphicsMode) -> String {
+    format!(
+        "document.documentElement.dataset.runtimePlatform={:?};\
+         document.documentElement.dataset.linuxGraphicsMode={:?};",
+        runtime_platform_name(),
+        mode.as_str()
+    )
 }
 
 #[cfg(not(debug_assertions))]
@@ -89,10 +119,13 @@ fn terminate_service(child: CommandChild) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    configure_linux_graphics_environment();
+    let graphics_mode =
+        parse_linux_graphics_mode(std::env::var(LINUX_GRAPHICS_MODE_ENV).ok().as_deref());
+    configure_linux_graphics_environment(graphics_mode);
 
-    let builder =
-        tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let builder = tauri::Builder::default()
+        .append_invoke_initialization_script(runtime_initialization_script(graphics_mode))
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             desktop::show_main_window(app);
         }));
 
@@ -146,7 +179,10 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_linux_graphics_mode, LinuxGraphicsMode};
+    use super::{
+        parse_linux_graphics_mode, runtime_initialization_script, runtime_platform_name,
+        LinuxGraphicsMode,
+    };
 
     #[test]
     fn linux_graphics_modes_are_explicit_and_unknown_values_are_safe() {
@@ -167,5 +203,11 @@ mod tests {
             parse_linux_graphics_mode(Some("unexpected")),
             LinuxGraphicsMode::Default
         );
+        let script = runtime_initialization_script(LinuxGraphicsMode::Software);
+        assert!(script.contains(&format!(
+            "dataset.runtimePlatform={:?}",
+            runtime_platform_name()
+        )));
+        assert!(script.contains("dataset.linuxGraphicsMode=\"software\""));
     }
 }

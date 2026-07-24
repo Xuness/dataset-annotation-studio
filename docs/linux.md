@@ -41,7 +41,7 @@ The upstream package list for other distributions is maintained in the
 ```bash
 corepack enable
 pnpm install --frozen-lockfile
-uv sync --project backend --extra cpu --all-groups --locked
+uv sync --project backend --extra cpu --all-groups --locked --exact
 pnpm dev
 ```
 
@@ -53,7 +53,7 @@ worker remain attached to the terminal and stop together.
 CPU is the portable default. On an x86_64 NVIDIA system with a compatible driver:
 
 ```bash
-uv sync --project backend --extra cuda --all-groups --locked
+uv sync --project backend --extra cuda --all-groups --locked --exact
 pnpm dev:cuda
 ```
 
@@ -67,7 +67,7 @@ mixed:
 
 ```bash
 uv venv --clear backend/.venv
-uv sync --project backend --extra cpu --all-groups --locked
+uv sync --project backend --extra cpu --all-groups --locked --exact
 ```
 
 Replace `cpu` with `cuda` in the second command when that is the intended runtime. This
@@ -94,9 +94,10 @@ variables remain available for model downloads.
 
 ## Wayland and WebKitGTK graphics compatibility
 
-Linux uses the compositor's native window decorations and an opaque, reduced-compositing
-theme path. Large backdrop blurs and animated modal surfaces are disabled automatically;
-Windows and macOS keep the existing custom title bar and visual effects.
+Linux uses the compositor's native window decorations, while the application content
+keeps the same theme materials, wallpaper, transparency controls, and immersive-mode
+presentation as Windows. The native title bar itself follows the desktop environment
+instead of the application's custom title-bar theme.
 
 If WebKitGTK still shows an invisible or black window, select one compatibility mode
 before starting Tauri. Start with the narrowest mode that matches the system:
@@ -112,10 +113,27 @@ DATASET_STUDIO_LINUX_GRAPHICS=dmabuf-off pnpm dev
 DATASET_STUDIO_LINUX_GRAPHICS=software pnpm dev
 ```
 
+For CUDA development, use the same prefix with `pnpm dev:cuda`, for example:
+
+```bash
+DATASET_STUDIO_LINUX_GRAPHICS=dmabuf-off pnpm dev:cuda
+```
+
 `default` (or an unset variable) changes no WebKitGTK graphics environment variables.
-The selected flags are applied before the Tauri webview is created, and an explicitly
-pre-set `WEBKIT_*` or NVIDIA variable is never overwritten. The `software` mode can
-reduce rendering performance, so it should be used only after the narrower modes fail.
+The `nvidia-sync` and `dmabuf-off` modes retain the full application visuals and
+animations. Depending on the installed WebKitGTK version, `dmabuf-off` can move the
+webview to a non-accelerated shared-memory presentation path, so it is an opt-in
+workaround rather than the Linux default. It does not disable ONNX Runtime CUDA
+inference.
+
+`software` is the last-resort mode: it disables accelerated compositing and removes
+backdrop blur and large-surface animations, while keeping the selected palette,
+wallpaper, and layout.
+
+The selected mode is applied before the Tauri webview is created and injected into the
+page before its first paint. An explicitly pre-set `WEBKIT_*` or NVIDIA variable is
+never overwritten. The `software` mode can reduce rendering performance, so it should
+be used only after the narrower modes fail.
 
 For a niri report, record the niri, WebKitGTK, Mesa/NVIDIA driver, and kernel versions,
 whether the session is native Wayland, and which compatibility mode changes the result.

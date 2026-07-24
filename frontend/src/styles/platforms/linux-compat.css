@@ -1,12 +1,9 @@
 /*
- * WebKitGTK can lose or black out large composited surfaces on some Wayland
- * compositor/driver combinations. Linux keeps the same layout and theme
- * palette, but uses opaque surfaces and avoids full-window blur layers.
+ * Linux uses native window decorations, so the page owns its scene instead of
+ * the hidden custom title bar. Full theme materials remain enabled by default.
  */
 :root[data-runtime-platform="linux"] .desktop-shell--tauri {
   grid-template-rows: minmax(0, 1fr) !important;
-  background: var(--app-backdrop);
-  transition: none;
 }
 
 :root[data-runtime-platform="linux"] .desktop-shell--tauri::before,
@@ -14,38 +11,49 @@
   display: none;
 }
 
-:root[data-runtime-platform="linux"] :where(.settings-center-backdrop, .asset-deletion-backdrop) {
+/*
+ * WEBKIT_DISABLE_COMPOSITING_MODE is a last-resort startup option. Only that
+ * explicit software mode receives reduced-compositing materials; default,
+ * nvidia-sync and dmabuf-off retain the same theme and immersive presentation
+ * as Windows.
+ */
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
+  :where(.settings-center-backdrop, .asset-deletion-backdrop) {
   backdrop-filter: none !important;
   animation: none !important;
 }
 
-:root[data-runtime-platform="linux"] .settings-center {
-  background: var(--work-surface) !important;
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"] .settings-center {
+  background: color-mix(in srgb, var(--work-surface) 97%, transparent) !important;
   backdrop-filter: none !important;
   animation: none !important;
 }
 
-:root[data-runtime-platform="linux"] .asset-deletion-dialog,
-:root[data-runtime-platform="linux"] .dialog {
-  background: var(--surface) !important;
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
+  :where(.asset-deletion-dialog, .dialog) {
+  background: color-mix(in srgb, var(--surface) 98%, transparent) !important;
   animation: none !important;
 }
 
-:root[data-runtime-platform="linux"] .dialog-backdrop::backdrop {
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
+  .dialog-backdrop::backdrop {
   animation: none !important;
 }
 
-:root[data-runtime-platform="linux"] :where(.home-page, .home-gallery-scene) {
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
+  :where(.home-page, .home-gallery-scene) {
   animation: none !important;
 }
 
-:root[data-runtime-platform="linux"] .home-gallery-scene,
-:root[data-runtime-platform="linux"] .workspace-atmosphere::before,
-:root[data-runtime-platform="linux"] .workspace-scene-surface::before {
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"] .home-gallery-scene,
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
+  .workspace-atmosphere::before,
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
+  .workspace-scene-surface::before {
   filter: none !important;
 }
 
-:root[data-runtime-platform="linux"]
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
   :where(
     .home-topbar,
     .home-entry,
@@ -59,34 +67,38 @@
   backdrop-filter: none !important;
 }
 
-:root[data-runtime-platform="linux"] .home-topbar {
-  background: var(--surface-sunken) !important;
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"] .home-topbar {
+  background: color-mix(in srgb, var(--surface-sunken) 94%, transparent) !important;
 }
 
-:root[data-runtime-platform="linux"] :where(.home-entry, .recent-card, .recent-placeholder) {
-  background: var(--surface-raised) !important;
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
+  :where(.home-entry, .recent-card, .recent-placeholder) {
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent) !important;
 }
 
-:root[data-runtime-platform="linux"]
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
   .workspace-page
   :where([data-surface-region="navigation"], [data-surface-region="chrome"]) {
-  background: var(--work-sunken) !important;
+  background: color-mix(in srgb, var(--work-sunken) 96%, transparent) !important;
 }
 
-:root[data-runtime-platform="linux"]
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
   .workspace-page
   :where(
     [data-surface-region="primary-sidebar"],
     [data-surface-region="content"],
     [data-surface-region="secondary-sidebar"]
   ) {
-  background: var(--work-surface) !important;
+  background: color-mix(in srgb, var(--work-surface) 94%, transparent) !important;
 }
 
-:root[data-runtime-platform="linux"] .workspace-page [data-surface-region="canvas"] {
-  background: var(--work-canvas) !important;
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
+  .workspace-page
+  [data-surface-region="canvas"] {
+  background: color-mix(in srgb, var(--work-canvas) 98%, transparent) !important;
 }
 
-:root[data-runtime-platform="linux"] :where(.presets-topbar, .presets-navigation, .preset-list) {
-  background: var(--work-surface) !important;
+:root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
+  :where(.presets-topbar, .presets-navigation, .preset-list) {
+  background: color-mix(in srgb, var(--work-surface) 94%, transparent) !important;
 }

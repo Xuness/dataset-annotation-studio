@@ -17,6 +17,10 @@ import {
 } from "../src/shared/desktop/useDesktopWindowBehavior.ts";
 import {
   detectRuntimePlatform,
+  filterTransparentRegionsForWindowDecorations,
+  normalizeLinuxGraphicsMode,
+  normalizeRuntimePlatform,
+  usesNativeDesktopWindowDecorations,
   usesNativeWindowDecorations,
 } from "../src/shared/desktop/runtimePlatform.ts";
 import { DEFAULT_INTERFACE_SCALE } from "../src/shared/desktop/useInterfaceScale.ts";
@@ -77,7 +81,7 @@ test("fullscreen shortcut accepts only an unmodified first F11 press", () => {
   assert.equal(isFullscreenShortcut({ ...f11, key: "F10" }), false);
 });
 
-test("runtime platform detection keeps native decorations on Linux", () => {
+test("runtime platform detection keeps native decorations and scene ownership on Linux", () => {
   assert.equal(
     detectRuntimePlatform("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15", "Linux x86_64"),
     "linux",
@@ -85,6 +89,68 @@ test("runtime platform detection keeps native decorations on Linux", () => {
   assert.equal(detectRuntimePlatform("Mozilla/5.0 (Windows NT 10.0; Win64; x64)"), "windows");
   assert.equal(usesNativeWindowDecorations("linux"), true);
   assert.equal(usesNativeWindowDecorations("windows"), false);
+  assert.equal(usesNativeDesktopWindowDecorations(true, "linux"), true);
+  assert.equal(usesNativeDesktopWindowDecorations(false, "linux"), false);
+  assert.deepEqual(
+    filterTransparentRegionsForWindowDecorations(
+      ["desktop-titlebar", "home-topbar", "content"],
+      true,
+    ),
+    ["home-topbar", "content"],
+  );
+  assert.deepEqual(
+    filterTransparentRegionsForWindowDecorations(["desktop-titlebar", "content"], false),
+    ["desktop-titlebar", "content"],
+  );
+  assert.equal(normalizeLinuxGraphicsMode("software"), "software");
+  assert.equal(normalizeLinuxGraphicsMode("dmabuf-off"), "dmabuf-off");
+  assert.equal(normalizeLinuxGraphicsMode("unexpected"), "default");
+  assert.equal(normalizeLinuxGraphicsMode(undefined), "default");
+  assert.equal(normalizeRuntimePlatform("linux", "windows"), "linux");
+  assert.equal(normalizeRuntimePlatform("unexpected", "windows"), "windows");
+});
+
+test("Linux visual degradation is scoped to the explicit software mode", () => {
+  const linuxCompatibility = readFileSync(
+    new URL("../src/styles/platforms/linux-compat.css", import.meta.url),
+    "utf8",
+  );
+  const reducedCompositionDeclaration =
+    /backdrop-filter:\s*none\s*!important|filter:\s*none\s*!important|animation:\s*none\s*!important|background:\s*color-mix/g;
+  const blocks = linuxCompatibility.matchAll(/([^{}]+)\{([^{}]*)\}/g);
+  let reducedBlockCount = 0;
+
+  for (const [, selector, declarations] of blocks) {
+    if (!reducedCompositionDeclaration.test(declarations)) continue;
+    reducedCompositionDeclaration.lastIndex = 0;
+    reducedBlockCount += 1;
+    assert.match(selector, /data-linux-graphics-mode="software"/);
+  }
+
+  assert.ok(reducedBlockCount >= 8);
+  const defaultShellRule = linuxCompatibility.match(
+    /:root\[data-runtime-platform="linux"\]\s+\.desktop-shell--tauri\s*\{([^}]*)\}/,
+  );
+  assert.ok(defaultShellRule);
+  assert.doesNotMatch(defaultShellRule[1], /transition:\s*none/);
+});
+
+test("large page scenes use paint containment without changing shared animation timing", () => {
+  const homeStyles = readFileSync(new URL("../src/pages/home/home.css", import.meta.url), "utf8");
+  const workspaceStyles = readFileSync(
+    new URL("../src/layouts/workspace/workspace-shell.css", import.meta.url),
+    "utf8",
+  );
+  const workspaceMaterialStyles = readFileSync(
+    new URL("../src/layouts/workspace/workspace-surface-materials.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(homeStyles, /\.home-gallery-scene\s*\{[^}]*contain:\s*paint/s);
+  assert.match(workspaceStyles, /\.workspace-atmosphere\s*\{[^}]*contain:\s*paint/s);
+  assert.match(homeStyles, /\.home-page\s*\{[^}]*animation:\s*home-reveal\s+700ms/s);
+  assert.match(homeStyles, /backdrop-filter\s+220ms\s+ease/);
+  assert.match(workspaceMaterialStyles, /backdrop-filter\s+var\(--transition\)/);
 });
 
 test("fresh interface geometry uses the curated local baseline", () => {

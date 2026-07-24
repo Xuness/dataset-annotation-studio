@@ -18,11 +18,11 @@
 
 ## 支持范围
 
-| 平台 | 当前状态 | 源码运行方式 |
-| --- | --- | --- |
-| Windows 10/11 x86_64 | 主要开发平台 | `pnpm dev` 或双击 `启动开发版.vbs` |
-| Linux x86_64 | 实验性 | 安装 Tauri 系统依赖后运行 `pnpm dev` |
-| macOS / ARM64 | 尚未验证 | 暂不承诺支持 |
+| 平台                 | 当前状态     | 源码运行方式                         |
+| -------------------- | ------------ | ------------------------------------ |
+| Windows 10/11 x86_64 | 主要开发平台 | `pnpm dev` 或双击 `启动开发版.vbs`   |
+| Linux x86_64         | 实验性       | 安装 Tauri 系统依赖后运行 `pnpm dev` |
+| macOS / ARM64        | 尚未验证     | 暂不承诺支持                         |
 
 源码运行仍会在本机编译 Rust/Tauri 桌面壳，但不会生成或发布安装包。
 
@@ -43,7 +43,7 @@ git clone https://github.com/Xuness/dataset-annotation-studio.git
 cd dataset-annotation-studio
 corepack enable
 pnpm install --frozen-lockfile
-uv sync --project backend --extra cpu --all-groups --locked
+uv sync --project backend --extra cpu --all-groups --locked --exact
 pnpm dev
 ```
 
@@ -61,12 +61,13 @@ pnpm dev
 CPU 是默认且跨平台的基线。x86_64 NVIDIA 环境可以显式选择 CUDA：
 
 ```text
-uv sync --project backend --extra cuda --all-groups --locked
+uv sync --project backend --extra cuda --all-groups --locked --exact
 pnpm dev:cuda
 ```
 
 `onnxruntime` 与 `onnxruntime-gpu` 不能在同一环境中并存，uv 配置会阻止同时选择两个
-extra。CUDA Runtime 还受 NVIDIA 软件条款约束；本仓库不分发其二进制文件。
+extra。CUDA extra 将 cuDNN 固定在仍支持 Tesla V100/Volta 的 9.10 系列；CUDA Runtime
+还受 NVIDIA 软件条款约束，本仓库不分发其二进制文件。
 
 如果已有 `.venv` 曾经切换或混装过 CPU/GPU Runtime，先运行
 `uv venv --clear backend/.venv`，再执行上面选定的一条 `uv sync` 命令。它只重建项目
@@ -135,9 +136,11 @@ Secret Service。应用不会退回到明文凭据文件。Hugging Face 下载�
 
 ### Linux 或 niri 下窗口偶发黑屏
 
-Linux 会自动使用原生窗口边框和低合成视觉路径。若 WebKitGTK 仍出现黑屏，可按
+Linux 使用原生窗口边框，但默认保留与 Windows 相同的主题、壁纸、透光区域和沉浸模式
+效果。若 WebKitGTK 仍出现黑屏，可按
 [Linux 源码指南](docs/linux.md#wayland-and-webkitgtk-graphics-compatibility) 依次尝试
-`nvidia-sync`、`dmabuf-off` 或 `software` 图形兼容档位。
+`nvidia-sync`、`dmabuf-off` 或 `software` 图形兼容档位；只有最后的 `software`
+档位会关闭高成本模糊与动画。
 
 ### 本地模型只显示 CPU
 
@@ -153,6 +156,7 @@ Linux 会自动使用原生窗口边框和低合成视觉路径。若 WebKitGTK 
 
 - [源码开发与检查](docs/development.md)
 - [Linux 源码指南](docs/linux.md)
+- [运行时稳定性修复报告](docs/runtime-stability-fix-report.md)
 - [架构与模块边界](docs/architecture.md)
 - [工作区文件格式](docs/workspace-layout.md)
 - [模型许可证说明](docs/model-licenses.md)

@@ -121,7 +121,7 @@ try {
         Assert-LastExitCode -Step "前端依赖同步"
 
         Write-Host "[Dataset Studio] 检查 Python 环境..." -ForegroundColor Cyan
-        & uv sync --project $Backend --extra cpu --all-groups --locked
+        & uv sync --project $Backend --extra cpu --all-groups --locked --exact
         Assert-LastExitCode -Step "Python 依赖同步"
 
         if ($CheckOnly) {

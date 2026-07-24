@@ -1,5 +1,10 @@
 import { Check } from "lucide-react";
+import { isTauri } from "@tauri-apps/api/core";
 
+import {
+  filterTransparentRegionsForWindowDecorations,
+  usesNativeDesktopWindowDecorations,
+} from "../../../desktop/runtimePlatform";
 import { useAppPreferences } from "../../../theme/appPreferences";
 import { APP_SURFACE_REGIONS, type AppSurfaceRegion } from "../../../theme/appearance";
 import { confirmDialog } from "../../../ui/dialogs";
@@ -75,7 +80,11 @@ export function SurfaceTransparencySection() {
   const setAllRegionsTransparent = useAppPreferences((state) => state.setAllRegionsTransparent);
   const resetRegionTransparency = useAppPreferences((state) => state.resetRegionTransparency);
   const setImmersiveMode = useAppPreferences((state) => state.setImmersiveMode);
-  const allRegionsTransparent = APP_SURFACE_REGIONS.every((region) => transparentRegions[region]);
+  const configurableRegions = filterTransparentRegionsForWindowDecorations(
+    APP_SURFACE_REGIONS,
+    usesNativeDesktopWindowDecorations(isTauri()),
+  );
+  const allRegionsTransparent = configurableRegions.every((region) => transparentRegions[region]);
 
   async function toggleRegionTransparency(region: AppSurfaceRegion, title: string) {
     if (immersiveMode) {
@@ -122,7 +131,7 @@ export function SurfaceTransparencySection() {
           </button>
         </div>
         <div className={`surface-transparency__grid ${immersiveMode ? "is-managed" : ""}`}>
-          {APP_SURFACE_REGIONS.map((region) => {
+          {configurableRegions.map((region) => {
             const option = surfaceRegionPresentation[region];
             const transparent = immersiveMode || transparentRegions[region];
             return (

@@ -167,6 +167,10 @@ export function TaggerDownloadPanel() {
     await run(() => actions.remove.mutateAsync(task.id), "下载任务已清理。");
   }
 
+  async function resumeDownload(task: TaggerDownloadTask) {
+    await run(() => actions.resume.mutateAsync(task.id), "下载已重新排队。");
+  }
+
   async function startDownload(offer: TaggerDownloadOffer) {
     const accepted = await confirmDialog(
       `“${offer.name}”受 ${offer.license_id} 许可证约束，模型权重不属于 Dataset Studio。请先通过“许可证”按钮阅读原始条款；确认后才会开始下载。`,
@@ -402,15 +406,29 @@ export function TaggerDownloadPanel() {
                   </Button>
                   <Button
                     tone="primary"
-                    icon={actions.create.isPending ? <Spinner /> : <Download size={13} />}
-                    disabled={Boolean(offer.installed_installation_id || task || busy)}
-                    onClick={() => void startDownload(offer)}
+                    icon={
+                      actions.create.isPending || actions.resume.isPending ? (
+                        <Spinner />
+                      ) : task?.can_resume ? (
+                        <Play size={13} />
+                      ) : (
+                        <Download size={13} />
+                      )
+                    }
+                    disabled={Boolean(
+                      offer.installed_installation_id || busy || (task && !task.can_resume),
+                    )}
+                    onClick={() =>
+                      task?.can_resume ? void resumeDownload(task) : void startDownload(offer)
+                    }
                   >
                     {offer.installed_installation_id
                       ? "已安装"
-                      : task
-                        ? STATUS_LABELS[task.status]
-                        : "下载并安装"}
+                      : task?.can_resume
+                        ? "继续下载"
+                        : task
+                          ? STATUS_LABELS[task.status]
+                          : "下载并安装"}
                   </Button>
                 </footer>
               </article>
@@ -485,9 +503,7 @@ export function TaggerDownloadPanel() {
                       tone="primary"
                       icon={<Play size={13} />}
                       disabled={busy}
-                      onClick={() =>
-                        void run(() => actions.resume.mutateAsync(task.id), "下载已重新排队。")
-                      }
+                      onClick={() => void resumeDownload(task)}
                     >
                       继续
                     </Button>

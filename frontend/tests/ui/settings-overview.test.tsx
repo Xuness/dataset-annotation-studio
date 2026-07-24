@@ -199,6 +199,124 @@ describe("settings overview sections", () => {
     expect(screen.getByRole("button", { name: "下载并安装" })).toBeTruthy();
   });
 
+  test("resumes an interrupted tagger download from the catalog button", async () => {
+    const user = userEvent.setup();
+    let status: "interrupted" | "queued" = "interrupted";
+    const downloadTask = () => ({
+      id: "download-1",
+      plan_id: "cl_tagger_v2:v2_01a",
+      plan_name: "CL Tagger v2 v2.01a",
+      adapter_id: "cl_tagger_v2",
+      repo_id: "cella110n/cl_tagger_v2",
+      revision: "b57909b8e9c63f71e208a26473e7aabdf45ed6b6",
+      model_root: "C:\\AppData\\DatasetAnnotationStudio\\models\\taggers",
+      status,
+      bytes_total: 2_200_000_000,
+      bytes_downloaded: 500_000_000,
+      files_total: 4,
+      files_completed: 1,
+      current_file: null,
+      speed_bps: null,
+      eta_seconds: null,
+      stop_requested: false,
+      installation_id: null,
+      error_code: status === "interrupted" ? "interrupted" : null,
+      error_message: status === "interrupted" ? "后台服务上次运行时中断，可继续下载。" : null,
+      can_pause: status === "queued",
+      can_resume: status === "interrupted",
+      can_delete: status === "interrupted",
+      created_at: "2026-07-24T08:00:00Z",
+      started_at: "2026-07-24T08:01:00Z",
+      completed_at: null,
+      updated_at: "2026-07-24T08:02:00Z",
+    });
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/taggers/downloads/download-1/resume")) {
+        expect(init?.method).toBe("POST");
+        status = "queued";
+        return jsonResponse(downloadTask());
+      }
+      if (url.endsWith("/api/v1/taggers/downloads/tasks")) {
+        return jsonResponse([downloadTask()]);
+      }
+      if (url.endsWith("/api/v1/taggers/downloads")) {
+        return jsonResponse({
+          offers: [
+            {
+              plan_id: "cl_tagger_v2:v2_01a",
+              adapter_id: "cl_tagger_v2",
+              adapter_name: "CL Tagger v2",
+              name: "CL Tagger v2 v2.01a",
+              model_version: "v2.01a",
+              description: "固定审核版本",
+              repo_id: "cella110n/cl_tagger_v2",
+              revision: "b57909b8e9c63f71e208a26473e7aabdf45ed6b6",
+              source_url: "https://huggingface.co/cella110n/cl_tagger_v2",
+              license_id: "LicenseRef-CL-Tagger-v2",
+              license_url:
+                "https://huggingface.co/cella110n/cl_tagger_v2/tree/b57909b8e9c63f71e208a26473e7aabdf45ed6b6",
+              gated: true,
+              provenance: "author",
+              download_size: 2_200_000_000,
+              file_count: 4,
+              installed_installation_id: null,
+              installed_installation_name: null,
+              active_download_id: status === "queued" ? "download-1" : null,
+            },
+          ],
+          tasks: [downloadTask()],
+        });
+      }
+      if (url.endsWith("/api/v1/taggers/huggingface")) {
+        return jsonResponse({
+          token_source: "anonymous",
+          has_saved_token: false,
+          proxy_mode: "environment",
+          has_custom_proxy: false,
+          proxy_display: null,
+          credential_store_available: true,
+          credential_store_error: null,
+        });
+      }
+      return jsonResponse({
+        model_root: "C:\\AppData\\DatasetAnnotationStudio\\models\\taggers",
+        disk_size: 0,
+        installations: [],
+        profiles: [],
+        runtime: {
+          available: true,
+          providers: ["CPUExecutionProvider"],
+          devices: ["auto", "cpu"],
+          error: null,
+        },
+        supported_adapters: [{ id: "cl_tagger_v2", name: "CL Tagger v2", description: "test" }],
+        scan_issues: [],
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <TaggerSettings onClose={() => undefined} />
+      </QueryClientProvider>,
+    );
+
+    await user.click(await screen.findByRole("tab", { name: "Hugging Face 下载" }));
+    const resumeButton = await screen.findByRole("button", { name: "继续下载" });
+    expect((resumeButton as HTMLButtonElement).disabled).toBe(false);
+    await user.click(resumeButton);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8765/api/v1/taggers/downloads/download-1/resume",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(await screen.findByText("下载已重新排队。")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "等待下载" })).toBeTruthy();
+  });
+
   test("shows live service diagnostics and copies a privacy-safe summary", async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse({

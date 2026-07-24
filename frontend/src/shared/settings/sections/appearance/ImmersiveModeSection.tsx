@@ -1,8 +1,12 @@
+import { isTauri } from "@tauri-apps/api/core";
+
+import { usesNativeDesktopWindowDecorations } from "../../../desktop/runtimePlatform";
 import { useAppPreferences } from "../../../theme/appPreferences";
 
 export function ImmersiveModeSection() {
   const immersiveMode = useAppPreferences((state) => state.preferences.appearance.immersiveMode);
   const setImmersiveMode = useAppPreferences((state) => state.setImmersiveMode);
+  const nativeWindowDecorations = usesNativeDesktopWindowDecorations(isTauri());
 
   return (
     <section className="appearance-section">
@@ -23,7 +27,9 @@ export function ImmersiveModeSection() {
         <span className="immersive-mode-card__copy">
           <strong>让工作台完全沉入场景</strong>
           <small>
-            强制开启标题栏、首页卡片与全部工作区域透光，并隐藏面板边界、栏位分隔和常驻拖拽线；输入控件与状态提示仍保留必要轮廓。
+            {nativeWindowDecorations
+              ? "强制开启首页卡片与全部应用内容区域透光，并隐藏面板边界、栏位分隔和常驻拖拽线；系统标题栏保持桌面环境原生样式。"
+              : "强制开启标题栏、首页卡片与全部工作区域透光，并隐藏面板边界、栏位分隔和常驻拖拽线；输入控件与状态提示仍保留必要轮廓。"}
           </small>
         </span>
         <span className="immersive-mode-card__state">

@@ -16,14 +16,14 @@ Portable CPU baseline:
 
 ```text
 pnpm install --frozen-lockfile
-uv sync --project backend --extra cpu --all-groups --locked
+uv sync --project backend --extra cpu --all-groups --locked --exact
 pnpm dev
 ```
 
 Optional CUDA development:
 
 ```text
-uv sync --project backend --extra cuda --all-groups --locked
+uv sync --project backend --extra cuda --all-groups --locked --exact
 pnpm dev:cuda
 ```
 
@@ -32,6 +32,9 @@ extras, run `uv venv --clear backend/.venv` before the selected `uv sync` comman
 
 `pnpm dev` starts the frontend, loopback API, durable worker, and Tauri window. The
 Python services run directly from the uv environment; no sidecar is generated.
+The explicit `uv sync --exact` step selects and cleans the CPU or CUDA runtime once;
+development services and checks then use that environment without attempting to rewrite
+it while the API and worker are running.
 
 On Windows, `启动开发版.vbs` performs the CPU dependency checks and launches the same
 source workflow in the background. The BAT/VBS and `scripts/start-dev.ps1` helpers are
@@ -41,8 +44,8 @@ Windows-only conveniences, not the portable entry point.
 
 ```text
 pnpm --dir frontend check
-uv run --project backend --extra cpu ruff check backend/src backend/tests
-uv run --project backend --extra cpu pytest
+uv run --project backend --no-sync ruff check backend/src backend/tests
+uv run --project backend --no-sync pytest
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
@@ -72,3 +75,6 @@ The public project currently promises source distribution only. `pnpm build` and
 `pnpm build:cuda` are maintainer-oriented packaging paths and are not part of the first
 source release support contract. PyInstaller/Tauri artifacts must be built and tested
 separately on each target operating system before they are published.
+
+Packaging performs an exact backend environment sync before PyInstaller runs. Stop any
+source-mode API or worker processes first so Windows can replace in-use executables.
