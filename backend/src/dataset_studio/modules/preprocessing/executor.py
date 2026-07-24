@@ -19,6 +19,7 @@ from dataset_studio.modules.preprocessing.planner import PlanItem
 from dataset_studio.modules.preprocessing.resize_runtime import (
     ResizeExecutor,
     ResizeRuntimeSelection,
+    encoding_supports_all_rendered_outputs,
 )
 
 _AUTO_WORKER_LIMIT = 8
@@ -47,9 +48,16 @@ def resolve_resize_worker_count(
     items: Sequence[PlanItem],
     request: PreprocessRequest,
     execution: PreprocessExecutionOptions,
+    *,
+    pipeline_device: str | None = None,
 ) -> int:
     render_items = [item for item in items if requires_render(item, request)]
     if not render_items:
+        return 1
+    # The all-GPU codec pipeline is guarded by one CUDA context/codec lock and
+    # keeps the decoded image in VRAM. Avoid queuing several large frames and
+    # report the effective serial execution accurately.
+    if pipeline_device == "cuda":
         return 1
 
     logical_cpus = os.cpu_count() or 1
@@ -90,12 +98,21 @@ class PreprocessItemPreparer:
             item.before_width != item.after_width or item.before_height != item.after_height
             for item in self._items
         )
+        render_needed = any(requires_render(item, request) for item in self._items)
+        encoding_supported = encoding_supports_all_rendered_outputs(self._items, request.convert)
         self._resize_executor = ResizeExecutor.create(
             execution.device,
             request.resize.algorithm if request.resize else None,
             resize_needed=resize_needed,
+            encoding_supported=encoding_supported,
+            render_needed=render_needed,
         )
-        self._worker_count = resolve_resize_worker_count(self._items, request, execution)
+        self._worker_count = resolve_resize_worker_count(
+            self._items,
+            request,
+            execution,
+            pipeline_device=self._resize_executor.selection.pipeline_device,
+        )
         self._pool: ThreadPoolExecutor | None = None
         self._futures: dict[int, Future[PreparedItem]] = {}
         self._iterated = False

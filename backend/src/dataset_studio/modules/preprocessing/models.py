@@ -91,6 +91,7 @@ class PreprocessPreviewItem(BaseModel):
 class PreprocessRuntimeInfo(BaseModel):
     device: str = "cpu"
     requested_device: PreprocessDevice = PreprocessDevice.AUTO
+    decode_device: str = "cpu"
     resize_device: str = "cpu"
     encoding_device: str = "cpu"
     cuda_available: bool = False
@@ -122,6 +123,7 @@ class PreprocessExecutionOptions(BaseModel):
 
 class PreprocessExecutionRuntimeInfo(BaseModel):
     requested_device: PreprocessDevice
+    decode_device: str = "cpu"
     resize_device: str
     encoding_device: str = "cpu"
     fallback_reason: str | None = None

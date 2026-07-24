@@ -17,7 +17,7 @@ Dataset Annotation Studio Linux 开发版启动器
 
 选项：
   --cpu                  使用 CPU Runtime（默认）
-  --cuda                 使用 CUDA Runtime，同时启用 CUDA 图片缩放
+  --cuda                 使用 CUDA Runtime，同时启用 CUDA 解码、缩放和编码
   --graphics MODE        native | nvidia-sync | dmabuf-off | software
   --check-only           只检查并同步依赖，不启动应用
   --skip-sync            跳过 pnpm install 与 uv sync
@@ -131,7 +131,10 @@ configure_cuda_library_path() {
     "$cuda_site/cuda_nvrtc/lib" \
     "$cuda_site/nvjitlink/lib" \
     "$cuda_site/cufft/lib" \
-    "$cuda_site/curand/lib"; do
+    "$cuda_site/curand/lib" \
+    "$cuda_site/nvjpeg/lib" \
+    "$cuda_site/nvimgcodec" \
+    "$cuda_site/nvimgcodec/extensions"; do
     if [[ -d "$lib_dir" ]]; then
       cuda_library_dirs+=("$lib_dir")
     fi
@@ -181,7 +184,7 @@ echo "[Dataset Studio] 启动开发版"
 echo "  Runtime: $RUNTIME"
 echo "  图形模式: $GRAPHICS"
 if [[ "$RUNTIME" == "cuda" ]]; then
-  echo "  图片预处理: CUDA Lanczos 缩放 + CPU 编码（失败自动回退 CPU）"
+  echo "  图片预处理: CUDA 解码 + CUDA Lanczos 缩放 + CUDA 编码（不支持格式或失败自动回退 CPU）"
   exec pnpm dev:cuda
 else
   echo "  图片预处理: CPU 缩放 + CPU 编码"

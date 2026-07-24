@@ -58,6 +58,17 @@ def render_image_to_staging(
     os.close(descriptor)
     temporary = Path(temporary_name)
     try:
+        if resize_executor is not None and resize_executor.try_render_gpu(
+            source,
+            temporary,
+            item,
+            resize,
+            convert,
+        ):
+            os.replace(temporary, staging)
+            return
+
+        temporary.unlink(missing_ok=True)
         with Image.open(source) as opened:
             image = ImageOps.exif_transpose(opened)
             if image.size != (item.after_width, item.after_height):

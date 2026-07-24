@@ -40,10 +40,11 @@ export interface PreprocessPreviewItem {
 }
 
 export interface PreprocessRuntimeInfo {
-  device: "cpu" | "mixed";
+  device: "cpu" | "mixed" | "cuda";
   requested_device: PreprocessDevice;
+  decode_device: "cpu" | "cuda";
   resize_device: "cpu" | "cuda";
-  encoding_device: "cpu";
+  encoding_device: "cpu" | "cuda";
   cuda_available: boolean;
   fallback_reason: string | null;
   preview_duration_ms: number;
@@ -71,8 +72,9 @@ export interface PreprocessExecutionOptions {
 
 export interface PreprocessExecutionRuntimeInfo {
   requested_device: PreprocessDevice;
+  decode_device: "cpu" | "cuda";
   resize_device: "cpu" | "cuda";
-  encoding_device: "cpu";
+  encoding_device: "cpu" | "cuda";
   fallback_reason: string | null;
   worker_count: number;
   duration_ms: number;

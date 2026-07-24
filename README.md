@@ -67,10 +67,11 @@ uv sync --project backend --extra cuda --all-groups --locked --exact
 pnpm dev:cuda
 ```
 
-CUDA Runtime 也会安装可选的 CuPy 图片预处理后端。预处理页面可以选择“自动（优先
-CUDA）”、“CUDA”或“CPU”：CUDA 目前只负责 Lanczos 3/4 缩放，PNG、WebP、JPEG
-解码/编码仍由 Pillow 在 CPU 上完成；CUDA 不可用、图片模式不支持或运行失败时会自动
-回退到 CPU，并在预览和执行结果中显示实际路径。
+CUDA Runtime 也会安装可选的 CuPy 与 nvImageCodec 图片预处理后端。预处理页面可以选择
+“自动（优先 CUDA）”、“CUDA”或“CPU”：对于 JPEG、PNG、WebP，CUDA 模式会尽量使用
+GPU 解码、Lanczos 3/4 缩放和编码，预览与执行结果会分别显示解码、缩放和编码的实际设备。
+CUDA 不可用、不支持的算法或格式、图片模式不兼容以及运行时故障都会自动回退到 CPU。完整
+GPU 管线默认使用单 worker，以限制批量处理时的显存峰值。
 
 Linux 也可以直接使用仓库根目录的 `启动开发版.sh`：
 

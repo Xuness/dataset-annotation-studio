@@ -45,11 +45,12 @@ def supports_cuda_resize(algorithm: ResizeAlgorithm) -> bool:
     return algorithm in {ResizeAlgorithm.LANCZOS3, ResizeAlgorithm.LANCZOS4}
 
 
-def resize_image_cuda(
-    image: Image.Image,
+def resize_array_cuda(
+    source_gpu: Any,
     target_size: tuple[int, int],
     algorithm: ResizeAlgorithm,
-) -> Image.Image:
+) -> Any:
+    """Resize an HWC uint8 array while keeping the result on the CUDA device."""
     if not supports_cuda_resize(algorithm):
         raise CudaResizeError(f"CUDA 缩放暂不支持算法：{algorithm.value}")
 
@@ -57,20 +58,19 @@ def resize_image_cuda(
     if cp is None:
         raise CudaResizeError(reason or "CUDA 缩放运行时不可用。")
 
-    prepared, restore_mode = _prepare_mode(image)
-    source = np.asarray(prepared)
-    if source.dtype != np.uint8:
-        raise CudaResizeError(f"CUDA 缩放暂不支持 {source.dtype} 像素格式。")
-    if source.ndim == 2:
-        source = source[:, :, None]
-    source = np.ascontiguousarray(source)
-    source_height, source_width, channels = source.shape
+    if getattr(source_gpu, "dtype", None) != np.dtype(np.uint8):
+        raise CudaResizeError("CUDA 缩放暂不支持非 uint8 GPU 像素格式。")
+    if getattr(source_gpu, "ndim", None) == 2:
+        source_gpu = source_gpu[:, :, None]
+    if getattr(source_gpu, "ndim", None) != 3:
+        raise CudaResizeError("CUDA 缩放需要 HWC 图像数组。")
+    source_height, source_width, channels = source_gpu.shape
     target_width, target_height = target_size
     lobes = 3 if algorithm == ResizeAlgorithm.LANCZOS3 else 4
 
     try:
         with _CUDA_LOCK, cp.cuda.Device(0):
-            source_gpu = cp.asarray(source)
+            source_gpu = cp.ascontiguousarray(source_gpu)
             horizontal = cp.empty((source_height, target_width, channels), dtype=cp.float32)
             output_gpu = cp.empty((target_height, target_width, channels), dtype=cp.uint8)
             horizontal_kernel, vertical_kernel = _kernels(cp)
@@ -100,11 +100,38 @@ def resize_image_cuda(
                     lobes,
                 ),
             )
-            output = cp.asnumpy(output_gpu)
+            return output_gpu
     except Exception as error:
         raise CudaResizeError(f"CUDA Lanczos 缩放失败：{error}") from error
 
-    if channels == 1:
+
+def resize_image_cuda(
+    image: Image.Image,
+    target_size: tuple[int, int],
+    algorithm: ResizeAlgorithm,
+) -> Image.Image:
+    if not supports_cuda_resize(algorithm):
+        raise CudaResizeError(f"CUDA 缩放暂不支持算法：{algorithm.value}")
+
+    cp, reason = load_cupy()
+    if cp is None:
+        raise CudaResizeError(reason or "CUDA 缩放运行时不可用。")
+
+    prepared, restore_mode = _prepare_mode(image)
+    source = np.asarray(prepared)
+    if source.dtype != np.uint8:
+        raise CudaResizeError(f"CUDA 缩放暂不支持 {source.dtype} 像素格式。")
+    try:
+        with _CUDA_LOCK, cp.cuda.Device(0):
+            source_gpu = cp.asarray(source)
+            output_gpu = resize_array_cuda(source_gpu, target_size, algorithm)
+            output = cp.asnumpy(output_gpu)
+    except CudaResizeError:
+        raise
+    except Exception as error:
+        raise CudaResizeError(f"CUDA Lanczos 缩放失败：{error}") from error
+
+    if output.ndim == 3 and output.shape[2] == 1:
         output = output[:, :, 0]
     result = Image.frombytes(prepared.mode, target_size, output.tobytes())
     if restore_mode is not None:

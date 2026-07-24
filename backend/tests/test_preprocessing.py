@@ -8,6 +8,7 @@ from dataset_studio.core.config import Settings
 from dataset_studio.core.files import file_sha256
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.assets.service import AssetService
+from dataset_studio.modules.preprocessing import cuda_pipeline as preprocessing_cuda_pipeline
 from dataset_studio.modules.preprocessing import executor as preprocessing_executor
 from dataset_studio.modules.preprocessing import image_pipeline as preprocessing_image_pipeline
 from dataset_studio.modules.preprocessing import planner as preprocessing_planner
@@ -25,6 +26,7 @@ from dataset_studio.modules.preprocessing.models import (
     ResizeAlgorithm,
     ResizeOptions,
 )
+from dataset_studio.modules.preprocessing.planner import PlanItem
 from dataset_studio.modules.preprocessing.repository import PreprocessRepository
 from dataset_studio.modules.preprocessing.service import PreprocessService
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
@@ -110,6 +112,158 @@ def test_cuda_resize_selection_reports_supported_path_and_fallback(monkeypatch) 
     )
     assert cpu.resize_device == "cpu"
     assert cpu.fallback_reason == "anime_low_halo 暂不支持 CUDA，已回退 CPU。"
+
+
+def test_all_gpu_runtime_selection_reports_cuda_and_serial_worker(monkeypatch) -> None:
+    monkeypatch.setattr(preprocessing_resize_runtime, "cuda_resize_status", lambda: (True, None))
+    monkeypatch.setattr(
+        preprocessing_resize_runtime,
+        "cuda_pipeline_status",
+        lambda: preprocessing_cuda_pipeline.CudaPipelineStatus(True, None),
+    )
+
+    selection = preprocessing_resize_runtime.select_preprocess_runtime(
+        PreprocessDevice.CUDA,
+        ResizeAlgorithm.LANCZOS3,
+        resize_needed=True,
+    )
+
+    assert selection.decode_device == "cuda"
+    assert selection.resize_device == "cuda"
+    assert selection.encoding_device == "cuda"
+    assert selection.pipeline_device == "cuda"
+
+    item = PlanItem(
+        asset_id="asset",
+        before_relative_path="source.png",
+        after_relative_path="output.png",
+        before_width=4000,
+        before_height=3000,
+        after_width=2000,
+        after_height=1500,
+        before_hash="0" * 64,
+        will_change=True,
+        warning=None,
+    )
+    request = PreprocessRequest(resize=ResizeOptions(max_edge=2000))
+    assert (
+        preprocessing_executor.resolve_resize_worker_count(
+            [item],
+            request,
+            PreprocessExecutionOptions(max_workers=16),
+            pipeline_device="cuda",
+        )
+        == 1
+    )
+
+
+def test_convert_only_runtime_reports_all_gpu(monkeypatch) -> None:
+    monkeypatch.setattr(preprocessing_resize_runtime, "cuda_resize_status", lambda: (True, None))
+    monkeypatch.setattr(
+        preprocessing_resize_runtime,
+        "cuda_pipeline_status",
+        lambda: preprocessing_cuda_pipeline.CudaPipelineStatus(True, None),
+    )
+
+    selection = preprocessing_resize_runtime.select_preprocess_runtime(
+        PreprocessDevice.CUDA,
+        None,
+        resize_needed=False,
+    )
+
+    assert selection.pipeline_device == "cuda"
+    assert selection.decode_device == "cuda"
+    assert selection.resize_device == "cuda"
+    assert selection.encoding_device == "cuda"
+
+
+def test_cuda_runtime_does_not_claim_gpu_for_rename_only(monkeypatch) -> None:
+    monkeypatch.setattr(preprocessing_resize_runtime, "cuda_resize_status", lambda: (True, None))
+    monkeypatch.setattr(
+        preprocessing_resize_runtime,
+        "cuda_pipeline_status",
+        lambda: preprocessing_cuda_pipeline.CudaPipelineStatus(True, None),
+    )
+
+    selection = preprocessing_resize_runtime.select_preprocess_runtime(
+        PreprocessDevice.CUDA,
+        None,
+        resize_needed=False,
+        render_needed=False,
+    )
+
+    assert selection.pipeline_device == "cpu"
+    assert selection.decode_device == "cpu"
+    assert selection.encoding_device == "cpu"
+
+
+def test_cuda_runtime_marks_unsupported_outputs_as_cpu_encoding(monkeypatch) -> None:
+    monkeypatch.setattr(preprocessing_resize_runtime, "cuda_resize_status", lambda: (True, None))
+    monkeypatch.setattr(
+        preprocessing_resize_runtime,
+        "cuda_pipeline_status",
+        lambda: preprocessing_cuda_pipeline.CudaPipelineStatus(True, None),
+    )
+
+    selection = preprocessing_resize_runtime.select_preprocess_runtime(
+        PreprocessDevice.CUDA,
+        ResizeAlgorithm.LANCZOS3,
+        resize_needed=True,
+        encoding_supported=False,
+    )
+
+    assert selection.decode_device == "cpu"
+    assert selection.resize_device == "cuda"
+    assert selection.encoding_device == "cpu"
+    assert selection.pipeline_device == "mixed"
+    assert "目标格式不支持 CUDA 编码" in (selection.fallback_reason or "")
+
+
+def test_cuda_pipeline_failure_switches_operation_to_cpu(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(preprocessing_resize_runtime, "cuda_resize_status", lambda: (True, None))
+    monkeypatch.setattr(
+        preprocessing_resize_runtime,
+        "cuda_pipeline_status",
+        lambda: preprocessing_cuda_pipeline.CudaPipelineStatus(True, None),
+    )
+
+    class FailingPipeline:
+        def __init__(self):
+            pass
+
+        def render(self, *_args, **_kwargs):
+            raise preprocessing_resize_runtime.CudaPipelineError("测试编解码失败")
+
+    monkeypatch.setattr(preprocessing_resize_runtime, "CudaImagePipeline", FailingPipeline)
+    executor = preprocessing_resize_runtime.ResizeExecutor.create(
+        PreprocessDevice.CUDA,
+        ResizeAlgorithm.LANCZOS3,
+        resize_needed=True,
+    )
+    item = PlanItem(
+        asset_id="asset",
+        before_relative_path="source.png",
+        after_relative_path="output.png",
+        before_width=100,
+        before_height=100,
+        after_width=64,
+        after_height=64,
+        before_hash="0" * 64,
+        will_change=True,
+        warning=None,
+    )
+
+    assert not executor.try_render_gpu(
+        tmp_path / "source.png",
+        tmp_path / "output.png",
+        item,
+        ResizeOptions(max_edge=64),
+        None,
+    )
+    assert executor.selection.pipeline_device == "cpu"
+    assert executor.selection.decode_device == "cpu"
+    assert executor.selection.encoding_device == "cpu"
+    assert "测试编解码失败" in (executor.selection.fallback_reason or "")
 
 
 def test_cuda_resize_executor_falls_back_after_runtime_failure(monkeypatch) -> None:

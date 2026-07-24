@@ -57,6 +57,9 @@ export function PreprocessSettingsPanel({
     (Number.isInteger(form.maxWorkers) && form.maxWorkers >= 1 && form.maxWorkers <= 16);
   const validRequest =
     (imageRenderingEnabled || form.renameEnabled) && validScope && validRename && validConcurrency;
+  const runtimeLabel = preview
+    ? `解码 ${preview.runtime.decode_device.toUpperCase()} · 缩放 ${preview.runtime.resize_device.toUpperCase()} · 编码 ${preview.runtime.encoding_device.toUpperCase()}`
+    : "解码 CPU · 缩放 CPU · 编码 CPU";
   const selectedWorkerCount = preview
     ? form.concurrencyMode === "auto"
       ? preview.runtime.automatic_worker_count
@@ -92,13 +95,17 @@ export function PreprocessSettingsPanel({
         <div className="preprocess-runtime-card__title">
           <Cpu size={15} />
           <strong>
-            {preview?.runtime.resize_device === "cuda" ? "CUDA 缩放 + CPU 编码" : "CPU 本地处理"}
+            {preview?.runtime.device === "cuda"
+              ? "CUDA 全 GPU 预处理"
+              : preview?.runtime.device === "mixed"
+                ? "CUDA / CPU 混合预处理"
+                : "CPU 本地处理"}
           </strong>
-          <span>编码始终使用 CPU</span>
+          <span>{runtimeLabel}</span>
         </div>
         <p>
-          预览只检查图片信息、文件状态和目标尺寸，不会真正缩放或编码。CUDA 模式使用 CuPy 执行
-          Lanczos 3/4 缩放，PNG、WebP 和 JPEG 保存仍由 Pillow 在 CPU 上完成。
+          预览只检查图片信息、文件状态和目标尺寸，不会真正缩放或编码。CUDA 模式会尽量让解码、
+          Lanczos 缩放和编码都停留在 GPU；不支持的算法、格式或运行时故障会自动回退 CPU。
         </p>
         <dl>
           <div>
@@ -119,7 +126,7 @@ export function PreprocessSettingsPanel({
             <dt>处理路径</dt>
             <dd>
               {preview
-                ? `缩放 ${preview.runtime.resize_device.toUpperCase()} · 编码 CPU`
+                ? runtimeLabel
                 : form.processingDevice === "cpu"
                   ? "缩放 CPU · 编码 CPU"
                   : "等待预览检测 CUDA"}
@@ -129,7 +136,7 @@ export function PreprocessSettingsPanel({
             <dt>实际处理</dt>
             <dd>
               {executeElapsedMs > 0
-                ? `${preview?.runtime.resize_device === "cuda" ? "CUDA 缩放 / CPU 编码" : "CPU"} 处理中 · 已用时 ${formatElapsed(executeElapsedMs)}`
+                ? `${preview?.runtime.device === "cuda" ? "CUDA 全 GPU" : preview?.runtime.device === "mixed" ? "CUDA / CPU 混合" : "CPU"} 处理中 · ${runtimeLabel} · 已用时 ${formatElapsed(executeElapsedMs)}`
                 : lastExecutionRuntime
                   ? `完成于 ${formatPreviewDuration(lastExecutionRuntime.duration_ms)} · ${lastExecutionRuntime.worker_count} 线程`
                   : selectedWorkerCount
@@ -307,8 +314,8 @@ export function PreprocessSettingsPanel({
           </label>
         </div>
         <small>
-          CUDA 只加速 Lanczos 3/4 缩放，解码和编码仍使用 CPU；多个工作线程可让 CPU 编码与串行 GPU
-          缩放重叠。重命名、数据库写入与回滚仍按顺序执行。
+          CUDA 模式优先使用 nvImageCodec 完成 GPU 解码/编码，并使用 CuPy 完成 Lanczos 3/4 缩放；
+          anime_low_halo、部分格式和异常情况会回退 CPU。重命名、数据库写入与回滚仍按顺序执行。
         </small>
       </section>
       <section className="preprocess-option">

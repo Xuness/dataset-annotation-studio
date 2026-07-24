@@ -40,7 +40,10 @@ from dataset_studio.modules.preprocessing.recovery import (
     RecoveryFileOperations,
 )
 from dataset_studio.modules.preprocessing.repository import PreprocessRepository
-from dataset_studio.modules.preprocessing.resize_runtime import select_resize_runtime
+from dataset_studio.modules.preprocessing.resize_runtime import (
+    encoding_supports_all_rendered_outputs,
+    select_preprocess_runtime,
+)
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
@@ -93,20 +96,27 @@ class PreprocessService:
             item.before_width != item.after_width or item.before_height != item.after_height
             for item in plan
         )
-        runtime_selection = select_resize_runtime(
+        render_items = [item for item in plan if requires_render(item, request)]
+        runtime_selection = select_preprocess_runtime(
             execution.device,
             request.resize.algorithm if request.resize else None,
             resize_needed=resize_needed,
+            encoding_supported=encoding_supports_all_rendered_outputs(
+                render_items, request.convert
+            ),
+            render_needed=bool(render_items),
         )
         automatic_worker_count = resolve_resize_worker_count(
             plan,
             request,
             PreprocessExecutionOptions(),
+            pipeline_device=runtime_selection.pipeline_device,
         )
         maximum_worker_count = resolve_resize_worker_count(
             plan,
             request,
             PreprocessExecutionOptions(max_workers=16),
+            pipeline_device=runtime_selection.pipeline_device,
         )
         preview_duration_ms = round((time.perf_counter() - started) * 1000)
         return PreprocessPreview(
@@ -120,8 +130,9 @@ class PreprocessService:
             runtime=PreprocessRuntimeInfo(
                 device=runtime_selection.pipeline_device,
                 requested_device=runtime_selection.requested_device,
+                decode_device=runtime_selection.decode_device,
                 resize_device=runtime_selection.resize_device,
-                encoding_device="cpu",
+                encoding_device=runtime_selection.encoding_device,
                 cuda_available=runtime_selection.cuda_available,
                 fallback_reason=runtime_selection.fallback_reason,
                 preview_duration_ms=preview_duration_ms,
@@ -194,8 +205,9 @@ class PreprocessService:
                 if runtime_selection is not None:
                     execution_runtime = PreprocessExecutionRuntimeInfo(
                         requested_device=runtime_selection.requested_device,
+                        decode_device=runtime_selection.decode_device,
                         resize_device=runtime_selection.resize_device,
-                        encoding_device="cpu",
+                        encoding_device=runtime_selection.encoding_device,
                         fallback_reason=runtime_selection.fallback_reason,
                         worker_count=worker_count,
                         duration_ms=round((time.perf_counter() - started) * 1000),
