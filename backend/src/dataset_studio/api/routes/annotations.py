@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
 from dataset_studio.modules.annotations.models import (
+    AnnotationBatchConfirmRequest,
+    AnnotationBatchConfirmResult,
     AnnotationBatchDeleteRequest,
     AnnotationBatchDeleteResult,
     AnnotationBundle,
@@ -83,6 +85,18 @@ def delete_annotations(
         )
 
 
+@batch_router.post("/tags/confirm", response_model=AnnotationBatchConfirmResult)
+def confirm_tag_annotations(
+    project_id: str,
+    request: AnnotationBatchConfirmRequest,
+    container: Container,
+):
+    with container.preprocessing.guard_workspace(project_id, "confirm-tags-batch"):
+        container.asset_deletions.ensure_persisted_inactive(project_id)
+        container.exports.ensure_inactive(project_id)
+        return container.annotations.confirm_tags_many(project_id, request.asset_ids)
+
+
 @channels_router.get("", response_model=AnnotationBundle)
 def list_annotation_channels(project_id: str, asset_id: str, container: Container):
     return container.annotations.list(project_id, asset_id)
@@ -114,6 +128,9 @@ def save_annotation_channel(
     ):
         container.asset_deletions.ensure_persisted_inactive(project_id)
         container.exports.ensure_inactive(project_id)
+        should_confirm = (
+            update.confirm if update.confirm is not None else channel == AnnotationChannel.TAGS
+        )
         if update.tags is not None:
             if channel != AnnotationChannel.TAGS:
                 raise ValueError("只有 Tags 通道可以保存结构化 Tag。")
@@ -122,7 +139,7 @@ def save_annotation_channel(
                 asset_id,
                 update.tags,
                 expected_head_revision_id=update.expected_head_revision_id,
-                confirm=update.confirm,
+                confirm=should_confirm,
             )
         elif channel == AnnotationChannel.TRANSLATION:
             assert update.content is not None
@@ -132,7 +149,7 @@ def save_annotation_channel(
                 language,
                 update.content,
                 expected_head_revision_id=update.expected_head_revision_id,
-                confirm=update.confirm,
+                confirm=should_confirm,
             )
         else:
             assert update.content is not None
@@ -143,7 +160,7 @@ def save_annotation_channel(
                 update.content,
                 language=language,
                 expected_head_revision_id=update.expected_head_revision_id,
-                confirm=update.confirm,
+                confirm=should_confirm,
             )
         return result.document
 

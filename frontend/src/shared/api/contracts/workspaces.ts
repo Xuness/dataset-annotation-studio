@@ -3,6 +3,7 @@ export interface WorkspaceSettings {
   system_preset_id: string | null;
   user_prompt: string;
   json_fields: string[];
+  use_confirmed_tags: boolean;
   validation_mode: string;
 }
 

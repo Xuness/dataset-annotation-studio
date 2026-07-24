@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from dataset_studio.modules.annotations.models import AnnotationChannel
 
@@ -55,6 +55,8 @@ class ExistingTranslationPolicy(StrEnum):
 
 
 class JobCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     execution_backend: ExecutionBackend = ExecutionBackend.PROVIDER
     provider_profile_id: str | None = None
     model_id: str | None = Field(default=None, min_length=1, max_length=500)
@@ -63,7 +65,6 @@ class JobCreateRequest(BaseModel):
     scope: JobScope = JobScope.ALL
     asset_ids: list[str] = Field(default_factory=list)
     overwrite_existing: bool = False
-    use_confirmed_tags: bool = False
     translation_prompt_preset_id: str | None = None
     target_language: str = "zh-CN"
     translation_policy: ExistingTranslationPolicy = ExistingTranslationPolicy.SKIP
@@ -79,10 +80,6 @@ class JobCreateRequest(BaseModel):
                 raise ValueError("请选择模型连接。")
         elif not self.tagger_profile_id or not self.tagger_profile_id.strip():
             raise ValueError("请选择本地打标配置。")
-        if self.use_confirmed_tags and (
-            self.kind != JobKind.ANNOTATION or self.execution_backend != ExecutionBackend.PROVIDER
-        ):
-            raise ValueError("只有 LLM 标注任务可以使用已确认 Tags 辅助。")
         return self
 
 

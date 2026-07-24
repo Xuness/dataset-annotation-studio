@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { AnnotationChannel, AnnotationTag } from "../../shared/api/types";
-import { annotationTraceKeys, assetKeys } from "../assets/queryKeys";
+import { annotationTraceKeys, assetKeys, promptPreviewKeys } from "../assets/queryKeys";
 import { statisticsKeys } from "../statistics/queryKeys";
 import { translationKeys } from "../translations/queryKeys";
 import { workspaceKeys } from "../workspaces/queryKeys";
 import {
+  confirmTagAnnotations,
   deleteAnnotationChannel,
   deleteAnnotations,
   getAnnotationBundle,
@@ -61,6 +62,7 @@ function useInvalidateAnnotation(projectId: string) {
     void queryClient.invalidateQueries({
       queryKey: annotationTraceKeys.project(projectId),
     });
+    void queryClient.invalidateQueries({ queryKey: promptPreviewKeys.project(projectId) });
     void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
     void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
     void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
@@ -137,10 +139,19 @@ export function useDeleteAnnotations(projectId: string) {
       void queryClient.invalidateQueries({
         queryKey: annotationTraceKeys.project(projectId),
       });
+      void queryClient.invalidateQueries({ queryKey: promptPreviewKeys.project(projectId) });
       void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
       void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
       void queryClient.invalidateQueries({ queryKey: statisticsKeys.project(projectId) });
     },
+  });
+}
+
+export function useConfirmTagAnnotations(projectId: string) {
+  const invalidate = useInvalidateAnnotation(projectId);
+  return useMutation({
+    mutationFn: (assetIds: string[]) => confirmTagAnnotations(projectId, assetIds),
+    onSuccess: invalidate,
   });
 }

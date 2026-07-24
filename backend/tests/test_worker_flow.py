@@ -234,7 +234,10 @@ def test_llm_job_does_not_freeze_confirmed_tags_for_an_old_image(
     )
     workspaces.update_settings(
         workspace.project_id,
-        WorkspaceSettingsUpdate(system_preset_id=system.id),
+        WorkspaceSettingsUpdate(
+            system_preset_id=system.id,
+            use_confirmed_tags=True,
+        ),
     )
     asset = container.assets.list_assets(workspace.project_id).items[0]
     container.annotations.save_tags(
@@ -273,7 +276,6 @@ def test_llm_job_does_not_freeze_confirmed_tags_for_an_old_image(
         JobCreateRequest(
             provider_profile_id=provider.id,
             scope=JobScope.ALL,
-            use_confirmed_tags=True,
         ),
     )
     paths, _ = workspaces.get(workspace.project_id)
@@ -362,7 +364,7 @@ async def test_worker_runs_local_tagger_without_prompt_or_provider(
         assert [tag.name for tag in document.tags] == ["alice", "blue_hair"]
         assert document.tags[0].category == "character"
         assert document.tags[0].confidence == 0.91
-        assert document.review_status.value == "unreviewed"
+        assert document.review_status.value == "confirmed"
     assert all(not image_path.with_suffix(".txt").exists() for image_path in image_paths)
     trace = container.annotation_traces.get(workspace.project_id, detail.items[0].asset_id)
     assert trace is not None
@@ -390,6 +392,7 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
             system_preset_id=system.id,
             user_prompt="Describe the image.",
             json_fields=["artist"],
+            use_confirmed_tags=True,
         ),
     )
     asset = container.assets.list_assets(workspace.project_id).items[0]
@@ -442,7 +445,6 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
             provider_profile_id=profile.id,
             model_id="fake-model-alternate",
             scope=JobScope.ALL,
-            use_confirmed_tags=True,
         ),
     )
     frozen_tags = container.annotations.get_channel(
@@ -495,7 +497,7 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
     assert stored.content == "<caption>quiet garden</caption>"
     assert stored.review_status.value == "unreviewed"
     assert not (project / "sample.txt").exists()
-    expected_prompt = 'Describe the image.\n\nartist: Mori\nconfirmed_tags: ["blue_hair","alice"]'
+    expected_prompt = 'Describe the image.\n\nartist: Mori\ntags: ["blue_hair","alice"]'
     assert provider.requests[0].user_prompt == expected_prompt
     detail = jobs.get(workspace.project_id, created.id)
     assert detail.succeeded == 1

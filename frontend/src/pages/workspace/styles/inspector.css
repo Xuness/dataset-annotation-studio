@@ -218,6 +218,48 @@
   font-weight: 650;
 }
 
+.prompt-tag-assist {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-soft) 30%, var(--surface-raised));
+  cursor: pointer;
+}
+
+.prompt-tag-assist input {
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
+.prompt-tag-assist > span,
+.prompt-tag-assist strong,
+.prompt-tag-assist small {
+  display: block;
+  min-width: 0;
+}
+
+.prompt-tag-assist strong {
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.prompt-tag-assist small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  line-height: 1.55;
+}
+
+.prompt-tag-assist code {
+  margin: 0 3px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+}
+
 .prompt-config-actions {
   display: flex;
   justify-content: space-between;
@@ -346,6 +388,11 @@
 .prompt-message-card--final {
   border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
   background: color-mix(in srgb, var(--accent-soft) 16%, var(--surface-raised));
+}
+
+.prompt-message-card--context {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 12%, var(--surface-raised));
 }
 
 .annotation-trace {

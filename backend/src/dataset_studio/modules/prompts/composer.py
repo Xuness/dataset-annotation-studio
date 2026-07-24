@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 class PromptPreview(BaseModel):
     user_prompt: str
     metadata_lines: list[str]
+    tag_line: str | None
     final_prompt: str
 
 
@@ -20,6 +22,11 @@ class RequestPromptPreview(BaseModel):
     system_prompt: str
     user_prompt: str
     metadata_lines: list[str]
+    tag_assistance_enabled: bool
+    tag_context_status: Literal["disabled", "ready", "unavailable"]
+    tag_revision_id: str | None
+    tag_count: int
+    tag_line: str | None
     final_user_prompt: str
     configuration_issue: str | None = None
 
@@ -77,44 +84,65 @@ def _format_value(value: object) -> str:
     return str(value)
 
 
+def _metadata_lines(
+    metadata: object | None,
+    selected_fields: Iterable[str],
+) -> list[str]:
+    lines: list[str] = []
+    if metadata is None:
+        return lines
+    for field in selected_fields:
+        found, value = _resolve_path(metadata, field)
+        if found:
+            lines.append(f"{field}: {_format_value(value)}")
+    return lines
+
+
+def _tag_line(auxiliary_tags: Iterable[str]) -> str | None:
+    tags = [str(tag) for tag in auxiliary_tags]
+    if not tags:
+        return None
+    return "tags: " + json.dumps(tags, ensure_ascii=False, separators=(",", ":"))
+
+
+def _append_context(user_prompt: str, lines: Iterable[str]) -> str:
+    context_lines = list(lines)
+    body = user_prompt.rstrip()
+    if not context_lines:
+        return body
+    if not body:
+        return "\n".join(context_lines)
+    return f"{body}\n\n" + "\n".join(context_lines)
+
+
 def compose_user_prompt(
     user_prompt: str,
     metadata: object | None,
     selected_fields: Iterable[str],
     auxiliary_tags: Iterable[str] = (),
 ) -> str:
-    lines: list[str] = []
-    if metadata is not None:
-        for field in selected_fields:
-            found, value = _resolve_path(metadata, field)
-            if found:
-                lines.append(f"{field}: {_format_value(value)}")
-    tags = [str(tag) for tag in auxiliary_tags]
-    if tags:
-        lines.append(
-            "confirmed_tags: " + json.dumps(tags, ensure_ascii=False, separators=(",", ":"))
-        )
-
-    body = user_prompt.rstrip()
-    if not lines:
-        return body
-    if not body:
-        return "\n".join(lines)
-    return f"{body}\n\n" + "\n".join(lines)
+    lines = _metadata_lines(metadata, selected_fields)
+    tag_line = _tag_line(auxiliary_tags)
+    if tag_line:
+        lines.append(tag_line)
+    return _append_context(user_prompt, lines)
 
 
 def preview_user_prompt(
     user_prompt: str,
     metadata: object | None,
     selected_fields: Iterable[str],
+    auxiliary_tags: Iterable[str] = (),
 ) -> PromptPreview:
-    final_prompt = compose_user_prompt(user_prompt, metadata, selected_fields)
     body = user_prompt.rstrip()
-    metadata_text = final_prompt[len(body) :].lstrip("\n") if body else final_prompt
+    metadata_lines = _metadata_lines(metadata, selected_fields)
+    tag_line = _tag_line(auxiliary_tags)
+    context_lines = [*metadata_lines, *([tag_line] if tag_line else [])]
     return PromptPreview(
         user_prompt=body,
-        metadata_lines=metadata_text.splitlines() if metadata_text else [],
-        final_prompt=final_prompt,
+        metadata_lines=metadata_lines,
+        tag_line=tag_line,
+        final_prompt=_append_context(body, context_lines),
     )
 
 
@@ -126,15 +154,31 @@ def preview_request_prompt(
     user_prompt: str,
     metadata: object | None,
     selected_fields: Iterable[str],
+    auxiliary_tags: Iterable[str] = (),
+    tag_assistance_enabled: bool = False,
+    tag_revision_id: str | None = None,
     configuration_issue: str | None = None,
 ) -> RequestPromptPreview:
-    user_preview = preview_user_prompt(user_prompt, metadata, selected_fields)
+    tags = [str(tag) for tag in auxiliary_tags]
+    user_preview = preview_user_prompt(user_prompt, metadata, selected_fields, tags)
+    tag_context_status: Literal["disabled", "ready", "unavailable"]
+    if not tag_assistance_enabled:
+        tag_context_status = "disabled"
+    elif user_preview.tag_line:
+        tag_context_status = "ready"
+    else:
+        tag_context_status = "unavailable"
     return RequestPromptPreview(
         system_preset_id=system_preset_id,
         system_preset_name=system_preset_name,
         system_prompt=system_prompt,
         user_prompt=user_preview.user_prompt,
         metadata_lines=user_preview.metadata_lines,
+        tag_assistance_enabled=tag_assistance_enabled,
+        tag_context_status=tag_context_status,
+        tag_revision_id=tag_revision_id,
+        tag_count=len(tags),
+        tag_line=user_preview.tag_line,
         final_user_prompt=user_preview.final_prompt,
         configuration_issue=configuration_issue,
     )

@@ -29,6 +29,7 @@ const asset: AssetSummary = {
   metadata_relative_path: null,
   generation_status: null,
   generation_error: null,
+  annotation_channels: {},
 };
 
 afterEach(cleanup);
@@ -38,6 +39,7 @@ describe("asset browser rows", () => {
     const user = userEvent.setup();
     const onSelect = vi.fn(async () => true);
     const onSetChecked = vi.fn();
+    const onConfirmCheckedTags = vi.fn();
 
     render(
       <AssetBrowser
@@ -45,7 +47,7 @@ describe("asset browser rows", () => {
         assets={[asset]}
         total={1}
         selectedAssetId={null}
-        checkedAssetIds={[]}
+        checkedAssetIds={["asset-1"]}
         search=""
         statusFilter={null}
         statusCounts={{}}
@@ -82,6 +84,7 @@ describe("asset browser rows", () => {
         onSetChecked={onSetChecked}
         onToggleAll={() => undefined}
         onRecursiveChange={() => undefined}
+        onConfirmCheckedTags={onConfirmCheckedTags}
         onDeleteCheckedAnnotations={() => undefined}
         onDeleteCheckedAssets={() => undefined}
         onOpenDeletionHistory={() => undefined}
@@ -94,8 +97,11 @@ describe("asset browser rows", () => {
     expect(openButton.contains(checkbox)).toBe(false);
 
     await user.click(checkbox);
-    expect(onSetChecked).toHaveBeenCalledWith(["asset-1"], true);
+    expect(onSetChecked).toHaveBeenCalledWith(["asset-1"], false);
     expect(onSelect).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "确认 Tags" }));
+    expect(onConfirmCheckedTags).toHaveBeenCalledOnce();
 
     await user.click(openButton);
     expect(onSelect).toHaveBeenCalledWith("asset-1");

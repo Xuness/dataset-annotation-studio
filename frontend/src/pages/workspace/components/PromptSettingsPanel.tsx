@@ -10,6 +10,7 @@ import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import type {
   AssetAnnotationTrace,
   AssetSummary,
+  PromptPreview,
   WorkspaceSummary,
 } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
@@ -64,6 +65,17 @@ function TraceMessageCard({
       <pre className={!content ? "is-empty" : undefined}>{content || empty}</pre>
     </article>
   );
+}
+
+function promptContextDetail(preview: PromptPreview): string {
+  const parts = preview.user_prompt ? ["项目内容"] : [];
+  if (preview.metadata_lines.length) {
+    parts.push(`${preview.metadata_lines.length} 行 JSON 元数据`);
+  }
+  if (preview.tag_context_status === "ready") {
+    parts.push(`${preview.tag_count} 个 Tags`);
+  }
+  return parts.length ? parts.join(" + ") : "当前为空";
 }
 
 function AnnotationTraceView({ trace }: { trace: AssetAnnotationTrace }) {
@@ -220,6 +232,7 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
   const systemPresets = useSystemPresets();
   const [systemPresetId, setSystemPresetId] = useState(workspace.settings.system_preset_id ?? "");
   const [prompt, setPrompt] = useState(workspace.settings.user_prompt);
+  const [useConfirmedTags, setUseConfirmedTags] = useState(workspace.settings.use_confirmed_tags);
   const [recordView, setRecordView] = useState<"trace" | "preview">("trace");
   const [error, setError] = useState<string | null>(null);
   const update = useUpdateWorkspace(projectId);
@@ -229,10 +242,16 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
   useEffect(() => {
     setSystemPresetId(workspace.settings.system_preset_id ?? "");
     setPrompt(workspace.settings.user_prompt);
-  }, [workspace.settings.system_preset_id, workspace.settings.user_prompt]);
+    setUseConfirmedTags(workspace.settings.use_confirmed_tags);
+  }, [
+    workspace.settings.system_preset_id,
+    workspace.settings.use_confirmed_tags,
+    workspace.settings.user_prompt,
+  ]);
   const dirty =
     systemPresetId !== (workspace.settings.system_preset_id ?? "") ||
-    prompt !== workspace.settings.user_prompt;
+    prompt !== workspace.settings.user_prompt ||
+    useConfirmedTags !== workspace.settings.use_confirmed_tags;
   useUnsavedScope(`workspace-prompt:${projectId}`, dirty);
 
   const selectedPresetExists = Boolean(
@@ -266,7 +285,11 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
       return;
     }
     try {
-      await update.mutateAsync({ system_preset_id: systemPresetId, user_prompt: prompt });
+      await update.mutateAsync({
+        system_preset_id: systemPresetId,
+        user_prompt: prompt,
+        use_confirmed_tags: useConfirmedTags,
+      });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "保存项目提示词配置失败。");
     }
@@ -321,6 +344,21 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
             onChange={(event) => setPrompt(event.target.value)}
             placeholder="输入在当前项目中保持稳定的 User Prompt…"
           />
+        </label>
+        <label className="prompt-tag-assist">
+          <input
+            type="checkbox"
+            checked={useConfirmedTags}
+            onChange={(event) => setUseConfirmedTags(event.target.checked)}
+          />
+          <span>
+            <strong>使用 Tags 辅助 LLM</strong>
+            <small>
+              每张图片创建任务时会冻结其已确认 Tags，并在 JSON 元数据之后以
+              <code>tags: [&quot;tag_a&quot;,&quot;tag_b&quot;]</code> 形式追加到 User
+              Prompt。没有可用 Tags 时不会追加这一行。
+            </small>
+          </span>
         </label>
         <div className="prompt-config-actions">
           <Button icon={<Settings2 size={14} />} onClick={openPresetLibrary}>
@@ -400,14 +438,28 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
                     </header>
                     <pre>{preview.data.system_prompt || "尚未保存 System Prompt 预设。"}</pre>
                   </article>
+                  <article className="prompt-message-card prompt-message-card--context">
+                    <header>
+                      <span>TAGS CONTEXT</span>
+                      <small>
+                        {preview.data.tag_context_status === "ready"
+                          ? `将追加 ${preview.data.tag_count} 个 Tags`
+                          : preview.data.tag_context_status === "unavailable"
+                            ? "已启用，当前图片无可用 Tags"
+                            : "项目设置未启用"}
+                      </small>
+                    </header>
+                    <pre className={preview.data.tag_line ? undefined : "is-empty"}>
+                      {preview.data.tag_line ??
+                        (preview.data.tag_context_status === "disabled"
+                          ? "不会向 User Prompt 追加 Tags 行。"
+                          : "当前图片没有与现有图片版本一致的已确认 Tags；实际请求将省略 Tags 行。")}
+                    </pre>
+                  </article>
                   <article className="prompt-message-card">
                     <header>
                       <span>USER</span>
-                      <small>
-                        {preview.data.metadata_lines.length
-                          ? `项目内容 + ${preview.data.metadata_lines.length} 行元数据`
-                          : "项目内容"}
-                      </small>
+                      <small>{promptContextDetail(preview.data)}</small>
                     </header>
                     <pre>{preview.data.final_user_prompt || "User Prompt 当前为空。"}</pre>
                   </article>

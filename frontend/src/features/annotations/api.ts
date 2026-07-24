@@ -1,5 +1,6 @@
 import { apiRequest } from "../../shared/api/client";
 import type {
+  AnnotationBatchConfirmResult,
   AnnotationBatchDeleteResult,
   AnnotationBundle,
   AnnotationChannel,
@@ -52,7 +53,7 @@ export function saveAnnotationChannel(
       content: input.content,
       tags: input.tags,
       expected_head_revision_id: input.expectedHeadRevisionId,
-      confirm: input.confirm ?? false,
+      confirm: input.confirm,
     }),
   });
 }
@@ -97,6 +98,16 @@ export function deleteAnnotations(
   assetIds: string[],
 ): Promise<AnnotationBatchDeleteResult> {
   return apiRequest(`/api/v1/workspaces/${projectId}/annotations/delete`, {
+    method: "POST",
+    body: JSON.stringify({ asset_ids: assetIds }),
+  });
+}
+
+export function confirmTagAnnotations(
+  projectId: string,
+  assetIds: string[],
+): Promise<AnnotationBatchConfirmResult> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/annotations/tags/confirm`, {
     method: "POST",
     body: JSON.stringify({ asset_ids: assetIds }),
   });

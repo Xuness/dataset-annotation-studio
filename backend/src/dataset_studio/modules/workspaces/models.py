@@ -12,6 +12,7 @@ class WorkspaceSettings(BaseModel):
     system_preset_id: str | None = None
     user_prompt: str = ""
     json_fields: list[str] = Field(default_factory=list)
+    use_confirmed_tags: bool = False
     validation_mode: Literal["tag_balance"] = "tag_balance"
 
 
@@ -51,6 +52,7 @@ class WorkspaceSettingsUpdate(BaseModel):
     system_preset_id: str | None = None
     user_prompt: str | None = None
     json_fields: list[str] | None = None
+    use_confirmed_tags: bool | None = None
     validation_mode: Literal["tag_balance"] | None = None
 
 

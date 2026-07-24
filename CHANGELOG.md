@@ -8,8 +8,10 @@ changes.
 
 - Replaced runtime annotation sidecars with revisioned SQLite channels for imported
   annotations, structured Tags, LLM descriptions, and translations.
-- Added optional confirmed-Tag assistance for LLM jobs with per-asset input revision
-  snapshots.
+- Made Tags immediately confirmed after Tagger or manual writes, with batch confirmation
+  for selected legacy, edited, or stale Tag revisions.
+- Added project-level Tag assistance beside the prompt settings, exact User Prompt
+  previews, and per-asset input revision snapshots for LLM jobs.
 - Added channel-aware TXT and JSON export, including independent training variants for
   multi-channel TXT output.
 - Prepared the repository for an Apache-2.0 source release.

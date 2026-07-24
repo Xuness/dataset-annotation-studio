@@ -13,7 +13,8 @@
 - 使用本地 ONNX Tagger，或 OpenRouter、OpenAI 兼容接口、OpenCode Go、Gemini、
   Codex 等外部提供方生成标注。
 - 在项目 SQLite 中分别管理原有标注、结构化 Tags、LLM 描述和多语言译文，保留确认状态与完整修订历史。
-- 可选择把已确认 Tags 冻结后追加到 LLM User Prompt；任务创建后的 Tag 编辑不会改变既有任务。
+- Tagger 与人工保存的 Tags 默认直接确认，并支持批量确认选中图片的历史或过期 Tags。
+- 可在素材页提示词配置中选择把 Tags 冻结后追加到 LLM User Prompt，并预览实际拼接内容；任务创建后的 Tag 编辑不会改变既有任务。
 - 批量缩放、格式转换、重命名、恢复与撤销，文件写入带预览和冲突检查。
 - 按通道和修订导出训练用 TXT、逐图 JSON 或两者；多个 TXT 通道生成独立训练集目录。
 

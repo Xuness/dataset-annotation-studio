@@ -28,6 +28,7 @@ def test_preview_separates_metadata_lines() -> None:
 
     assert preview.user_prompt == "Task"
     assert preview.metadata_lines == ["key: value"]
+    assert preview.tag_line is None
     assert preview.final_prompt == "Task\n\nkey: value"
 
 
@@ -39,11 +40,36 @@ def test_request_preview_keeps_system_and_final_user_messages_separate() -> None
         user_prompt="Describe the image.",
         metadata={"artist": "Mori"},
         selected_fields=["artist"],
+        auxiliary_tags=["blue_hair", "alice"],
+        tag_assistance_enabled=True,
+        tag_revision_id="tag-revision",
     )
 
     assert preview.system_prompt == "Return balanced XML."
     assert preview.system_preset_name == "XML caption"
-    assert preview.final_user_prompt == "Describe the image.\n\nartist: Mori"
+    assert preview.tag_context_status == "ready"
+    assert preview.tag_revision_id == "tag-revision"
+    assert preview.tag_count == 2
+    assert preview.tag_line == 'tags: ["blue_hair","alice"]'
+    assert preview.final_user_prompt == (
+        'Describe the image.\n\nartist: Mori\ntags: ["blue_hair","alice"]'
+    )
+
+
+def test_request_preview_reports_enabled_tags_as_unavailable_without_a_revision() -> None:
+    preview = preview_request_prompt(
+        system_preset_id=None,
+        system_preset_name=None,
+        system_prompt="",
+        user_prompt="Task",
+        metadata=None,
+        selected_fields=[],
+        tag_assistance_enabled=True,
+    )
+
+    assert preview.tag_context_status == "unavailable"
+    assert preview.tag_line is None
+    assert preview.final_user_prompt == "Task"
 
 
 def test_escaped_metadata_path_supports_dots_and_backslashes_in_keys() -> None:

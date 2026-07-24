@@ -141,6 +141,7 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
             json={
                 "system_preset_id": preset.json()["id"],
                 "user_prompt": "Describe this image.",
+                "use_confirmed_tags": True,
             },
         )
         assert configured.status_code == 200
@@ -150,6 +151,7 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
         assert preview.json()["system_preset_name"] == "XML caption"
         assert preview.json()["system_prompt"] == "Return balanced XML."
         assert preview.json()["final_user_prompt"] == "Describe this image."
+        assert preview.json()["tag_context_status"] == "unavailable"
         assert preview.json()["configuration_issue"] is None
 
         matching_ids = client.get(
@@ -185,12 +187,65 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
         )
         assert stale_annotation.status_code == 409
         assert "版本已经变化" in stale_annotation.json()["detail"]
+        tags_path = f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotations/tags"
+        saved_tags = client.put(
+            tags_path,
+            json={
+                "tags": [
+                    {
+                        "name": "blue_hair",
+                        "category": "general",
+                        "confidence": 0.95,
+                        "origin": "tagger",
+                    }
+                ],
+                "expected_head_revision_id": None,
+            },
+        )
+        assert saved_tags.status_code == 200
+        assert saved_tags.json()["review_status"] == "confirmed"
+        edited_tags = client.put(
+            tags_path,
+            json={
+                "tags": [
+                    {
+                        "name": "blue_hair",
+                        "category": "general",
+                        "confidence": 0.95,
+                        "origin": "tagger",
+                    },
+                    {
+                        "name": "alice",
+                        "category": "character",
+                        "confidence": None,
+                        "origin": "manual",
+                    },
+                ],
+                "expected_head_revision_id": saved_tags.json()["head_revision_id"],
+                "confirm": False,
+            },
+        )
+        assert edited_tags.status_code == 200
+        assert edited_tags.json()["review_status"] == "unreviewed"
+        batch_confirmed = client.post(
+            f"/api/v1/workspaces/{project_id}/annotations/tags/confirm",
+            json={"asset_ids": [asset_id]},
+        )
+        assert batch_confirmed.status_code == 200
+        assert batch_confirmed.json()["confirmed_count"] == 1
+        assisted_preview = client.get(
+            f"/api/v1/workspaces/{project_id}/assets/{asset_id}/prompt-preview"
+        )
+        assert assisted_preview.json()["tag_line"] == 'tags: ["blue_hair","alice"]'
+        assert assisted_preview.json()["final_user_prompt"] == (
+            'Describe this image.\n\ntags: ["blue_hair","alice"]'
+        )
         batch_deleted = client.post(
             f"/api/v1/workspaces/{project_id}/annotations/delete",
             json={"asset_ids": [asset_id]},
         )
         assert batch_deleted.status_code == 200
-        assert batch_deleted.json()["deleted_count"] == 1
+        assert batch_deleted.json()["deleted_count"] == 2
 
         deletion_preview = client.post(
             f"/api/v1/workspaces/{project_id}/asset-deletions/preview",

@@ -6,6 +6,7 @@ from pathlib import Path
 from dataset_studio.core.errors import AssetNotFoundError
 from dataset_studio.core.languages import normalize_language_code
 from dataset_studio.modules.annotations.models import (
+    AnnotationBatchConfirmResult,
     AnnotationBatchDeleteResult,
     AnnotationBundle,
     AnnotationChannel,
@@ -170,7 +171,7 @@ class AnnotationService:
         *,
         source: str = "manual_edit",
         expected_head_revision_id: str | None | object = _EXPECTED_VERSION_UNSET,
-        confirm: bool = False,
+        confirm: bool = True,
         lease_owner_id: str | None = None,
         source_job_item_id: str | None = None,
         input_revisions: Sequence[tuple[str, str]] = (),
@@ -234,7 +235,7 @@ class AnnotationService:
                 tags or self.tags_from_content(content, origin="tagger"),
                 source=source,
                 expected_head_revision_id=expected_modified_at,
-                confirm=manually_accepted,
+                confirm=True,
                 lease_owner_id=lease_owner_id,
                 source_job_item_id=source_job_item_id,
                 input_revisions=input_revisions,
@@ -281,6 +282,60 @@ class AnnotationService:
                 expected_head_revision_id,
             )
         return self.get_channel(project_id, asset_id, channel, language)
+
+    def confirm_tags_many(
+        self,
+        project_id: str,
+        asset_ids: Sequence[str],
+    ) -> AnnotationBatchConfirmResult:
+        normalized_ids = list(dict.fromkeys(asset_id for asset_id in asset_ids if asset_id))
+        if not normalized_ids:
+            raise ValueError("至少需要选择一个素材。")
+        paths, _ = self._workspaces.get(project_id)
+        assets = AssetRepository(paths.database).get_assets(normalized_ids)
+        missing_assets = [asset_id for asset_id in normalized_ids if asset_id not in assets]
+        if missing_assets:
+            raise AssetNotFoundError(f"找不到素材：{missing_assets[0]}")
+
+        repository = AnnotationRepository(paths.database)
+        claims = [
+            OutputResourceClaim(
+                annotation_document_resource_key(asset_id, AnnotationChannel.TAGS.value)
+            )
+            for asset_id in normalized_ids
+        ]
+        with hold_output_resources(paths.database, claims):
+            rows = repository.get_document_rows(normalized_ids, AnnotationChannel.TAGS)
+            revisions: list[tuple[str, AnnotationChannel, str, str]] = []
+            already_confirmed = 0
+            missing = 0
+            for asset_id in normalized_ids:
+                row = rows.get(asset_id)
+                if row is None:
+                    missing += 1
+                    continue
+                document = self._document(repository, row)
+                if not document.exists or not document.head_revision_id:
+                    missing += 1
+                elif document.review_status == AnnotationReviewStatus.CONFIRMED:
+                    already_confirmed += 1
+                else:
+                    revisions.append(
+                        (
+                            asset_id,
+                            AnnotationChannel.TAGS,
+                            "",
+                            document.head_revision_id,
+                        )
+                    )
+            repository.confirm_many(revisions)
+        return AnnotationBatchConfirmResult(
+            requested_count=len(normalized_ids),
+            confirmed_count=len(revisions),
+            already_confirmed_count=already_confirmed,
+            missing_count=missing,
+            asset_ids=normalized_ids,
+        )
 
     def delete(
         self,

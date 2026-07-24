@@ -11,6 +11,7 @@ import {
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { useConfirmTagAnnotations } from "../../features/annotations/hooks";
 import { useAssetFolders, useAssetIds, useInfiniteAssets } from "../../features/assets/hooks";
 import {
   useRescanWorkspace,
@@ -54,6 +55,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const workspace = useWorkspace(projectId);
   const rescan = useRescanWorkspace(projectId);
   const updateWorkspace = useUpdateWorkspace(projectId);
+  const confirmTags = useConfirmTagAnnotations(projectId);
   const selectedAssetId = useAppStore((state) => state.selectedAssetId);
   const selectAsset = useAppStore((state) => state.selectAsset);
   const checkedAssetIds = useAppStore((state) => state.checkedAssetIds);
@@ -217,6 +219,33 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     setAssetsChecked(assetIds, shouldCheck);
   }, [knownMatchingAssetIds, matchingAssetIds, setAssetsChecked]);
 
+  const confirmCheckedTags = useCallback(async () => {
+    const assetIds = [...useAppStore.getState().checkedAssetIds];
+    if (!assetIds.length) return;
+    if (editorDirty && selectedAssetId && assetIds.includes(selectedAssetId)) {
+      const proceed = await confirmDialog(
+        "批量确认只会采用数据库中已保存的 Tags，不包含当前编辑器尚未保存的修改。仍要继续吗？",
+        {
+          title: "存在未保存修改",
+          confirmLabel: "确认已保存 Tags",
+          cancelLabel: "继续编辑",
+        },
+      );
+      if (!proceed) return;
+    }
+    try {
+      const result = await confirmTags.mutateAsync(assetIds);
+      await alertDialog(
+        `已确认 ${result.confirmed_count} 张图片的 Tags；${result.already_confirmed_count} 张原本已确认，${result.missing_count} 张没有可确认的 Tags。`,
+        { title: "批量确认完成" },
+      );
+    } catch (error) {
+      await alertDialog(error instanceof Error ? error.message : "批量确认 Tags 失败。", {
+        title: "批量确认失败",
+      });
+    }
+  }, [confirmTags, editorDirty, selectedAssetId]);
+
   const layoutStyle = {
     "--asset-pane-width": `${layout.assetPaneWidth}px`,
     "--inspector-pane-width": `${layout.inspectorPaneWidth}px`,
@@ -284,7 +313,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         selectAllPending={matchingAssetIds.isFetching}
         allMatchingSelected={allMatchingSelected}
         error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
-        bulkActionPending={assetActions.annotationDeletePending}
+        bulkActionPending={assetActions.annotationDeletePending || confirmTags.isPending}
         onLoadMore={loadMoreAssets}
         recursive={workspace.data.settings.recursive_scan}
         onSearchChange={setSearch}
@@ -293,6 +322,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         onSelect={requestSelectAsset}
         onSetChecked={setAssetsChecked}
         onToggleAll={() => void toggleAllMatchingAssets()}
+        onConfirmCheckedTags={() => void confirmCheckedTags()}
         onDeleteCheckedAnnotations={() => void assetActions.deleteCheckedAnnotations()}
         onDeleteCheckedAssets={assetActions.openCheckedAssetDeletion}
         onOpenDeletionHistory={assetActions.openDeletionHistory}

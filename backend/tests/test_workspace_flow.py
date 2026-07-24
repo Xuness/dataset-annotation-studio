@@ -464,6 +464,21 @@ def test_review_queue_tracks_unreviewed_and_stale_database_channels(
         asset.id,
         [AnnotationTag(name="subject", origin="tagger")],
     )
+    assert tags.document.review_status.value == "confirmed"
+    assert (
+        assets.list_assets(
+            workspace.project_id,
+            annotation_status="needs_review",
+        ).total
+        == 0
+    )
+    tags = annotations.save_tags(
+        workspace.project_id,
+        asset.id,
+        [AnnotationTag(name="subject"), AnnotationTag(name="updated")],
+        expected_head_revision_id=tags.revision_id,
+        confirm=False,
+    )
 
     unreviewed = assets.list_assets(
         workspace.project_id,
@@ -518,6 +533,49 @@ def test_review_queue_tracks_unreviewed_and_stale_database_channels(
             AnnotationChannel.TAGS,
         )[0].source
         == "manual_reconfirm"
+    )
+
+
+def test_batch_confirm_tags_reports_confirmed_existing_and_missing_assets(
+    tmp_path: Path,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    for name in ("confirmed.png", "pending.png", "missing.png"):
+        _write_image(project / name)
+    workspace, _ = workspaces.open(str(project))
+    by_name = {asset.filename: asset for asset in assets.list_assets(workspace.project_id).items}
+    annotations.save_tags(
+        workspace.project_id,
+        by_name["confirmed.png"].id,
+        [AnnotationTag(name="confirmed", origin="tagger")],
+    )
+    annotations.save_tags(
+        workspace.project_id,
+        by_name["pending.png"].id,
+        [AnnotationTag(name="pending", origin="manual")],
+        confirm=False,
+    )
+
+    selected_ids = [
+        by_name["confirmed.png"].id,
+        by_name["pending.png"].id,
+        by_name["missing.png"].id,
+    ]
+    result = annotations.confirm_tags_many(workspace.project_id, selected_ids)
+
+    assert result.requested_count == 3
+    assert result.confirmed_count == 1
+    assert result.already_confirmed_count == 1
+    assert result.missing_count == 1
+    assert result.asset_ids == selected_ids
+    assert (
+        annotations.get_channel(
+            workspace.project_id,
+            by_name["pending.png"].id,
+            AnnotationChannel.TAGS,
+        ).review_status.value
+        == "confirmed"
     )
 
 

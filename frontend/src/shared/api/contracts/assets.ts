@@ -59,6 +59,11 @@ export interface PromptPreview {
   system_prompt: string;
   user_prompt: string;
   metadata_lines: string[];
+  tag_assistance_enabled: boolean;
+  tag_context_status: "disabled" | "ready" | "unavailable";
+  tag_revision_id: string | null;
+  tag_count: number;
+  tag_line: string | null;
   final_user_prompt: string;
   configuration_issue: string | null;
 }

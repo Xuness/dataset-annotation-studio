@@ -544,7 +544,7 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
             onChange={setContent}
             placeholder={
               activeChannel === "tags"
-                ? "输入逗号或换行分隔的 Tags。保存后会写入结构化 Tag 记录。"
+                ? "输入逗号或换行分隔的 Tags。保存后会写入结构化记录并直接确认为当前版本。"
                 : activeChannel === "existing_annotation"
                   ? "这里存放迁移时确认存在的旧 TXT，也可以继续人工修订。"
                   : activeChannel === "description"

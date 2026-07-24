@@ -77,3 +77,11 @@ export interface AnnotationBatchDeleteResult {
   missing_count: number;
   asset_ids: string[];
 }
+
+export interface AnnotationBatchConfirmResult {
+  requested_count: number;
+  confirmed_count: number;
+  already_confirmed_count: number;
+  missing_count: number;
+  asset_ids: string[];
+}

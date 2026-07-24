@@ -79,7 +79,10 @@ def _single_item_job(
     )
     workspaces.update_settings(
         workspace.project_id,
-        WorkspaceSettingsUpdate(system_preset_id=system.id),
+        WorkspaceSettingsUpdate(
+            system_preset_id=system.id,
+            use_confirmed_tags=use_confirmed_tags,
+        ),
     )
     paths, _ = workspaces.get(workspace.project_id)
     if use_confirmed_tags:
@@ -118,7 +121,6 @@ def _single_item_job(
         JobCreateRequest(
             provider_profile_id=provider.id,
             scope=JobScope.ALL,
-            use_confirmed_tags=use_confirmed_tags,
         ),
     )
     return jobs, workspace.project_id, job, paths.database, project

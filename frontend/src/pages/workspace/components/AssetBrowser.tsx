@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+  BadgeCheck,
   CheckCircle2,
   CircleAlert,
   FileQuestion,
@@ -51,6 +52,7 @@ interface AssetBrowserProps {
   onSetChecked: (assetIds: string[], checked: boolean) => void;
   onToggleAll: () => void;
   onRecursiveChange: (value: boolean) => void;
+  onConfirmCheckedTags: () => void;
   onDeleteCheckedAnnotations: () => void;
   onDeleteCheckedAssets: () => void;
   onOpenDeletionHistory: () => void;
@@ -102,6 +104,7 @@ export function AssetBrowser({
   onSetChecked,
   onToggleAll,
   onRecursiveChange,
+  onConfirmCheckedTags,
   onDeleteCheckedAnnotations,
   onDeleteCheckedAssets,
   onOpenDeletionHistory,
@@ -311,6 +314,14 @@ export function AssetBrowser({
           </span>
         </div>
         <div className="asset-selection-toolbar__actions">
+          <button
+            type="button"
+            disabled={!checkedAssetIds.length || bulkActionPending}
+            onClick={onConfirmCheckedTags}
+          >
+            <BadgeCheck size={13} />
+            确认 Tags
+          </button>
           <button
             type="button"
             disabled={!checkedAssetIds.length || bulkActionPending}

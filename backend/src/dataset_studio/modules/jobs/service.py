@@ -78,6 +78,7 @@ class JobService:
         include_items: bool,
     ) -> JobDetail:
         paths, manifest = self._workspaces.get(project_id)
+        use_confirmed_tags = False
         if request.execution_backend == ExecutionBackend.LOCAL_TAGGER:
             output_channel = AnnotationChannel.TAGS
             output_language = ""
@@ -181,8 +182,9 @@ class JobService:
                         "项目关联的 System Prompt 预设已不存在，请在素材页重新选择并保存。"
                     ) from error
                 system_prompt_snapshot = system_preset.model_dump_json()
+                use_confirmed_tags = manifest.settings.use_confirmed_tags
                 configuration = {
-                    "use_confirmed_tags": request.use_confirmed_tags,
+                    "use_confirmed_tags": use_confirmed_tags,
                 }
                 asset_ids = self._select_annotation_assets(
                     paths.database,
@@ -218,7 +220,7 @@ class JobService:
             scope=request.scope.value,
             overwrite_existing=overwrite_existing,
             output_channel=output_channel.value,
-            use_confirmed_tags=request.use_confirmed_tags,
+            use_confirmed_tags=use_confirmed_tags,
             output_language=output_language,
             retry_limit=retry_limit,
             asset_ids=asset_ids,

@@ -93,6 +93,42 @@ class AnnotationRepository:
         finally:
             connection.close()
 
+    def get_document_rows(
+        self,
+        asset_ids: Sequence[str],
+        channel: AnnotationChannel,
+        language: str = "",
+    ) -> dict[str, sqlite3.Row]:
+        unique_ids = list(dict.fromkeys(asset_id for asset_id in asset_ids if asset_id))
+        if not unique_ids:
+            return {}
+        rows: list[sqlite3.Row] = []
+        connection = connect(self._database_path)
+        try:
+            for start in range(0, len(unique_ids), 500):
+                batch = unique_ids[start : start + 500]
+                placeholders = ",".join("?" for _ in batch)
+                rows.extend(
+                    connection.execute(
+                        f"""
+                        SELECT d.*, r.source, r.image_content_hash, r.validation_status,
+                               r.is_tombstone, r.is_candidate,
+                               r.created_at AS revision_created_at,
+                               r.metadata_json, a.content_hash AS current_image_hash
+                        FROM annotation_documents d
+                        JOIN assets a ON a.id = d.asset_id
+                        LEFT JOIN annotation_document_revisions r
+                          ON r.id = d.head_revision_id
+                        WHERE d.channel = ? AND d.language = ?
+                          AND d.asset_id IN ({placeholders})
+                        """,
+                        [channel.value, language, *batch],
+                    ).fetchall()
+                )
+        finally:
+            connection.close()
+        return {str(row["asset_id"]): row for row in rows}
+
     def text_content(self, revision_id: str) -> tuple[str, bytes | None]:
         connection = connect(self._database_path)
         try:
@@ -337,104 +373,138 @@ class AnnotationRepository:
         expected_head_revision_id: str,
     ) -> str:
         with transaction(self._database_path) as connection:
-            document = self._document(connection, asset_id, channel, language, create=False)
-            if document is None or not document["head_revision_id"]:
-                raise ValueError("当前标注通道还没有可确认的版本。")
-            current = str(document["head_revision_id"])
-            if current != expected_head_revision_id:
-                raise ResourceConflictError("标注版本已经变化，请刷新后再确认。")
-            revision = connection.execute(
-                """
-                SELECT *
-                FROM annotation_document_revisions
-                WHERE id = ?
-                """,
-                (current,),
-            ).fetchone()
-            if revision is None or bool(revision["is_tombstone"]):
-                raise ValueError("已删除的标注不能被确认。")
-            now = utc_now_iso()
-            current_image_hash = self._asset_hash(connection, asset_id)
-            confirmed_revision_id = current
-            validation_status = AnnotationStatus(str(revision["validation_status"]))
-            image_changed = str(revision["image_content_hash"]) != current_image_hash
-            if image_changed:
-                confirmed_revision_id = str(uuid.uuid4())
-                metadata = self._metadata(str(revision["metadata_json"]))
-                metadata["reconfirmed_from_revision_id"] = current
-                connection.execute(
-                    """
-                    INSERT INTO annotation_document_revisions (
-                        id, document_id, parent_revision_id, base_revision_id,
-                        source, source_job_item_id, image_content_hash,
-                        validation_status, is_tombstone, is_candidate,
-                        metadata_json, created_at
-                    ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 0, 0, ?, ?)
-                    """,
-                    (
-                        confirmed_revision_id,
-                        str(document["id"]),
-                        current,
-                        current,
-                        "manual_reconfirm",
-                        current_image_hash,
-                        validation_status.value,
-                        json.dumps(metadata, ensure_ascii=False, separators=(",", ":")),
-                        now,
-                    ),
+            return self._confirm_in_transaction(
+                connection,
+                asset_id,
+                channel,
+                language,
+                expected_head_revision_id,
+            )
+
+    def confirm_many(
+        self,
+        revisions: Sequence[tuple[str, AnnotationChannel, str, str]],
+    ) -> list[str]:
+        if not revisions:
+            return []
+        with transaction(self._database_path) as connection:
+            return [
+                self._confirm_in_transaction(
+                    connection,
+                    asset_id,
+                    channel,
+                    language,
+                    expected_head_revision_id,
                 )
-                if str(document["content_kind"]) == AnnotationContentKind.TEXT.value:
-                    connection.execute(
-                        """
-                        INSERT INTO annotation_text_contents (
-                            revision_id, content, format, raw_bytes
-                        )
-                        SELECT ?, content, format, raw_bytes
-                        FROM annotation_text_contents
-                        WHERE revision_id = ?
-                        """,
-                        (confirmed_revision_id, current),
-                    )
-                else:
-                    connection.execute(
-                        """
-                        INSERT INTO annotation_tag_items (
-                            revision_id, position, name, normalized_name,
-                            category, confidence, origin
-                        )
-                        SELECT ?, position, name, normalized_name,
-                               category, confidence, origin
-                        FROM annotation_tag_items
-                        WHERE revision_id = ?
-                        """,
-                        (confirmed_revision_id, current),
-                    )
+                for asset_id, channel, language, expected_head_revision_id in revisions
+            ]
+
+    def _confirm_in_transaction(
+        self,
+        connection: sqlite3.Connection,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str,
+        expected_head_revision_id: str,
+    ) -> str:
+        document = self._document(connection, asset_id, channel, language, create=False)
+        if document is None or not document["head_revision_id"]:
+            raise ValueError("当前标注通道还没有可确认的版本。")
+        current = str(document["head_revision_id"])
+        if current != expected_head_revision_id:
+            raise ResourceConflictError("标注版本已经变化，请刷新后再确认。")
+        revision = connection.execute(
+            """
+            SELECT *
+            FROM annotation_document_revisions
+            WHERE id = ?
+            """,
+            (current,),
+        ).fetchone()
+        if revision is None or bool(revision["is_tombstone"]):
+            raise ValueError("已删除的标注不能被确认。")
+        now = utc_now_iso()
+        current_image_hash = self._asset_hash(connection, asset_id)
+        confirmed_revision_id = current
+        validation_status = AnnotationStatus(str(revision["validation_status"]))
+        image_changed = str(revision["image_content_hash"]) != current_image_hash
+        if image_changed:
+            confirmed_revision_id = str(uuid.uuid4())
+            metadata = self._metadata(str(revision["metadata_json"]))
+            metadata["reconfirmed_from_revision_id"] = current
+            connection.execute(
+                """
+                INSERT INTO annotation_document_revisions (
+                    id, document_id, parent_revision_id, base_revision_id,
+                    source, source_job_item_id, image_content_hash,
+                    validation_status, is_tombstone, is_candidate,
+                    metadata_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 0, 0, ?, ?)
+                """,
+                (
+                    confirmed_revision_id,
+                    str(document["id"]),
+                    current,
+                    current,
+                    "manual_reconfirm",
+                    current_image_hash,
+                    validation_status.value,
+                    json.dumps(metadata, ensure_ascii=False, separators=(",", ":")),
+                    now,
+                ),
+            )
+            if str(document["content_kind"]) == AnnotationContentKind.TEXT.value:
                 connection.execute(
                     """
-                    INSERT INTO annotation_revision_inputs (
-                        output_revision_id, input_revision_id, role
+                    INSERT INTO annotation_text_contents (
+                        revision_id, content, format, raw_bytes
                     )
-                    SELECT ?, input_revision_id, role
-                    FROM annotation_revision_inputs
-                    WHERE output_revision_id = ?
+                    SELECT ?, content, format, raw_bytes
+                    FROM annotation_text_contents
+                    WHERE revision_id = ?
+                    """,
+                    (confirmed_revision_id, current),
+                )
+            else:
+                connection.execute(
+                    """
+                    INSERT INTO annotation_tag_items (
+                        revision_id, position, name, normalized_name,
+                        category, confidence, origin
+                    )
+                    SELECT ?, position, name, normalized_name,
+                           category, confidence, origin
+                    FROM annotation_tag_items
+                    WHERE revision_id = ?
                     """,
                     (confirmed_revision_id, current),
                 )
             connection.execute(
                 """
-                UPDATE annotation_documents
-                SET head_revision_id = ?, confirmed_revision_id = ?, updated_at = ?
-                WHERE id = ?
+                INSERT INTO annotation_revision_inputs (
+                    output_revision_id, input_revision_id, role
+                )
+                SELECT ?, input_revision_id, role
+                FROM annotation_revision_inputs
+                WHERE output_revision_id = ?
                 """,
-                (
-                    confirmed_revision_id,
-                    confirmed_revision_id,
-                    now,
-                    str(document["id"]),
-                ),
+                (confirmed_revision_id, current),
             )
-            self._sync_asset_summary(connection, asset_id)
-            return confirmed_revision_id
+        connection.execute(
+            """
+            UPDATE annotation_documents
+            SET head_revision_id = ?, confirmed_revision_id = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                confirmed_revision_id,
+                confirmed_revision_id,
+                now,
+                str(document["id"]),
+            ),
+        )
+        self._sync_asset_summary(connection, asset_id)
+        return confirmed_revision_id
 
     def history_rows(
         self,

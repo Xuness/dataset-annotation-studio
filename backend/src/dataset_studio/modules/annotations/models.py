@@ -143,7 +143,7 @@ class AnnotationChannelUpdate(BaseModel):
     content: str | None = None
     tags: list[AnnotationTag] | None = None
     expected_head_revision_id: str | None = None
-    confirm: bool = False
+    confirm: bool | None = None
 
     @model_validator(mode="after")
     def validate_payload(self) -> AnnotationChannelUpdate:
@@ -172,6 +172,28 @@ class AnnotationBatchDeleteRequest(BaseModel):
         if not normalized:
             raise ValueError("至少需要选择一个素材。")
         return normalized
+
+
+class AnnotationBatchConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_ids: list[str]
+
+    @field_validator("asset_ids")
+    @classmethod
+    def normalize_asset_ids(cls, value: list[str]) -> list[str]:
+        normalized = list(dict.fromkeys(asset_id for asset_id in value if asset_id))
+        if not normalized:
+            raise ValueError("至少需要选择一个素材。")
+        return normalized
+
+
+class AnnotationBatchConfirmResult(BaseModel):
+    requested_count: int
+    confirmed_count: int
+    already_confirmed_count: int
+    missing_count: int
+    asset_ids: list[str]
 
 
 class AnnotationBatchDeleteResult(BaseModel):

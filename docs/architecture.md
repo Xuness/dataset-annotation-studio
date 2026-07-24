@@ -64,15 +64,16 @@ Windows 主窗口的关闭请求只隐藏窗口，不销毁 WebView，也不停�
 
 固定通道为“原有标注”、`Tags`、`LLM 描述` 和按语言区分的“翻译”。Tagger 只写 Tags，
 远端标注模型只写 LLM 描述，翻译器只写目标语言通道；协议适配器不理解通道仓储，通道服务也不依赖具体模型。
-生成结果默认待确认，人工确认只移动 confirmed 指针，不复制正文。
+LLM 描述和译文生成结果默认待确认；Tagger 与人工保存的 Tags 默认同步更新 confirmed 指针。
+普通确认只移动指针，图片变化后的复核才复制内容到绑定当前图片哈希的新修订。
 
 数据库迁移首次启用该存储时，扫描当时实际存在的旧 TXT 并导入保留名称的通道。迁移前 SQLite
 备份进入项目 `history/`；无效 UTF-8 同时保留原始字节，确保以后仍可原样导出。导入完成后应用不再扫描外部
 TXT 作为活动状态，也不删除旧文件。
 
-任务创建会在同一个 SQLite 事务内冻结目标通道的 base revision。启用 Tagger 辅助 LLM 时，还逐图冻结当时已确认的
-Tag revision；Worker 只从该修订读取 Tag 名称并追加到 User Prompt。后续编辑 Tags 不会改变既有任务，
-也不会把 LLM 结果写回 Tags 通道。
+任务创建会在同一个 SQLite 事务内冻结目标通道的 base revision。项目提示词设置启用 Tags 辅助 LLM 时，还逐图
+冻结当时已确认的 Tag revision；Worker 只从该修订读取 Tag 名称，并在 JSON 元数据之后以可预览的 `tags: [...]`
+行追加到 User Prompt。后续编辑 Tags 不会改变既有任务，也不会把 LLM 结果写回 Tags 通道。
 
 ## 模型连接与执行快照
 
