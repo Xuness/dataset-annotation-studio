@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 import { AppearanceSettings } from "../../src/shared/settings/sections/AppearanceSettings";
-import { applyPreferences } from "../../src/shared/theme/appearanceRuntime";
+import {
+  applyPreferences,
+  resolveRenderedTransparentRegions,
+} from "../../src/shared/theme/appearanceRuntime";
 import { useAppPreferences } from "../../src/shared/theme/appPreferences";
 import { createDefaultPreferences, DEFAULT_HOME_CONTENT } from "../../src/shared/theme/appearance";
 
@@ -17,6 +20,19 @@ function resetAppearance() {
 describe("appearance settings", () => {
   beforeEach(resetAppearance);
   afterEach(cleanup);
+
+  test("does not render custom titlebar transparency with native decorations", () => {
+    const transparency = {
+      ...createDefaultPreferences().appearance.transparentRegions,
+      "desktop-titlebar": true,
+      "home-topbar": true,
+    };
+
+    expect(resolveRenderedTransparentRegions(transparency, true)).not.toContain("desktop-titlebar");
+    expect(resolveRenderedTransparentRegions(transparency, true)).toContain("home-topbar");
+    expect(resolveRenderedTransparentRegions(transparency, false)).toContain("desktop-titlebar");
+    expect(transparency["desktop-titlebar"]).toBe(true);
+  });
 
   test("switches themes and stores the selection", async () => {
     const user = userEvent.setup();

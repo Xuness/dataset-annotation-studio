@@ -1,8 +1,7 @@
 [data-surface-region] {
   transition:
     background var(--transition),
-    border-color var(--transition),
-    backdrop-filter var(--transition);
+    border-color var(--transition);
 }
 
 :root[data-transparent-regions~="canvas"] .workspace-page [data-surface-region="canvas"],

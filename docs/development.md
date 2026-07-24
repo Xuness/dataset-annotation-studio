@@ -16,14 +16,14 @@ Portable CPU baseline:
 
 ```text
 pnpm install --frozen-lockfile
-uv sync --project backend --extra cpu --all-groups --locked
+uv sync --project backend --extra cpu --all-groups --locked --exact
 pnpm dev
 ```
 
 Optional CUDA development:
 
 ```text
-uv sync --project backend --extra cuda --all-groups --locked
+uv sync --project backend --extra cuda --all-groups --locked --exact
 pnpm dev:cuda
 ```
 
@@ -41,8 +41,8 @@ Windows-only conveniences, not the portable entry point.
 
 ```text
 pnpm --dir frontend check
-uv run --project backend --extra cpu ruff check backend/src backend/tests
-uv run --project backend --extra cpu pytest
+uv run --project backend --extra cpu --exact ruff check backend/src backend/tests
+uv run --project backend --extra cpu --exact pytest
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo check --manifest-path src-tauri/Cargo.toml
 ```

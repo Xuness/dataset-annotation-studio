@@ -87,6 +87,33 @@ test("runtime platform detection keeps native decorations on Linux", () => {
   assert.equal(usesNativeWindowDecorations("windows"), false);
 });
 
+test("Linux native-decoration layout preserves shared appearance effects", () => {
+  const css = readFileSync(
+    new URL("../src/styles/platforms/linux-compat.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(css, /grid-template-rows:\s*minmax\(0, 1fr\)/);
+  assert.doesNotMatch(css, /backdrop-filter\s*:\s*none/i);
+  assert.doesNotMatch(css, /animation\s*:\s*none/i);
+  assert.doesNotMatch(css, /filter\s*:\s*none/i);
+  assert.doesNotMatch(css, /\.desktop-shell--tauri::(?:before|after)/);
+});
+
+test("scene materials keep blur static instead of interpolating it", () => {
+  const styles = [
+    readFileSync(new URL("../src/pages/home/home.css", import.meta.url), "utf8"),
+    readFileSync(
+      new URL("../src/layouts/workspace/workspace-surface-materials.css", import.meta.url),
+      "utf8",
+    ),
+  ].join("\n");
+
+  assert.doesNotMatch(styles, /backdrop-filter\s+(?:var\(--transition\)|220ms\s+ease)/i);
+  assert.doesNotMatch(styles, /\.home-page\s*\{[^}]*animation\s*:/s);
+  assert.match(styles, /\.home-hero__copy[\s\S]*animation:\s*home-reveal\s+280ms/);
+});
+
 test("fresh interface geometry uses the curated local baseline", () => {
   assert.equal(DEFAULT_INTERFACE_SCALE, 1.2);
   assert.deepEqual(DEFAULT_WORKSPACE_LAYOUT, {

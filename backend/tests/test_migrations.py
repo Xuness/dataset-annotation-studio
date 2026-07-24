@@ -204,7 +204,7 @@ def test_recent_workspace_activity_migration_hides_duplicate_roots(
     finally:
         connection.close()
 
-    initialize_global_database(database)
+    initialize_global_database(database, case_sensitive_paths=False)
 
     connection = connect(database)
     try:

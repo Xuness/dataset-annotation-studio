@@ -18,11 +18,11 @@
     "dev": "tauri dev",
     "dev:cuda": "tauri dev --config src-tauri/tauri.cuda.conf.json",
     "dev:frontend": "pnpm --dir frontend dev",
-    "dev:api": "uv run --project backend --extra cpu dataset-studio-api",
-    "dev:worker": "uv run --project backend --extra cpu dataset-studio-worker",
+    "dev:api": "uv run --project backend --extra cpu --exact dataset-studio-api",
+    "dev:worker": "uv run --project backend --extra cpu --exact dataset-studio-worker",
     "dev:services": "concurrently --kill-others --names frontend,api,worker \"pnpm dev:frontend\" \"pnpm dev:api\" \"pnpm dev:worker\"",
-    "dev:api:cuda": "uv run --project backend --extra cuda dataset-studio-api",
-    "dev:worker:cuda": "uv run --project backend --extra cuda dataset-studio-worker",
+    "dev:api:cuda": "uv run --project backend --extra cuda --exact dataset-studio-api",
+    "dev:worker:cuda": "uv run --project backend --extra cuda --exact dataset-studio-worker",
     "dev:services:cuda": "concurrently --kill-others --names frontend,api,worker \"pnpm dev:frontend\" \"pnpm dev:api:cuda\" \"pnpm dev:worker:cuda\"",
     "build:frontend": "pnpm --dir frontend build",
     "build:sidecar": "pwsh -NoProfile -File scripts/build-sidecar.ps1",
@@ -31,8 +31,8 @@
     "build:cuda": "pnpm build:sidecar:cuda && tauri build --config src-tauri/tauri.release.conf.json",
     "icons:generate": "tauri icon assets/app-icon.png --output src-tauri/icons --ios-color \"#050607\" && node scripts/sync-app-icon.mjs",
     "clean": "pwsh -NoProfile -File scripts/clean-generated.ps1",
-    "check": "pnpm --dir frontend check && uv run --project backend --extra cpu ruff check backend/src backend/tests && uv run --project backend --extra cpu pytest && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo check --manifest-path src-tauri/Cargo.toml",
-    "format": "pnpm --dir frontend format && uv run --project backend --extra cpu ruff format backend/src backend/tests"
+    "check": "pnpm --dir frontend check && uv run --project backend --extra cpu --exact ruff check backend/src backend/tests && uv run --project backend --extra cpu --exact pytest && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo check --manifest-path src-tauri/Cargo.toml",
+    "format": "pnpm --dir frontend format && uv run --project backend --extra cpu --exact ruff format backend/src backend/tests"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.8.5",
