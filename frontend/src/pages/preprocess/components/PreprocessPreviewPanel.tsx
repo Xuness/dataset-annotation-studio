@@ -1,8 +1,16 @@
-import { Eye } from "lucide-react";
+import { Clock3, Cpu, Eye } from "lucide-react";
 
 import type { PreprocessPreview } from "../../../shared/api/types";
+import { Spinner } from "../../../shared/ui/Spinner";
+import { formatByteSize, formatElapsed, formatPreviewDuration } from "../runtimeFeedback";
 
-export function PreprocessPreviewPanel({ preview }: { preview: PreprocessPreview | undefined }) {
+interface Props {
+  preview: PreprocessPreview | undefined;
+  pending: boolean;
+  elapsedMs: number;
+}
+
+export function PreprocessPreviewPanel({ preview, pending, elapsedMs }: Props) {
   return (
     <section className="preprocess-preview workspace-scene-surface" data-surface-region="content">
       <header>
@@ -20,6 +28,16 @@ export function PreprocessPreviewPanel({ preview }: { preview: PreprocessPreview
         ) : null}
       </header>
       <div className="preview-table">
+        {preview ? (
+          <p className="preview-runtime-summary">
+            <span>
+              <Cpu size={13} /> CPU
+            </span>
+            <span>预览耗时 {formatPreviewDuration(preview.runtime.preview_duration_ms)}</span>
+            <span>{preview.runtime.render_count} 张需要实际渲染</span>
+            <span>输入 {formatByteSize(preview.runtime.source_bytes)}</span>
+          </p>
+        ) : null}
         {preview?.truncated ? (
           <p className="preview-limit-note">
             当前展示 {preview.items.length} / {preview.total_items} 项；执行校验仍覆盖全部图片。
@@ -44,8 +62,17 @@ export function PreprocessPreviewPanel({ preview }: { preview: PreprocessPreview
         ))}
         {!preview ? (
           <div className="preview-empty">
-            <Eye size={24} />
-            <p>调整参数后先生成预览；应用前不会改动任何文件。</p>
+            {pending ? <Spinner /> : <Eye size={24} />}
+            <p>
+              {pending
+                ? `正在使用 CPU 检查图片和目标尺寸，已用时 ${formatElapsed(elapsedMs)}`
+                : "调整参数后先生成预览；应用前不会改动任何文件。"}
+            </p>
+            {pending ? (
+              <small>
+                <Clock3 size={12} /> 该阶段不会缩放图片，也不会调用 GPU / CUDA。
+              </small>
+            ) : null}
           </div>
         ) : null}
       </div>

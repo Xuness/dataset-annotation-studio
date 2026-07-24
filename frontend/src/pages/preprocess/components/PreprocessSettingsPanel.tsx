@@ -1,8 +1,9 @@
-import { Eye, ImageDown, Play } from "lucide-react";
+import { Clock3, Cpu, Eye, ImageDown, Play } from "lucide-react";
 
 import type { PreprocessPreview } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
+import { formatByteSize, formatElapsed, formatPreviewDuration } from "../runtimeFeedback";
 import type { PreprocessFormState } from "../types";
 
 const resizeAlgorithmDescriptions: Record<PreprocessFormState["resizeAlgorithm"], string> = {
@@ -18,7 +19,9 @@ interface Props {
   checkedCount: number;
   preview: PreprocessPreview | undefined;
   previewPending: boolean;
+  previewElapsedMs: number;
   executePending: boolean;
+  executeElapsedMs: number;
   error: string | null;
   onPreview: () => void;
   onExecute: () => void;
@@ -31,7 +34,9 @@ export function PreprocessSettingsPanel({
   checkedCount,
   preview,
   previewPending,
+  previewElapsedMs,
   executePending,
+  executeElapsedMs,
   error,
   onPreview,
   onExecute,
@@ -50,6 +55,11 @@ export function PreprocessSettingsPanel({
     (Number.isInteger(form.maxWorkers) && form.maxWorkers >= 1 && form.maxWorkers <= 16);
   const validRequest =
     (imageRenderingEnabled || form.renameEnabled) && validScope && validRename && validConcurrency;
+  const selectedWorkerCount = preview
+    ? form.concurrencyMode === "auto"
+      ? preview.runtime.automatic_worker_count
+      : Math.min(form.maxWorkers, preview.runtime.maximum_worker_count)
+    : null;
   return (
     <aside className="preprocess-settings" data-surface-region="primary-sidebar">
       <header>
@@ -76,6 +86,55 @@ export function PreprocessSettingsPanel({
           工作台选中<small>{checkedCount} 张</small>
         </button>
       </div>
+      <section className="preprocess-runtime-card" aria-label="预处理运行信息">
+        <div className="preprocess-runtime-card__title">
+          <Cpu size={15} />
+          <strong>CPU 本地处理</strong>
+          <span>不使用 GPU / CUDA</span>
+        </div>
+        <p>
+          预览只检查图片信息、文件状态和目标尺寸，不会执行缩放或重新编码；应用处理才会使用 Pillow /
+          OpenCV 的 CPU 多线程。
+        </p>
+        <dl>
+          <div>
+            <dt>预览状态</dt>
+            <dd>
+              {previewPending ? (
+                <>
+                  <Clock3 size={12} /> 已用时 {formatElapsed(previewElapsedMs)}
+                </>
+              ) : preview ? (
+                `完成于 ${formatPreviewDuration(preview.runtime.preview_duration_ms)}`
+              ) : (
+                "尚未运行"
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>实际处理</dt>
+            <dd>
+              {executeElapsedMs > 0
+                ? `CPU 处理中 · 已用时 ${formatElapsed(executeElapsedMs)}`
+                : selectedWorkerCount
+                  ? `${selectedWorkerCount} 个 CPU 线程 · ${preview?.runtime.render_count ?? 0} 张需渲染`
+                  : form.concurrencyMode === "auto"
+                    ? "CPU 自动并发，最多 8 线程"
+                    : `CPU 最多 ${form.maxWorkers} 线程`}
+            </dd>
+          </div>
+          {preview ? (
+            <div>
+              <dt>输入规模</dt>
+              <dd>{formatByteSize(preview.runtime.source_bytes)}</dd>
+            </div>
+          ) : null}
+        </dl>
+        <small>
+          完成时间取决于图片总容量、分辨率、磁盘速度和输出格式；执行开始后会持续显示已用时间，
+          预览不会占用显卡。
+        </small>
+      </section>
       <section className="preprocess-option">
         <label className="option-toggle">
           <input
@@ -268,7 +327,7 @@ export function PreprocessSettingsPanel({
           disabled={!validRequest || previewPending}
           onClick={onPreview}
         >
-          预览改动
+          {previewPending ? `预览中 ${formatElapsed(previewElapsedMs)}` : "预览改动"}
         </Button>
         <Button
           tone="primary"
@@ -281,7 +340,7 @@ export function PreprocessSettingsPanel({
           }
           onClick={onExecute}
         >
-          应用处理
+          {executeElapsedMs > 0 ? `处理中 ${formatElapsed(executeElapsedMs)}` : "应用处理"}
         </Button>
       </div>
     </aside>

@@ -40,7 +40,13 @@ class PlanItem:
     warning: str | None
 
 
-def build_plan(database_path: Path, root: Path, request: PreprocessRequest) -> list[PlanItem]:
+def build_plan(
+    database_path: Path,
+    root: Path,
+    request: PreprocessRequest,
+    *,
+    verify_content: bool = True,
+) -> list[PlanItem]:
     rows = _select_assets(database_path, request.asset_ids)
     claimed_annotations = _claimed_annotation_paths(database_path, root)
     if request.asset_ids:
@@ -56,10 +62,15 @@ def build_plan(database_path: Path, root: Path, request: PreprocessRequest) -> l
         if not source.is_file():
             raise ValueError(f"图片已不存在：{before_relative}")
         stat_before = source.stat()
+        if not verify_content and (
+            stat_before.st_size != int(row["byte_size"])
+            or stat_before.st_mtime_ns != int(row["modified_ns"])
+        ):
+            raise ValueError(f"图片文件已变化，请先重新扫描项目后再预览：{before_relative}")
         with Image.open(source) as opened:
             width, height = ImageOps.exif_transpose(opened).size
             frame_count = int(getattr(opened, "n_frames", 1))
-        before_hash = file_sha256(source)
+        before_hash = file_sha256(source) if verify_content else str(row["content_hash"])
         stat_after = source.stat()
         if (stat_before.st_size, stat_before.st_mtime_ns) != (
             stat_after.st_size,

@@ -82,6 +82,15 @@ class PreprocessPreviewItem(BaseModel):
     warning: str | None = None
 
 
+class PreprocessRuntimeInfo(BaseModel):
+    device: str = "cpu"
+    preview_duration_ms: int = Field(ge=0)
+    source_bytes: int = Field(ge=0)
+    render_count: int = Field(ge=0)
+    automatic_worker_count: int = Field(ge=1)
+    maximum_worker_count: int = Field(ge=1)
+
+
 class PreprocessPreview(BaseModel):
     items: list[PreprocessPreviewItem]
     total_items: int
@@ -90,6 +99,7 @@ class PreprocessPreview(BaseModel):
     unchanged_count: int
     warning_count: int
     preview_token: str
+    runtime: PreprocessRuntimeInfo
 
 
 class PreprocessExecutionOptions(BaseModel):

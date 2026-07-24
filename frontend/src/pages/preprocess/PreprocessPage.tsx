@@ -20,6 +20,21 @@ import { PreprocessSettingsPanel } from "./components/PreprocessSettingsPanel";
 import "./preprocess.css";
 import type { PreprocessFormState } from "./types";
 
+function usePendingElapsed(active: boolean) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const started = performance.now();
+    const update = () => setElapsed(performance.now() - started);
+    update();
+    const timer = window.setInterval(update, 250);
+    return () => window.clearInterval(timer);
+  }, [active]);
+
+  return active ? elapsed : 0;
+}
+
 const initialForm: PreprocessFormState = {
   scope: "all",
   resizeEnabled: true,
@@ -51,6 +66,8 @@ export function PreprocessPage() {
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState<string | null>(null);
   const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
+  const previewElapsedMs = usePendingElapsed(actions.preview.isPending);
+  const executeElapsedMs = usePendingElapsed(actions.execute.isPending);
 
   useEffect(() => {
     setActiveProject(projectId);
@@ -185,12 +202,18 @@ export function PreprocessPage() {
         checkedCount={checkedAssetIds.length}
         preview={validPreview}
         previewPending={actions.preview.isPending || workspaceBusy}
+        previewElapsedMs={previewElapsedMs}
         executePending={workspaceBusy}
+        executeElapsedMs={executeElapsedMs}
         error={error}
         onPreview={() => void preview()}
         onExecute={() => void execute()}
       />
-      <PreprocessPreviewPanel preview={validPreview} />
+      <PreprocessPreviewPanel
+        preview={validPreview}
+        pending={actions.preview.isPending}
+        elapsedMs={previewElapsedMs}
+      />
       <PreprocessHistoryPanel
         operations={operations.data ?? []}
         undoPending={workspaceBusy}

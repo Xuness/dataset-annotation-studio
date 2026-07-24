@@ -4,6 +4,7 @@ import os
 import secrets
 import shutil
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -15,15 +16,22 @@ from dataset_studio.core.languages import LANGUAGE_PATTERN
 from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.modules.assets.scanner import IMAGE_METADATA_VERSION, AssetScanner
-from dataset_studio.modules.preprocessing.executor import PreparedItem, PreprocessItemPreparer
+from dataset_studio.modules.preprocessing.executor import (
+    PreparedItem,
+    PreprocessItemPreparer,
+    requires_render,
+    resolve_resize_worker_count,
+)
 from dataset_studio.modules.preprocessing.image_pipeline import sha256
 from dataset_studio.modules.preprocessing.models import (
     PreprocessExecuteRequest,
+    PreprocessExecutionOptions,
     PreprocessItemPhase,
     PreprocessOperation,
     PreprocessPreview,
     PreprocessPreviewItem,
     PreprocessRequest,
+    PreprocessRuntimeInfo,
 )
 from dataset_studio.modules.preprocessing.planner import PlanItem, build_plan, preview_token
 from dataset_studio.modules.preprocessing.recovery import (
@@ -62,14 +70,28 @@ class PreprocessService:
         self._active_operations: dict[tuple[str, str], bool] = {}
 
     def preview(self, project_id: str, request: PreprocessRequest) -> PreprocessPreview:
+        started = time.perf_counter()
         paths, _ = self._workspaces.get(project_id)
-        plan = build_plan(paths.database, paths.root, request)
+        plan = build_plan(paths.database, paths.root, request, verify_content=False)
         visible_plan = plan[:1000]
         visible_ids = {item.asset_id for item in visible_plan}
         visible_plan.extend(
             item for item in plan if item.warning and item.asset_id not in visible_ids
         )
         visible_plan = visible_plan[:2000]
+        source_bytes = sum((paths.root / item.before_relative_path).stat().st_size for item in plan)
+        render_count = sum(requires_render(item, request) for item in plan)
+        automatic_worker_count = resolve_resize_worker_count(
+            plan,
+            request,
+            PreprocessExecutionOptions(),
+        )
+        maximum_worker_count = resolve_resize_worker_count(
+            plan,
+            request,
+            PreprocessExecutionOptions(max_workers=16),
+        )
+        preview_duration_ms = round((time.perf_counter() - started) * 1000)
         return PreprocessPreview(
             items=[PreprocessPreviewItem(**asdict(item)) for item in visible_plan],
             total_items=len(plan),
@@ -78,6 +100,13 @@ class PreprocessService:
             unchanged_count=sum(not item.will_change for item in plan),
             warning_count=sum(item.warning is not None for item in plan),
             preview_token=preview_token(request, plan),
+            runtime=PreprocessRuntimeInfo(
+                preview_duration_ms=preview_duration_ms,
+                source_bytes=source_bytes,
+                render_count=render_count,
+                automatic_worker_count=automatic_worker_count,
+                maximum_worker_count=maximum_worker_count,
+            ),
         )
 
     def execute(

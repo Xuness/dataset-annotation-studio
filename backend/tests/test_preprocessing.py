@@ -10,6 +10,7 @@ from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.preprocessing import executor as preprocessing_executor
 from dataset_studio.modules.preprocessing import image_pipeline as preprocessing_image_pipeline
+from dataset_studio.modules.preprocessing import planner as preprocessing_planner
 from dataset_studio.modules.preprocessing.models import (
     ConvertOptions,
     OutputFormat,
@@ -54,6 +55,38 @@ def _execute(
             execution=execution or PreprocessExecutionOptions(),
         ),
     )
+
+
+def test_preview_uses_indexed_hash_and_reports_cpu_runtime(tmp_path: Path, monkeypatch) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (256, 128), "white").save(project / "sample.png")
+    summary, _ = workspaces.open(str(project))
+    original_file_sha256 = preprocessing_planner.file_sha256
+    hash_calls = 0
+
+    def observed_file_sha256(path: Path) -> str:
+        nonlocal hash_calls
+        hash_calls += 1
+        return original_file_sha256(path)
+
+    monkeypatch.setattr(preprocessing_planner, "file_sha256", observed_file_sha256)
+    request = PreprocessRequest(resize=ResizeOptions(max_edge=128))
+
+    preview = preprocessing.preview(summary.project_id, request)
+
+    assert hash_calls == 0
+    assert preview.runtime.device == "cpu"
+    assert preview.runtime.preview_duration_ms >= 0
+    assert preview.runtime.source_bytes == (project / "sample.png").stat().st_size
+    assert preview.runtime.render_count == 1
+    assert preview.runtime.automatic_worker_count == 1
+    assert preview.runtime.maximum_worker_count == 1
+
+    operation = _execute(preprocessing, summary.project_id, request, preview)
+    assert operation.status == "completed"
+    assert hash_calls >= 1
 
 
 def test_resize_algorithm_defaults_and_low_halo_filter_selection() -> None:

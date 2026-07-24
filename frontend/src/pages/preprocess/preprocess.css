@@ -48,6 +48,75 @@
   margin: 19px 0;
 }
 
+.preprocess-runtime-card {
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-soft) 38%, var(--surface-raised));
+}
+
+.preprocess-runtime-card__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.preprocess-runtime-card__title > span {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.preprocess-runtime-card > p,
+.preprocess-runtime-card > small {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
+}
+
+.preprocess-runtime-card > p {
+  margin: 8px 0;
+}
+
+.preprocess-runtime-card > small {
+  display: block;
+  margin-top: 8px;
+}
+
+.preprocess-runtime-card dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.preprocess-runtime-card dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.preprocess-runtime-card dt,
+.preprocess-runtime-card dd {
+  margin: 0;
+  font-size: var(--text-2xs);
+}
+
+.preprocess-runtime-card dt {
+  color: var(--muted);
+}
+
+.preprocess-runtime-card dd {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-soft);
+  text-align: right;
+}
+
 .preprocess-option {
   margin-bottom: 10px;
   padding: 12px;
@@ -206,6 +275,25 @@
   padding: 8px;
 }
 
+.preview-runtime-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--accent-soft) 28%, transparent);
+  font-size: var(--text-2xs);
+}
+
+.preview-runtime-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .preview-limit-note {
   margin: 0;
   padding: 8px 10px;
@@ -258,6 +346,14 @@
   color: var(--muted);
   text-align: center;
   font-size: var(--text-xs);
+}
+
+.preview-empty > small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  color: var(--muted);
 }
 
 .preprocess-history {

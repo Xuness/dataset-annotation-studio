@@ -37,6 +37,15 @@ export interface PreprocessPreviewItem {
   warning: string | null;
 }
 
+export interface PreprocessRuntimeInfo {
+  device: "cpu";
+  preview_duration_ms: number;
+  source_bytes: number;
+  render_count: number;
+  automatic_worker_count: number;
+  maximum_worker_count: number;
+}
+
 export interface PreprocessPreview {
   items: PreprocessPreviewItem[];
   total_items: number;
@@ -45,6 +54,7 @@ export interface PreprocessPreview {
   unchanged_count: number;
   warning_count: number;
   preview_token: string;
+  runtime: PreprocessRuntimeInfo;
 }
 
 export interface PreprocessExecutionOptions {
