@@ -69,6 +69,62 @@ if [[ $SKIP_SYNC -eq 0 ]]; then
   uv sync --project "$BACKEND" --extra "$RUNTIME" --all-groups --locked --exact
 fi
 
+configure_cuda_library_path() {
+  local environment_dir="${UV_PROJECT_ENVIRONMENT:-$BACKEND/.venv}"
+  local python_bin
+  local site_packages=""
+  local cuda_site
+  local lib_dir
+  local joined_paths=""
+  local -a cuda_library_dirs=()
+
+  if [[ "$environment_dir" != /* ]]; then
+    environment_dir="$ROOT/$environment_dir"
+  fi
+  python_bin="$environment_dir/bin/python"
+
+  # Prefer the selected uv environment so this also works with an isolated
+  # CUDA test environment (for example backend/.venv-cuda-test). If the
+  # configured path is unavailable, ask uv which project environment it uses.
+  if [[ -x "$python_bin" ]]; then
+    site_packages="$($python_bin -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])' 2>/dev/null || true)"
+  fi
+  if [[ -z "$site_packages" ]]; then
+    site_packages="$(uv run --project "$BACKEND" --extra cuda --no-sync python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])' 2>/dev/null || true)"
+  fi
+
+  cuda_site="$site_packages/nvidia"
+  for lib_dir in \
+    "$cuda_site/cublas/lib" \
+    "$cuda_site/cudnn/lib" \
+    "$cuda_site/cuda_runtime/lib" \
+    "$cuda_site/cuda_nvrtc/lib" \
+    "$cuda_site/nvjitlink/lib" \
+    "$cuda_site/cufft/lib" \
+    "$cuda_site/curand/lib"; do
+    if [[ -d "$lib_dir" ]]; then
+      cuda_library_dirs+=("$lib_dir")
+    fi
+  done
+
+  if ((${#cuda_library_dirs[@]} > 0)); then
+    joined_paths="$(IFS=:; echo "${cuda_library_dirs[*]}")"
+    if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
+      export LD_LIBRARY_PATH="$joined_paths:$LD_LIBRARY_PATH"
+    else
+      export LD_LIBRARY_PATH="$joined_paths"
+    fi
+    echo "  CUDA 动态库: 已加入 NVIDIA Python 包路径（${#cuda_library_dirs[@]} 个目录）"
+  else
+    echo "  警告：未找到 NVIDIA Python 动态库目录，ONNX Runtime CUDA 可能无法加载。" >&2
+    echo "  请确认 CUDA extra 已安装，或手动设置 LD_LIBRARY_PATH。" >&2
+  fi
+}
+
+if [[ "$RUNTIME" == "cuda" ]]; then
+  configure_cuda_library_path
+fi
+
 if [[ $CHECK_ONLY -eq 1 ]]; then
   echo "[Dataset Studio] 开发环境检查通过（runtime=$RUNTIME, graphics=$GRAPHICS）。"
   exit 0
