@@ -4,10 +4,11 @@ import type { ExportPreview } from "../../../shared/api/types";
 import { formatBytes } from "../../../shared/format/bytes";
 
 const statusLabels: Record<string, string> = {
-  valid: "校验通过",
-  manually_accepted: "人工确认",
-  missing: "缺少 TXT",
-  empty: "空 TXT",
+  confirmed: "已确认",
+  unreviewed: "待确认",
+  stale: "已过期",
+  missing: "通道缺失",
+  empty: "内容为空",
   invalid: "结构异常",
   encoding_error: "编码异常",
 };
@@ -37,10 +38,11 @@ export function ExportPreviewPanel({ preview }: { preview: ExportPreview | undef
 
       {preview ? (
         <div className="export-status-strip">
-          <span>通过 {preview.valid_count}</span>
-          <span>人工确认 {preview.manually_accepted_count}</span>
-          <span>未标注 {preview.missing_count}</span>
-          <span>空文件 {preview.empty_count}</span>
+          <span>已确认 {preview.valid_count}</span>
+          <span>待确认 {preview.unreviewed_count}</span>
+          <span>已过期 {preview.stale_count}</span>
+          <span>通道缺失 {preview.missing_count}</span>
+          <span>内容为空 {preview.empty_count}</span>
           <span>结构异常 {preview.invalid_count}</span>
           <span>编码异常 {preview.encoding_error_count}</span>
         </div>
@@ -67,9 +69,19 @@ export function ExportPreviewPanel({ preview }: { preview: ExportPreview | undef
               }
             >
               <span title={item.source_relative_path}>{item.source_relative_path}</span>
-              <span title={item.target_image_name}>{item.target_image_name}</span>
+              <span title={item.target_outputs.join("\n")}>
+                {item.target_outputs.length} 个输出
+              </span>
               <span>{statusLabels[item.annotation_status] ?? item.annotation_status}</span>
-              <span title={item.target_annotation_name}>{item.target_annotation_name}</span>
+              <span
+                title={Object.entries(item.channel_statuses)
+                  .map(([channel, status]) => `${channel}: ${status}`)
+                  .join("\n")}
+              >
+                {Object.values(item.channel_statuses)
+                  .map((status) => statusLabels[status] ?? status)
+                  .join(" / ")}
+              </span>
               {issue ? <small>{issue}</small> : null}
             </div>
           );

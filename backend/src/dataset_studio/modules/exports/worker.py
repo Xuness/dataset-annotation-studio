@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
+import json
 import logging
 import os
 import shutil
@@ -9,7 +11,7 @@ import sqlite3
 import tempfile
 import threading
 from contextlib import suppress
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 from dataset_studio.core.errors import WorkspaceNotFoundError
@@ -112,8 +114,8 @@ class ExportWorker:
                 destination = Path(operation.destination_path)
                 self._cleanup_operation_temp_files(destination, operation.operation_id)
                 for target_name in operation.target_names:
-                    target = destination / target_name
-                    if target.is_file():
+                    target = self._safe_target(destination, target_name)
+                    if target is not None and target.is_file():
                         target.unlink(missing_ok=True)
                 LOGGER.info(
                     "Marked export %s interrupted in %s.",
@@ -177,50 +179,44 @@ class ExportWorker:
         repository: ExportRepository,
     ) -> int:
         root = workspace_root.resolve()
-        image_source = (root / str(item["source_relative_path"])).resolve()
-        annotation_source = (root / str(item["annotation_relative_path"])).resolve()
-        image_target = destination / str(item["target_image_name"])
-        annotation_target = destination / str(item["target_annotation_name"])
+        artifacts = self._artifacts(item)
         published: list[Path] = []
+        copied_bytes = 0
         try:
-            if not image_source.is_relative_to(root):
-                raise ValueError("图片路径超出当前项目范围。")
-            image_bytes = self._copy_verified(
-                image_source,
-                image_target,
-                expected_hash=str(item["image_hash"]),
-                expected_size=int(item["image_size"]),
-                expected_modified_ns=int(item["image_modified_ns"]),
-                operation_id=operation_id,
-                repository=repository,
-            )
-            published.append(image_target)
-            self._check_stop(repository, operation_id)
-
-            annotation_bytes = 0
-            if int(item["annotation_exists"]):
-                if not annotation_source.is_relative_to(root):
-                    raise ValueError("标注路径超出当前项目范围。")
-                annotation_hash = item["annotation_hash"]
-                annotation_modified_ns = item["annotation_modified_ns"]
-                if annotation_hash is None or annotation_modified_ns is None:
-                    raise ValueError("导出计划缺少同名 TXT 的版本信息。")
-                annotation_bytes = self._copy_verified(
-                    annotation_source,
-                    annotation_target,
-                    expected_hash=str(annotation_hash),
-                    expected_size=int(item["annotation_size"]),
-                    expected_modified_ns=int(annotation_modified_ns),
-                    operation_id=operation_id,
-                    repository=repository,
+            for artifact in artifacts:
+                self._check_stop(repository, operation_id)
+                target = self._required_target(
+                    destination,
+                    str(artifact["target_relative_path"]),
                 )
-                published.append(annotation_target)
-            elif annotation_source.exists():
-                raise ValueError(
-                    f"原先缺失的同名 TXT 已经出现，请重新创建导出任务："
-                    f"{item['annotation_relative_path']}"
-                )
-            return image_bytes + annotation_bytes
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if str(artifact["kind"]) == "image":
+                    source_relative = artifact.get("source_relative_path")
+                    if not source_relative:
+                        raise ValueError("导出图片快照缺少源路径。")
+                    source = (root / str(source_relative)).resolve()
+                    if not source.is_relative_to(root):
+                        raise ValueError("图片路径超出当前项目范围。")
+                    copied_bytes += self._copy_verified(
+                        source,
+                        target,
+                        expected_hash=str(artifact["content_hash"]),
+                        expected_size=int(artifact["byte_size"]),
+                        expected_modified_ns=int(artifact["source_modified_ns"]),
+                        operation_id=operation_id,
+                        repository=repository,
+                    )
+                else:
+                    payload = self._artifact_payload(artifact)
+                    copied_bytes += self._write_payload(
+                        target,
+                        payload,
+                        expected_hash=str(artifact["content_hash"]),
+                        operation_id=operation_id,
+                        repository=repository,
+                    )
+                published.append(target)
+            return copied_bytes
         except BaseException:
             for target in reversed(published):
                 target.unlink(missing_ok=True)
@@ -238,7 +234,7 @@ class ExportWorker:
         repository: ExportRepository,
     ) -> int:
         if target.exists():
-            raise ValueError(f"导出目标已经存在：{target.name}")
+            raise ValueError(f"导出目标已经存在：{target}")
         if not source.is_file():
             raise ValueError(f"源文件已经不存在：{source}")
         stat_before = source.stat()
@@ -291,6 +287,44 @@ class ExportWorker:
                 target.unlink(missing_ok=True)
             raise
 
+    def _write_payload(
+        self,
+        target: Path,
+        payload: bytes,
+        *,
+        expected_hash: str,
+        operation_id: str,
+        repository: ExportRepository,
+    ) -> int:
+        if hashlib.sha256(payload).hexdigest() != expected_hash:
+            raise ValueError("导出标注快照校验失败。")
+        if target.exists():
+            raise ValueError(f"导出目标已经存在：{target}")
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".dataset-studio-export-{operation_id}-",
+            suffix=".write",
+            dir=target.parent,
+        )
+        temporary = Path(temporary_name)
+        reserved_target = False
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            self._check_stop(repository, operation_id)
+            reservation = os.open(target, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(reservation)
+            reserved_target = True
+            os.replace(temporary, target)
+            reserved_target = False
+            return len(payload)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            if reserved_target:
+                target.unlink(missing_ok=True)
+            raise
+
     def _validate_destination(
         self,
         operation: ExportOperation,
@@ -303,38 +337,33 @@ class ExportWorker:
             raise ValueError("导出目录已经不存在或不再是文件夹。")
         self._cleanup_operation_temp_files(destination, operation.id)
 
-        allowed_names: set[str] = set()
+        allowed_paths: set[str] = set()
         for item in items:
             completed = str(item["status"]) == "completed"
             if require_complete and not completed:
                 raise ValueError("导出任务仍有未完成条目。")
             if not completed:
                 continue
-            image_name = str(item["target_image_name"])
-            annotation_name = str(item["target_annotation_name"])
-            image_target = destination / image_name
-            if not image_target.is_file():
-                raise ValueError(f"已导出的图片缺失，无法继续：{image_name}")
-            if image_target.stat().st_size != int(item["image_size"]):
-                raise ValueError(f"已导出的图片大小发生了变化：{image_name}")
-            if file_sha256(image_target) != str(item["image_hash"]):
-                raise ValueError(f"已导出的图片内容发生了变化：{image_name}")
-            allowed_names.add(image_name)
-            if int(item["annotation_exists"]):
-                annotation_target = destination / annotation_name
-                if not annotation_target.is_file():
-                    raise ValueError(f"已导出的同名 TXT 缺失：{annotation_name}")
-                if annotation_target.stat().st_size != int(item["annotation_size"]):
-                    raise ValueError(f"已导出的同名 TXT 大小发生了变化：{annotation_name}")
-                if file_sha256(annotation_target) != str(item["annotation_hash"]):
-                    raise ValueError(f"已导出的同名 TXT 内容发生了变化：{annotation_name}")
-                allowed_names.add(annotation_name)
+            for artifact in self._artifacts(item):
+                relative = str(artifact["target_relative_path"])
+                target = self._required_target(destination, relative)
+                if not target.is_file():
+                    raise ValueError(f"已导出的文件缺失，无法继续：{relative}")
+                if target.stat().st_size != int(artifact["byte_size"]):
+                    raise ValueError(f"已导出的文件大小发生了变化：{relative}")
+                if file_sha256(target) != str(artifact["content_hash"]):
+                    raise ValueError(f"已导出的文件内容发生了变化：{relative}")
+                allowed_paths.add(PurePosixPath(relative).as_posix().casefold())
 
         try:
-            entries = list(destination.iterdir())
+            files = [entry for entry in destination.rglob("*") if entry.is_file()]
         except OSError as error:
             raise ValueError(f"无法读取导出目录：{error}") from error
-        unknown = [entry.name for entry in entries if entry.name not in allowed_names]
+        unknown = [
+            entry.relative_to(destination).as_posix()
+            for entry in files
+            if entry.relative_to(destination).as_posix().casefold() not in allowed_paths
+        ]
         if unknown:
             examples = "、".join(sorted(unknown, key=str.casefold)[:5])
             raise ValueError(f"导出目录中出现了任务之外的文件：{examples}")
@@ -350,16 +379,68 @@ class ExportWorker:
             raise ExportStopped
 
     @staticmethod
+    def _artifacts(item) -> list[dict[str, object]]:
+        try:
+            value = json.loads(str(item["artifact_snapshot"]))
+        except (json.JSONDecodeError, TypeError) as error:
+            raise ValueError("导出条目的快照无效。") from error
+        if not isinstance(value, list) or not value:
+            raise ValueError("导出条目没有可执行的文件快照。")
+        if not all(isinstance(artifact, dict) for artifact in value):
+            raise ValueError("导出条目的文件快照结构无效。")
+        return value
+
+    @staticmethod
+    def _artifact_payload(artifact: dict[str, object]) -> bytes:
+        raw_base64 = artifact.get("raw_base64")
+        if raw_base64 is not None:
+            try:
+                return base64.b64decode(str(raw_base64), validate=True)
+            except ValueError as error:
+                raise ValueError("导出标注的二进制快照无效。") from error
+        content = artifact.get("content")
+        if content is None:
+            raise ValueError("导出标注快照缺少内容。")
+        return str(content).encode("utf-8")
+
+    @staticmethod
+    def _required_target(destination: Path, relative_path: str) -> Path:
+        target = ExportWorker._safe_target(destination, relative_path)
+        if target is None:
+            raise ValueError("导出目标路径超出目标目录。")
+        return target
+
+    @staticmethod
+    def _safe_target(destination: Path, relative_path: str) -> Path | None:
+        pure = PurePosixPath(relative_path)
+        if (
+            not relative_path
+            or pure.is_absolute()
+            or "\\" in relative_path
+            or any(part in {"", ".", ".."} for part in pure.parts)
+        ):
+            return None
+        root = destination.resolve()
+        target = (root / Path(*pure.parts)).resolve()
+        return target if target.is_relative_to(root) else None
+
+    @staticmethod
     def _cleanup_operation_temp_files(destination: Path, operation_id: str) -> None:
         if not destination.is_dir():
             return
         prefix = f".dataset-studio-export-{operation_id}-"
-        for candidate in destination.iterdir():
+        for candidate in destination.rglob("*"):
             if candidate.is_file() and candidate.name.startswith(prefix):
                 candidate.unlink(missing_ok=True)
 
     @staticmethod
     def _cleanup_item_targets(destination: Path, item) -> None:
-        (destination / str(item["target_image_name"])).unlink(missing_ok=True)
-        if int(item["annotation_exists"]):
-            (destination / str(item["target_annotation_name"])).unlink(missing_ok=True)
+        with suppress(ValueError):
+            artifacts = ExportWorker._artifacts(item)
+            for artifact in artifacts:
+                target = ExportWorker._safe_target(
+                    destination,
+                    str(artifact["target_relative_path"]),
+                )
+                if target is not None:
+                    target.unlink(missing_ok=True)

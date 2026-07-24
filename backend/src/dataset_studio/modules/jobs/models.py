@@ -4,6 +4,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from dataset_studio.modules.annotations.models import AnnotationChannel
+
 
 def _require_non_blank(value: str | None) -> str | None:
     if value is not None and not value.strip():
@@ -61,6 +63,7 @@ class JobCreateRequest(BaseModel):
     scope: JobScope = JobScope.ALL
     asset_ids: list[str] = Field(default_factory=list)
     overwrite_existing: bool = False
+    use_confirmed_tags: bool = False
     translation_prompt_preset_id: str | None = None
     target_language: str = "zh-CN"
     translation_policy: ExistingTranslationPolicy = ExistingTranslationPolicy.SKIP
@@ -76,6 +79,10 @@ class JobCreateRequest(BaseModel):
                 raise ValueError("请选择模型连接。")
         elif not self.tagger_profile_id or not self.tagger_profile_id.strip():
             raise ValueError("请选择本地打标配置。")
+        if self.use_confirmed_tags and (
+            self.kind != JobKind.ANNOTATION or self.execution_backend != ExecutionBackend.PROVIDER
+        ):
+            raise ValueError("只有 LLM 标注任务可以使用已确认 Tags 辅助。")
         return self
 
 
@@ -93,6 +100,8 @@ class JobSummary(BaseModel):
     model: str
     scope: JobScope
     overwrite_existing: bool
+    output_channel: AnnotationChannel
+    use_confirmed_tags: bool = False
     target_language: str | None = None
     translation_policy: ExistingTranslationPolicy | None = None
     retry_limit: int

@@ -1,1 +1,1 @@
-"""Translation sidecars for annotation documents."""
+"""Database-backed translation channels for annotation documents."""

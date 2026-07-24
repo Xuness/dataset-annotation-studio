@@ -467,6 +467,37 @@
   white-space: nowrap;
 }
 
+.asset-row__channels {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+.asset-row__channels i {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  border-radius: 3px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 8px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.asset-row__channels i.is-confirmed {
+  color: var(--sage);
+  background: var(--sage-soft);
+}
+
+.asset-row__channels i.is-unreviewed,
+.asset-row__channels i.is-stale {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
 .asset-row__copy strong {
   margin-bottom: 3px;
   font-size: var(--text-sm);

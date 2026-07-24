@@ -28,6 +28,8 @@ export interface JobSummary {
   model: string;
   scope: "all" | "selected";
   overwrite_existing: boolean;
+  output_channel: "tags" | "description" | "translation";
+  use_confirmed_tags: boolean;
   target_language: string | null;
   translation_policy: ExistingTranslationPolicy | null;
   retry_limit: number;

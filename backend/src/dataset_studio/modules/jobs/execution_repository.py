@@ -55,7 +55,7 @@ class JobExecutionRepository:
         with transaction(self._database_path) as connection:
             job = connection.execute(
                 """
-                SELECT stop_requested, kind, configuration_snapshot
+                SELECT stop_requested, kind, configuration_snapshot, output_channel
                 FROM jobs
                 WHERE id = ?
                 """,
@@ -72,7 +72,7 @@ class JobExecutionRepository:
                 if last_path is None:
                     rows = connection.execute(
                         """
-                        SELECT ji.*, a.relative_path, a.annotation_relative_path
+                        SELECT ji.*, a.relative_path
                         FROM job_items ji
                         JOIN assets a ON a.id = ji.asset_id
                         WHERE ji.job_id = ? AND ji.status = 'pending'
@@ -84,7 +84,7 @@ class JobExecutionRepository:
                 else:
                     rows = connection.execute(
                         """
-                        SELECT ji.*, a.relative_path, a.annotation_relative_path
+                        SELECT ji.*, a.relative_path
                         FROM job_items ji
                         JOIN assets a ON a.id = ji.asset_id
                         WHERE ji.job_id = ? AND ji.status = 'pending'
@@ -107,7 +107,8 @@ class JobExecutionRepository:
                     resource_key = job_output_resource_key(
                         str(job["kind"]),
                         str(job["configuration_snapshot"]),
-                        str(row["annotation_relative_path"]),
+                        str(row["asset_id"]),
+                        str(job["output_channel"]),
                     )
                     acquired = connection.execute(
                         """
@@ -183,6 +184,21 @@ class JobExecutionRepository:
                 (attempt_id, item_id, attempt_number, now, source_annotation_hash),
             )
         return attempt_id, attempt_number
+
+    def annotation_input_revision(self, item_id: str, role: str) -> str | None:
+        connection = connect(self._database_path)
+        try:
+            row = connection.execute(
+                """
+                SELECT revision_id
+                FROM job_item_annotation_inputs
+                WHERE job_item_id = ? AND role = ?
+                """,
+                (item_id, role),
+            ).fetchone()
+            return str(row["revision_id"]) if row else None
+        finally:
+            connection.close()
 
     def start_attempts(self, item_ids: list[str]) -> dict[str, tuple[str, int]]:
         if not item_ids:

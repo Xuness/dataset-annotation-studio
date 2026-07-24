@@ -3,6 +3,9 @@ from pathlib import Path
 from PIL import Image
 
 from dataset_studio.core.config import Settings
+from dataset_studio.modules.annotations.models import AnnotationTag
+from dataset_studio.modules.annotations.service import AnnotationService
+from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.statistics.service import StatisticsService
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -19,11 +22,26 @@ def test_tag_frequency_is_a_read_only_replaceable_projection(tmp_path: Path) -> 
     project.mkdir()
     for name in ("one", "two"):
         Image.new("RGB", (32, 32), "white").save(project / f"{name}.png")
-    first = "<caption><subject /></caption>"
-    second = "<caption><subject /><subject /></caption>"
-    (project / "one.txt").write_text(first, encoding="utf-8")
-    (project / "two.txt").write_text(second, encoding="utf-8")
     workspace, _ = workspaces.open(str(project))
+    assets = AssetService(workspaces).list_assets(workspace.project_id).items
+    by_name = {asset.filename: asset for asset in assets}
+    annotations = AnnotationService(workspaces)
+    annotations.save_tags(
+        workspace.project_id,
+        by_name["one.png"].id,
+        [AnnotationTag(name="caption"), AnnotationTag(name="subject")],
+        confirm=True,
+    )
+    annotations.save_tags(
+        workspace.project_id,
+        by_name["two.png"].id,
+        [
+            AnnotationTag(name="caption"),
+            AnnotationTag(name="subject"),
+            AnnotationTag(name="garden"),
+        ],
+        confirm=True,
+    )
 
     result = StatisticsService(workspaces).tag_frequency(workspace.project_id)
 
@@ -31,8 +49,9 @@ def test_tag_frequency_is_a_read_only_replaceable_projection(tmp_path: Path) -> 
     assert result.document_count == 2
     assert result.occurrence_count == 5
     assert [(bucket.value, bucket.count) for bucket in result.buckets] == [
-        ("subject", 3),
         ("caption", 2),
+        ("subject", 2),
+        ("garden", 1),
     ]
-    assert (project / "one.txt").read_text(encoding="utf-8") == first
-    assert (project / "two.txt").read_text(encoding="utf-8") == second
+    assert not (project / "one.txt").exists()
+    assert not (project / "two.txt").exists()

@@ -1,6 +1,7 @@
 import type { AnnotationStatus } from "./annotations";
 
-export type AssetFilterStatus = AnnotationStatus | "failed" | "needs_review";
+export type AssetFilterStatus =
+  AnnotationStatus | "failed" | "needs_review" | "unreviewed" | "stale";
 
 export interface AssetSummary {
   id: string;
@@ -16,6 +17,7 @@ export interface AssetSummary {
   metadata_relative_path: string | null;
   generation_status: "failed" | null;
   generation_error: string | null;
+  annotation_channels: Record<string, string>;
 }
 
 export interface AssetListResponse {

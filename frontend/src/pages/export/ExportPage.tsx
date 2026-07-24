@@ -22,6 +22,10 @@ import type { ExportFormState } from "./types";
 const initialForm: ExportFormState = {
   scope: "all",
   destinationPath: "",
+  channels: ["existing_annotation"],
+  translationLanguage: "zh-CN",
+  revision: "confirmed",
+  formats: ["txt"],
 };
 
 const activeStatuses = new Set(["queued", "running", "stopping"]);
@@ -52,6 +56,12 @@ export function ExportPage() {
       scope: form.scope,
       asset_ids: form.scope === "selected" ? checkedAssetIds : [],
       destination_path: form.destinationPath,
+      channels: form.channels.map((channel) => ({
+        channel,
+        language: channel === "translation" ? form.translationLanguage : "",
+        revision: form.revision,
+      })),
+      formats: form.formats,
     }),
     [checkedAssetIds, form],
   );
@@ -113,9 +123,10 @@ export function ExportPage() {
       const confirmed = await confirmDialog(
         [
           `所选 ${previewData.total_items} 张图片中发现 ${previewData.warning_count} 个标注警告：`,
-          `未标注 ${previewData.missing_count}，空文件 ${previewData.empty_count}，`,
+          `未标注 ${previewData.missing_count}，空内容 ${previewData.empty_count}，`,
+          `待确认 ${previewData.unreviewed_count}，已过期 ${previewData.stale_count}，`,
           `结构异常 ${previewData.invalid_count}，编码异常 ${previewData.encoding_error_count}。`,
-          "继续后，未标注项只导出图片，其余 TXT 按原始字节复制。",
+          "继续后会严格使用当前预览冻结的数据库修订；缺失通道不会生成对应标注文件。",
         ].join("\n"),
         {
           title: "发现标注问题",
@@ -128,7 +139,7 @@ export function ExportPage() {
       allowWarnings = true;
     } else {
       const confirmed = await confirmDialog(
-        `将 ${previewData.total_items} 张图片及其同名 TXT 扁平导出到所选目录？`,
+        `将 ${previewData.total_items} 张图片及所选标注通道物化到导出目录？`,
         {
           title: "开始导出",
           confirmLabel: "开始导出",
@@ -153,7 +164,7 @@ export function ExportPage() {
 
   async function stop(operationId: string) {
     const confirmed = await confirmDialog(
-      "停止后已完成的图片和 TXT 会保留在导出目录中，之后可以继续任务。",
+      "停止后已完成的输出文件会保留在导出目录中，之后可以继续任务。",
       {
         title: "停止导出",
         confirmLabel: "停止",
@@ -198,7 +209,7 @@ export function ExportPage() {
       bodyClassName="export-workspace-body"
       statusbar={
         <>
-          <span>扁平导出 · 原始图片与活动同名 TXT</span>
+          <span>多通道导出 · 数据库修订物化为 TXT / JSON</span>
           <span className="workspace-statusbar__path">
             任务状态：.annotation-workspace/state.sqlite3
           </span>

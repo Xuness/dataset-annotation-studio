@@ -9,15 +9,11 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Protocol
 
-from dataset_studio.core.errors import (
-    FileRollbackError,
-    ResourceConflictError,
-    WorkspaceNotFoundError,
-)
+from dataset_studio.core.errors import ResourceConflictError, WorkspaceNotFoundError
 from dataset_studio.core.files import atomic_write_text
+from dataset_studio.modules.annotations.models import AnnotationChannel
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
-from dataset_studio.modules.annotations.text import AnnotationEncodingError
 from dataset_studio.modules.assets.deletions.service import AssetDeletionService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.execution_repository import (
@@ -360,19 +356,18 @@ class AnnotationWorker:
                 execution_profile,
             )
             return
-        if kind == JobKind.ANNOTATION and not bool(job["overwrite_existing"]):
-            annotation_path = (workspace_root / str(item["annotation_relative_path"])).resolve()
-            if not annotation_path.is_relative_to(workspace_root.resolve()):
-                repository.finish_item(
-                    item_id,
-                    JobItemStatus.FAILED,
-                    error="任务输出路径超出当前工作区。",
-                    validation_status="invalid_path",
-                )
-                return
-            if annotation_path.is_file():
-                repository.finish_item(item_id, JobItemStatus.SKIPPED)
-                return
+        output_channel = AnnotationChannel(str(job["output_channel"]))
+        if (
+            kind == JobKind.ANNOTATION
+            and not bool(job["overwrite_existing"])
+            and self._container.annotations.get_channel(
+                project_id,
+                asset_id,
+                output_channel,
+            ).exists
+        ):
+            repository.finish_item(item_id, JobItemStatus.SKIPPED)
+            return
         profile = execution_profile
         try:
             credential = self._container.presets.get_provider_credential(profile)
@@ -389,16 +384,7 @@ class AnnotationWorker:
             translation_configuration = json.loads(str(job["configuration_snapshot"]))
             language = str(translation_configuration["target_language"])
             policy = str(translation_configuration["translation_policy"])
-            try:
-                source = self._container.translations.read_source(project_id, asset_id)
-            except AnnotationEncodingError:
-                repository.finish_item(
-                    item_id,
-                    JobItemStatus.FAILED,
-                    error="源标注不是有效的 UTF-8，无法翻译。",
-                    validation_status="source_invalid",
-                )
-                return
+            source = self._container.translations.read_source(project_id, asset_id)
             if source is None:
                 repository.finish_item(
                     item_id,
@@ -425,25 +411,35 @@ class AnnotationWorker:
             image_path = None
             user_prompt = translation_user_prompt(language, source_content)
         else:
-            annotation_path = (workspace_root / str(item["annotation_relative_path"])).resolve()
-            if not annotation_path.is_relative_to(workspace_root.resolve()):
-                repository.finish_item(
-                    item_id,
-                    JobItemStatus.FAILED,
-                    error="任务输出路径超出当前工作区。",
-                    validation_status="invalid_path",
-                )
-                return
             expected_output_modified_at = (
-                str(annotation_path.stat().st_mtime_ns) if annotation_path.is_file() else None
+                str(item["output_base_revision_id"])
+                if item.get("output_base_revision_id")
+                else None
             )
             image_path = self._container.assets.image_path(project_id, asset_id)
             metadata = self._container.assets.metadata(project_id, asset_id)
             selected_fields = json.loads(str(job["json_fields_snapshot"]))
+            tag_revision_id = (
+                repository.annotation_input_revision(item_id, "tag_context")
+                if bool(job["use_confirmed_tags"])
+                else None
+            )
+            auxiliary_tags = (
+                [
+                    tag.name
+                    for tag in self._container.annotations.revision_tags(
+                        project_id,
+                        tag_revision_id,
+                    )
+                ]
+                if tag_revision_id
+                else []
+            )
             user_prompt = compose_user_prompt(
                 str(job["user_prompt_snapshot"]),
                 metadata.value if metadata.exists and not metadata.error else None,
                 selected_fields,
+                auxiliary_tags,
             )
         request = MultimodalRequest(
             image_path=image_path,
@@ -553,10 +549,14 @@ class AnnotationWorker:
                             model=profile.model_id,
                             expected_modified_at=expected_output_modified_at,
                             lease_owner_id=item_id,
+                            source_job_item_id=item_id,
                         )
                     else:
-                        annotation_path = workspace_root / str(item["annotation_relative_path"])
-                        if annotation_path.is_file() and not bool(job["overwrite_existing"]):
+                        if self._container.annotations.get_channel(
+                            project_id,
+                            asset_id,
+                            output_channel,
+                        ).exists and not bool(job["overwrite_existing"]):
                             repository.finish_attempt(
                                 attempt_id,
                                 status="skipped_existing",
@@ -575,8 +575,13 @@ class AnnotationWorker:
                             project_id,
                             asset_id,
                             response.content,
+                            channel=output_channel,
                             expected_modified_at=expected_output_modified_at,
                             lease_owner_id=item_id,
+                            source_job_item_id=item_id,
+                            input_revisions=(
+                                ((tag_revision_id, "tag_context"),) if tag_revision_id else ()
+                            ),
                         )
                     repository.finish_attempt(
                         attempt_id,
@@ -638,28 +643,6 @@ class AnnotationWorker:
                     JobItemStatus.FAILED,
                     error=last_error,
                     validation_status="output_changed",
-                )
-                return
-            except FileRollbackError as error:
-                last_error = str(error)
-                repository.finish_attempt(
-                    attempt_id,
-                    status="rollback_failed",
-                    response_content=response.content,
-                    error_message=last_error,
-                    provider_payload_path=payload_path,
-                    input_tokens=response.input_tokens,
-                    output_tokens=response.output_tokens,
-                    cache_read_tokens=response.cache_read_tokens,
-                    cache_write_tokens=response.cache_write_tokens,
-                    reasoning_tokens=response.reasoning_tokens,
-                    finish_reason=response.finish_reason,
-                )
-                repository.finish_item(
-                    item_id,
-                    JobItemStatus.FAILED,
-                    error=last_error,
-                    validation_status="rollback_failed",
                 )
                 return
             except JobStopped:

@@ -5,6 +5,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from dataset_studio.core.languages import normalize_language_code
+from dataset_studio.modules.annotations.models import AnnotationChannel
+
 
 class ExportScope(StrEnum):
     ALL = "all"
@@ -21,12 +24,71 @@ class ExportOperationStatus(StrEnum):
     FAILED = "failed"
 
 
+class ExportRevisionMode(StrEnum):
+    CONFIRMED = "confirmed"
+    HEAD = "head"
+
+
+class ExportFormat(StrEnum):
+    TXT = "txt"
+    JSON = "json"
+
+
+class ExportChannelSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channel: AnnotationChannel
+    language: str = ""
+    revision: ExportRevisionMode = ExportRevisionMode.CONFIRMED
+
+    @field_validator("language")
+    @classmethod
+    def normalize_language(cls, value: str) -> str:
+        if not value.strip():
+            return ""
+        try:
+            return normalize_language_code(value)
+        except ValueError as error:
+            raise ValueError("导出翻译通道的语言代码无效。") from error
+
+    @model_validator(mode="after")
+    def validate_language(self) -> ExportChannelSelection:
+        if self.channel == AnnotationChannel.TRANSLATION and not self.language:
+            raise ValueError("导出翻译通道时必须指定语言。")
+        if self.channel != AnnotationChannel.TRANSLATION and self.language:
+            raise ValueError("只有翻译通道可以指定语言。")
+        return self
+
+    @property
+    def key(self) -> str:
+        return f"{self.channel.value}:{self.language}" if self.language else self.channel.value
+
+
+def _default_channels() -> list[ExportChannelSelection]:
+    return [
+        ExportChannelSelection(
+            channel=AnnotationChannel.EXISTING,
+            revision=ExportRevisionMode.CONFIRMED,
+        )
+    ]
+
+
 class ExportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scope: ExportScope = ExportScope.ALL
     asset_ids: list[str] = Field(default_factory=list)
     destination_path: str = Field(min_length=1, max_length=32_767)
+    channels: list[ExportChannelSelection] = Field(
+        default_factory=_default_channels,
+        min_length=1,
+        max_length=32,
+    )
+    formats: list[ExportFormat] = Field(
+        default_factory=lambda: [ExportFormat.TXT],
+        min_length=1,
+        max_length=2,
+    )
 
     @field_validator("asset_ids")
     @classmethod
@@ -41,8 +103,26 @@ class ExportRequest(BaseModel):
             raise ValueError("请选择导出目录。")
         return normalized
 
+    @field_validator("channels")
+    @classmethod
+    def unique_channels(
+        cls,
+        value: list[ExportChannelSelection],
+    ) -> list[ExportChannelSelection]:
+        keys = [selection.key for selection in value]
+        if len(keys) != len(set(keys)):
+            raise ValueError("同一个标注通道不能重复选择。")
+        return value
+
+    @field_validator("formats")
+    @classmethod
+    def unique_formats(cls, value: list[ExportFormat]) -> list[ExportFormat]:
+        if len(value) != len(set(value)):
+            raise ValueError("导出格式不能重复。")
+        return value
+
     @model_validator(mode="after")
-    def validate_scope(self):
+    def validate_scope(self) -> ExportRequest:
         if self.scope == ExportScope.SELECTED and not self.asset_ids:
             raise ValueError("请先在素材工作台中选择要导出的图片。")
         if self.scope == ExportScope.ALL and self.asset_ids:
@@ -55,6 +135,8 @@ class ExportPreviewItem(BaseModel):
     source_relative_path: str
     target_image_name: str
     target_annotation_name: str
+    target_outputs: list[str] = Field(default_factory=list)
+    channel_statuses: dict[str, str] = Field(default_factory=dict)
     annotation_status: str
     image_bytes: int
     annotation_bytes: int
@@ -75,6 +157,8 @@ class ExportPreview(BaseModel):
     empty_count: int
     invalid_count: int
     encoding_error_count: int
+    unreviewed_count: int = 0
+    stale_count: int = 0
     warning_count: int
     blocking_issue_count: int
     blocking_issues: list[str] = Field(default_factory=list)
@@ -100,6 +184,7 @@ class ExportOperation(BaseModel):
     copied_bytes: int
     warning_count: int
     allow_warnings: bool
+    configuration_snapshot: dict[str, object] = Field(default_factory=dict)
     current_relative_path: str | None = None
     created_at: str
     updated_at: str

@@ -9,10 +9,12 @@ from PIL import Image
 
 from dataset_studio.api.container import AppContainer
 from dataset_studio.core.config import Settings
+from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationTag
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.deletions.service import AssetDeletionService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.exports.service import ExportService
+from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
 from dataset_studio.modules.jobs.models import (
     ExecutionBackend,
     ExistingTranslationPolicy,
@@ -218,6 +220,73 @@ def test_idle_job_scheduler_does_not_scan_recent_workspaces(
     AnnotationWorker(container)._schedule_available_items()
 
 
+def test_llm_job_does_not_freeze_confirmed_tags_for_an_old_image(
+    tmp_path: Path,
+) -> None:
+    container, workspaces, presets, jobs = _runtime(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    image_path = project / "sample.png"
+    Image.new("RGB", (32, 32), "white").save(image_path)
+    workspace, _ = workspaces.open(str(project))
+    system = presets.create_system(
+        SystemPresetCreate(name="Caption", system_prompt="Describe the image.")
+    )
+    workspaces.update_settings(
+        workspace.project_id,
+        WorkspaceSettingsUpdate(system_preset_id=system.id),
+    )
+    asset = container.assets.list_assets(workspace.project_id).items[0]
+    container.annotations.save_tags(
+        workspace.project_id,
+        asset.id,
+        [AnnotationTag(name="old_image_tag", origin="manual")],
+        confirm=True,
+    )
+
+    Image.new("RGB", (64, 48), "black").save(image_path)
+    workspaces.rescan(workspace.project_id)
+    stale_tags = container.annotations.get_channel(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.TAGS,
+    )
+    assert stale_tags.review_status.value == "stale"
+
+    provider = presets.create_provider(
+        ProviderProfileCreate(
+            name="Provider",
+            provider_type=ProviderType.OPENAI_COMPATIBLE,
+            base_url="https://example.invalid/v1",
+            default_model_id="model",
+            models=[
+                ProviderModelConfig(
+                    model_id="model",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                )
+            ],
+            api_key="secret",
+        )
+    )
+    job = jobs.create(
+        workspace.project_id,
+        JobCreateRequest(
+            provider_profile_id=provider.id,
+            scope=JobScope.ALL,
+            use_confirmed_tags=True,
+        ),
+    )
+    paths, _ = workspaces.get(workspace.project_id)
+
+    assert (
+        JobExecutionRepository(paths.database).annotation_input_revision(
+            job.items[0].id,
+            "tag_context",
+        )
+        is None
+    )
+
+
 @pytest.mark.asyncio
 async def test_worker_runs_local_tagger_without_prompt_or_provider(
     tmp_path: Path,
@@ -229,6 +298,17 @@ async def test_worker_runs_local_tagger_without_prompt_or_provider(
     for image_path in image_paths:
         Image.new("RGB", (48, 48), "white").save(image_path)
     workspace, _ = workspaces.open(str(project))
+    deleted_asset = container.assets.list_assets(workspace.project_id).items[0]
+    container.annotations.save_tags(
+        workspace.project_id,
+        deleted_asset.id,
+        [AnnotationTag(name="deleted_before_rerun", origin="manual")],
+    )
+    container.annotations.delete(
+        workspace.project_id,
+        deleted_asset.id,
+        AnnotationChannel.TAGS,
+    )
     catalog = StaticTaggerCatalog()
     jobs = JobService(
         workspaces,
@@ -273,8 +353,17 @@ async def test_worker_runs_local_tagger_without_prompt_or_provider(
     assert len(detail.items) == 5
     assert all(item.status == JobItemStatus.SUCCEEDED for item in detail.items)
     assert tagger_runtime.batch_sizes == [4, 1]
-    for image_path in image_paths:
-        assert image_path.with_suffix(".txt").read_text(encoding="utf-8") == "alice, blue_hair"
+    for item in detail.items:
+        document = container.annotations.get_channel(
+            workspace.project_id,
+            item.asset_id,
+            AnnotationChannel.TAGS,
+        )
+        assert [tag.name for tag in document.tags] == ["alice", "blue_hair"]
+        assert document.tags[0].category == "character"
+        assert document.tags[0].confidence == 0.91
+        assert document.review_status.value == "unreviewed"
+    assert all(not image_path.with_suffix(".txt").exists() for image_path in image_paths)
     trace = container.annotation_traces.get(workspace.project_id, detail.items[0].asset_id)
     assert trace is not None
     assert trace.matches_current_annotation
@@ -302,6 +391,27 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
             user_prompt="Describe the image.",
             json_fields=["artist"],
         ),
+    )
+    asset = container.assets.list_assets(workspace.project_id).items[0]
+    container.annotations.save_tags(
+        workspace.project_id,
+        asset.id,
+        [
+            AnnotationTag(name="blue_hair", category="general", origin="manual"),
+            AnnotationTag(name="alice", category="character", origin="manual"),
+        ],
+        confirm=True,
+    )
+    container.annotations.save_text(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>deleted before rerun</caption>",
+    )
+    container.annotations.delete(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
     )
     profile = presets.create_provider(
         ProviderProfileCreate(
@@ -332,7 +442,20 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
             provider_profile_id=profile.id,
             model_id="fake-model-alternate",
             scope=JobScope.ALL,
+            use_confirmed_tags=True,
         ),
+    )
+    frozen_tags = container.annotations.get_channel(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.TAGS,
+    )
+    container.annotations.save_tags(
+        workspace.project_id,
+        asset.id,
+        [AnnotationTag(name="changed_after_job_creation", origin="manual")],
+        expected_head_revision_id=frozen_tags.head_revision_id,
+        confirm=True,
     )
     presets.update_provider(
         profile.id,
@@ -364,10 +487,16 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
         stopped.set()
         await asyncio.wait_for(worker_task, timeout=2)
 
-    assert (project / "sample.txt").read_text(encoding="utf-8") == (
-        "<caption>quiet garden</caption>"
+    stored = container.annotations.get_channel(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
     )
-    assert provider.requests[0].user_prompt == "Describe the image.\n\nartist: Mori"
+    assert stored.content == "<caption>quiet garden</caption>"
+    assert stored.review_status.value == "unreviewed"
+    assert not (project / "sample.txt").exists()
+    expected_prompt = 'Describe the image.\n\nartist: Mori\nconfirmed_tags: ["blue_hair","alice"]'
+    assert provider.requests[0].user_prompt == expected_prompt
     detail = jobs.get(workspace.project_id, created.id)
     assert detail.succeeded == 1
     assert detail.items[0].attempts[0].response_content == "<caption>quiet garden</caption>"
@@ -379,7 +508,7 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
     payload = json.loads(payloads[0].read_text(encoding="utf-8"))
     assert payload["kind"] == "response"
     assert payload["request"]["system_prompt"] == "Return one XML element."
-    assert payload["request"]["user_prompt"] == "Describe the image.\n\nartist: Mori"
+    assert payload["request"]["user_prompt"] == expected_prompt
     assert payload["request"]["parameters"]["model"] == "fake-model-alternate"
     assert payload["request"]["parameters"]["temperature"] == 0.8
     assert payload["request"]["parameters"]["max_output_tokens"] == 8192
@@ -390,9 +519,18 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
     assert trace is not None
     assert trace.matches_current_annotation
     assert trace.request.source == "recorded"
-    assert trace.request.user_prompt == "Describe the image.\n\nartist: Mori"
+    assert trace.request.user_prompt == expected_prompt
     assert trace.response.reasoning_content == "The scene contains a quiet garden."
     assert trace.response.final_content == "<caption>quiet garden</caption>"
+
+    payloads[0].unlink()
+    reconstructed = container.annotation_traces.get(
+        workspace.project_id,
+        detail.items[0].asset_id,
+    )
+    assert reconstructed is not None
+    assert reconstructed.request.source == "reconstructed"
+    assert reconstructed.request.user_prompt == expected_prompt
 
 
 @pytest.mark.asyncio
@@ -468,7 +606,13 @@ async def test_worker_translates_annotation_without_sending_image(tmp_path: Path
     workspace, _ = workspaces.open(str(project))
     asset = container.assets.list_assets(workspace.project_id).items[0]
     source = "<caption>quiet garden</caption>"
-    container.annotations.save(workspace.project_id, asset.id, source)
+    container.annotations.save_text(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        source,
+        confirm=True,
+    )
     profile = presets.create_provider(
         ProviderProfileCreate(
             name="Fake translator",
@@ -524,10 +668,15 @@ async def test_worker_translates_annotation_without_sending_image(tmp_path: Path
         stopped.set()
         await asyncio.wait_for(worker_task, timeout=2)
 
-    assert (project / "sample.txt").read_text(encoding="utf-8") == source
-    assert (project / "sample.zh-CN.txt").read_text(encoding="utf-8") == (
-        "<caption>安静的花园</caption>"
+    assert not (project / "sample.txt").exists()
+    assert not (project / "sample.zh-CN.txt").exists()
+    stored_translation = container.annotations.get_channel(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.TRANSLATION,
+        "zh-CN",
     )
+    assert stored_translation.content == "<caption>安静的花园</caption>"
     assert provider.requests[0].image_path is None
     assert provider.requests[0].system_prompt == "Translate into 简体中文; locale=zh-CN."
     assert source in provider.requests[0].user_prompt

@@ -6,42 +6,173 @@ from pathlib import Path
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.modules.assets.models import AssetRecord, AssetSummary
 
-LATEST_JOB_STATUS_SQL = """
-(
-    SELECT job_items.status
-    FROM job_items
-    WHERE job_items.asset_id = assets.id
-      AND EXISTS (
-          SELECT 1 FROM jobs
-          WHERE jobs.id = job_items.job_id AND jobs.kind = 'annotation'
+
+def _latest_unresolved_generation_failure_sql(column: str) -> str:
+    if column not in {"id", "last_error"}:
+        raise ValueError("不支持的任务失败字段。")
+    return f"""
+    (
+        SELECT failed.{column}
+        FROM job_items failed
+        JOIN jobs failed_job ON failed_job.id = failed.job_id
+        WHERE failed.asset_id = assets.id
+          AND failed.status = 'failed'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM job_items newer
+              JOIN jobs newer_job ON newer_job.id = newer.job_id
+              WHERE newer.asset_id = failed.asset_id
+                AND newer_job.output_channel = failed_job.output_channel
+                AND (
+                    failed_job.output_channel != 'translation'
+                    OR (
+                        LOWER(
+                            CASE
+                                WHEN json_valid(newer_job.configuration_snapshot)
+                                THEN COALESCE(
+                                    json_extract(
+                                        newer_job.configuration_snapshot,
+                                        '$.target_language'
+                                    ),
+                                    ''
+                                )
+                                ELSE ''
+                            END
+                        )
+                        =
+                        LOWER(
+                            CASE
+                                WHEN json_valid(failed_job.configuration_snapshot)
+                                THEN COALESCE(
+                                    json_extract(
+                                        failed_job.configuration_snapshot,
+                                        '$.target_language'
+                                    ),
+                                    ''
+                                )
+                                ELSE ''
+                            END
+                        )
+                    )
+                )
+                AND (
+                    newer.updated_at > failed.updated_at
+                    OR (
+                        newer.updated_at = failed.updated_at
+                        AND newer.rowid > failed.rowid
+                    )
+                )
+          )
+        ORDER BY failed.updated_at DESC, failed.rowid DESC
+        LIMIT 1
+    )
+    """
+
+
+LATEST_JOB_ERROR_SQL = _latest_unresolved_generation_failure_sql("last_error")
+UNRESOLVED_GENERATION_FAILURE_SQL = (
+    f"({_latest_unresolved_generation_failure_sql('id')} IS NOT NULL)"
+)
+
+REVIEW_VALIDATION_STATUSES = ("invalid", "encoding_error", "empty", "unchecked")
+
+ACTIVE_UNREVIEWED_DOCUMENT_SQL = """
+EXISTS (
+    SELECT 1
+    FROM annotation_documents d
+    JOIN annotation_document_revisions r ON r.id = d.head_revision_id
+    WHERE d.asset_id = assets.id
+      AND r.is_tombstone = 0
+      AND r.image_content_hash = assets.content_hash
+      AND (
+          d.confirmed_revision_id IS NULL
+          OR d.confirmed_revision_id != d.head_revision_id
       )
-    ORDER BY job_items.updated_at DESC, job_items.created_at DESC, job_items.id DESC
-    LIMIT 1
 )
 """
 
-LATEST_JOB_ERROR_SQL = """
+STALE_DOCUMENT_SQL = """
 (
-    SELECT job_items.last_error
-    FROM job_items
-    WHERE job_items.asset_id = assets.id
-      AND EXISTS (
-          SELECT 1 FROM jobs
-          WHERE jobs.id = job_items.job_id AND jobs.kind = 'annotation'
+    EXISTS (
+        SELECT 1
+        FROM annotation_documents d
+        JOIN annotation_document_revisions r ON r.id = d.head_revision_id
+        WHERE d.asset_id = assets.id
+          AND r.is_tombstone = 0
+          AND r.image_content_hash != assets.content_hash
+    )
+    OR EXISTS (
+        SELECT 1
+        FROM annotation_documents translated
+        JOIN annotation_document_revisions translated_revision
+          ON translated_revision.id = translated.head_revision_id
+        WHERE translated.asset_id = assets.id
+          AND translated.channel = 'translation'
+          AND translated_revision.is_tombstone = 0
+          AND NOT EXISTS (
+              SELECT 1
+              FROM annotation_revision_inputs dependency
+              WHERE dependency.output_revision_id = translated_revision.id
+                AND dependency.role = 'translation_source'
+                AND dependency.input_revision_id = COALESCE(
+                    (
+                        SELECT description.confirmed_revision_id
+                        FROM annotation_documents description
+                        JOIN annotation_document_revisions source_revision
+                          ON source_revision.id = description.confirmed_revision_id
+                        WHERE description.asset_id = assets.id
+                          AND description.channel = 'description'
+                          AND description.language = ''
+                          AND source_revision.is_tombstone = 0
+                          AND source_revision.image_content_hash = assets.content_hash
+                          AND source_revision.validation_status NOT IN (
+                              'invalid', 'encoding_error', 'empty'
+                          )
+                    ),
+                    (
+                        SELECT existing.confirmed_revision_id
+                        FROM annotation_documents existing
+                        JOIN annotation_document_revisions source_revision
+                          ON source_revision.id = existing.confirmed_revision_id
+                        WHERE existing.asset_id = assets.id
+                          AND existing.channel = 'existing_annotation'
+                          AND existing.language = ''
+                          AND source_revision.is_tombstone = 0
+                          AND source_revision.image_content_hash = assets.content_hash
+                          AND source_revision.validation_status NOT IN (
+                              'invalid', 'encoding_error', 'empty'
+                          )
+                    )
+                )
+          )
+    )
+)
+"""
+
+INVALID_DOCUMENT_SQL = """
+EXISTS (
+    SELECT 1
+    FROM annotation_documents d
+    JOIN annotation_document_revisions r ON r.id = d.head_revision_id
+    WHERE d.asset_id = assets.id
+      AND r.is_tombstone = 0
+      AND r.validation_status IN ('invalid', 'encoding_error', 'empty', 'unchecked')
+      AND (
+          d.confirmed_revision_id IS NULL
+          OR d.confirmed_revision_id != d.head_revision_id
+          OR r.source = 'legacy_txt_import'
       )
-    ORDER BY job_items.updated_at DESC, job_items.created_at DESC, job_items.id DESC
-    LIMIT 1
 )
 """
 
-UNRESOLVED_GENERATION_FAILURE_SQL = f"""
+NEEDS_REVIEW_SQL = f"""
 (
-    assets.annotation_status = 'missing'
-    AND {LATEST_JOB_STATUS_SQL} = 'failed'
+    {ACTIVE_UNREVIEWED_DOCUMENT_SQL}
+    OR {STALE_DOCUMENT_SQL}
+    OR {INVALID_DOCUMENT_SQL}
+    OR {UNRESOLVED_GENERATION_FAILURE_SQL}
 )
 """
-
-REVIEW_ANNOTATION_STATUSES = ("invalid", "encoding_error", "empty", "unchecked")
 
 
 class AssetRepository:
@@ -196,22 +327,32 @@ class AssetRepository:
                 scope_parameters,
             ).fetchall()
             status_counts = {str(row["annotation_status"]): int(row["count"]) for row in count_rows}
-            failed_count = int(
-                connection.execute(
-                    f"""
-                    SELECT COUNT(*)
-                    FROM assets
-                    WHERE {scope_where} AND {UNRESOLVED_GENERATION_FAILURE_SQL}
-                    """,
-                    scope_parameters,
-                ).fetchone()[0]
-            )
             status_counts["all"] = sum(int(row["count"]) for row in count_rows)
-            status_counts["failed"] = failed_count
-            status_counts["needs_review"] = failed_count + sum(
-                status_counts.get(status, 0) for status in REVIEW_ANNOTATION_STATUSES
-            )
-            return ([AssetSummary.model_validate(dict(row)) for row in rows], total, status_counts)
+            for review_status in (
+                "needs_review",
+                "failed",
+                "unreviewed",
+                "stale",
+                *REVIEW_VALIDATION_STATUSES,
+            ):
+                review_where, review_parameters = self._asset_filter(
+                    search,
+                    review_status,
+                    folder_path,
+                )
+                status_counts[review_status] = int(
+                    connection.execute(
+                        f"SELECT COUNT(*) FROM assets WHERE {review_where}",
+                        review_parameters,
+                    ).fetchone()[0]
+                )
+            channels_by_asset = self._channel_statuses(connection, rows)
+            items: list[AssetSummary] = []
+            for row in rows:
+                values = dict(row)
+                values["annotation_channels"] = channels_by_asset.get(str(row["id"]), {})
+                items.append(AssetSummary.model_validate(values))
+            return items, total, status_counts
         finally:
             connection.close()
 
@@ -244,27 +385,46 @@ class AssetRepository:
         annotation_status: str | None,
         folder_path: str = "",
     ) -> tuple[str, list[object]]:
-        clauses = ["is_present = 1"]
+        clauses = ["assets.is_present = 1"]
         parameters: list[object] = []
         if folder_path:
             escaped_folder = (
                 folder_path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             )
-            clauses.append("relative_path LIKE ? ESCAPE '\\'")
+            clauses.append("assets.relative_path LIKE ? ESCAPE '\\'")
             parameters.append(f"{escaped_folder}/%")
         if search:
-            clauses.append("relative_path LIKE ? ESCAPE '\\'")
+            clauses.append("assets.relative_path LIKE ? ESCAPE '\\'")
             escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             parameters.append(f"%{escaped}%")
         if annotation_status == "failed":
             clauses.append(UNRESOLVED_GENERATION_FAILURE_SQL)
         elif annotation_status == "needs_review":
-            review_statuses = ", ".join(f"'{status}'" for status in REVIEW_ANNOTATION_STATUSES)
+            clauses.append(NEEDS_REVIEW_SQL)
+        elif annotation_status == "unreviewed":
+            clauses.append(ACTIVE_UNREVIEWED_DOCUMENT_SQL)
+        elif annotation_status == "stale":
+            clauses.append(STALE_DOCUMENT_SQL)
+        elif annotation_status in REVIEW_VALIDATION_STATUSES:
             clauses.append(
-                f"(annotation_status IN ({review_statuses}) OR {UNRESOLVED_GENERATION_FAILURE_SQL})"
+                """
+                (
+                    assets.annotation_status = ?
+                    OR EXISTS (
+                        SELECT 1
+                        FROM annotation_documents d
+                        JOIN annotation_document_revisions r
+                          ON r.id = d.head_revision_id
+                        WHERE d.asset_id = assets.id
+                          AND r.is_tombstone = 0
+                          AND r.validation_status = ?
+                    )
+                )
+                """
             )
+            parameters.extend((annotation_status, annotation_status))
         elif annotation_status:
-            clauses.append("annotation_status = ?")
+            clauses.append("assets.annotation_status = ?")
             parameters.append(annotation_status)
         return " AND ".join(clauses), parameters
 
@@ -336,13 +496,30 @@ class AssetRepository:
                 f"""
                 SELECT
                     COUNT(*) AS total,
-                    SUM(CASE WHEN annotation_status != 'missing' THEN 1 ELSE 0 END) AS annotated,
                     SUM(
-                        CASE
-                            WHEN annotation_status IN ('invalid', 'encoding_error', 'empty')
-                                 OR {UNRESOLVED_GENERATION_FAILURE_SQL}
-                            THEN 1 ELSE 0
-                        END
+                        EXISTS (
+                            SELECT 1
+                            FROM annotation_documents d
+                            JOIN annotation_document_revisions r
+                              ON r.id = d.head_revision_id
+                            WHERE d.asset_id = assets.id
+                              AND d.channel != 'translation'
+                              AND r.is_tombstone = 0
+                        )
+                    ) AS annotated,
+                    SUM(
+                        EXISTS (
+                            SELECT 1
+                            FROM annotation_documents d
+                            JOIN annotation_document_revisions r
+                              ON r.id = d.head_revision_id
+                            WHERE d.asset_id = assets.id
+                              AND r.is_tombstone = 0
+                              AND r.validation_status IN (
+                                  'invalid', 'encoding_error', 'empty'
+                              )
+                        )
+                        OR {UNRESOLVED_GENERATION_FAILURE_SQL}
                     ) AS invalid
                 FROM assets
                 WHERE is_present = 1
@@ -351,3 +528,44 @@ class AssetRepository:
             return int(row["total"] or 0), int(row["annotated"] or 0), int(row["invalid"] or 0)
         finally:
             connection.close()
+
+    @staticmethod
+    def _channel_statuses(
+        connection,
+        assets,
+    ) -> dict[str, dict[str, str]]:
+        asset_ids = [str(asset["id"]) for asset in assets]
+        if not asset_ids:
+            return {}
+        statuses: dict[str, dict[str, str]] = {asset_id: {} for asset_id in asset_ids}
+        for start in range(0, len(asset_ids), 500):
+            batch = asset_ids[start : start + 500]
+            placeholders = ",".join("?" for _ in batch)
+            rows = connection.execute(
+                f"""
+                SELECT d.asset_id, d.channel, d.language,
+                       d.head_revision_id, d.confirmed_revision_id,
+                       r.is_tombstone, r.image_content_hash,
+                       a.content_hash AS current_image_hash
+                FROM annotation_documents d
+                JOIN assets a ON a.id = d.asset_id
+                LEFT JOIN annotation_document_revisions r
+                  ON r.id = d.head_revision_id
+                WHERE d.asset_id IN ({placeholders})
+                """,
+                batch,
+            ).fetchall()
+            for row in rows:
+                key = str(row["channel"])
+                if row["language"]:
+                    key = f"{key}:{row['language']}"
+                if not row["head_revision_id"] or bool(row["is_tombstone"]):
+                    status = "missing"
+                elif str(row["image_content_hash"]) != str(row["current_image_hash"]):
+                    status = "stale"
+                elif row["confirmed_revision_id"] == row["head_revision_id"]:
+                    status = "confirmed"
+                else:
+                    status = "unreviewed"
+                statuses[str(row["asset_id"])][key] = status
+        return statuses

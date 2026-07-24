@@ -16,6 +16,7 @@ export interface CreateJobInput {
   scope: "all" | "selected";
   asset_ids: string[];
   overwrite_existing?: boolean;
+  use_confirmed_tags?: boolean;
   translation_prompt_preset_id?: string;
   target_language?: string;
   translation_policy?: ExistingTranslationPolicy;

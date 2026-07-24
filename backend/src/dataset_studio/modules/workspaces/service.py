@@ -11,6 +11,7 @@ from dataset_studio.core.config import Settings
 from dataset_studio.core.errors import WorkspaceNotFoundError
 from dataset_studio.core.files import atomic_write_text
 from dataset_studio.core.time import utc_now_iso
+from dataset_studio.modules.annotations.legacy_import import ensure_database_annotation_store
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.assets.scanner import AssetScanner
 from dataset_studio.modules.workspaces.models import (
@@ -62,6 +63,7 @@ class WorkspaceService:
                 if should_scan is not False
                 else self._cached_scan_result(paths.database)
             )
+            ensure_database_annotation_store(paths)
         opened_at = utc_now_iso()
         self._registry.upsert(manifest, root, opened_at)
         return self._summary(paths, manifest, opened_at), scan_result
@@ -121,6 +123,7 @@ class WorkspaceService:
         manifest = self._load_manifest(paths)
         paths.ensure_directories()
         self._ensure_database(paths.database)
+        ensure_database_annotation_store(paths)
         return paths, manifest
 
     def get_summary(self, project_id: str) -> WorkspaceSummary:
@@ -166,6 +169,7 @@ class WorkspaceService:
     def rescan(self, project_id: str) -> tuple[WorkspaceSummary, ScanResult]:
         paths, manifest = self.get(project_id)
         result = self._scanner.scan(paths, manifest)
+        ensure_database_annotation_store(paths)
         return self._summary(paths, manifest, None), result
 
     def update_settings(self, project_id: str, update: WorkspaceSettingsUpdate) -> WorkspaceSummary:
@@ -175,6 +179,7 @@ class WorkspaceService:
         self._save_manifest(paths, next_manifest)
         if next_settings.recursive_scan != manifest.settings.recursive_scan:
             self._scanner.scan(paths, next_manifest)
+            ensure_database_annotation_store(paths)
         return self._summary(paths, next_manifest, None)
 
     def _load_or_create_manifest(self, paths: WorkspacePaths) -> WorkspaceManifest:

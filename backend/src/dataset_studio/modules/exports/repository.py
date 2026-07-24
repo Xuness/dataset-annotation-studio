@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from dataset_studio.core.sqlite import connect, transaction
@@ -41,9 +42,14 @@ class ExportRepository:
     ) -> None:
         now = utc_now_iso()
         warning_count = sum(item.warning_code is not None for item in plan.items)
-        total_bytes = sum(
-            item.image_size + (item.annotation_size if item.annotation_exists else 0)
-            for item in plan.items
+        total_bytes = sum(artifact.byte_size for item in plan.items for artifact in item.artifacts)
+        configuration_snapshot = json.dumps(
+            {
+                "channels": [selection.model_dump(mode="json") for selection in request.channels],
+                "formats": [format_.value for format_ in request.formats],
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
         )
         with transaction(self._database_path) as connection:
             active = connection.execute(
@@ -60,8 +66,9 @@ class ExportRepository:
                 INSERT INTO export_operations (
                     id, status, scope, destination_path, total_items,
                     completed_items, total_bytes, copied_bytes, warning_count,
-                    allow_warnings, stop_requested, created_at, updated_at
-                ) VALUES (?, 'queued', ?, ?, ?, 0, ?, 0, ?, ?, 0, ?, ?)
+                    allow_warnings, stop_requested, configuration_snapshot,
+                    created_at, updated_at
+                ) VALUES (?, 'queued', ?, ?, ?, 0, ?, 0, ?, ?, 0, ?, ?, ?)
                 """,
                 (
                     operation_id,
@@ -71,6 +78,7 @@ class ExportRepository:
                     total_bytes,
                     warning_count,
                     int(allow_warnings),
+                    configuration_snapshot,
                     now,
                     now,
                 ),
@@ -86,10 +94,10 @@ class ExportRepository:
                         annotation_exists, annotation_hash, annotation_size,
                         annotation_modified_ns, annotation_status,
                         warning_code, warning_message, status, copied_bytes,
-                        created_at, updated_at
+                        artifact_snapshot, created_at, updated_at
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        'pending', 0, ?, ?
+                        'pending', 0, ?, ?, ?
                     )
                     """,
                     (
@@ -111,6 +119,11 @@ class ExportRepository:
                         item.annotation_status,
                         item.warning_code,
                         item.warning_message,
+                        json.dumps(
+                            [asdict(artifact) for artifact in item.artifacts],
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        ),
                         now,
                         now,
                     ),
@@ -461,7 +474,7 @@ class ExportRepository:
                 """
                 SELECT o.id AS operation_id, o.destination_path,
                        i.target_image_name, i.target_annotation_name,
-                       i.annotation_exists
+                       i.annotation_exists, i.artifact_snapshot
                 FROM export_operations o
                 LEFT JOIN export_items i
                   ON i.operation_id = o.id AND i.status = 'running'
@@ -476,10 +489,21 @@ class ExportRepository:
                     operation_id,
                     (str(row["destination_path"]), []),
                 )
-                if row["target_image_name"]:
-                    names.append(str(row["target_image_name"]))
-                if row["target_annotation_name"] and int(row["annotation_exists"] or 0):
-                    names.append(str(row["target_annotation_name"]))
+                try:
+                    artifacts = json.loads(str(row["artifact_snapshot"]))
+                except json.JSONDecodeError:
+                    artifacts = []
+                if artifacts:
+                    names.extend(
+                        str(artifact["target_relative_path"])
+                        for artifact in artifacts
+                        if isinstance(artifact, dict) and artifact.get("target_relative_path")
+                    )
+                else:
+                    if row["target_image_name"]:
+                        names.append(str(row["target_image_name"]))
+                    if row["target_annotation_name"] and int(row["annotation_exists"] or 0):
+                        names.append(str(row["target_annotation_name"]))
                 recovered[operation_id] = (destination_path, names)
             if not recovered:
                 return []
@@ -528,6 +552,10 @@ class ExportRepository:
 
     @staticmethod
     def _operation(row) -> ExportOperation:
+        try:
+            configuration = json.loads(str(row["configuration_snapshot"]))
+        except (json.JSONDecodeError, TypeError):
+            configuration = {}
         return ExportOperation(
             id=str(row["id"]),
             status=ExportOperationStatus(str(row["status"])),
@@ -539,6 +567,7 @@ class ExportRepository:
             copied_bytes=int(row["copied_bytes"]),
             warning_count=int(row["warning_count"]),
             allow_warnings=bool(row["allow_warnings"]),
+            configuration_snapshot=configuration if isinstance(configuration, dict) else {},
             current_relative_path=(
                 str(row["current_relative_path"])
                 if row["current_relative_path"] is not None

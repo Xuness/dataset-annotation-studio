@@ -64,11 +64,13 @@ const assetFilters: Array<{ value: StatusFilter; label: string; icon: typeof Che
 ];
 
 const reviewFilters: Array<{ value: StatusFilter; label: string; icon: typeof CheckCircle2 }> = [
-  { value: "needs_review", label: "全部异常", icon: CircleAlert },
+  { value: "needs_review", label: "全部待审核", icon: CircleAlert },
+  { value: "unreviewed", label: "待确认", icon: FileQuestion },
+  { value: "stale", label: "已过期", icon: CircleAlert },
   { value: "failed", label: "生成失败", icon: CircleAlert },
-  { value: "invalid", label: "标签异常", icon: CircleAlert },
+  { value: "invalid", label: "结构异常", icon: CircleAlert },
   { value: "encoding_error", label: "编码异常", icon: CircleAlert },
-  { value: "empty", label: "空文件", icon: FileQuestion },
+  { value: "empty", label: "空内容", icon: FileQuestion },
   { value: "unchecked", label: "未校验", icon: FileQuestion },
 ];
 
@@ -382,6 +384,24 @@ export function AssetBrowser({
                       <strong title={asset.filename}>{asset.filename}</strong>
                       <small>
                         {asset.width} × {asset.height} · {formatBytes(asset.byte_size, "KB")}
+                        <span className="asset-row__channels" aria-label="标注通道状态">
+                          {[
+                            ["existing_annotation", "原", "原有标注"],
+                            ["tags", "T", "Tags"],
+                            ["description", "L", "LLM 描述"],
+                          ].map(([channel, shortLabel, label]) => {
+                            const status = asset.annotation_channels?.[channel];
+                            return status && status !== "missing" ? (
+                              <i
+                                key={channel}
+                                className={`is-${status}`}
+                                title={`${label}：${status}`}
+                              >
+                                {shortLabel}
+                              </i>
+                            ) : null;
+                          })}
+                        </span>
                       </small>
                       <span title={asset.relative_path}>{asset.relative_path}</span>
                     </span>

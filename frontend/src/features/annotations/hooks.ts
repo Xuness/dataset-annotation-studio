@@ -1,30 +1,52 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import type { AnnotationChannel, AnnotationTag } from "../../shared/api/types";
 import { annotationTraceKeys, assetKeys } from "../assets/queryKeys";
 import { statisticsKeys } from "../statistics/queryKeys";
 import { translationKeys } from "../translations/queryKeys";
 import { workspaceKeys } from "../workspaces/queryKeys";
 import {
-  deleteAnnotation,
+  deleteAnnotationChannel,
   deleteAnnotations,
-  getAnnotation,
-  getAnnotationHistory,
-  saveAnnotation,
+  getAnnotationBundle,
+  getAnnotationChannel,
+  getAnnotationChannelHistory,
+  confirmAnnotationChannel,
+  saveAnnotationChannel,
 } from "./api";
 import { annotationHistoryKeys, annotationKeys } from "./queryKeys";
 
-export function useAnnotation(projectId: string, assetId: string | null) {
+export function useAnnotationBundle(projectId: string, assetId: string | null) {
   return useQuery({
-    queryKey: annotationKeys.detail(projectId, assetId),
-    queryFn: () => getAnnotation(projectId, assetId!),
+    queryKey: annotationKeys.bundle(projectId, assetId),
+    queryFn: () => getAnnotationBundle(projectId, assetId!),
     enabled: Boolean(projectId && assetId),
   });
 }
 
-export function useAnnotationHistory(projectId: string, assetId: string | null, enabled: boolean) {
+export function useAnnotationChannel(
+  projectId: string,
+  assetId: string | null,
+  channel: AnnotationChannel,
+  language = "",
+) {
   return useQuery({
-    queryKey: annotationHistoryKeys.detail(projectId, assetId),
-    queryFn: () => getAnnotationHistory(projectId, assetId!),
+    queryKey: annotationKeys.channel(projectId, assetId, channel, language),
+    queryFn: () => getAnnotationChannel(projectId, assetId!, channel, language),
+    enabled: Boolean(projectId && assetId),
+  });
+}
+
+export function useAnnotationChannelHistory(
+  projectId: string,
+  assetId: string | null,
+  channel: AnnotationChannel,
+  language: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: annotationHistoryKeys.channel(projectId, assetId, channel, language),
+    queryFn: () => getAnnotationChannelHistory(projectId, assetId!, channel, language),
     enabled: Boolean(projectId && assetId && enabled),
   });
 }
@@ -46,24 +68,59 @@ function useInvalidateAnnotation(projectId: string) {
   };
 }
 
-export function useSaveAnnotation(projectId: string, assetId: string) {
+export function useSaveAnnotationChannel(
+  projectId: string,
+  assetId: string,
+  channel: AnnotationChannel,
+  language = "",
+) {
   const invalidate = useInvalidateAnnotation(projectId);
   return useMutation({
     mutationFn: ({
       content,
-      expectedModifiedAt,
+      tags,
+      expectedHeadRevisionId,
+      confirm,
     }: {
-      content: string;
-      expectedModifiedAt: string | null;
-    }) => saveAnnotation(projectId, assetId, content, expectedModifiedAt),
+      content?: string;
+      tags?: AnnotationTag[];
+      expectedHeadRevisionId: string | null;
+      confirm?: boolean;
+    }) =>
+      saveAnnotationChannel(projectId, assetId, channel, {
+        content,
+        tags,
+        expectedHeadRevisionId,
+        confirm,
+        language,
+      }),
     onSuccess: invalidate,
   });
 }
 
-export function useDeleteAnnotation(projectId: string, assetId: string) {
+export function useConfirmAnnotationChannel(
+  projectId: string,
+  assetId: string,
+  channel: AnnotationChannel,
+  language = "",
+) {
   const invalidate = useInvalidateAnnotation(projectId);
   return useMutation({
-    mutationFn: () => deleteAnnotation(projectId, assetId),
+    mutationFn: (expectedHeadRevisionId: string) =>
+      confirmAnnotationChannel(projectId, assetId, channel, expectedHeadRevisionId, language),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteAnnotationChannel(
+  projectId: string,
+  assetId: string,
+  channel: AnnotationChannel,
+  language = "",
+) {
+  const invalidate = useInvalidateAnnotation(projectId);
+  return useMutation({
+    mutationFn: () => deleteAnnotationChannel(projectId, assetId, channel, language),
     onSuccess: invalidate,
   });
 }

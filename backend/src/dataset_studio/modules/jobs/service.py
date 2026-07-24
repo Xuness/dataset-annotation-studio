@@ -11,6 +11,7 @@ from dataset_studio.core.errors import (
     WorkspaceNotFoundError,
 )
 from dataset_studio.core.sqlite import connect
+from dataset_studio.modules.annotations.models import AnnotationChannel
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
@@ -28,10 +29,6 @@ from dataset_studio.modules.jobs.models import (
 from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
 from dataset_studio.modules.jobs.query_repository import JobQueryRepository
 from dataset_studio.modules.jobs.repository import JobCreationRepository
-from dataset_studio.modules.output_resources import (
-    annotation_output_resource_key,
-    translation_output_relative_path,
-)
 from dataset_studio.modules.presets.models import TranslationPromptPreset
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.taggers.models import TaggerExecutionProfile
@@ -56,7 +53,7 @@ class JobService:
         self._workspaces = workspaces
         self._presets = presets
         self._annotations = annotations
-        self._translations = translations or TranslationService(workspaces)
+        self._translations = translations or TranslationService(workspaces, annotations)
         self._taggers = taggers
 
     def create(
@@ -82,6 +79,8 @@ class JobService:
     ) -> JobDetail:
         paths, manifest = self._workspaces.get(project_id)
         if request.execution_backend == ExecutionBackend.LOCAL_TAGGER:
+            output_channel = AnnotationChannel.TAGS
+            output_language = ""
             assert self._taggers is not None
             assert request.tagger_profile_id is not None
             local_snapshot = self._taggers.resolve_execution_profile(request.tagger_profile_id)
@@ -103,10 +102,11 @@ class JobService:
                 paths.database,
                 request.scope,
                 request.asset_ids,
+                output_channel=output_channel,
                 overwrite_existing=request.overwrite_existing,
             )
             if not asset_ids:
-                raise ValueError("当前范围内没有需要标注的图片；已有同名 TXT 会被自动跳过。")
+                raise ValueError("当前范围内没有需要生成的 Tags；已有 Tags 会被自动跳过。")
             user_prompt_snapshot = ""
             json_fields_snapshot = "[]"
             overwrite_existing = request.overwrite_existing
@@ -126,7 +126,9 @@ class JobService:
             retry_limit = 3
 
             if request.kind == JobKind.TRANSLATION:
+                output_channel = AnnotationChannel.TRANSLATION
                 language = self._translations.normalize_language(request.target_language)
+                output_language = language
                 translation_prompt = self._resolve_translation_prompt(
                     request.translation_prompt_preset_id
                 )
@@ -152,8 +154,8 @@ class JobService:
                     "translation_prompt_preset_id": translation_prompt.id,
                 }
                 asset_ids = self._select_translation_assets(
+                    project_id,
                     paths.database,
-                    paths.root,
                     request.scope,
                     request.asset_ids,
                     language=language,
@@ -167,6 +169,8 @@ class JobService:
                     request.translation_policy == ExistingTranslationPolicy.OVERWRITE
                 )
             else:
+                output_channel = AnnotationChannel.DESCRIPTION
+                output_language = ""
                 system_preset_id = manifest.settings.system_preset_id
                 if not system_preset_id:
                     raise ValueError("请先在素材页的提示词面板选择并保存 System Prompt 预设。")
@@ -177,15 +181,18 @@ class JobService:
                         "项目关联的 System Prompt 预设已不存在，请在素材页重新选择并保存。"
                     ) from error
                 system_prompt_snapshot = system_preset.model_dump_json()
-                configuration = {}
+                configuration = {
+                    "use_confirmed_tags": request.use_confirmed_tags,
+                }
                 asset_ids = self._select_annotation_assets(
                     paths.database,
                     request.scope,
                     request.asset_ids,
+                    output_channel=output_channel,
                     overwrite_existing=request.overwrite_existing,
                 )
                 if not asset_ids:
-                    raise ValueError("当前范围内没有需要标注的图片；已有同名 TXT 会被自动跳过。")
+                    raise ValueError("当前范围内没有需要生成的 LLM 描述；已有描述会被自动跳过。")
                 user_prompt_snapshot = manifest.settings.user_prompt
                 json_fields_snapshot = json.dumps(
                     manifest.settings.json_fields,
@@ -210,6 +217,9 @@ class JobService:
             json_fields_snapshot=json_fields_snapshot,
             scope=request.scope.value,
             overwrite_existing=overwrite_existing,
+            output_channel=output_channel.value,
+            use_confirmed_tags=request.use_confirmed_tags,
+            output_language=output_language,
             retry_limit=retry_limit,
             asset_ids=asset_ids,
         )
@@ -436,29 +446,37 @@ class JobService:
         response = queries.latest_failed_response(job_id, item_id)
         if response is None:
             raise ValueError("这个失败项没有可以人工采用的模型响应。")
-        asset_id, content, source_hash = response
         if str(job["kind"]) == JobKind.TRANSLATION.value:
             configuration = json.loads(str(job["configuration_snapshot"]))
-            if not source_hash:
+            if not response.source_hash:
                 raise ValueError("这个译文响应缺少对应的源标注版本，无法安全采用。")
             profile = load_provider_snapshot(str(job["provider_snapshot"]))
             self._translations.save_generated(
                 project_id,
-                asset_id,
+                response.asset_id,
                 str(configuration["target_language"]),
-                content,
-                expected_source_hash=source_hash,
+                response.content,
+                expected_source_hash=response.source_hash,
                 provider_profile_id=str(job["provider_profile_id"]),
                 provider_profile_name=profile.name,
                 model=profile.model_id,
                 manually_accepted=True,
+                expected_modified_at=response.output_base_revision_id,
+                source_job_item_id=item_id,
+                allow_candidate_on_conflict=False,
             )
         else:
+            tag_revision_id = execution.annotation_input_revision(item_id, "tag_context")
             self._annotations.save_generated(
                 project_id,
-                asset_id,
-                content,
+                response.asset_id,
+                response.content,
+                channel=AnnotationChannel(str(job["output_channel"])),
                 manually_accepted=True,
+                expected_modified_at=response.output_base_revision_id,
+                source_job_item_id=item_id,
+                input_revisions=(((tag_revision_id, "tag_context"),) if tag_revision_id else ()),
+                allow_candidate_on_conflict=False,
             )
         execution.finish_item(
             item_id,
@@ -471,10 +489,11 @@ class JobService:
 
     @staticmethod
     def _select_annotation_assets(
-        database_path,
+        database_path: Path,
         scope: JobScope,
         selected_ids: list[str],
         *,
+        output_channel: AnnotationChannel,
         overwrite_existing: bool,
     ) -> list[str]:
         if scope == JobScope.SELECTED:
@@ -485,16 +504,33 @@ class JobService:
             unique_ids = []
         connection = connect(database_path)
         try:
-            clauses = ["is_present = 1"]
+            clauses = ["a.is_present = 1"]
+            parameters: list[object] = []
             if not overwrite_existing:
-                clauses.append("annotation_status = 'missing'")
+                clauses.append(
+                    """
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM annotation_documents d
+                        JOIN annotation_document_revisions r
+                          ON r.id = d.head_revision_id
+                        WHERE d.asset_id = a.id
+                          AND d.channel = ?
+                          AND d.language = ''
+                          AND r.is_tombstone = 0
+                    )
+                    """
+                )
+                parameters.append(output_channel.value)
             if not unique_ids:
                 rows = connection.execute(
                     f"""
-                    SELECT id, relative_path, annotation_relative_path FROM assets
+                    SELECT a.id, a.relative_path
+                    FROM assets a
                     WHERE {" AND ".join(clauses)}
-                    ORDER BY relative_path
-                    """
+                    ORDER BY a.relative_path
+                    """,
+                    parameters,
                 ).fetchall()
             else:
                 rows = []
@@ -504,45 +540,23 @@ class JobService:
                     rows.extend(
                         connection.execute(
                             f"""
-                            SELECT id, relative_path, annotation_relative_path FROM assets
-                            WHERE {" AND ".join(clauses)} AND id IN ({placeholders})
+                            SELECT a.id, a.relative_path
+                            FROM assets a
+                            WHERE {" AND ".join(clauses)}
+                              AND a.id IN ({placeholders})
                             """,
-                            batch,
+                            [*parameters, *batch],
                         ).fetchall()
                     )
                 rows.sort(key=lambda row: str(row["relative_path"]).casefold())
-            owner_counts: dict[str, int] = {}
-            for owner in connection.execute(
-                """
-                SELECT annotation_relative_path
-                FROM assets
-                WHERE is_present = 1
-                """
-            ):
-                key = annotation_output_resource_key(str(owner["annotation_relative_path"]))
-                owner_counts[key] = owner_counts.get(key, 0) + 1
-            ambiguous = [
-                str(row["relative_path"])
-                for row in rows
-                if owner_counts[
-                    annotation_output_resource_key(str(row["annotation_relative_path"]))
-                ]
-                > 1
-            ]
-            if ambiguous:
-                examples = "、".join(ambiguous[:3])
-                raise ValueError(
-                    "所选范围包含共享同一个 TXT 的图片"
-                    f"（例如 {examples}）。请先重命名同名但扩展名不同的图片并重新扫描。"
-                )
             return [str(row["id"]) for row in rows]
         finally:
             connection.close()
 
-    @staticmethod
     def _select_translation_assets(
+        self,
+        project_id: str,
         database_path: Path,
-        workspace_root: Path,
         scope: JobScope,
         selected_ids: list[str],
         *,
@@ -555,112 +569,40 @@ class JobService:
 
         connection = connect(database_path)
         try:
-            rows = []
-            batches = (
-                [unique_ids[start : start + 500] for start in range(0, len(unique_ids), 500)]
-                if unique_ids
-                else [[]]
-            )
-            for batch in batches:
-                selected_clause = ""
-                if batch:
+            if unique_ids:
+                rows = []
+                for start in range(0, len(unique_ids), 500):
+                    batch = unique_ids[start : start + 500]
                     placeholders = ",".join("?" for _ in batch)
-                    selected_clause = f"AND a.id IN ({placeholders})"
-                rows.extend(
-                    connection.execute(
-                        f"""
-                        SELECT a.id, a.relative_path, a.annotation_relative_path,
-                               t.source_annotation_hash
-                        FROM assets a
-                        LEFT JOIN annotation_translations t
-                          ON t.asset_id = a.id AND t.language = ?
-                        WHERE a.is_present = 1
-                          AND a.annotation_status NOT IN ('missing', 'encoding_error')
-                          {selected_clause}
-                        ORDER BY a.relative_path COLLATE NOCASE
-                        """,
-                        [language, *batch],
-                    ).fetchall()
-                )
-            rows.sort(key=lambda row: str(row["relative_path"]).casefold())
-            annotation_owner_counts: dict[str, int] = {}
-            for owner in connection.execute(
-                """
-                SELECT annotation_relative_path
-                FROM assets
-                WHERE is_present = 1
-                """
-            ):
-                key = annotation_output_resource_key(str(owner["annotation_relative_path"]))
-                annotation_owner_counts[key] = annotation_owner_counts.get(key, 0) + 1
+                    rows.extend(
+                        connection.execute(
+                            f"""
+                            SELECT id, relative_path
+                            FROM assets
+                            WHERE is_present = 1 AND id IN ({placeholders})
+                            """,
+                            batch,
+                        ).fetchall()
+                    )
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT id, relative_path
+                    FROM assets
+                    WHERE is_present = 1
+                    ORDER BY relative_path COLLATE NOCASE
+                    """
+                ).fetchall()
         finally:
             connection.close()
-
-        selected: list[str] = []
-        selected_outputs: dict[str, str] = {}
-        ambiguous_sources: list[str] = []
-        conflicting_outputs: list[str] = []
-        unsafe_outputs: list[str] = []
-        root = workspace_root.resolve()
-        for row in rows:
-            annotation_path = (root / str(row["annotation_relative_path"])).resolve()
-            if not annotation_path.is_relative_to(root) or not annotation_path.is_file():
-                continue
-            source_key = annotation_output_resource_key(str(row["annotation_relative_path"]))
-            if annotation_owner_counts.get(source_key, 0) > 1:
-                ambiguous_sources.append(str(row["relative_path"]))
-                continue
-            translation_relative_path = translation_output_relative_path(
-                str(row["annotation_relative_path"]),
+        rows.sort(key=lambda row: str(row["relative_path"]).casefold())
+        return [
+            str(row["id"])
+            for row in rows
+            if self._translations.should_translate(
+                project_id,
+                str(row["id"]),
                 language,
+                policy.value,
             )
-            translation_path = root / translation_relative_path
-            if translation_path.is_symlink():
-                unsafe_outputs.append(str(row["relative_path"]))
-                continue
-            output_key = annotation_output_resource_key(translation_relative_path)
-            if output_key != source_key and output_key in annotation_owner_counts:
-                conflicting_outputs.append(str(row["relative_path"]))
-                continue
-            if policy == ExistingTranslationPolicy.OVERWRITE or not translation_path.is_file():
-                should_select = True
-            elif policy == ExistingTranslationPolicy.SKIP:
-                should_select = False
-            else:
-                recorded_hash = row["source_annotation_hash"]
-                if recorded_hash is None:
-                    should_select = True
-                else:
-                    source_content = annotation_path.read_text(
-                        encoding="utf-8",
-                        errors="strict",
-                    )
-                    should_select = str(recorded_hash) != TranslationService.content_hash(
-                        source_content
-                    )
-            if not should_select:
-                continue
-            previous = selected_outputs.get(output_key)
-            if previous is not None:
-                ambiguous_sources.extend((previous, str(row["relative_path"])))
-                continue
-            selected_outputs[output_key] = str(row["relative_path"])
-            selected.append(str(row["id"]))
-        if ambiguous_sources:
-            examples = "、".join(list(dict.fromkeys(ambiguous_sources))[:3])
-            raise ValueError(
-                "所选范围包含共享同一个源标注或译文输出的图片"
-                f"（例如 {examples}）。请先重命名同名但扩展名不同的图片并重新扫描。"
-            )
-        if conflicting_outputs:
-            examples = "、".join(list(dict.fromkeys(conflicting_outputs))[:3])
-            raise ValueError(
-                "所选范围的译文输出会覆盖另一张图片的活动标注"
-                f"（例如 {examples}）。请调整目标语言或重命名冲突文件后重新扫描。"
-            )
-        if unsafe_outputs:
-            examples = "、".join(list(dict.fromkeys(unsafe_outputs))[:3])
-            raise ValueError(
-                f"所选范围的译文输出是符号链接（例如 {examples}）。请移除这些链接文件后重新扫描。"
-            )
-        return selected
+        ]

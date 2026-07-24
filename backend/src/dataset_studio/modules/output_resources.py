@@ -5,15 +5,13 @@ import uuid
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from dataset_studio.core.errors import ResourceConflictError
-from dataset_studio.core.paths import relative_path_key
 from dataset_studio.core.sqlite import transaction
 from dataset_studio.core.time import utc_now_iso
-from dataset_studio.modules.translations.languages import LANGUAGE_PATTERN
 
-_RESOURCE_PREFIX = "workspace-file:"
+_ANNOTATION_DOCUMENT_PREFIX = "annotation-document:"
 LOGGER = logging.getLogger("dataset_studio.output_resources")
 
 
@@ -23,18 +21,20 @@ class OutputResourceClaim:
     job_item_id: str | None = None
 
 
-def annotation_output_resource_key(annotation_relative_path: str) -> str:
-    return _RESOURCE_PREFIX + _normalized_relative_path(annotation_relative_path)
-
-
-def translation_output_relative_path(
-    annotation_relative_path: str,
-    language: str,
+def annotation_document_resource_key(
+    asset_id: str,
+    channel: str,
+    language: str = "",
 ) -> str:
-    annotation_path = _relative_path(annotation_relative_path)
-    if not LANGUAGE_PATTERN.fullmatch(language):
-        raise ValueError("翻译任务的目标语言快照无效。")
-    return annotation_path.with_name(f"{annotation_path.stem}.{language}.txt").as_posix()
+    if not asset_id or not channel:
+        raise ValueError("标注资源缺少素材或通道标识。")
+    if any(character in asset_id for character in ("\x00", "\n", "\r")):
+        raise ValueError("素材标识包含无效字符。")
+    if any(character in channel for character in ("\x00", "\n", "\r", ":")):
+        raise ValueError("标注通道包含无效字符。")
+    if any(character in language for character in ("\x00", "\n", "\r", ":")):
+        raise ValueError("标注语言包含无效字符。")
+    return f"{_ANNOTATION_DOCUMENT_PREFIX}{asset_id}:{channel}:{language}"
 
 
 @contextmanager
@@ -77,7 +77,7 @@ def hold_output_resources(
             ).rowcount
             if not acquired:
                 raise ResourceConflictError(
-                    "目标文件正由另一个后台任务或编辑操作写入，请稍后重试。"
+                    "目标标注通道正由另一个后台任务或编辑操作写入，请稍后重试。"
                 )
             has_foreground_claims = True
     try:
@@ -95,19 +95,3 @@ def hold_output_resources(
                     "Output operation %s finished, but its resource lease could not be released.",
                     operation_id,
                 )
-
-
-def _normalized_relative_path(value: str) -> str:
-    return relative_path_key(_relative_path(value))
-
-
-def _relative_path(value: str) -> PurePosixPath:
-    path = PurePosixPath(value)
-    if (
-        not value
-        or path.is_absolute()
-        or "\\" in value
-        or any(part in {"", ".", ".."} for part in path.parts)
-    ):
-        raise ValueError("任务输出路径必须位于当前工作区内。")
-    return path

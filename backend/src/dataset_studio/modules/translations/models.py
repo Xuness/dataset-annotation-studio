@@ -9,10 +9,8 @@ class TranslationStatus(StrEnum):
     MISSING = "missing"
     CURRENT = "current"
     STALE = "stale"
-    UNTRACKED = "untracked"
     SOURCE_MISSING = "source_missing"
     SOURCE_INVALID = "source_invalid"
-    CONFLICT = "conflict"
 
 
 class TranslationDocument(BaseModel):

@@ -3,28 +3,27 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 
+from dataset_studio.core.languages import normalize_language_code
 from dataset_studio.modules.jobs.models import JobKind
-from dataset_studio.modules.output_resources import (
-    annotation_output_resource_key,
-    translation_output_relative_path,
-)
-from dataset_studio.modules.translations.languages import LANGUAGE_PATTERN
+from dataset_studio.modules.output_resources import annotation_document_resource_key
 
 
 def job_output_resource_key(
     kind: str,
     configuration_snapshot: str,
-    annotation_relative_path: str,
+    asset_id: str,
+    output_channel: str,
 ) -> str:
     job_kind, target_language = _job_output_configuration(kind, configuration_snapshot)
-    output_path = annotation_relative_path
-    if job_kind == JobKind.TRANSLATION:
-        assert target_language is not None
-        output_path = translation_output_relative_path(
-            annotation_relative_path,
-            target_language,
-        )
-    return annotation_output_resource_key(output_path)
+    if job_kind == JobKind.TRANSLATION and output_channel != "translation":
+        raise ValueError("翻译任务的输出通道快照无效。")
+    if job_kind == JobKind.ANNOTATION and output_channel == "translation":
+        raise ValueError("标注任务的输出通道快照无效。")
+    return annotation_document_resource_key(
+        asset_id,
+        output_channel,
+        target_language or "",
+    )
 
 
 @lru_cache(maxsize=128)
@@ -37,9 +36,7 @@ def _job_output_configuration(
         return job_kind, None
     try:
         configuration = json.loads(configuration_snapshot)
-        language = str(configuration["target_language"])
-    except (KeyError, TypeError, json.JSONDecodeError) as error:
+        language = normalize_language_code(str(configuration["target_language"]))
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         raise ValueError("翻译任务的配置快照无效。") from error
-    if not LANGUAGE_PATTERN.fullmatch(language):
-        raise ValueError("翻译任务的目标语言快照无效。")
     return job_kind, language

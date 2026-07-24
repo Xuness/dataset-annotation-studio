@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from glob import escape as escape_glob
 from pathlib import Path
 
+from dataset_studio.core.languages import LANGUAGE_PATTERN
 from dataset_studio.core.paths import filesystem_path_key
-from dataset_studio.modules.translations.languages import LANGUAGE_PATTERN
 
 
 class AssetBundleFileKind(StrEnum):
@@ -31,7 +32,7 @@ def discover_asset_companions(
     ]
     prefix = f"{image_path.stem}."
     if image_path.parent.is_dir():
-        for candidate in image_path.parent.glob(f"{image_path.stem}.*.txt"):
+        for candidate in image_path.parent.glob(f"{escape_glob(image_path.stem)}.*.txt"):
             if _path_key(candidate) in claimed_annotation_paths:
                 continue
             language = candidate.name[len(prefix) : -len(".txt")]

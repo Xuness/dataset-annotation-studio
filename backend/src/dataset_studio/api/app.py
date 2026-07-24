@@ -93,6 +93,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(asset_deletions.router, prefix=api_prefix)
     app.include_router(annotations.router, prefix=api_prefix)
     app.include_router(annotations.batch_router, prefix=api_prefix)
+    app.include_router(annotations.channels_router, prefix=api_prefix)
     app.include_router(translations.router, prefix=api_prefix)
     app.include_router(presets.router, prefix=api_prefix)
     app.include_router(providers.router, prefix=api_prefix)

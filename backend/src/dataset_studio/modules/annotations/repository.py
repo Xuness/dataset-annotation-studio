@@ -1,0 +1,859 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path
+
+from dataset_studio.core.errors import ResourceConflictError
+from dataset_studio.core.sqlite import connect, transaction
+from dataset_studio.core.time import utc_now_iso
+from dataset_studio.modules.annotations.models import (
+    AnnotationChannel,
+    AnnotationContentKind,
+    AnnotationStatus,
+    AnnotationTag,
+)
+
+_EXPECTED_HEAD_UNSET = object()
+
+
+@dataclass(frozen=True, slots=True)
+class RevisionWrite:
+    revision_id: str
+    document_id: str
+    became_head: bool
+
+
+def channel_definition(
+    channel: AnnotationChannel,
+    language: str = "",
+) -> tuple[AnnotationContentKind, str]:
+    if channel == AnnotationChannel.EXISTING:
+        return AnnotationContentKind.TEXT, "原有标注"
+    if channel == AnnotationChannel.TAGS:
+        return AnnotationContentKind.TAGS, "Tags"
+    if channel == AnnotationChannel.DESCRIPTION:
+        return AnnotationContentKind.TEXT, "LLM 描述"
+    return AnnotationContentKind.TEXT, f"翻译 · {language}"
+
+
+class AnnotationRepository:
+    def __init__(self, database_path: Path) -> None:
+        self._database_path = database_path
+
+    def list_document_rows(self, asset_id: str) -> list[sqlite3.Row]:
+        connection = connect(self._database_path)
+        try:
+            return connection.execute(
+                """
+                SELECT d.*, r.source, r.image_content_hash, r.validation_status,
+                       r.is_tombstone, r.is_candidate, r.created_at AS revision_created_at,
+                       r.metadata_json, a.content_hash AS current_image_hash
+                FROM annotation_documents d
+                JOIN assets a ON a.id = d.asset_id
+                LEFT JOIN annotation_document_revisions r ON r.id = d.head_revision_id
+                WHERE d.asset_id = ?
+                ORDER BY
+                    CASE d.channel
+                        WHEN 'existing_annotation' THEN 0
+                        WHEN 'tags' THEN 1
+                        WHEN 'description' THEN 2
+                        ELSE 3
+                    END,
+                    d.language
+                """,
+                (asset_id,),
+            ).fetchall()
+        finally:
+            connection.close()
+
+    def get_document_row(
+        self,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str = "",
+    ) -> sqlite3.Row | None:
+        connection = connect(self._database_path)
+        try:
+            return connection.execute(
+                """
+                SELECT d.*, r.source, r.image_content_hash, r.validation_status,
+                       r.is_tombstone, r.is_candidate, r.created_at AS revision_created_at,
+                       r.metadata_json, a.content_hash AS current_image_hash
+                FROM annotation_documents d
+                JOIN assets a ON a.id = d.asset_id
+                LEFT JOIN annotation_document_revisions r ON r.id = d.head_revision_id
+                WHERE d.asset_id = ? AND d.channel = ? AND d.language = ?
+                """,
+                (asset_id, channel.value, language),
+            ).fetchone()
+        finally:
+            connection.close()
+
+    def text_content(self, revision_id: str) -> tuple[str, bytes | None]:
+        connection = connect(self._database_path)
+        try:
+            row = connection.execute(
+                """
+                SELECT content, raw_bytes
+                FROM annotation_text_contents
+                WHERE revision_id = ?
+                """,
+                (revision_id,),
+            ).fetchone()
+            return (str(row["content"]), row["raw_bytes"]) if row else ("", None)
+        finally:
+            connection.close()
+
+    def tags(self, revision_id: str) -> list[AnnotationTag]:
+        connection = connect(self._database_path)
+        try:
+            rows = connection.execute(
+                """
+                SELECT name, category, confidence, origin
+                FROM annotation_tag_items
+                WHERE revision_id = ?
+                ORDER BY position
+                """,
+                (revision_id,),
+            ).fetchall()
+            return [AnnotationTag.model_validate(dict(row)) for row in rows]
+        finally:
+            connection.close()
+
+    def confirmed_revision_id(
+        self,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str = "",
+        *,
+        require_current_image: bool = False,
+    ) -> str | None:
+        connection = connect(self._database_path)
+        try:
+            row = connection.execute(
+                """
+                SELECT d.confirmed_revision_id,
+                       r.image_content_hash,
+                       a.content_hash AS current_image_hash
+                FROM annotation_documents d
+                JOIN assets a ON a.id = d.asset_id
+                LEFT JOIN annotation_document_revisions r
+                  ON r.id = d.confirmed_revision_id
+                WHERE d.asset_id = ? AND d.channel = ? AND d.language = ?
+                """,
+                (asset_id, channel.value, language),
+            ).fetchone()
+            if not row or not row["confirmed_revision_id"]:
+                return None
+            if require_current_image and str(row["image_content_hash"]) != str(
+                row["current_image_hash"]
+            ):
+                return None
+            return str(row["confirmed_revision_id"])
+        finally:
+            connection.close()
+
+    def head_revision_id(
+        self,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str = "",
+    ) -> str | None:
+        connection = connect(self._database_path)
+        try:
+            row = connection.execute(
+                """
+                SELECT head_revision_id
+                FROM annotation_documents
+                WHERE asset_id = ? AND channel = ? AND language = ?
+                """,
+                (asset_id, channel.value, language),
+            ).fetchone()
+            return str(row["head_revision_id"]) if row and row["head_revision_id"] else None
+        finally:
+            connection.close()
+
+    def write_text(
+        self,
+        *,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str = "",
+        content: str,
+        raw_bytes: bytes | None = None,
+        source: str,
+        validation_status: AnnotationStatus,
+        image_content_hash: str,
+        expected_head_revision_id: str | None | object = _EXPECTED_HEAD_UNSET,
+        confirm: bool = False,
+        source_job_item_id: str | None = None,
+        input_revisions: Sequence[tuple[str, str]] = (),
+        metadata: dict[str, object] | None = None,
+        allow_candidate_on_conflict: bool = False,
+    ) -> RevisionWrite:
+        with transaction(self._database_path) as connection:
+            return self.write_text_in_transaction(
+                connection,
+                asset_id=asset_id,
+                channel=channel,
+                language=language,
+                content=content,
+                raw_bytes=raw_bytes,
+                source=source,
+                validation_status=validation_status,
+                image_content_hash=image_content_hash,
+                expected_head_revision_id=expected_head_revision_id,
+                confirm=confirm,
+                source_job_item_id=source_job_item_id,
+                input_revisions=input_revisions,
+                metadata=metadata,
+                allow_candidate_on_conflict=allow_candidate_on_conflict,
+            )
+
+    def write_text_in_transaction(
+        self,
+        connection: sqlite3.Connection,
+        **kwargs,
+    ) -> RevisionWrite:
+        return self._write_revision(
+            connection,
+            content_kind=AnnotationContentKind.TEXT,
+            text_content=kwargs.pop("content"),
+            raw_bytes=kwargs.pop("raw_bytes", None),
+            tags=(),
+            **kwargs,
+        )
+
+    def write_tags(
+        self,
+        *,
+        asset_id: str,
+        tags: Sequence[AnnotationTag],
+        source: str,
+        validation_status: AnnotationStatus,
+        image_content_hash: str,
+        expected_head_revision_id: str | None | object = _EXPECTED_HEAD_UNSET,
+        confirm: bool = False,
+        source_job_item_id: str | None = None,
+        input_revisions: Sequence[tuple[str, str]] = (),
+        metadata: dict[str, object] | None = None,
+        allow_candidate_on_conflict: bool = False,
+    ) -> RevisionWrite:
+        with transaction(self._database_path) as connection:
+            return self._write_revision(
+                connection,
+                asset_id=asset_id,
+                channel=AnnotationChannel.TAGS,
+                language="",
+                content_kind=AnnotationContentKind.TAGS,
+                text_content=None,
+                raw_bytes=None,
+                tags=tags,
+                source=source,
+                validation_status=validation_status,
+                image_content_hash=image_content_hash,
+                expected_head_revision_id=expected_head_revision_id,
+                confirm=confirm,
+                source_job_item_id=source_job_item_id,
+                input_revisions=input_revisions,
+                metadata=metadata,
+                allow_candidate_on_conflict=allow_candidate_on_conflict,
+            )
+
+    def write_tags_in_transaction(
+        self,
+        connection: sqlite3.Connection,
+        **kwargs,
+    ) -> RevisionWrite:
+        return self._write_revision(
+            connection,
+            channel=AnnotationChannel.TAGS,
+            language="",
+            content_kind=AnnotationContentKind.TAGS,
+            text_content=None,
+            raw_bytes=None,
+            **kwargs,
+        )
+
+    def delete(
+        self,
+        *,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str = "",
+        expected_head_revision_id: str | None | object = _EXPECTED_HEAD_UNSET,
+        source: str = "manual_delete",
+    ) -> RevisionWrite | None:
+        with transaction(self._database_path) as connection:
+            document = self._document(
+                connection,
+                asset_id,
+                channel,
+                language,
+                create=False,
+            )
+            if document is None or not document["head_revision_id"]:
+                return None
+            head = connection.execute(
+                """
+                SELECT is_tombstone
+                FROM annotation_document_revisions
+                WHERE id = ?
+                """,
+                (str(document["head_revision_id"]),),
+            ).fetchone()
+            if head is None or bool(head["is_tombstone"]):
+                return None
+            return self._write_revision(
+                connection,
+                asset_id=asset_id,
+                channel=channel,
+                language=language,
+                content_kind=AnnotationContentKind(str(document["content_kind"])),
+                text_content=None,
+                raw_bytes=None,
+                tags=(),
+                source=source,
+                validation_status=AnnotationStatus.MISSING,
+                image_content_hash=self._asset_hash(connection, asset_id),
+                expected_head_revision_id=expected_head_revision_id,
+                confirm=False,
+                source_job_item_id=None,
+                input_revisions=(),
+                metadata=None,
+                allow_candidate_on_conflict=False,
+                is_tombstone=True,
+            )
+
+    def confirm(
+        self,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str,
+        expected_head_revision_id: str,
+    ) -> str:
+        with transaction(self._database_path) as connection:
+            document = self._document(connection, asset_id, channel, language, create=False)
+            if document is None or not document["head_revision_id"]:
+                raise ValueError("当前标注通道还没有可确认的版本。")
+            current = str(document["head_revision_id"])
+            if current != expected_head_revision_id:
+                raise ResourceConflictError("标注版本已经变化，请刷新后再确认。")
+            revision = connection.execute(
+                """
+                SELECT *
+                FROM annotation_document_revisions
+                WHERE id = ?
+                """,
+                (current,),
+            ).fetchone()
+            if revision is None or bool(revision["is_tombstone"]):
+                raise ValueError("已删除的标注不能被确认。")
+            now = utc_now_iso()
+            current_image_hash = self._asset_hash(connection, asset_id)
+            confirmed_revision_id = current
+            validation_status = AnnotationStatus(str(revision["validation_status"]))
+            image_changed = str(revision["image_content_hash"]) != current_image_hash
+            if image_changed:
+                confirmed_revision_id = str(uuid.uuid4())
+                metadata = self._metadata(str(revision["metadata_json"]))
+                metadata["reconfirmed_from_revision_id"] = current
+                connection.execute(
+                    """
+                    INSERT INTO annotation_document_revisions (
+                        id, document_id, parent_revision_id, base_revision_id,
+                        source, source_job_item_id, image_content_hash,
+                        validation_status, is_tombstone, is_candidate,
+                        metadata_json, created_at
+                    ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 0, 0, ?, ?)
+                    """,
+                    (
+                        confirmed_revision_id,
+                        str(document["id"]),
+                        current,
+                        current,
+                        "manual_reconfirm",
+                        current_image_hash,
+                        validation_status.value,
+                        json.dumps(metadata, ensure_ascii=False, separators=(",", ":")),
+                        now,
+                    ),
+                )
+                if str(document["content_kind"]) == AnnotationContentKind.TEXT.value:
+                    connection.execute(
+                        """
+                        INSERT INTO annotation_text_contents (
+                            revision_id, content, format, raw_bytes
+                        )
+                        SELECT ?, content, format, raw_bytes
+                        FROM annotation_text_contents
+                        WHERE revision_id = ?
+                        """,
+                        (confirmed_revision_id, current),
+                    )
+                else:
+                    connection.execute(
+                        """
+                        INSERT INTO annotation_tag_items (
+                            revision_id, position, name, normalized_name,
+                            category, confidence, origin
+                        )
+                        SELECT ?, position, name, normalized_name,
+                               category, confidence, origin
+                        FROM annotation_tag_items
+                        WHERE revision_id = ?
+                        """,
+                        (confirmed_revision_id, current),
+                    )
+                connection.execute(
+                    """
+                    INSERT INTO annotation_revision_inputs (
+                        output_revision_id, input_revision_id, role
+                    )
+                    SELECT ?, input_revision_id, role
+                    FROM annotation_revision_inputs
+                    WHERE output_revision_id = ?
+                    """,
+                    (confirmed_revision_id, current),
+                )
+            connection.execute(
+                """
+                UPDATE annotation_documents
+                SET head_revision_id = ?, confirmed_revision_id = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    confirmed_revision_id,
+                    confirmed_revision_id,
+                    now,
+                    str(document["id"]),
+                ),
+            )
+            self._sync_asset_summary(connection, asset_id)
+            return confirmed_revision_id
+
+    def history_rows(
+        self,
+        asset_id: str,
+        channel: AnnotationChannel | None = None,
+        language: str = "",
+    ) -> list[sqlite3.Row]:
+        connection = connect(self._database_path)
+        try:
+            clauses = ["d.asset_id = ?"]
+            parameters: list[object] = [asset_id]
+            if channel is not None:
+                clauses.extend(("d.channel = ?", "d.language = ?"))
+                parameters.extend((channel.value, language))
+            return connection.execute(
+                f"""
+                SELECT r.*, d.channel, d.language, d.content_kind
+                FROM annotation_document_revisions r
+                JOIN annotation_documents d ON d.id = r.document_id
+                WHERE {" AND ".join(clauses)}
+                ORDER BY r.created_at DESC, r.rowid DESC
+                """,
+                parameters,
+            ).fetchall()
+        finally:
+            connection.close()
+
+    def revision_text(self, revision_id: str) -> str:
+        return self.text_content(revision_id)[0]
+
+    def revision_tags(self, revision_id: str) -> list[AnnotationTag]:
+        return self.tags(revision_id)
+
+    def tag_names(self, revision_id: str) -> list[str]:
+        connection = connect(self._database_path)
+        try:
+            return [
+                str(row["name"])
+                for row in connection.execute(
+                    """
+                    SELECT name
+                    FROM annotation_tag_items
+                    WHERE revision_id = ?
+                    ORDER BY position
+                    """,
+                    (revision_id,),
+                ).fetchall()
+            ]
+        finally:
+            connection.close()
+
+    def revision_exists(self, revision_id: str) -> bool:
+        connection = connect(self._database_path)
+        try:
+            return (
+                connection.execute(
+                    "SELECT 1 FROM annotation_document_revisions WHERE id = ?",
+                    (revision_id,),
+                ).fetchone()
+                is not None
+            )
+        finally:
+            connection.close()
+
+    def revision_validation_status(self, revision_id: str) -> AnnotationStatus | None:
+        connection = connect(self._database_path)
+        try:
+            row = connection.execute(
+                """
+                SELECT validation_status
+                FROM annotation_document_revisions
+                WHERE id = ? AND is_tombstone = 0
+                """,
+                (revision_id,),
+            ).fetchone()
+            return AnnotationStatus(str(row["validation_status"])) if row else None
+        finally:
+            connection.close()
+
+    def revision_matches_current_image(self, revision_id: str) -> bool:
+        connection = connect(self._database_path)
+        try:
+            row = connection.execute(
+                """
+                SELECT r.image_content_hash, a.content_hash AS current_image_hash
+                FROM annotation_document_revisions r
+                JOIN annotation_documents d ON d.id = r.document_id
+                JOIN assets a ON a.id = d.asset_id
+                WHERE r.id = ? AND a.is_present = 1
+                """,
+                (revision_id,),
+            ).fetchone()
+            return bool(row and str(row["image_content_hash"]) == str(row["current_image_hash"]))
+        finally:
+            connection.close()
+
+    def revision_inputs(self, revision_id: str) -> list[tuple[str, str]]:
+        connection = connect(self._database_path)
+        try:
+            return [
+                (str(row["input_revision_id"]), str(row["role"]))
+                for row in connection.execute(
+                    """
+                    SELECT input_revision_id, role
+                    FROM annotation_revision_inputs
+                    WHERE output_revision_id = ?
+                    ORDER BY role, input_revision_id
+                    """,
+                    (revision_id,),
+                ).fetchall()
+            ]
+        finally:
+            connection.close()
+
+    def revision_metadata(self, revision_id: str) -> dict[str, object]:
+        connection = connect(self._database_path)
+        try:
+            row = connection.execute(
+                """
+                SELECT metadata_json
+                FROM annotation_document_revisions
+                WHERE id = ?
+                """,
+                (revision_id,),
+            ).fetchone()
+            if row is None:
+                return {}
+            try:
+                value = json.loads(str(row["metadata_json"]))
+            except json.JSONDecodeError:
+                return {}
+            return value if isinstance(value, dict) else {}
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _metadata(value: str) -> dict[str, object]:
+        try:
+            metadata = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        return metadata if isinstance(metadata, dict) else {}
+
+    def _write_revision(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str,
+        content_kind: AnnotationContentKind,
+        text_content: str | None,
+        raw_bytes: bytes | None,
+        tags: Sequence[AnnotationTag],
+        source: str,
+        validation_status: AnnotationStatus,
+        image_content_hash: str,
+        expected_head_revision_id: str | None | object,
+        confirm: bool,
+        source_job_item_id: str | None,
+        input_revisions: Sequence[tuple[str, str]],
+        metadata: dict[str, object] | None,
+        allow_candidate_on_conflict: bool,
+        is_tombstone: bool = False,
+    ) -> RevisionWrite:
+        document = self._document(
+            connection,
+            asset_id,
+            channel,
+            language,
+            create=True,
+            content_kind=content_kind,
+        )
+        assert document is not None
+        current_head = str(document["head_revision_id"]) if document["head_revision_id"] else None
+        conflicted = (
+            expected_head_revision_id is not _EXPECTED_HEAD_UNSET
+            and expected_head_revision_id != current_head
+        )
+        if conflicted and not allow_candidate_on_conflict:
+            raise ResourceConflictError("标注版本已经变化，当前结果未覆盖新内容。")
+
+        revision_id = str(uuid.uuid4())
+        now = utc_now_iso()
+        base_revision_id = (
+            expected_head_revision_id
+            if expected_head_revision_id is not _EXPECTED_HEAD_UNSET
+            else current_head
+        )
+        if base_revision_id is not None and not self._revision_exists(connection, base_revision_id):
+            base_revision_id = None
+        parent_revision_id = base_revision_id if conflicted else current_head
+        connection.execute(
+            """
+            INSERT INTO annotation_document_revisions (
+                id, document_id, parent_revision_id, base_revision_id,
+                source, source_job_item_id, image_content_hash,
+                validation_status, is_tombstone, is_candidate,
+                metadata_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                revision_id,
+                str(document["id"]),
+                parent_revision_id,
+                base_revision_id,
+                source,
+                source_job_item_id,
+                image_content_hash,
+                validation_status.value,
+                int(is_tombstone),
+                int(conflicted),
+                json.dumps(metadata or {}, ensure_ascii=False, separators=(",", ":")),
+                now,
+            ),
+        )
+        if not is_tombstone:
+            if content_kind == AnnotationContentKind.TEXT:
+                connection.execute(
+                    """
+                    INSERT INTO annotation_text_contents (
+                        revision_id, content, format, raw_bytes
+                    ) VALUES (?, ?, 'plain', ?)
+                    """,
+                    (revision_id, text_content or "", raw_bytes),
+                )
+            else:
+                connection.executemany(
+                    """
+                    INSERT INTO annotation_tag_items (
+                        revision_id, position, name, normalized_name,
+                        category, confidence, origin
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            revision_id,
+                            position,
+                            tag.name,
+                            tag.name.casefold(),
+                            tag.category,
+                            tag.confidence,
+                            tag.origin,
+                        )
+                        for position, tag in enumerate(tags)
+                    ],
+                )
+        connection.executemany(
+            """
+            INSERT INTO annotation_revision_inputs (
+                output_revision_id, input_revision_id, role
+            ) VALUES (?, ?, ?)
+            """,
+            [(revision_id, input_revision_id, role) for input_revision_id, role in input_revisions],
+        )
+
+        if not conflicted:
+            confirmed_revision_id = revision_id if confirm and not is_tombstone else None
+            if confirm:
+                connection.execute(
+                    """
+                    UPDATE annotation_documents
+                    SET head_revision_id = ?, confirmed_revision_id = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        revision_id,
+                        confirmed_revision_id,
+                        now,
+                        str(document["id"]),
+                    ),
+                )
+            elif is_tombstone:
+                connection.execute(
+                    """
+                    UPDATE annotation_documents
+                    SET head_revision_id = ?, confirmed_revision_id = NULL,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (revision_id, now, str(document["id"])),
+                )
+            else:
+                connection.execute(
+                    """
+                    UPDATE annotation_documents
+                    SET head_revision_id = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (revision_id, now, str(document["id"])),
+                )
+            self._sync_asset_summary(connection, asset_id)
+        return RevisionWrite(
+            revision_id=revision_id,
+            document_id=str(document["id"]),
+            became_head=not conflicted,
+        )
+
+    @staticmethod
+    def _revision_exists(connection: sqlite3.Connection, revision_id: str) -> bool:
+        return (
+            connection.execute(
+                "SELECT 1 FROM annotation_document_revisions WHERE id = ?",
+                (revision_id,),
+            ).fetchone()
+            is not None
+        )
+
+    @staticmethod
+    def _asset_hash(connection: sqlite3.Connection, asset_id: str) -> str:
+        row = connection.execute(
+            "SELECT content_hash FROM assets WHERE id = ?",
+            (asset_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"找不到素材：{asset_id}")
+        return str(row["content_hash"])
+
+    @staticmethod
+    def _document(
+        connection: sqlite3.Connection,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str,
+        *,
+        create: bool,
+        content_kind: AnnotationContentKind | None = None,
+    ) -> sqlite3.Row | None:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM annotation_documents
+            WHERE asset_id = ? AND channel = ? AND language = ?
+            """,
+            (asset_id, channel.value, language),
+        ).fetchone()
+        if row is not None or not create:
+            return row
+        expected_kind, display_name = channel_definition(channel, language)
+        if content_kind is not None and content_kind != expected_kind:
+            raise ValueError("标注通道与内容类型不匹配。")
+        now = utc_now_iso()
+        document_id = str(uuid.uuid4())
+        connection.execute(
+            """
+            INSERT INTO annotation_documents (
+                id, asset_id, channel, language, display_name,
+                content_kind, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                document_id,
+                asset_id,
+                channel.value,
+                language,
+                display_name,
+                expected_kind.value,
+                now,
+                now,
+            ),
+        )
+        return connection.execute(
+            "SELECT * FROM annotation_documents WHERE id = ?",
+            (document_id,),
+        ).fetchone()
+
+    @staticmethod
+    def _sync_asset_summary(connection: sqlite3.Connection, asset_id: str) -> None:
+        row = connection.execute(
+            """
+            SELECT d.head_revision_id, d.confirmed_revision_id,
+                   r.validation_status, r.is_tombstone
+                FROM annotation_documents d
+                JOIN annotation_document_revisions r ON r.id = d.head_revision_id
+                WHERE d.asset_id = ?
+                  AND d.channel != 'translation'
+                ORDER BY
+                CASE d.channel
+                    WHEN 'description' THEN 0
+                    WHEN 'existing_annotation' THEN 1
+                    WHEN 'tags' THEN 2
+                    ELSE 3
+                END,
+                d.language
+            """,
+            (asset_id,),
+        ).fetchall()
+        active = next((candidate for candidate in row if not bool(candidate["is_tombstone"])), None)
+        if active is None:
+            status = AnnotationStatus.MISSING.value
+        elif str(active["validation_status"]) in {
+            AnnotationStatus.INVALID.value,
+            AnnotationStatus.ENCODING_ERROR.value,
+            AnnotationStatus.EMPTY.value,
+        }:
+            status = str(active["validation_status"])
+        elif active["confirmed_revision_id"] and str(active["confirmed_revision_id"]) == str(
+            active["head_revision_id"]
+        ):
+            status = AnnotationStatus.MANUALLY_ACCEPTED.value
+        else:
+            status = str(active["validation_status"])
+        connection.execute(
+            """
+            UPDATE assets
+            SET annotation_status = ?, annotation_modified_ns = NULL, updated_at = ?
+            WHERE id = ?
+            """,
+            (status, utc_now_iso(), asset_id),
+        )
+
+    @classmethod
+    def sync_asset_summary_in_transaction(
+        cls,
+        connection: sqlite3.Connection,
+        asset_id: str,
+    ) -> None:
+        cls._sync_asset_summary(connection, asset_id)
+
+
+EXPECTED_HEAD_UNSET = _EXPECTED_HEAD_UNSET

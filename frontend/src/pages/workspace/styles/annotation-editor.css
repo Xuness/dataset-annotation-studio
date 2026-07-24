@@ -39,6 +39,26 @@
   white-space: nowrap;
 }
 
+.annotation-review {
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+
+.annotation-review--confirmed {
+  color: var(--sage);
+  background: var(--sage-soft);
+}
+
+.annotation-review--unreviewed,
+.annotation-review--stale {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
 .annotation-editor__actions .button {
   min-height: 30px;
   padding: 0 10px;
@@ -67,6 +87,9 @@
 }
 
 .annotation-view-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 0 9px;
   border-bottom: 1px solid transparent;
   border-radius: 0;
@@ -74,6 +97,23 @@
   background: transparent;
   cursor: pointer;
   font-size: var(--text-xs);
+}
+
+.annotation-channel-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.annotation-channel-dot--confirmed {
+  background: var(--sage);
+}
+
+.annotation-channel-dot--unreviewed,
+.annotation-channel-dot--stale {
+  background: var(--warning);
 }
 
 .annotation-view-tabs button.is-active {
@@ -146,6 +186,11 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);
+}
+
+.annotation-editor__history article.is-candidate {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--warning) 54%, var(--line));
 }
 
 .annotation-editor__history article > header {

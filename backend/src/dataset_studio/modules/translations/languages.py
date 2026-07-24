@@ -1,5 +1,3 @@
-from __future__ import annotations
+from dataset_studio.core.languages import LANGUAGE_PATTERN, normalize_language_code
 
-import re
-
-LANGUAGE_PATTERN = re.compile(r"^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$")
+__all__ = ["LANGUAGE_PATTERN", "normalize_language_code"]

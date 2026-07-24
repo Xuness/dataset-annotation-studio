@@ -46,6 +46,15 @@ export function ExportHistoryPanel({
           const progress = operation.total_items
             ? Math.round((operation.completed_items / operation.total_items) * 100)
             : 0;
+          const channels =
+            operation.configuration_snapshot.channels
+              ?.map((selection) =>
+                selection.channel === "translation"
+                  ? `translation:${selection.language}`
+                  : selection.channel,
+              )
+              .join(" · ") ?? "旧版导出";
+          const formats = operation.configuration_snapshot.formats?.join(" + ") ?? "txt";
           return (
             <article key={operation.id} className={active ? "is-active" : ""}>
               <header>
@@ -60,6 +69,9 @@ export function ExportHistoryPanel({
                 {operation.completed_items} / {operation.total_items} 张 ·{" "}
                 {formatBytes(operation.copied_bytes, "KB")} /
                 {formatBytes(operation.total_bytes, "KB")}
+              </small>
+              <small title={channels}>
+                {formats.toUpperCase()} · {channels}
               </small>
               {operation.current_relative_path ? (
                 <small title={operation.current_relative_path}>

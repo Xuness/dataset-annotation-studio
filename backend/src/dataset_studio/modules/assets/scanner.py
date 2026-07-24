@@ -10,7 +10,6 @@ from dataset_studio.core.files import file_sha256
 from dataset_studio.core.paths import relative_path_key
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.annotations.models import AnnotationStatus
-from dataset_studio.modules.annotations.text import read_annotation_text
 from dataset_studio.modules.assets.models import SUPPORTED_IMAGE_SUFFIXES, AssetRecord
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.workspaces.models import ScanIssue, ScanResult, WorkspaceManifest
@@ -166,6 +165,9 @@ class AssetScanner:
                 width, height = _image_dimensions(image_path)
                 was_updated = False
 
+        # ``annotation_relative_path`` remains as a compatibility hint for
+        # legacy import and older task records. Sidecars are no longer scanned
+        # as live annotation state once the database store is available.
         annotation_path = image_path.with_suffix(".txt")
         metadata_path = image_path.with_suffix(".json")
         if annotation_path.is_symlink():
@@ -173,7 +175,7 @@ class AssetScanner:
         if metadata_path.is_symlink():
             raise ValueError("同名元数据文件不能是符号链接。")
         annotation_status, annotation_modified_ns = AssetScanner._annotation_state(
-            annotation_path, annotation_state_source
+            annotation_state_source
         )
         metadata_relative_path = (
             metadata_path.relative_to(paths.root).as_posix() if metadata_path.is_file() else None
@@ -232,16 +234,7 @@ class AssetScanner:
                 yield candidate
 
     @staticmethod
-    def _annotation_state(annotation_path: Path, existing=None) -> tuple[str, int | None]:
-        if not annotation_path.is_file():
+    def _annotation_state(existing=None) -> tuple[str, int | None]:
+        if existing is None:
             return AnnotationStatus.MISSING.value, None
-        modified_ns = annotation_path.stat().st_mtime_ns
-        if (
-            existing is not None
-            and str(existing["annotation_status"]) == AnnotationStatus.MANUALLY_ACCEPTED.value
-            and existing["annotation_modified_ns"] is not None
-            and int(existing["annotation_modified_ns"]) == modified_ns
-        ):
-            return AnnotationStatus.MANUALLY_ACCEPTED.value, modified_ns
-        _, validation = read_annotation_text(annotation_path)
-        return validation.status.value, modified_ns
+        return str(existing["annotation_status"]), None

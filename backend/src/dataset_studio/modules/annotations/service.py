@@ -1,110 +1,100 @@
 from __future__ import annotations
 
-import os
-import sqlite3
-import uuid
-from collections.abc import Mapping, Sequence
-from contextlib import suppress
-from dataclasses import dataclass
+from collections.abc import Sequence
 from pathlib import Path
 
-from dataset_studio.core.errors import (
-    AssetNotFoundError,
-    FileRollbackError,
-    ResourceConflictError,
-)
-from dataset_studio.core.files import atomic_copy_file, atomic_write_text
-from dataset_studio.core.paths import filesystem_path_key
-from dataset_studio.core.sqlite import connect, transaction
-from dataset_studio.core.time import utc_now_iso
+from dataset_studio.core.errors import AssetNotFoundError
+from dataset_studio.core.languages import normalize_language_code
 from dataset_studio.modules.annotations.models import (
     AnnotationBatchDeleteResult,
+    AnnotationBundle,
+    AnnotationChannel,
+    AnnotationContentKind,
     AnnotationDocument,
+    AnnotationReviewStatus,
     AnnotationRevision,
     AnnotationStatus,
+    AnnotationTag,
+    AnnotationWriteResult,
+    ValidationIssue,
     ValidationResult,
 )
+from dataset_studio.modules.annotations.repository import (
+    EXPECTED_HEAD_UNSET,
+    AnnotationRepository,
+    channel_definition,
+)
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
-from dataset_studio.modules.annotations.text import read_annotation_text
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.output_resources import (
     OutputResourceClaim,
-    annotation_output_resource_key,
+    annotation_document_resource_key,
     hold_output_resources,
 )
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
-_EXPECTED_VERSION_UNSET = object()
-
-
-@dataclass(frozen=True, slots=True)
-class GeneratedAnnotation:
-    asset_id: str
-    content: str
-    expected_modified_at: str | None | object = _EXPECTED_VERSION_UNSET
-    lease_owner_id: str | None = None
-
-
-class AnnotationBatchRollbackError(FileRollbackError):
-    """Raised when a failed batch cannot restore every touched file."""
-
-
-class AnnotationRollbackError(FileRollbackError):
-    """Raised when a failed single write cannot restore its previous file."""
-
-
-@dataclass(frozen=True, slots=True)
-class _PreparedAnnotation:
-    asset_id: str
-    content: str
-    path: Path
-    validation: ValidationResult
-    expected_modified_at: str | None | object
-    lease_owner_id: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class _PreparedAnnotationDeletion:
-    path: Path
-    tombstone: Path
-    owner_ids: tuple[str, ...]
-    content: str
-    validation: ValidationResult
+_EXPECTED_VERSION_UNSET = EXPECTED_HEAD_UNSET
 
 
 class AnnotationService:
     def __init__(self, workspaces: WorkspaceService) -> None:
         self._workspaces = workspaces
 
-    def get(self, project_id: str, asset_id: str) -> AnnotationDocument:
+    def list(self, project_id: str, asset_id: str) -> AnnotationBundle:
+        paths, _ = self._workspaces.get(project_id)
+        self._asset(paths.database, asset_id)
+        repository = AnnotationRepository(paths.database)
+        return AnnotationBundle(
+            asset_id=asset_id,
+            documents=[
+                self._document(repository, row) for row in repository.list_document_rows(asset_id)
+            ],
+        )
+
+    def get_channel(
+        self,
+        project_id: str,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str = "",
+    ) -> AnnotationDocument:
+        language = self._channel_language(channel, language)
         paths, _ = self._workspaces.get(project_id)
         asset = self._asset(paths.database, asset_id)
-        annotation_path = self._annotation_path(paths.root, asset)
-        if not annotation_path.is_file():
+        repository = AnnotationRepository(paths.database)
+        row = repository.get_document_row(asset_id, channel, language)
+        if row is None:
+            kind, display_name = channel_definition(channel, language)
             return AnnotationDocument(
                 asset_id=asset_id,
-                path=str(asset["annotation_relative_path"]),
+                channel=channel,
+                language=language or None,
+                display_name=display_name,
+                content_kind=kind,
+                path=self._database_path_label(channel, language),
                 exists=False,
                 status=AnnotationStatus.MISSING,
+                review_status=AnnotationReviewStatus.MISSING,
+                current_image_hash=str(asset["content_hash"]),
             )
-        content, validation = read_annotation_text(annotation_path)
-        status = validation.status
-        if (
-            status != AnnotationStatus.ENCODING_ERROR
-            and str(asset["annotation_status"]) == AnnotationStatus.MANUALLY_ACCEPTED.value
-            and asset["annotation_modified_ns"] is not None
-            and int(asset["annotation_modified_ns"]) == annotation_path.stat().st_mtime_ns
+        return self._document(repository, row)
+
+    def get(self, project_id: str, asset_id: str) -> AnnotationDocument:
+        """Return the primary editable text channel for compatibility clients."""
+
+        bundle = self.list(project_id, asset_id)
+        active = {
+            (document.channel, document.language or ""): document
+            for document in bundle.documents
+            if document.exists
+        }
+        for key in (
+            (AnnotationChannel.DESCRIPTION, ""),
+            (AnnotationChannel.EXISTING, ""),
         ):
-            status = AnnotationStatus.MANUALLY_ACCEPTED
-        return AnnotationDocument(
-            asset_id=asset_id,
-            path=str(asset["annotation_relative_path"]),
-            exists=True,
-            content=content,
-            status=status,
-            validation=validation,
-            modified_at=str(annotation_path.stat().st_mtime_ns),
-        )
+            if key in active:
+                return active[key]
+        return self.get_channel(project_id, asset_id, AnnotationChannel.DESCRIPTION)
 
     def save(
         self,
@@ -114,14 +104,105 @@ class AnnotationService:
         *,
         expected_modified_at: str | None | object = _EXPECTED_VERSION_UNSET,
     ) -> AnnotationDocument:
-        return self._save(
+        return self.save_text(
             project_id,
             asset_id,
+            AnnotationChannel.DESCRIPTION,
             content,
             source="manual_edit",
-            expected_modified_at=expected_modified_at,
-            lease_owner_id=None,
-            allow_shared=True,
+            expected_head_revision_id=expected_modified_at,
+        ).document
+
+    def save_text(
+        self,
+        project_id: str,
+        asset_id: str,
+        channel: AnnotationChannel,
+        content: str,
+        *,
+        language: str = "",
+        source: str = "manual_edit",
+        expected_head_revision_id: str | None | object = _EXPECTED_VERSION_UNSET,
+        confirm: bool = False,
+        lease_owner_id: str | None = None,
+        source_job_item_id: str | None = None,
+        input_revisions: Sequence[tuple[str, str]] = (),
+        metadata: dict[str, object] | None = None,
+        allow_candidate_on_conflict: bool = False,
+    ) -> AnnotationWriteResult:
+        if channel == AnnotationChannel.TAGS:
+            raise ValueError("Tags 通道必须使用结构化 Tag 保存接口。")
+        language = self._channel_language(channel, language)
+        paths, _ = self._workspaces.get(project_id)
+        asset = self._asset(paths.database, asset_id)
+        claim = OutputResourceClaim(
+            annotation_document_resource_key(asset_id, channel.value, language),
+            lease_owner_id,
+        )
+        validation = validate_tag_balance(content)
+        with hold_output_resources(paths.database, [claim]):
+            write = AnnotationRepository(paths.database).write_text(
+                asset_id=asset_id,
+                channel=channel,
+                language=language,
+                content=content,
+                source=source,
+                validation_status=validation.status,
+                image_content_hash=str(asset["content_hash"]),
+                expected_head_revision_id=expected_head_revision_id,
+                confirm=confirm,
+                source_job_item_id=source_job_item_id,
+                input_revisions=input_revisions,
+                metadata=metadata,
+                allow_candidate_on_conflict=allow_candidate_on_conflict,
+            )
+        return AnnotationWriteResult(
+            document=self.get_channel(project_id, asset_id, channel, language),
+            revision_id=write.revision_id,
+            became_head=write.became_head,
+        )
+
+    def save_tags(
+        self,
+        project_id: str,
+        asset_id: str,
+        tags: Sequence[AnnotationTag],
+        *,
+        source: str = "manual_edit",
+        expected_head_revision_id: str | None | object = _EXPECTED_VERSION_UNSET,
+        confirm: bool = False,
+        lease_owner_id: str | None = None,
+        source_job_item_id: str | None = None,
+        input_revisions: Sequence[tuple[str, str]] = (),
+        metadata: dict[str, object] | None = None,
+        allow_candidate_on_conflict: bool = False,
+    ) -> AnnotationWriteResult:
+        normalized = self._normalize_tags(tags)
+        paths, _ = self._workspaces.get(project_id)
+        asset = self._asset(paths.database, asset_id)
+        claim = OutputResourceClaim(
+            annotation_document_resource_key(asset_id, AnnotationChannel.TAGS.value),
+            lease_owner_id,
+        )
+        validation_status = AnnotationStatus.EMPTY if not normalized else AnnotationStatus.VALID
+        with hold_output_resources(paths.database, [claim]):
+            write = AnnotationRepository(paths.database).write_tags(
+                asset_id=asset_id,
+                tags=normalized,
+                source=source,
+                validation_status=validation_status,
+                image_content_hash=str(asset["content_hash"]),
+                expected_head_revision_id=expected_head_revision_id,
+                confirm=confirm,
+                source_job_item_id=source_job_item_id,
+                input_revisions=input_revisions,
+                metadata=metadata,
+                allow_candidate_on_conflict=allow_candidate_on_conflict,
+            )
+        return AnnotationWriteResult(
+            document=self.get_channel(project_id, asset_id, AnnotationChannel.TAGS),
+            revision_id=write.revision_id,
+            became_head=write.became_head,
         )
 
     def save_generated(
@@ -130,431 +211,375 @@ class AnnotationService:
         asset_id: str,
         content: str,
         *,
+        channel: AnnotationChannel = AnnotationChannel.DESCRIPTION,
+        tags: Sequence[AnnotationTag] | None = None,
+        language: str = "",
         manually_accepted: bool = False,
         expected_modified_at: str | None | object = _EXPECTED_VERSION_UNSET,
         lease_owner_id: str | None = None,
-    ) -> AnnotationDocument:
-        return self._save(
-            project_id,
-            asset_id,
-            content,
-            source="manual_accept" if manually_accepted else "model_response",
-            manually_accepted=manually_accepted,
-            expected_modified_at=expected_modified_at,
-            lease_owner_id=lease_owner_id,
-            allow_shared=False,
+        source_job_item_id: str | None = None,
+        input_revisions: Sequence[tuple[str, str]] = (),
+        metadata: dict[str, object] | None = None,
+        allow_candidate_on_conflict: bool = True,
+    ) -> AnnotationWriteResult:
+        source = (
+            "manual_accept"
+            if manually_accepted
+            else ("local_tagger" if channel == AnnotationChannel.TAGS else "model_response")
         )
-
-    def save_generated_batch(
-        self,
-        project_id: str,
-        annotations: Sequence[GeneratedAnnotation],
-    ) -> None:
-        """Write a staged annotation batch, then commit all metadata once."""
-
-        if not annotations:
-            return
-        asset_ids = [annotation.asset_id for annotation in annotations]
-        if len(asset_ids) != len(set(asset_ids)):
-            raise ValueError("批量保存标注时包含重复素材。")
-        paths, _ = self._workspaces.get(project_id)
-        placeholders = ", ".join("?" for _ in asset_ids)
-        connection = connect(paths.database)
-        try:
-            rows = connection.execute(
-                f"SELECT * FROM assets WHERE id IN ({placeholders})",
-                asset_ids,
-            ).fetchall()
-        finally:
-            connection.close()
-        assets = {str(row["id"]): row for row in rows}
-        missing = [asset_id for asset_id in asset_ids if asset_id not in assets]
-        if missing:
-            raise AssetNotFoundError(f"找不到素材：{missing[0]}")
-
-        prepared = [
-            _PreparedAnnotation(
-                asset_id=annotation.asset_id,
-                content=annotation.content,
-                path=self._annotation_path(paths.root, assets[annotation.asset_id]),
-                validation=validate_tag_balance(annotation.content),
-                expected_modified_at=annotation.expected_modified_at,
-                lease_owner_id=annotation.lease_owner_id,
+        if channel == AnnotationChannel.TAGS:
+            result = self.save_tags(
+                project_id,
+                asset_id,
+                tags or self.tags_from_content(content, origin="tagger"),
+                source=source,
+                expected_head_revision_id=expected_modified_at,
+                confirm=manually_accepted,
+                lease_owner_id=lease_owner_id,
+                source_job_item_id=source_job_item_id,
+                input_revisions=input_revisions,
+                metadata=metadata,
+                allow_candidate_on_conflict=allow_candidate_on_conflict,
             )
-            for annotation in annotations
-        ]
-        path_keys = [self._path_key(item.path) for item in prepared]
-        if len(path_keys) != len(set(path_keys)):
-            raise ValueError("批量生成结果包含共享同一个标注文件的素材，已拒绝写入。")
-        claims = [
-            OutputResourceClaim(
-                annotation_output_resource_key(
-                    str(assets[item.asset_id]["annotation_relative_path"])
-                ),
-                item.lease_owner_id,
+        else:
+            result = self.save_text(
+                project_id,
+                asset_id,
+                channel,
+                content,
+                language=language,
+                source=source,
+                expected_head_revision_id=expected_modified_at,
+                confirm=manually_accepted,
+                lease_owner_id=lease_owner_id,
+                source_job_item_id=source_job_item_id,
+                input_revisions=input_revisions,
+                metadata=metadata,
+                allow_candidate_on_conflict=allow_candidate_on_conflict,
             )
-            for item in prepared
-        ]
-        with hold_output_resources(paths.database, claims):
-            self._save_generated_batch_locked(
-                paths.database,
-                assets,
-                prepared,
-            )
+        return result
 
-    def _save_generated_batch_locked(
-        self,
-        database_path: Path,
-        assets: Mapping[str, sqlite3.Row],
-        prepared: Sequence[_PreparedAnnotation],
-    ) -> None:
-        for item in prepared:
-            owner_ids = self._annotation_owner_ids(
-                database_path,
-                str(assets[item.asset_id]["annotation_relative_path"]),
-            )
-            if len(owner_ids) > 1:
-                raise ValueError(
-                    "图片与其他素材共享同一个 TXT，不能自动生成标注；"
-                    "请先重命名同名但扩展名不同的图片并重新扫描。"
-                )
-            actual_modified_at = str(item.path.stat().st_mtime_ns) if item.path.is_file() else None
-            if (
-                item.expected_modified_at is not _EXPECTED_VERSION_UNSET
-                and item.expected_modified_at != actual_modified_at
-            ):
-                raise ResourceConflictError(
-                    "标注在任务执行期间被其他操作修改，模型结果未覆盖新内容。"
-                )
-        backups: dict[Path, Path] = {}
-        written_paths: set[Path] = set()
-        modified_ns: dict[str, int] = {}
-        try:
-            for item in prepared:
-                if item.path.is_file():
-                    backup = item.path.with_name(f".{item.path.name}.{uuid.uuid4().hex}.backup")
-                    atomic_copy_file(item.path, backup)
-                    backups[item.path] = backup
-            for item in prepared:
-                atomic_write_text(item.path, item.content)
-                written_paths.add(item.path)
-                modified_ns[item.asset_id] = item.path.stat().st_mtime_ns
-            with transaction(database_path) as database:
-                for item in prepared:
-                    self._insert_revision(
-                        database,
-                        item.asset_id,
-                        item.content,
-                        source="model_response",
-                        validation=item.validation,
-                    )
-                    self._update_annotation_status(
-                        database,
-                        item.asset_id,
-                        item.validation.status.value,
-                        modified_ns[item.asset_id],
-                    )
-        except BaseException as error:
-            rollback_errors: list[OSError] = []
-            for item in reversed(prepared):
-                backup = backups.get(item.path)
-                try:
-                    if item.path in written_paths:
-                        if backup is not None and backup.is_file():
-                            os.replace(backup, item.path)
-                        else:
-                            item.path.unlink(missing_ok=True)
-                    elif backup is not None:
-                        backup.unlink(missing_ok=True)
-                except OSError as rollback_error:
-                    rollback_errors.append(rollback_error)
-            if rollback_errors:
-                raise AnnotationBatchRollbackError(
-                    f"批量标注写入失败，且有 {len(rollback_errors)} 个文件无法回滚。"
-                ) from error
-            raise
-        for backup in backups.values():
-            with suppress(OSError):
-                backup.unlink(missing_ok=True)
-
-    def _save(
+    def confirm(
         self,
         project_id: str,
         asset_id: str,
-        content: str,
-        *,
-        source: str,
-        manually_accepted: bool = False,
-        expected_modified_at: str | None | object = _EXPECTED_VERSION_UNSET,
-        lease_owner_id: str | None,
-        allow_shared: bool,
+        channel: AnnotationChannel,
+        expected_head_revision_id: str,
+        language: str = "",
     ) -> AnnotationDocument:
+        language = self._channel_language(channel, language)
         paths, _ = self._workspaces.get(project_id)
-        asset = self._asset(paths.database, asset_id)
-        annotation_path = self._annotation_path(paths.root, asset)
-        annotation_relative_path = str(asset["annotation_relative_path"])
+        self._asset(paths.database, asset_id)
         claim = OutputResourceClaim(
-            annotation_output_resource_key(annotation_relative_path),
-            lease_owner_id,
+            annotation_document_resource_key(asset_id, channel.value, language)
         )
         with hold_output_resources(paths.database, [claim]):
-            return self._save_locked(
-                project_id,
-                paths.database,
+            AnnotationRepository(paths.database).confirm(
                 asset_id,
-                annotation_relative_path,
-                annotation_path,
-                content,
-                source=source,
-                manually_accepted=manually_accepted,
-                expected_modified_at=expected_modified_at,
-                allow_shared=allow_shared,
+                channel,
+                language,
+                expected_head_revision_id,
             )
+        return self.get_channel(project_id, asset_id, channel, language)
 
-    def _save_locked(
+    def delete(
         self,
         project_id: str,
-        database_path: Path,
         asset_id: str,
-        annotation_relative_path: str,
-        annotation_path: Path,
-        content: str,
-        *,
-        source: str,
-        manually_accepted: bool,
-        expected_modified_at: str | None | object,
-        allow_shared: bool,
+        channel: AnnotationChannel | None = None,
+        language: str = "",
     ) -> AnnotationDocument:
-        owner_ids = self._annotation_owner_ids(
-            database_path,
-            annotation_relative_path,
+        selected_channel = channel or self.get(project_id, asset_id).channel
+        self.delete_many(
+            project_id,
+            [asset_id],
+            channel=selected_channel,
+            language=language,
         )
-        if not allow_shared and len(owner_ids) > 1:
-            raise ValueError(
-                "图片与其他素材共享同一个 TXT，不能自动写入标注；"
-                "请先重命名同名但扩展名不同的图片并重新扫描。"
-            )
-        actual_modified_at = (
-            str(annotation_path.stat().st_mtime_ns) if annotation_path.is_file() else None
-        )
-        if (
-            expected_modified_at is not _EXPECTED_VERSION_UNSET
-            and expected_modified_at != actual_modified_at
-        ):
-            raise ResourceConflictError(
-                "标注已被其他操作修改，当前草稿未写入。请刷新后核对新内容再保存。"
-            )
-        validation = validate_tag_balance(content)
-        backup: Path | None = None
-        if annotation_path.is_file():
-            backup = annotation_path.with_name(f".{annotation_path.name}.{uuid.uuid4().hex}.backup")
-            atomic_copy_file(annotation_path, backup)
-        status = AnnotationStatus.MANUALLY_ACCEPTED if manually_accepted else validation.status
-        try:
-            atomic_write_text(annotation_path, content)
-            modified_ns = annotation_path.stat().st_mtime_ns
-            with transaction(database_path) as connection:
-                for owner_id in owner_ids:
-                    self._insert_revision(
-                        connection,
-                        owner_id,
-                        content,
-                        source=source,
-                        validation=validation,
-                    )
-                    self._update_annotation_status(
-                        connection,
-                        owner_id,
-                        status.value,
-                        modified_ns,
-                    )
-        except BaseException as error:
-            try:
-                if backup is not None and backup.is_file():
-                    os.replace(backup, annotation_path)
-                else:
-                    annotation_path.unlink(missing_ok=True)
-            except OSError:
-                raise AnnotationRollbackError("标注写入失败，且原文件未能自动恢复。") from error
-            raise
-        if backup is not None:
-            with suppress(OSError):
-                backup.unlink(missing_ok=True)
-        document = self.get(project_id, asset_id)
-        if manually_accepted:
-            return document.model_copy(update={"status": AnnotationStatus.MANUALLY_ACCEPTED})
-        return document
-
-    def delete(self, project_id: str, asset_id: str) -> AnnotationDocument:
-        self.delete_many(project_id, [asset_id])
-        return self.get(project_id, asset_id)
+        return self.get_channel(project_id, asset_id, selected_channel, language)
 
     def delete_many(
         self,
         project_id: str,
         asset_ids: Sequence[str],
+        *,
+        channel: AnnotationChannel | None = None,
+        language: str = "",
     ) -> AnnotationBatchDeleteResult:
         normalized_ids = list(dict.fromkeys(asset_id for asset_id in asset_ids if asset_id))
         if not normalized_ids:
             raise ValueError("至少需要选择一个素材。")
+        if channel is None:
+            if language:
+                raise ValueError("未指定标注通道时不能指定语言。")
+        else:
+            language = self._channel_language(channel, language)
         paths, _ = self._workspaces.get(project_id)
-        repository = AssetRepository(paths.database)
-        assets = repository.get_assets(normalized_ids)
+        assets = AssetRepository(paths.database).get_assets(normalized_ids)
         missing_assets = [asset_id for asset_id in normalized_ids if asset_id not in assets]
         if missing_assets:
             raise AssetNotFoundError(f"找不到素材：{missing_assets[0]}")
 
-        selected_ids = set(normalized_ids)
-        owners_by_path: dict[str, list[str]] = {}
-        for row in repository.list_present_records():
-            annotation_path = self._annotation_path(paths.root, row)
-            owners_by_path.setdefault(self._path_key(annotation_path), []).append(str(row["id"]))
+        deleted = 0
+        deleted_asset_ids: set[str] = set()
         for asset_id in normalized_ids:
-            annotation_path = self._annotation_path(paths.root, assets[asset_id])
-            unselected_owners = [
-                owner_id
-                for owner_id in owners_by_path[self._path_key(annotation_path)]
-                if owner_id not in selected_ids
-            ]
-            if unselected_owners and annotation_path.is_file():
-                raise ValueError(
-                    "所选图片与未选图片共享同一个标注文件；请同时选择这些图片后再删除标注。"
-                )
-
-        prepared: list[_PreparedAnnotationDeletion] = []
-        prepared_paths: set[str] = set()
-        affected_asset_ids: set[str] = set()
-        status_asset_ids = set(normalized_ids)
-        for asset_id in normalized_ids:
-            annotation_path = self._annotation_path(paths.root, assets[asset_id])
-            if not annotation_path.is_file():
-                status_asset_ids.update(owners_by_path[self._path_key(annotation_path)])
-        try:
-            for asset_id in normalized_ids:
-                annotation_path = self._annotation_path(paths.root, assets[asset_id])
-                path_key = self._path_key(annotation_path)
-                if path_key in prepared_paths or not annotation_path.is_file():
+            channels = (
+                [channel]
+                if channel is not None
+                else [
+                    document.channel
+                    for document in self.list(project_id, asset_id).documents
+                    if document.exists and document.channel != AnnotationChannel.TRANSLATION
+                ]
+            )
+            for selected_channel in channels:
+                if selected_channel is None:
                     continue
-                previous, previous_validation = read_annotation_text(annotation_path)
-                tombstone = annotation_path.with_name(
-                    f".{annotation_path.name}.{uuid.uuid4().hex}.deleted"
-                )
-                os.replace(annotation_path, tombstone)
-                owner_ids = tuple(owners_by_path[path_key])
-                prepared.append(
-                    _PreparedAnnotationDeletion(
-                        path=annotation_path,
-                        tombstone=tombstone,
-                        owner_ids=owner_ids,
-                        content=previous,
-                        validation=previous_validation,
-                    )
-                )
-                prepared_paths.add(path_key)
-                affected_asset_ids.update(owner_ids)
-
-            with transaction(paths.database) as connection:
-                snapshots = {
-                    owner_id: (item.content, item.validation)
-                    for item in prepared
-                    for owner_id in item.owner_ids
-                }
-                for asset_id in sorted(status_asset_ids):
-                    snapshot = snapshots.get(asset_id)
-                    if snapshot is not None:
-                        previous, previous_validation = snapshot
-                        self._insert_revision(
-                            connection,
-                            asset_id,
-                            previous,
-                            source="deleted_snapshot",
-                            validation=previous_validation,
-                        )
-                    self._update_annotation_status(
-                        connection,
+                claim = OutputResourceClaim(
+                    annotation_document_resource_key(
                         asset_id,
-                        AnnotationStatus.MISSING.value,
-                        None,
+                        selected_channel.value,
+                        language,
                     )
-        except BaseException as error:
-            rollback_errors: list[OSError] = []
-            for item in reversed(prepared):
-                try:
-                    if item.tombstone.is_file():
-                        os.replace(item.tombstone, item.path)
-                except OSError as rollback_error:
-                    rollback_errors.append(rollback_error)
-            if rollback_errors:
-                raise RuntimeError("批量删除标注失败，且部分文件未能自动恢复。") from error
-            raise
-        for item in prepared:
-            with suppress(OSError):
-                item.tombstone.unlink(missing_ok=True)
+                )
+                with hold_output_resources(paths.database, [claim]):
+                    write = AnnotationRepository(paths.database).delete(
+                        asset_id=asset_id,
+                        channel=selected_channel,
+                        language=language,
+                    )
+                deleted += int(write is not None)
+                if write is not None:
+                    deleted_asset_ids.add(asset_id)
         return AnnotationBatchDeleteResult(
             requested_count=len(normalized_ids),
-            deleted_count=len(affected_asset_ids),
-            missing_count=len(normalized_ids) - len(affected_asset_ids),
+            deleted_count=deleted,
+            missing_count=len(normalized_ids) - len(deleted_asset_ids),
             asset_ids=normalized_ids,
         )
 
-    def history(self, project_id: str, asset_id: str) -> list[AnnotationRevision]:
+    def history(
+        self,
+        project_id: str,
+        asset_id: str,
+        channel: AnnotationChannel | None = None,
+        language: str = "",
+    ) -> list[AnnotationRevision]:
+        if channel is None:
+            if language:
+                raise ValueError("未指定标注通道时不能指定语言。")
+        else:
+            language = self._channel_language(channel, language)
         paths, _ = self._workspaces.get(project_id)
         self._asset(paths.database, asset_id)
-        connection = connect(paths.database)
-        try:
-            rows = connection.execute(
-                """
-                SELECT id, source, validation_status, created_at, content
-                FROM annotation_revisions
-                WHERE asset_id = ?
-                ORDER BY created_at DESC, rowid DESC
-                """,
-                (asset_id,),
-            ).fetchall()
-            return [AnnotationRevision.model_validate(dict(row)) for row in rows]
-        finally:
-            connection.close()
+        repository = AnnotationRepository(paths.database)
+        revisions: list[AnnotationRevision] = []
+        for row in repository.history_rows(asset_id, channel, language):
+            revision_id = str(row["id"])
+            content_kind = AnnotationContentKind(str(row["content_kind"]))
+            revisions.append(
+                AnnotationRevision(
+                    id=revision_id,
+                    document_id=str(row["document_id"]),
+                    channel=AnnotationChannel(str(row["channel"])),
+                    language=str(row["language"]) or None,
+                    source=str(row["source"]),
+                    validation_status=AnnotationStatus(str(row["validation_status"])),
+                    created_at=str(row["created_at"]),
+                    content=(
+                        repository.revision_text(revision_id)
+                        if content_kind == AnnotationContentKind.TEXT
+                        else self.render_tags(repository.revision_tags(revision_id))
+                    ),
+                    tags=(
+                        repository.revision_tags(revision_id)
+                        if content_kind == AnnotationContentKind.TAGS
+                        else []
+                    ),
+                    is_tombstone=bool(row["is_tombstone"]),
+                    is_candidate=bool(row["is_candidate"]),
+                    image_content_hash=str(row["image_content_hash"]),
+                    source_job_item_id=(
+                        str(row["source_job_item_id"]) if row["source_job_item_id"] else None
+                    ),
+                )
+            )
+        return revisions
+
+    def confirmed_tags(
+        self,
+        project_id: str,
+        asset_id: str,
+    ) -> tuple[str, list[AnnotationTag]] | None:
+        paths, _ = self._workspaces.get(project_id)
+        self._asset(paths.database, asset_id)
+        repository = AnnotationRepository(paths.database)
+        revision_id = repository.confirmed_revision_id(
+            asset_id,
+            AnnotationChannel.TAGS,
+            require_current_image=True,
+        )
+        if revision_id is None:
+            return None
+        return revision_id, repository.revision_tags(revision_id)
+
+    def revision_tags(self, project_id: str, revision_id: str) -> list[AnnotationTag]:
+        paths, _ = self._workspaces.get(project_id)
+        return AnnotationRepository(paths.database).revision_tags(revision_id)
+
+    def head_revision_id(
+        self,
+        project_id: str,
+        asset_id: str,
+        channel: AnnotationChannel,
+        language: str = "",
+    ) -> str | None:
+        language = self._channel_language(channel, language)
+        paths, _ = self._workspaces.get(project_id)
+        self._asset(paths.database, asset_id)
+        return AnnotationRepository(paths.database).head_revision_id(asset_id, channel, language)
 
     @staticmethod
-    def _insert_revision(
-        connection,
-        asset_id: str,
-        content: str,
-        *,
-        source: str,
-        validation: ValidationResult,
-    ) -> None:
-        connection.execute(
-            """
-            INSERT INTO annotation_revisions (
-                id, asset_id, content, source, validation_status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                str(uuid.uuid4()),
-                asset_id,
-                content,
-                source,
-                validation.status.value,
-                utc_now_iso(),
+    def tags_from_content(content: str, *, origin: str) -> list[AnnotationTag]:
+        return AnnotationService._normalize_tags(
+            [
+                AnnotationTag(name=value.strip(), origin=origin)
+                for value in content.replace("\n", ",").split(",")
+                if value.strip()
+            ]
+        )
+
+    @staticmethod
+    def render_tags(tags: Sequence[AnnotationTag]) -> str:
+        return ", ".join(tag.name for tag in tags)
+
+    @staticmethod
+    def _normalize_tags(tags: Sequence[AnnotationTag]) -> list[AnnotationTag]:
+        normalized: list[AnnotationTag] = []
+        seen: set[str] = set()
+        for tag in tags:
+            key = tag.name.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            normalized.append(tag)
+        return normalized
+
+    def _document(self, repository: AnnotationRepository, row) -> AnnotationDocument:
+        channel = AnnotationChannel(str(row["channel"]))
+        kind = AnnotationContentKind(str(row["content_kind"]))
+        head_revision_id = str(row["head_revision_id"]) if row["head_revision_id"] else None
+        confirmed_revision_id = (
+            str(row["confirmed_revision_id"]) if row["confirmed_revision_id"] else None
+        )
+        tombstone = bool(row["is_tombstone"]) if row["is_tombstone"] is not None else False
+        exists = bool(head_revision_id and not tombstone)
+        content = ""
+        tags: list[AnnotationTag] = []
+        if exists and head_revision_id:
+            if kind == AnnotationContentKind.TEXT:
+                content = repository.revision_text(head_revision_id)
+            else:
+                tags = repository.revision_tags(head_revision_id)
+                content = self.render_tags(tags)
+
+        validation_status = (
+            AnnotationStatus(str(row["validation_status"]))
+            if row["validation_status"] is not None
+            else None
+        )
+        stale = bool(
+            exists
+            and row["image_content_hash"]
+            and str(row["image_content_hash"]) != str(row["current_image_hash"])
+        )
+        if not exists:
+            review_status = AnnotationReviewStatus.MISSING
+        elif stale:
+            review_status = AnnotationReviewStatus.STALE
+        elif confirmed_revision_id == head_revision_id:
+            review_status = AnnotationReviewStatus.CONFIRMED
+        else:
+            review_status = AnnotationReviewStatus.UNREVIEWED
+        invalid_statuses = {
+            AnnotationStatus.INVALID,
+            AnnotationStatus.ENCODING_ERROR,
+            AnnotationStatus.EMPTY,
+        }
+        compatibility_status = (
+            AnnotationStatus.MISSING
+            if not exists
+            else validation_status
+            if validation_status in invalid_statuses
+            else AnnotationStatus.MANUALLY_ACCEPTED
+            if review_status == AnnotationReviewStatus.CONFIRMED
+            else validation_status or AnnotationStatus.UNCHECKED
+        )
+        validation: ValidationResult | None = None
+        if exists:
+            validation = (
+                ValidationResult(
+                    valid=False,
+                    status=AnnotationStatus.ENCODING_ERROR,
+                    issues=[
+                        ValidationIssue(
+                            code="invalid_encoding",
+                            message="旧 TXT 不是有效的 UTF-8；请人工修复后再确认。",
+                        )
+                    ],
+                )
+                if validation_status == AnnotationStatus.ENCODING_ERROR
+                else validate_tag_balance(content)
+                if kind == AnnotationContentKind.TEXT
+                else ValidationResult(
+                    valid=bool(tags),
+                    status=validation_status or AnnotationStatus.UNCHECKED,
+                    tag_count=len(tags),
+                )
+            )
+        return AnnotationDocument(
+            asset_id=str(row["asset_id"]),
+            document_id=str(row["id"]),
+            channel=channel,
+            language=str(row["language"]) or None,
+            display_name=str(row["display_name"]),
+            content_kind=kind,
+            path=self._database_path_label(channel, str(row["language"])),
+            exists=exists,
+            content=content,
+            tags=tags,
+            status=compatibility_status,
+            review_status=review_status,
+            validation=validation,
+            validation_status=validation_status,
+            modified_at=head_revision_id,
+            head_revision_id=head_revision_id,
+            confirmed_revision_id=confirmed_revision_id,
+            image_content_hash=(
+                str(row["image_content_hash"]) if row["image_content_hash"] else None
             ),
+            current_image_hash=str(row["current_image_hash"]),
+            source=str(row["source"]) if row["source"] else None,
+            updated_at=str(row["updated_at"]),
         )
 
     @staticmethod
-    def _update_annotation_status(
-        connection,
-        asset_id: str,
-        status: str,
-        modified_ns: int | None,
-    ) -> None:
-        connection.execute(
-            """
-            UPDATE assets
-            SET annotation_status = ?, annotation_modified_ns = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (status, modified_ns, utc_now_iso(), asset_id),
-        )
+    def _database_path_label(channel: AnnotationChannel, language: str) -> str:
+        suffix = f":{language}" if language else ""
+        return f"数据库 · {channel.value}{suffix}"
+
+    @staticmethod
+    def _channel_language(channel: AnnotationChannel, language: str) -> str:
+        if channel == AnnotationChannel.TRANSLATION:
+            if not language:
+                raise ValueError("翻译标注通道必须指定语言。")
+            try:
+                return normalize_language_code(language)
+            except ValueError as error:
+                raise ValueError("翻译标注通道的语言代码无效。") from error
+        if language:
+            raise ValueError("只有翻译标注通道可以指定语言。")
+        return ""
 
     @staticmethod
     def _asset(database_path: Path, asset_id: str):
@@ -562,38 +587,3 @@ class AnnotationService:
         if asset is None:
             raise AssetNotFoundError(f"找不到素材：{asset_id}")
         return asset
-
-    @staticmethod
-    def _annotation_path(root: Path, asset) -> Path:
-        workspace_root = root.resolve()
-        candidate = workspace_root / str(asset["annotation_relative_path"])
-        if candidate.is_symlink():
-            raise ValueError("标注文件不能是符号链接。")
-        path = candidate.resolve()
-        if not path.is_relative_to(workspace_root):
-            raise AssetNotFoundError("标注路径超出当前工作区。")
-        return path
-
-    @staticmethod
-    def _path_key(path: Path) -> str:
-        return filesystem_path_key(path)
-
-    @staticmethod
-    def _annotation_owner_ids(
-        database_path: Path,
-        annotation_relative_path: str,
-    ) -> tuple[str, ...]:
-        connection = connect(database_path)
-        try:
-            rows = connection.execute(
-                """
-                SELECT id
-                FROM assets
-                WHERE is_present = 1 AND annotation_relative_path = ?
-                ORDER BY relative_path COLLATE NOCASE
-                """,
-                (annotation_relative_path,),
-            ).fetchall()
-            return tuple(str(row["id"]) for row in rows)
-        finally:
-            connection.close()

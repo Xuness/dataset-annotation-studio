@@ -184,7 +184,7 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
             json={"content": "<caption>stale</caption>", "expected_modified_at": None},
         )
         assert stale_annotation.status_code == 409
-        assert "其他操作修改" in stale_annotation.json()["detail"]
+        assert "版本已经变化" in stale_annotation.json()["detail"]
         batch_deleted = client.post(
             f"/api/v1/workspaces/{project_id}/annotations/delete",
             json={"asset_ids": [asset_id]},

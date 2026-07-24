@@ -7,6 +7,8 @@ from typing import Literal
 from pydantic import BaseModel
 
 from dataset_studio.core.sqlite import connect
+from dataset_studio.modules.annotations.models import AnnotationChannel
+from dataset_studio.modules.annotations.repository import AnnotationRepository
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
@@ -93,39 +95,47 @@ class AnnotationTraceService:
 
     def get(self, project_id: str, asset_id: str) -> AssetAnnotationTrace | None:
         paths, _ = self._workspaces.get(project_id)
-        annotation = self._annotations.get(project_id, asset_id)
         metadata = self._assets.metadata(project_id, asset_id)
         rows = self._attempt_rows(paths.database, asset_id)
         if not rows:
             return None
 
-        annotation_source = (
-            self._annotation_source(
-                paths.database,
+        candidates: list[AssetAnnotationTrace] = []
+        annotation_repository = AnnotationRepository(paths.database)
+        tag_names_by_revision: dict[str, list[str]] = {}
+        for row in rows:
+            channel = AnnotationChannel(
+                _string(row.get("output_channel")) or AnnotationChannel.DESCRIPTION.value
+            )
+            annotation = self._annotations.get_channel(
+                project_id,
                 asset_id,
-                annotation.content,
+                channel,
             )
-            if annotation.exists
-            else None
+            tag_revision_id = _string(row.get("tag_context_revision_id"))
+            if tag_revision_id and tag_revision_id not in tag_names_by_revision:
+                tag_names_by_revision[tag_revision_id] = annotation_repository.tag_names(
+                    tag_revision_id
+                )
+            candidates.append(
+                self._build_trace(
+                    paths,
+                    row,
+                    annotation_exists=annotation.exists,
+                    annotation_content=annotation.content,
+                    annotation_source=annotation.source if annotation.exists else None,
+                    metadata=metadata.value if metadata.exists and not metadata.error else None,
+                    auxiliary_tags=(
+                        tag_names_by_revision.get(tag_revision_id, []) if tag_revision_id else []
+                    ),
+                )
+            )
+        matching = next(
+            (candidate for candidate in candidates if candidate.matches_current_annotation),
+            None,
         )
-        candidates = [
-            self._build_trace(
-                paths,
-                row,
-                annotation_exists=annotation.exists,
-                annotation_content=annotation.content,
-                annotation_source=annotation_source,
-                metadata=metadata.value if metadata.exists and not metadata.error else None,
-            )
-            for row in rows
-        ]
-        if annotation.exists:
-            matching = next(
-                (candidate for candidate in candidates if candidate.matches_current_annotation),
-                None,
-            )
-            if matching is not None:
-                return matching
+        if matching is not None:
+            return matching
         return candidates[0]
 
     @staticmethod
@@ -143,9 +153,16 @@ class AnnotationTraceService:
                     j.provider_snapshot,
                     j.execution_backend,
                     j.execution_snapshot,
+                    j.output_channel,
                     ji.id AS item_id,
                     ji.status AS item_status,
                     ji.asset_id,
+                    (
+                        SELECT input.revision_id
+                        FROM job_item_annotation_inputs input
+                        WHERE input.job_item_id = ji.id
+                          AND input.role = 'tag_context'
+                    ) AS tag_context_revision_id,
                     ja.id AS attempt_id,
                     ja.attempt_number,
                     ja.status AS attempt_status,
@@ -173,28 +190,6 @@ class AnnotationTraceService:
         finally:
             connection.close()
 
-    @staticmethod
-    def _annotation_source(
-        database_path: Path,
-        asset_id: str,
-        content: str,
-    ) -> str | None:
-        connection = connect(database_path)
-        try:
-            row = connection.execute(
-                """
-                SELECT source
-                FROM annotation_revisions
-                WHERE asset_id = ? AND content = ?
-                ORDER BY created_at DESC, rowid DESC
-                LIMIT 1
-                """,
-                (asset_id, content),
-            ).fetchone()
-            return str(row["source"]) if row is not None else "external"
-        finally:
-            connection.close()
-
     def _build_trace(
         self,
         paths: WorkspacePaths,
@@ -204,6 +199,7 @@ class AnnotationTraceService:
         annotation_content: str,
         annotation_source: str | None,
         metadata: object,
+        auxiliary_tags: list[str],
     ) -> AssetAnnotationTrace:
         artifact = self._load_artifact(paths, row)
         execution_backend = _string(row.get("execution_backend")) or "provider"
@@ -231,6 +227,7 @@ class AnnotationTraceService:
                 _string(row.get("user_prompt_snapshot")) or "",
                 metadata,
                 [str(field) for field in selected_fields],
+                auxiliary_tags,
             )
             request_source = "reconstructed"
 

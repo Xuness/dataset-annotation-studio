@@ -81,6 +81,7 @@ def compose_user_prompt(
     user_prompt: str,
     metadata: object | None,
     selected_fields: Iterable[str],
+    auxiliary_tags: Iterable[str] = (),
 ) -> str:
     lines: list[str] = []
     if metadata is not None:
@@ -88,6 +89,11 @@ def compose_user_prompt(
             found, value = _resolve_path(metadata, field)
             if found:
                 lines.append(f"{field}: {_format_value(value)}")
+    tags = [str(tag) for tag in auxiliary_tags]
+    if tags:
+        lines.append(
+            "confirmed_tags: " + json.dumps(tags, ensure_ascii=False, separators=(",", ":"))
+        )
 
     body = user_prompt.rstrip()
     if not lines:

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import pytest
@@ -8,22 +7,17 @@ from PIL import Image
 from dataset_studio.api.app import create_app
 from dataset_studio.core.config import Settings
 from dataset_studio.core.errors import ResourceConflictError
-from dataset_studio.modules.annotations.service import (
-    AnnotationBatchRollbackError,
-    AnnotationService,
-    GeneratedAnnotation,
-)
-from dataset_studio.modules.annotations.text import AnnotationEncodingError
+from dataset_studio.core.sqlite import connect
+from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationTag
+from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.assets.service import AssetService
-from dataset_studio.modules.jobs.models import JobScope
-from dataset_studio.modules.jobs.service import JobService
 from dataset_studio.modules.output_resources import (
     OutputResourceClaim,
-    annotation_output_resource_key,
+    annotation_document_resource_key,
     hold_output_resources,
 )
-from dataset_studio.modules.statistics.service import StatisticsService
+from dataset_studio.modules.translations.models import TranslationStatus
 from dataset_studio.modules.translations.service import TranslationService
 from dataset_studio.modules.workspaces.paths import WorkspacePaths
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
@@ -60,6 +54,7 @@ def test_workspace_is_portable_and_scans_recursive_assets(tmp_path: Path) -> Non
     listed = assets.list_assets(summary.project_id)
     assert [item.relative_path for item in listed.items] == ["first.png", "nested/second.webp"]
     assert listed.items[0].metadata_relative_path == "first.json"
+    assert listed.items[0].annotation_channels["existing_annotation"] == "confirmed"
 
     moved = tmp_path / "Style" / "MovedExample"
     moved.parent.mkdir()
@@ -117,30 +112,77 @@ def test_remove_recent_clears_idle_worker_candidates(tmp_path: Path) -> None:
     assert (project / "sample.png").is_file()
 
 
-def test_annotation_save_delete_and_history(tmp_path: Path) -> None:
+def test_annotation_channels_save_confirm_delete_and_keep_history_in_database(
+    tmp_path: Path,
+) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
     _write_image(project / "image.jpg")
     summary, _ = workspaces.open(str(project))
     asset = assets.list_assets(summary.project_id).items[0]
 
-    saved = annotations.save(summary.project_id, asset.id, "<root>text</root>")
-    assert saved.exists is True
-    assert (project / "image.txt").read_text(encoding="utf-8") == "<root>text</root>"
-
-    deleted = annotations.delete(summary.project_id, asset.id)
-    assert deleted.exists is False
+    description = annotations.save_text(
+        summary.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<root>text</root>",
+    )
+    assert description.document.review_status.value == "unreviewed"
     assert not (project / "image.txt").exists()
-    history = annotations.history(summary.project_id, asset.id)
-    assert [revision.source for revision in history] == [
-        "deleted_snapshot",
-        "manual_edit",
-    ]
+    confirmed = annotations.confirm(
+        summary.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        description.revision_id,
+    )
+    assert confirmed.review_status.value == "confirmed"
+
+    tags = annotations.save_tags(
+        summary.project_id,
+        asset.id,
+        [
+            AnnotationTag(
+                name="blue_hair",
+                category="general",
+                confidence=0.92,
+                origin="local_tagger",
+            ),
+            AnnotationTag(name="alice", category="character", origin="manual"),
+        ],
+        confirm=True,
+    )
+    assert [tag.name for tag in tags.document.tags] == ["blue_hair", "alice"]
+    assert tags.document.tags[0].confidence == 0.92
+
+    bundle = annotations.list(summary.project_id, asset.id)
+    assert {document.channel: document.review_status.value for document in bundle.documents} == {
+        AnnotationChannel.TAGS: "confirmed",
+        AnnotationChannel.DESCRIPTION: "confirmed",
+    }
+
+    deleted = annotations.delete(
+        summary.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+    )
+    assert deleted.exists is False
+    assert annotations.get_channel(
+        summary.project_id,
+        asset.id,
+        AnnotationChannel.TAGS,
+    ).exists
+    history = annotations.history(
+        summary.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+    )
+    assert [revision.source for revision in history] == ["manual_delete", "manual_edit"]
+    assert history[0].is_tombstone
 
 
-def test_scan_preserves_annotation_written_after_scan_snapshot(
+def test_scan_preserves_database_annotation_written_after_scan_snapshot(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
@@ -154,37 +196,58 @@ def test_scan_preserves_annotation_written_after_scan_snapshot(
         nonlocal interleaved
         if not interleaved:
             interleaved = True
-            annotations.save(summary.project_id, asset.id, "<caption>new</caption>")
+            annotations.save_text(
+                summary.project_id,
+                asset.id,
+                AnnotationChannel.DESCRIPTION,
+                "<caption>new</caption>",
+            )
         return original_replace_scan(repository, records, present_ids, annotation_baseline)
 
     monkeypatch.setattr(AssetRepository, "replace_scan", replace_after_concurrent_save)
     workspaces.rescan(summary.project_id)
 
-    current = assets.list_assets(summary.project_id).items[0]
-    assert current.annotation_status.value == "valid"
-    assert (project / "image.txt").read_text(encoding="utf-8") == "<caption>new</caption>"
+    current = annotations.get_channel(
+        summary.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+    )
+    assert current.content == "<caption>new</caption>"
+    assert current.review_status.value == "unreviewed"
+    assert not (project / "image.txt").exists()
 
 
-def test_invalid_utf8_annotation_is_visible_and_not_used_for_translation(tmp_path: Path) -> None:
+def test_invalid_utf8_legacy_annotation_is_visible_but_not_a_translation_source(
+    tmp_path: Path,
+) -> None:
     workspaces, assets, annotations = _services(tmp_path)
-    translations = TranslationService(workspaces)
+    translations = TranslationService(workspaces, annotations)
     project = tmp_path / "dataset"
     _write_image(project / "image.png")
     (project / "image.txt").write_bytes(b"plain-text-\xff")
 
     summary, _ = workspaces.open(str(project))
     asset = assets.list_assets(summary.project_id).items[0]
-    document = annotations.get(summary.project_id, asset.id)
+    document = annotations.get_channel(
+        summary.project_id,
+        asset.id,
+        AnnotationChannel.EXISTING,
+    )
 
     assert asset.annotation_status.value == "encoding_error"
     assert document.status.value == "encoding_error"
+    assert document.review_status.value == "confirmed"
     assert document.validation is not None
     assert document.validation.issues[0].code == "invalid_encoding"
     translation = translations.get(summary.project_id, asset.id, "zh-CN")
-    assert translation.status.value == "source_invalid"
-    assert translation.issue == "源标注不是有效的 UTF-8，修复编码后才能生成译文。"
-    with pytest.raises(AnnotationEncodingError, match="UTF-8"):
-        translations.read_source(summary.project_id, asset.id)
+    assert translation.status == TranslationStatus.SOURCE_INVALID
+    review = assets.list_assets(
+        summary.project_id,
+        annotation_status="needs_review",
+    )
+    assert [item.id for item in review.items] == [asset.id]
+    assert translation.issue and "UTF-8" in translation.issue
+    assert translations.read_source(summary.project_id, asset.id) is None
 
 
 def test_workspace_scan_skips_broken_images_and_reports_them(tmp_path: Path) -> None:
@@ -203,370 +266,321 @@ def test_workspace_scan_skips_broken_images_and_reports_them(tmp_path: Path) -> 
     assert [item.filename for item in assets.list_assets(summary.project_id).items] == ["valid.png"]
 
 
-def test_moved_asset_keeps_manually_accepted_annotation_status(tmp_path: Path) -> None:
+def test_moved_asset_keeps_confirmed_database_annotation_status(tmp_path: Path) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
     _write_image(project / "before.png")
     summary, _ = workspaces.open(str(project))
     asset = assets.list_assets(summary.project_id).items[0]
-    annotations.save_generated(
+    annotations.save_text(
         summary.project_id,
         asset.id,
+        AnnotationChannel.DESCRIPTION,
         "<caption>accepted despite review</caption>",
-        manually_accepted=True,
+        confirm=True,
     )
 
     (project / "before.png").rename(project / "after.png")
-    (project / "before.txt").rename(project / "after.txt")
     workspaces.rescan(summary.project_id)
 
     moved = assets.list_assets(summary.project_id).items[0]
     assert moved.id == asset.id
     assert moved.relative_path == "after.png"
     assert moved.annotation_status.value == "manually_accepted"
+    assert moved.annotation_channels["description"] == "confirmed"
 
 
-def test_annotation_save_failure_restores_exact_previous_file(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
+def test_legacy_txt_import_is_one_time_and_preserves_the_source_file(tmp_path: Path) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
-    _write_image(project / "image.png")
-    summary, _ = workspaces.open(str(project))
-    asset = assets.list_assets(summary.project_id).items[0]
-    annotations.save_generated(
-        summary.project_id,
+    _write_image(project / "sample.png")
+    source_file = project / "sample.txt"
+    source_file.write_text("<caption>imported</caption>", encoding="utf-8")
+
+    workspace, _ = workspaces.open(str(project))
+    asset = assets.list_assets(workspace.project_id).items[0]
+    imported = annotations.get_channel(
+        workspace.project_id,
         asset.id,
-        "<caption>previous</caption>",
-        manually_accepted=True,
+        AnnotationChannel.EXISTING,
     )
-    annotation_path = project / "image.txt"
-    previous_bytes = annotation_path.read_bytes()
-    previous_modified_ns = annotation_path.stat().st_mtime_ns
+    assert imported.content == "<caption>imported</caption>"
+    assert imported.review_status.value == "confirmed"
 
-    def fail_revision(*_args, **_kwargs):
-        raise RuntimeError("simulated revision failure")
+    paths, _ = workspaces.get(workspace.project_id)
+    assert list(paths.history.glob("pre-annotation-store-v2-*.sqlite3"))
+    connection = connect(paths.database)
+    try:
+        state = connection.execute("SELECT * FROM annotation_store_state").fetchone()
+        imports = connection.execute("SELECT COUNT(*) FROM legacy_annotation_imports").fetchone()[0]
+    finally:
+        connection.close()
+    assert state is not None and state["mode"] == "database"
+    assert imports == 1
 
-    monkeypatch.setattr(annotations, "_insert_revision", fail_revision)
-    with pytest.raises(RuntimeError, match="simulated revision failure"):
-        annotations.save(summary.project_id, asset.id, "<caption>replacement</caption>")
+    source_file.write_text("<caption>external change</caption>", encoding="utf-8")
+    workspaces.rescan(workspace.project_id)
+    reopened, _ = workspaces.open(str(project))
+    assert reopened.project_id == workspace.project_id
+    assert (
+        annotations.get_channel(
+            workspace.project_id,
+            asset.id,
+            AnnotationChannel.EXISTING,
+        ).content
+        == "<caption>imported</caption>"
+    )
+    assert source_file.read_text(encoding="utf-8") == "<caption>external change</caption>"
 
-    assert annotation_path.read_bytes() == previous_bytes
-    assert annotation_path.stat().st_mtime_ns == previous_modified_ns
-    assert annotations.get(summary.project_id, asset.id).status.value == "manually_accepted"
 
-
-def test_annotation_batch_failure_rolls_back_every_file_and_revision(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
+def test_legacy_translation_language_is_canonicalized_once(tmp_path: Path) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
-    _write_image(project / "first.png")
-    _write_image(project / "second.png")
-    summary, _ = workspaces.open(str(project))
-    indexed = assets.list_assets(summary.project_id).items
-    first = next(item for item in indexed if item.filename == "first.png")
-    second = next(item for item in indexed if item.filename == "second.png")
-    annotations.save_generated(
-        summary.project_id,
-        first.id,
-        "<caption>previous</caption>",
-        manually_accepted=True,
-    )
-    previous_bytes = (project / "first.txt").read_bytes()
-    original_insert = annotations._insert_revision
-    insert_count = 0
+    _write_image(project / "sample.png")
+    (project / "sample.txt").write_text("<caption>source</caption>", encoding="utf-8")
+    (project / "sample.zh-cn.txt").write_text("<caption>译文</caption>", encoding="utf-8")
 
-    def fail_second_revision(*args, **kwargs):
-        nonlocal insert_count
-        insert_count += 1
-        if insert_count == 2:
-            raise RuntimeError("simulated batch revision failure")
-        return original_insert(*args, **kwargs)
-
-    monkeypatch.setattr(annotations, "_insert_revision", fail_second_revision)
-    with pytest.raises(RuntimeError, match="simulated batch revision failure"):
-        annotations.save_generated_batch(
-            summary.project_id,
-            [
-                GeneratedAnnotation(first.id, "<caption>replacement</caption>"),
-                GeneratedAnnotation(second.id, "<caption>new</caption>"),
-            ],
-        )
-
-    assert (project / "first.txt").read_bytes() == previous_bytes
-    assert not (project / "second.txt").exists()
-    assert len(annotations.history(summary.project_id, first.id)) == 1
-    assert annotations.history(summary.project_id, second.id) == []
-
-
-def test_annotation_batch_reports_incomplete_file_rollback(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    workspaces, assets, annotations = _services(tmp_path)
-    project = tmp_path / "dataset"
-    _write_image(project / "image.png")
-    summary, _ = workspaces.open(str(project))
-    asset = assets.list_assets(summary.project_id).items[0]
-    annotations.save_generated(
-        summary.project_id,
+    workspace, _ = workspaces.open(str(project))
+    asset = assets.list_assets(workspace.project_id).items[0]
+    translation = annotations.get_channel(
+        workspace.project_id,
         asset.id,
-        "<caption>previous</caption>",
+        AnnotationChannel.TRANSLATION,
+        "zh-CN",
     )
 
-    def fail_revision(*_args, **_kwargs):
-        raise RuntimeError("simulated database failure")
-
-    original_replace = os.replace
-
-    def fail_restore(source, target):
-        if Path(source).suffix == ".backup" and Path(target) == project / "image.txt":
-            raise OSError("simulated rollback failure")
-        return original_replace(source, target)
-
-    monkeypatch.setattr(annotations, "_insert_revision", fail_revision)
-    monkeypatch.setattr(
-        "dataset_studio.modules.annotations.service.os.replace",
-        fail_restore,
-    )
-
-    with pytest.raises(AnnotationBatchRollbackError, match="无法回滚"):
-        annotations.save_generated_batch(
-            summary.project_id,
-            [GeneratedAnnotation(asset.id, "<caption>replacement</caption>")],
-        )
+    assert translation.exists
+    assert translation.language == "zh-CN"
+    assert translation.content == "<caption>译文</caption>"
+    assert [
+        document.language
+        for document in annotations.list(workspace.project_id, asset.id).documents
+        if document.channel == AnnotationChannel.TRANSLATION
+    ] == ["zh-CN"]
 
 
-def test_annotation_delete_failure_restores_file(tmp_path: Path, monkeypatch) -> None:
+def test_legacy_translation_discovery_treats_image_stem_as_literal(tmp_path: Path) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
-    _write_image(project / "image.png")
-    summary, _ = workspaces.open(str(project))
-    asset = assets.list_assets(summary.project_id).items[0]
-    annotations.save(summary.project_id, asset.id, "<caption>keep me</caption>")
+    _write_image(project / "sample[1].png")
+    (project / "sample[1].zh-cn.txt").write_text("<caption>正确译文</caption>", encoding="utf-8")
+    (project / "sample1.zh-cn.txt").write_text("<caption>错误匹配</caption>", encoding="utf-8")
 
-    def fail_status_update(*_args, **_kwargs):
-        raise RuntimeError("simulated status failure")
-
-    monkeypatch.setattr(annotations, "_update_annotation_status", fail_status_update)
-    with pytest.raises(RuntimeError, match="simulated status failure"):
-        annotations.delete(summary.project_id, asset.id)
-
-    assert (project / "image.txt").read_text(encoding="utf-8") == "<caption>keep me</caption>"
-
-
-def test_annotation_batch_delete_is_atomic(tmp_path: Path, monkeypatch) -> None:
-    workspaces, assets, annotations = _services(tmp_path)
-    project = tmp_path / "dataset"
-    _write_image(project / "first.png")
-    _write_image(project / "second.png")
-    (project / "first.txt").write_text("<caption>first</caption>", encoding="utf-8")
-    (project / "second.txt").write_text("<caption>second</caption>", encoding="utf-8")
-    summary, _ = workspaces.open(str(project))
-    indexed = assets.list_assets(summary.project_id).items
-    original_update = annotations._update_annotation_status
-    update_count = 0
-
-    def fail_second_update(*args, **kwargs):
-        nonlocal update_count
-        update_count += 1
-        if update_count == 2:
-            raise RuntimeError("simulated batch delete failure")
-        return original_update(*args, **kwargs)
-
-    monkeypatch.setattr(annotations, "_update_annotation_status", fail_second_update)
-    with pytest.raises(RuntimeError, match="simulated batch delete failure"):
-        annotations.delete_many(summary.project_id, [item.id for item in indexed])
-
-    assert (project / "first.txt").read_text(encoding="utf-8") == "<caption>first</caption>"
-    assert (project / "second.txt").read_text(encoding="utf-8") == "<caption>second</caption>"
-    assert all(
-        item.annotation_status.value == "valid"
-        for item in assets.list_assets(summary.project_id).items
+    workspace, _ = workspaces.open(str(project))
+    asset = assets.list_assets(workspace.project_id).items[0]
+    translation = annotations.get_channel(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.TRANSLATION,
+        "zh-CN",
     )
 
+    assert translation.exists
+    assert translation.content == "<caption>正确译文</caption>"
 
-def test_annotation_delete_requires_all_owners_of_shared_sidecar(tmp_path: Path) -> None:
+
+def test_same_stem_assets_have_independent_database_channels(tmp_path: Path) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
     _write_image(project / "same.jpg")
     _write_image(project / "same.png", (90, 130))
-    (project / "same.txt").write_text("<caption>shared</caption>", encoding="utf-8")
+    sidecar = project / "same.txt"
+    sidecar.write_text("<caption>legacy shared</caption>", encoding="utf-8")
     summary, _ = workspaces.open(str(project))
     indexed = assets.list_assets(summary.project_id).items
 
-    with pytest.raises(ValueError, match="共享同一个标注文件"):
-        annotations.delete_many(summary.project_id, [indexed[0].id])
-
-    result = annotations.delete_many(summary.project_id, [item.id for item in indexed])
-
-    assert result.deleted_count == 2
-    assert result.missing_count == 0
-    assert not (project / "same.txt").exists()
-    assert all(
-        item.annotation_status.value == "missing"
-        for item in assets.list_assets(summary.project_id).items
-    )
-
-
-def test_shared_sidecar_manual_save_updates_every_owner_and_blocks_generation(
-    tmp_path: Path,
-) -> None:
-    workspaces, assets, annotations = _services(tmp_path)
-    project = tmp_path / "dataset"
-    _write_image(project / "same.jpg")
-    _write_image(project / "same.png", (90, 130))
-    summary, _ = workspaces.open(str(project))
-    indexed = assets.list_assets(summary.project_id).items
-
-    saved = annotations.save(
+    first = annotations.save_text(
         summary.project_id,
         indexed[0].id,
-        "<caption>shared</caption>",
-        expected_modified_at=None,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>first only</caption>",
+        confirm=True,
     )
-
-    assert saved.exists
-    assert all(
-        annotations.get(summary.project_id, item.id).content == "<caption>shared</caption>"
-        for item in indexed
-    )
-    assert all(len(annotations.history(summary.project_id, item.id)) == 1 for item in indexed)
-    assert StatisticsService(workspaces).tag_frequency(summary.project_id).document_count == 1
-    with pytest.raises(ValueError, match="共享同一个 TXT"):
-        annotations.save_generated(
-            summary.project_id,
-            indexed[0].id,
-            "<caption>generated</caption>",
-        )
-    with pytest.raises(ValueError, match="共享同一个标注文件"):
-        annotations.save_generated_batch(
-            summary.project_id,
-            [
-                GeneratedAnnotation(indexed[0].id, "<caption>first</caption>"),
-                GeneratedAnnotation(indexed[1].id, "<caption>second</caption>"),
-            ],
-        )
-    paths, _ = workspaces.get(summary.project_id)
-    with pytest.raises(ValueError, match="共享同一个 TXT"):
-        JobService._select_annotation_assets(
-            paths.database,
-            JobScope.ALL,
-            [],
-            overwrite_existing=True,
-        )
-
-
-def test_missing_shared_sidecar_reconciles_every_owner_on_delete(tmp_path: Path) -> None:
-    workspaces, assets, annotations = _services(tmp_path)
-    project = tmp_path / "dataset"
-    _write_image(project / "same.jpg")
-    _write_image(project / "same.png", (90, 130))
-    (project / "same.txt").write_text("<caption>shared</caption>", encoding="utf-8")
-    summary, _ = workspaces.open(str(project))
-    indexed = assets.list_assets(summary.project_id).items
-    (project / "same.txt").unlink()
-
-    result = annotations.delete_many(summary.project_id, [indexed[0].id])
-
-    assert result.deleted_count == 0
-    assert result.missing_count == 1
-    assert all(
-        item.annotation_status.value == "missing"
-        for item in assets.list_assets(summary.project_id).items
-    )
-
-
-def test_annotation_save_rejects_a_stale_editor_version(tmp_path: Path) -> None:
-    workspaces, assets, annotations = _services(tmp_path)
-    project = tmp_path / "dataset"
-    _write_image(project / "sample.png")
-    summary, _ = workspaces.open(str(project))
-    asset = assets.list_assets(summary.project_id).items[0]
-    initial = annotations.save(
+    second = annotations.get_channel(
         summary.project_id,
-        asset.id,
-        "<caption>initial</caption>",
-        expected_modified_at=None,
+        indexed[1].id,
+        AnnotationChannel.DESCRIPTION,
     )
-    (project / "sample.txt").write_text("<caption>external</caption>", encoding="utf-8")
+    assert first.document.content == "<caption>first only</caption>"
+    assert not second.exists
 
-    with pytest.raises(ResourceConflictError, match="任务执行期间"):
-        annotations.save_generated_batch(
-            summary.project_id,
-            [
-                GeneratedAnnotation(
-                    asset.id,
-                    "<caption>stale model output</caption>",
-                    expected_modified_at=initial.modified_at,
-                )
-            ],
-        )
-    with pytest.raises(ResourceConflictError, match="其他操作修改"):
-        annotations.save(
-            summary.project_id,
+    annotations.delete(
+        summary.project_id,
+        indexed[0].id,
+        AnnotationChannel.EXISTING,
+    )
+    assert sidecar.read_text(encoding="utf-8") == "<caption>legacy shared</caption>"
+    assert annotations.get_channel(
+        summary.project_id,
+        indexed[1].id,
+        AnnotationChannel.EXISTING,
+    ).exists
+
+
+def test_batch_delete_reports_channels_and_assets_without_primary_annotations(
+    tmp_path: Path,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "annotated.png")
+    _write_image(project / "missing.png")
+    workspace, _ = workspaces.open(str(project))
+    indexed = assets.list_assets(workspace.project_id).items
+    by_name = {asset.filename: asset for asset in indexed}
+    annotated_id = by_name["annotated.png"].id
+    annotations.save_text(
+        workspace.project_id,
+        annotated_id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>description</caption>",
+    )
+    annotations.save_tags(
+        workspace.project_id,
+        annotated_id,
+        [AnnotationTag(name="subject", origin="manual")],
+    )
+
+    result = annotations.delete_many(
+        workspace.project_id,
+        [annotated_id, by_name["missing.png"].id],
+    )
+
+    assert result.requested_count == 2
+    assert result.deleted_count == 2
+    assert result.missing_count == 1
+
+
+def test_review_queue_tracks_unreviewed_and_stale_database_channels(
+    tmp_path: Path,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    image_path = project / "sample.png"
+    _write_image(image_path)
+    workspace, _ = workspaces.open(str(project))
+    asset = assets.list_assets(workspace.project_id).items[0]
+    tags = annotations.save_tags(
+        workspace.project_id,
+        asset.id,
+        [AnnotationTag(name="subject", origin="tagger")],
+    )
+
+    unreviewed = assets.list_assets(
+        workspace.project_id,
+        annotation_status="needs_review",
+    )
+    assert [item.id for item in unreviewed.items] == [asset.id]
+    assert unreviewed.status_counts["unreviewed"] == 1
+    assert unreviewed.status_counts["stale"] == 0
+
+    annotations.confirm(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.TAGS,
+        tags.revision_id,
+    )
+    assert (
+        assets.list_assets(
+            workspace.project_id,
+            annotation_status="needs_review",
+        ).total
+        == 0
+    )
+
+    _write_image(image_path, (130, 90))
+    workspaces.rescan(workspace.project_id)
+    stale = assets.list_assets(
+        workspace.project_id,
+        annotation_status="stale",
+    )
+    assert [item.id for item in stale.items] == [asset.id]
+    assert stale.status_counts["needs_review"] == 1
+
+    reconfirmed = annotations.confirm(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.TAGS,
+        tags.revision_id,
+    )
+    assert reconfirmed.review_status.value == "confirmed"
+    assert reconfirmed.head_revision_id != tags.revision_id
+    assert (
+        assets.list_assets(
+            workspace.project_id,
+            annotation_status="needs_review",
+        ).total
+        == 0
+    )
+    assert (
+        annotations.history(
+            workspace.project_id,
             asset.id,
-            "<caption>stale draft</caption>",
-            expected_modified_at=initial.modified_at,
-        )
+            AnnotationChannel.TAGS,
+        )[0].source
+        == "manual_reconfirm"
+    )
 
-    assert (project / "sample.txt").read_text(encoding="utf-8") == "<caption>external</caption>"
 
-
-def test_annotation_save_respects_an_active_output_resource_lease(tmp_path: Path) -> None:
+def test_annotation_save_rejects_a_stale_database_revision(tmp_path: Path) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
     _write_image(project / "sample.png")
-    summary, _ = workspaces.open(str(project))
-    asset = assets.list_assets(summary.project_id).items[0]
-    paths, _ = workspaces.get(summary.project_id)
-    claim = OutputResourceClaim(annotation_output_resource_key("sample.txt"))
+    workspace, _ = workspaces.open(str(project))
+    asset = assets.list_assets(workspace.project_id).items[0]
+
+    first = annotations.save_text(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>first</caption>",
+        expected_head_revision_id=None,
+    )
+    annotations.save_text(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>second</caption>",
+        expected_head_revision_id=first.revision_id,
+    )
+    with pytest.raises(ResourceConflictError, match="版本已经变化"):
+        annotations.save_text(
+            workspace.project_id,
+            asset.id,
+            AnnotationChannel.DESCRIPTION,
+            "<caption>stale editor</caption>",
+            expected_head_revision_id=first.revision_id,
+        )
+
+
+def test_annotation_save_respects_an_active_document_lease(tmp_path: Path) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "sample.png")
+    workspace, _ = workspaces.open(str(project))
+    asset = assets.list_assets(workspace.project_id).items[0]
+    paths, _ = workspaces.get(workspace.project_id)
+    claim = OutputResourceClaim(
+        annotation_document_resource_key(asset.id, AnnotationChannel.DESCRIPTION.value)
+    )
 
     with (
         hold_output_resources(paths.database, [claim]),
         pytest.raises(ResourceConflictError, match="写入"),
     ):
-        annotations.save(
-            summary.project_id,
+        annotations.save_text(
+            workspace.project_id,
             asset.id,
+            AnnotationChannel.DESCRIPTION,
             "<caption>blocked</caption>",
-            expected_modified_at=None,
         )
 
-    saved = annotations.save(
-        summary.project_id,
+    saved = annotations.save_text(
+        workspace.project_id,
         asset.id,
+        AnnotationChannel.DESCRIPTION,
         "<caption>after lease</caption>",
-        expected_modified_at=None,
     )
-    assert saved.content == "<caption>after lease</caption>"
-
-
-def test_annotation_read_rejects_a_sidecar_replaced_by_a_symbolic_link(
-    tmp_path: Path,
-) -> None:
-    workspaces, assets, annotations = _services(tmp_path)
-    project = tmp_path / "dataset"
-    _write_image(project / "sample.png")
-    summary, _ = workspaces.open(str(project))
-    asset = assets.list_assets(summary.project_id).items[0]
-    annotations.save(summary.project_id, asset.id, "<caption>inside</caption>")
-    annotation_path = project / "sample.txt"
-    annotation_path.unlink()
-    external = tmp_path / "external.txt"
-    external.write_text("<caption>outside</caption>", encoding="utf-8")
-    try:
-        annotation_path.symlink_to(external)
-    except OSError as error:
-        pytest.skip(f"当前环境不能创建符号链接：{error}")
-
-    with pytest.raises(ValueError, match="符号链接"):
-        annotations.get(summary.project_id, asset.id)
-
-    assert StatisticsService(workspaces).tag_frequency(summary.project_id).document_count == 0
+    assert saved.document.content == "<caption>after lease</caption>"
 
 
 def test_asset_folder_tree_and_filter_use_subtree_boundaries(tmp_path: Path) -> None:

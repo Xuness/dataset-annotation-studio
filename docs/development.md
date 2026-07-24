@@ -59,8 +59,8 @@ desired.
 - Database migrations are immutable after commit. Add a new numbered migration instead
   of editing an existing one.
 - Frontend code must not directly mutate dataset files.
-- File replacement, sidecar movement, SQLite updates, and rollback stay ordered in the
-  backend coordinator.
+- Image and legacy companion-file replacement, SQLite updates, and rollback stay ordered
+  in the backend coordinator. Annotation revisions themselves are SQLite-only.
 - Remote provider and local tagger task snapshots must remain reproducible after preset
   changes.
 - Downloaded models, local datasets, application data, logs, and build outputs must not

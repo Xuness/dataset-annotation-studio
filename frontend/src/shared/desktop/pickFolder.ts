@@ -9,7 +9,10 @@ export async function pickWorkspaceFolder(): Promise<string | null> {
 }
 
 export async function pickExportFolder(): Promise<string | null> {
-  return pickFolder("选择空的导出文件夹", "输入用于存放图片和同名 TXT 的空文件夹绝对路径：");
+  return pickFolder(
+    "选择空的导出文件夹",
+    "输入用于存放图片和所选标注通道导出物的空文件夹绝对路径：",
+  );
 }
 
 export async function pickTaggerModelFolder(): Promise<string | null> {

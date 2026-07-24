@@ -6,7 +6,9 @@ from PIL import Image
 
 from dataset_studio.api.app import create_app
 from dataset_studio.core.config import Settings
+from dataset_studio.core.errors import ResourceConflictError
 from dataset_studio.core.sqlite import connect
+from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationTag
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
@@ -19,7 +21,7 @@ from dataset_studio.modules.jobs.models import (
 )
 from dataset_studio.modules.jobs.output_resources import job_output_resource_key
 from dataset_studio.modules.jobs.service import JobService
-from dataset_studio.modules.output_resources import annotation_output_resource_key
+from dataset_studio.modules.output_resources import annotation_document_resource_key
 from dataset_studio.modules.presets.models import (
     ProviderProfileCreate,
     SystemPresetCreate,
@@ -52,7 +54,12 @@ class MemorySecrets:
         self.values.pop(key, None)
 
 
-def _single_item_job(tmp_path: Path, *, extra_assets: int = 0):
+def _single_item_job(
+    tmp_path: Path,
+    *,
+    extra_assets: int = 0,
+    use_confirmed_tags: bool = False,
+):
     settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
     settings.ensure_directories()
     global_database = settings.app_data_dir / "global.sqlite3"
@@ -74,6 +81,23 @@ def _single_item_job(tmp_path: Path, *, extra_assets: int = 0):
         workspace.project_id,
         WorkspaceSettingsUpdate(system_preset_id=system.id),
     )
+    paths, _ = workspaces.get(workspace.project_id)
+    if use_confirmed_tags:
+        connection = connect(paths.database)
+        try:
+            asset_id = str(
+                connection.execute(
+                    "SELECT id FROM assets ORDER BY relative_path LIMIT 1"
+                ).fetchone()["id"]
+            )
+        finally:
+            connection.close()
+        annotations.save_tags(
+            workspace.project_id,
+            asset_id,
+            [AnnotationTag(name="blue_hair", origin="manual")],
+            confirm=True,
+        )
     provider = presets.create_provider(
         ProviderProfileCreate(
             name="Provider",
@@ -94,9 +118,9 @@ def _single_item_job(tmp_path: Path, *, extra_assets: int = 0):
         JobCreateRequest(
             provider_profile_id=provider.id,
             scope=JobScope.ALL,
+            use_confirmed_tags=use_confirmed_tags,
         ),
     )
-    paths, _ = workspaces.get(workspace.project_id)
     return jobs, workspace.project_id, job, paths.database, project
 
 
@@ -197,14 +221,22 @@ def test_output_claim_pages_past_resources_held_by_another_job(tmp_path: Path) -
     assert second_claim[0]["relative_path"] == "sample.png"
 
 
-def test_translation_and_annotation_jobs_share_the_same_physical_resource_key() -> None:
+def test_job_output_resource_keys_are_database_channel_specific() -> None:
     translation_key = job_output_resource_key(
         "translation",
-        '{"target_language":"zh-CN"}',
-        "nested/sample.txt",
+        '{"target_language":"zh-cn"}',
+        "asset",
+        "translation",
     )
+    description_key = job_output_resource_key("annotation", "{}", "asset", "description")
+    tags_key = job_output_resource_key("annotation", "{}", "asset", "tags")
 
-    assert translation_key == annotation_output_resource_key("nested/sample.zh-CN.txt")
+    assert translation_key == annotation_document_resource_key(
+        "asset",
+        "translation",
+        "zh-CN",
+    )
+    assert description_key != tags_key
 
 
 def test_scan_api_refuses_to_run_while_job_is_active(tmp_path: Path) -> None:
@@ -242,7 +274,9 @@ def test_remove_recent_api_refuses_while_job_is_active(tmp_path: Path) -> None:
     assert (project / "sample.png").is_file()
 
 
-def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -> None:
+def test_job_creation_targets_description_independently_and_snapshots_presets(
+    tmp_path: Path,
+) -> None:
     settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
     settings.ensure_directories()
     global_database = settings.app_data_dir / "global.sqlite3"
@@ -296,8 +330,9 @@ def test_job_creation_skips_existing_txt_and_snapshots_presets(tmp_path: Path) -
         ),
     )
 
-    assert job.total == 1
-    assert job.items[0].relative_path == "pending.png"
+    assert job.total == 2
+    assert [item.relative_path for item in job.items] == ["already.png", "pending.png"]
+    assert job.output_channel.value == "description"
     assert job.system_preset_name == "XML caption"
     assert job.provider_profile_name == "OpenRouter"
     assert job.model == "example/alternate"
@@ -385,11 +420,106 @@ def test_manual_accept_uses_validation_failure_and_completes_job(tmp_path: Path)
 
     accepted = jobs.manually_accept(project_id, job.id, item.id)
 
-    assert (project / "sample.txt").read_text(encoding="utf-8") == invalid_response
+    assert not (project / "sample.txt").exists()
+    connection = connect(database)
+    try:
+        stored = connection.execute(
+            """
+            SELECT t.content, d.channel, d.confirmed_revision_id, d.head_revision_id
+            FROM annotation_documents d
+            JOIN annotation_text_contents t ON t.revision_id = d.head_revision_id
+            WHERE d.asset_id = ? AND d.channel = 'description'
+            """,
+            (item.asset_id,),
+        ).fetchone()
+    finally:
+        connection.close()
+    assert stored is not None
+    assert str(stored["content"]) == invalid_response
+    assert stored["confirmed_revision_id"] == stored["head_revision_id"]
     assert accepted.status == JobStatus.COMPLETED
     assert accepted.manually_accepted == 1
     assert accepted.failed == 0
     assert accepted.items[0].status == JobItemStatus.MANUALLY_ACCEPTED
+
+
+def test_manual_accept_preserves_frozen_tag_dependency(tmp_path: Path) -> None:
+    jobs, project_id, job, database, _ = _single_item_job(
+        tmp_path,
+        use_confirmed_tags=True,
+    )
+    item = job.items[0]
+    _fail_item(
+        database,
+        item.id,
+        attempt_status="validation_failed",
+        response_content="<caption>accepted with frozen tags",
+    )
+
+    jobs.manually_accept(project_id, job.id, item.id)
+
+    connection = connect(database)
+    try:
+        dependency = connection.execute(
+            """
+            SELECT dependency.input_revision_id, dependency.role,
+                   frozen.revision_id AS frozen_revision_id
+            FROM annotation_documents description
+            JOIN annotation_revision_inputs dependency
+              ON dependency.output_revision_id = description.head_revision_id
+            JOIN job_item_annotation_inputs frozen
+              ON frozen.job_item_id = ?
+             AND frozen.role = 'tag_context'
+            WHERE description.asset_id = ?
+              AND description.channel = 'description'
+            """,
+            (item.id, item.asset_id),
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert dependency is not None
+    assert dependency["role"] == "tag_context"
+    assert dependency["input_revision_id"] == dependency["frozen_revision_id"]
+
+
+def test_manual_accept_does_not_overwrite_a_newer_annotation(tmp_path: Path) -> None:
+    jobs, project_id, job, database, _ = _single_item_job(tmp_path)
+    item = job.items[0]
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+    workspaces = WorkspaceService(
+        settings,
+        WorkspaceRegistry(settings.app_data_dir / "global.sqlite3"),
+    )
+    annotations = AnnotationService(workspaces)
+    annotations.save_text(
+        project_id,
+        item.asset_id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>new manual edit</caption>",
+        expected_head_revision_id=None,
+        confirm=True,
+    )
+    _fail_item(
+        database,
+        item.id,
+        attempt_status="validation_failed",
+        response_content="<caption>stale model response",
+    )
+
+    with pytest.raises(ResourceConflictError, match="版本已经变化"):
+        jobs.manually_accept(project_id, job.id, item.id)
+
+    current = annotations.get_channel(
+        project_id,
+        item.asset_id,
+        AnnotationChannel.DESCRIPTION,
+    )
+    assert current.content == "<caption>new manual edit</caption>"
+    assert current.review_status.value == "confirmed"
+    failed = jobs.get(project_id, job.id)
+    assert failed.status == JobStatus.COMPLETED_WITH_ERRORS
+    assert failed.manually_accepted == 0
 
 
 def test_failed_only_retry_keeps_attempt_numbers_unique(tmp_path: Path) -> None:
@@ -452,3 +582,90 @@ def test_failed_job_item_appears_in_review_until_retry(tmp_path: Path) -> None:
     assert status_counts_after_retry["needs_review"] == 0
     assert repository.list_asset_ids(annotation_status="needs_review") == []
     assert repository.count_summary() == (1, 0, 0)
+
+
+def test_translation_failure_appears_in_database_review_queue(tmp_path: Path) -> None:
+    _, _, job, database, _ = _single_item_job(tmp_path)
+    item = job.items[0]
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            UPDATE jobs
+            SET kind = 'translation',
+                configuration_snapshot = '{"target_language":"zh-CN"}',
+                output_channel = 'translation'
+            WHERE id = ?
+            """,
+            (job.id,),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    _fail_item(
+        database,
+        item.id,
+        attempt_status="request_failed",
+        response_content='{"error":"translation unavailable"}',
+    )
+
+    repository = AssetRepository(database)
+
+    assert repository.list_asset_ids(annotation_status="failed") == [item.asset_id]
+    assert repository.list_asset_ids(annotation_status="needs_review") == [item.asset_id]
+
+
+def test_success_in_another_channel_does_not_hide_generation_failure(tmp_path: Path) -> None:
+    _, _, job, database, _ = _single_item_job(tmp_path)
+    item = job.items[0]
+    _fail_item(
+        database,
+        item.id,
+        attempt_status="request_failed",
+        response_content='{"error":"description unavailable"}',
+    )
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            INSERT INTO jobs (
+                id, status, system_preset_id, system_prompt_snapshot,
+                provider_profile_id, provider_snapshot, user_prompt_snapshot,
+                json_fields_snapshot, scope, created_at, updated_at,
+                kind, configuration_snapshot, execution_backend,
+                execution_profile_id, execution_snapshot, output_channel
+            ) VALUES (
+                'later-job', 'completed', 'tagger', '{}',
+                '', '{}', '', '[]', 'all',
+                '9999-01-01T00:00:00Z', '9999-01-01T00:00:00Z',
+                'annotation', '{}', 'local_tagger',
+                'tagger-profile', '{}', 'tags'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO job_items (
+                id, job_id, asset_id, status, created_at, updated_at
+            ) VALUES (
+                'later-item', 'later-job', ?, 'succeeded',
+                '9999-01-01T00:00:00Z', '9999-01-01T00:00:00Z'
+            )
+            """,
+            (item.asset_id,),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    repository = AssetRepository(database)
+    assert repository.list_asset_ids(annotation_status="failed") == [item.asset_id]
+
+    connection = connect(database)
+    try:
+        connection.execute("UPDATE jobs SET output_channel = 'description' WHERE id = 'later-job'")
+        connection.commit()
+    finally:
+        connection.close()
+
+    assert repository.list_asset_ids(annotation_status="failed") == []

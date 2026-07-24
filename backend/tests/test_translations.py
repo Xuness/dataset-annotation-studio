@@ -3,9 +3,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-import dataset_studio.modules.translations.service as translation_service
 from dataset_studio.core.config import Settings
-from dataset_studio.core.errors import ResourceConflictError
+from dataset_studio.modules.annotations.models import AnnotationChannel
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
@@ -44,7 +43,7 @@ def _translation_services(tmp_path: Path, filenames: tuple[str, ...] = ("sample.
     initialize_global_database(global_database)
     workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
     annotations = AnnotationService(workspaces)
-    translations = TranslationService(workspaces)
+    translations = TranslationService(workspaces, annotations)
     assets = AssetService(workspaces)
     project = tmp_path / "dataset"
     project.mkdir()
@@ -55,19 +54,36 @@ def _translation_services(tmp_path: Path, filenames: tuple[str, ...] = ("sample.
     return project, workspace.project_id, asset_items, workspaces, annotations, translations
 
 
-def test_translation_sidecar_tracks_source_version_and_preserves_existing_file(
+def _save_confirmed_source(
+    annotations: AnnotationService,
+    project_id: str,
+    asset_id: str,
+    content: str,
+):
+    return annotations.save_text(
+        project_id,
+        asset_id,
+        AnnotationChannel.DESCRIPTION,
+        content,
+        confirm=True,
+    )
+
+
+def test_translation_tracks_confirmed_source_revision_without_writing_sidecars(
     tmp_path: Path,
 ) -> None:
     project, project_id, assets, _, annotations, translations = _translation_services(tmp_path)
     asset = assets[0]
     source = '<caption mood="quiet">a small garden</caption>'
-    annotations.save(project_id, asset.id, source)
-    source_hash = translations.read_source(project_id, asset.id)[1]
+    source_write = _save_confirmed_source(annotations, project_id, asset.id, source)
+    source_revision = translations.read_source_revision(project_id, asset.id)
+    assert source_revision is not None
+    source_hash = source_revision[2]
 
     missing = translations.get(project_id, asset.id, "zh-cn")
     assert missing.status == TranslationStatus.MISSING
     assert missing.language == "zh-CN"
-    assert missing.path == "sample.zh-CN.txt"
+    assert missing.path == "数据库 · translation:zh-CN"
 
     saved = translations.save_generated(
         project_id,
@@ -80,10 +96,16 @@ def test_translation_sidecar_tracks_source_version_and_preserves_existing_file(
         model="model",
     )
     assert saved.status == TranslationStatus.CURRENT
-    assert (project / "sample.txt").read_text(encoding="utf-8") == source
-    assert (project / "sample.zh-CN.txt").read_text(encoding="utf-8") == (
-        '<caption mood="quiet">一座小花园</caption>'
+    assert not (project / "sample.txt").exists()
+    assert not (project / "sample.zh-CN.txt").exists()
+    stored = annotations.get_channel(
+        project_id,
+        asset.id,
+        AnnotationChannel.TRANSLATION,
+        "zh-CN",
     )
+    assert stored.content == '<caption mood="quiet">一座小花园</caption>'
+    assert stored.review_status.value == "unreviewed"
 
     with pytest.raises(ValueError, match="标签、属性或标签顺序"):
         translations.save_generated(
@@ -93,85 +115,98 @@ def test_translation_sidecar_tracks_source_version_and_preserves_existing_file(
             "<description>错误结构</description>",
             expected_source_hash=source_hash,
         )
-    assert (project / "sample.zh-CN.txt").read_text(encoding="utf-8") == (
-        '<caption mood="quiet">一座小花园</caption>'
-    )
+    assert translations.get(project_id, asset.id, "zh-CN").content == stored.content
 
-    (project / "sample.zh-CN.txt").write_text(
-        '<caption mood="quiet">外部编辑</caption>',
-        encoding="utf-8",
+    pending_source = annotations.save_text(
+        project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        '<caption mood="quiet">a larger garden</caption>',
+        expected_head_revision_id=source_write.revision_id,
     )
-    with pytest.raises(ResourceConflictError, match="任务执行期间"):
-        translations.save_generated(
-            project_id,
-            asset.id,
-            "zh-CN",
-            '<caption mood="quiet">旧模型结果</caption>',
-            expected_source_hash=source_hash,
-            expected_modified_at=saved.modified_at,
-        )
-    assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.UNTRACKED
-
-    annotations.save(project_id, asset.id, '<caption mood="quiet">a larger garden</caption>')
+    assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.CURRENT
+    annotations.confirm(
+        project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        pending_source.revision_id,
+    )
     stale = translations.get(project_id, asset.id, "zh-CN")
     assert stale.status == TranslationStatus.STALE
     assert stale.source_hash != stale.current_source_hash
 
 
-def test_translation_rolls_back_when_source_changes_during_commit(
+def test_manual_translation_edit_tracks_the_confirmed_source_revision(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    (
-        _,
-        project_id,
-        assets,
-        _,
-        annotations,
-        translations,
-    ) = _translation_services(tmp_path, ("sample.png",))
+    _, project_id, assets, workspaces, annotations, translations = _translation_services(tmp_path)
     asset = assets[0]
-    annotations.save(project_id, asset.id, "<caption>source</caption>")
-    source_hash = translations.read_source(project_id, asset.id)[1]
-    source_path = tmp_path / "dataset" / "sample.txt"
+    source = _save_confirmed_source(
+        annotations,
+        project_id,
+        asset.id,
+        "<caption>source</caption>",
+    )
 
-    original_write = translation_service.atomic_write_text
+    saved = translations.save_manual(
+        project_id,
+        asset.id,
+        "zh-cn",
+        "<caption>人工译文</caption>",
+        expected_head_revision_id=None,
+    )
 
-    def change_source_after_write(path: Path, content: str) -> None:
-        original_write(path, content)
-        source_path.write_text("<caption>changed</caption>", encoding="utf-8")
+    assert saved.language == "zh-CN"
+    assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.CURRENT
 
-    monkeypatch.setattr(translation_service, "atomic_write_text", change_source_after_write)
+    changed = annotations.save_text(
+        project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>changed</caption>",
+        expected_head_revision_id=source.revision_id,
+    )
+    assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.CURRENT
+    annotations.confirm(
+        project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        changed.revision_id,
+    )
+    assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.STALE
+    stale_assets = AssetService(workspaces).list_assets(
+        project_id,
+        annotation_status="stale",
+    )
+    assert [item.id for item in stale_assets.items] == [asset.id]
 
-    with pytest.raises(TranslationSourceChangedError, match="提交期间"):
+
+def test_translation_requires_a_valid_confirmed_source(tmp_path: Path) -> None:
+    _, project_id, assets, _, annotations, translations = _translation_services(tmp_path)
+    asset = assets[0]
+    annotations.save_text(
+        project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>broken",
+        confirm=True,
+    )
+
+    assert translations.read_source(project_id, asset.id) is None
+    assert (
+        translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.SOURCE_INVALID
+    )
+    with pytest.raises(TranslationSourceChangedError, match="源标注已不存在"):
         translations.save_generated(
             project_id,
             asset.id,
             "zh-CN",
             "<caption>译文</caption>",
-            expected_source_hash=source_hash,
+            expected_source_hash="0" * 64,
         )
 
-    assert not (tmp_path / "dataset" / "sample.zh-CN.txt").exists()
 
-
-def test_translation_rejects_a_symbolic_link_output(tmp_path: Path) -> None:
-    project, project_id, assets, _, annotations, translations = _translation_services(tmp_path)
-    asset = assets[0]
-    annotations.save(project_id, asset.id, "<caption>source</caption>")
-    external = tmp_path / "external-translation.txt"
-    external.write_text("<caption>outside</caption>", encoding="utf-8")
-    translation_path = project / "sample.zh-CN.txt"
-    try:
-        translation_path.symlink_to(external)
-    except OSError as error:
-        pytest.skip(f"当前环境不能创建符号链接：{error}")
-
-    with pytest.raises(ValueError, match="符号链接"):
-        translations.get(project_id, asset.id, "zh-CN")
-
-
-def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path: Path) -> None:
+def test_translation_job_uses_confirmed_sources_and_existing_policy(tmp_path: Path) -> None:
     (
         _,
         project_id,
@@ -182,14 +217,15 @@ def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path:
     ) = _translation_services(tmp_path, ("current.png", "missing.png"))
     by_name = {asset.filename: asset for asset in assets}
     for asset in assets:
-        annotations.save(project_id, asset.id, "<caption>source</caption>")
-    source_hash = translations.read_source(project_id, by_name["current.png"].id)[1]
+        _save_confirmed_source(annotations, project_id, asset.id, "<caption>source</caption>")
+    current_source = translations.read_source_revision(project_id, by_name["current.png"].id)
+    assert current_source is not None
     translations.save_generated(
         project_id,
         by_name["current.png"].id,
         "zh-CN",
         "<caption>当前译文</caption>",
-        expected_source_hash=source_hash,
+        expected_source_hash=current_source[2],
     )
 
     presets = PresetService(
@@ -227,20 +263,17 @@ def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path:
             translation_policy=ExistingTranslationPolicy.SKIP,
         ),
     )
-    assert missing_job.kind == JobKind.TRANSLATION
-    assert missing_job.target_language == "zh-CN"
-    assert missing_job.system_preset_id == "default-translation-prompt"
-    assert missing_job.system_preset_name == "默认结构保留翻译"
-    assert missing_job.model == "translation-quality"
+    assert missing_job.output_channel == AnnotationChannel.TRANSLATION
     assert [item.asset_id for item in missing_job.items] == [by_name["missing.png"].id]
 
     paths, _ = workspaces.get(project_id)
     failed_item = missing_job.items[0]
-    source_hash = translations.read_source(project_id, failed_item.asset_id)[1]
+    frozen_source = translations.read_source_revision(project_id, failed_item.asset_id)
+    assert frozen_source is not None
     execution = JobExecutionRepository(paths.database)
     attempt_id, _ = execution.start_attempt(
         failed_item.id,
-        source_annotation_hash=source_hash,
+        source_annotation_hash=frozen_source[2],
     )
     execution.finish_attempt(
         attempt_id,
@@ -255,14 +288,29 @@ def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path:
         validation_status="failed",
     )
     JobLifecycleRepository(paths.database).finalize_jobs()
-
     jobs.manually_accept(project_id, missing_job.id, failed_item.id)
-
     accepted = translations.get(project_id, failed_item.asset_id, "zh-CN")
     assert accepted.model == "translation-quality"
     assert accepted.provider_profile_name == "Translator"
 
-    annotations.save(project_id, by_name["current.png"].id, "<caption>changed</caption>")
+    current = annotations.get_channel(
+        project_id,
+        by_name["current.png"].id,
+        AnnotationChannel.DESCRIPTION,
+    )
+    changed = annotations.save_text(
+        project_id,
+        by_name["current.png"].id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>changed</caption>",
+        expected_head_revision_id=current.head_revision_id,
+    )
+    annotations.confirm(
+        project_id,
+        by_name["current.png"].id,
+        AnnotationChannel.DESCRIPTION,
+        changed.revision_id,
+    )
     stale_job = jobs.create(
         project_id,
         JobCreateRequest(
@@ -277,11 +325,11 @@ def test_translation_job_uses_annotation_selection_and_existing_policy(tmp_path:
     assert [item.asset_id for item in stale_job.items] == [by_name["current.png"].id]
 
 
-def test_translation_never_treats_another_assets_annotation_as_a_sidecar(
+def test_translation_channels_are_isolated_per_asset_and_ignore_legacy_filename_collisions(
     tmp_path: Path,
 ) -> None:
     (
-        _,
+        project,
         project_id,
         assets,
         _,
@@ -289,23 +337,29 @@ def test_translation_never_treats_another_assets_annotation_as_a_sidecar(
         translations,
     ) = _translation_services(tmp_path, ("sample.png", "sample.zh-CN.png"))
     by_name = {asset.filename: asset for asset in assets}
-    annotations.save(project_id, by_name["sample.png"].id, "<caption>source</caption>")
-    annotations.save(
+    _save_confirmed_source(
+        annotations,
+        project_id,
+        by_name["sample.png"].id,
+        "<caption>source</caption>",
+    )
+    _save_confirmed_source(
+        annotations,
         project_id,
         by_name["sample.zh-CN.png"].id,
         "<caption>another image annotation</caption>",
     )
-    source_hash = translations.read_source(project_id, by_name["sample.png"].id)[1]
+    source = translations.read_source_revision(project_id, by_name["sample.png"].id)
+    assert source is not None
 
-    document = translations.get(project_id, by_name["sample.png"].id, "zh-CN")
-    assert document.status == TranslationStatus.CONFLICT
-    assert not document.exists
-    assert document.issue
-    with pytest.raises(ValueError, match="另一张图片"):
-        translations.save_generated(
-            project_id,
-            by_name["sample.png"].id,
-            "zh-CN",
-            "<caption>译文</caption>",
-            expected_source_hash=source_hash,
-        )
+    saved = translations.save_generated(
+        project_id,
+        by_name["sample.png"].id,
+        "zh-CN",
+        "<caption>译文</caption>",
+        expected_source_hash=source[2],
+    )
+
+    assert saved.status == TranslationStatus.CURRENT
+    assert saved.content == "<caption>译文</caption>"
+    assert not (project / "sample.zh-CN.txt").exists()

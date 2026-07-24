@@ -167,8 +167,8 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
                   disabled={actions.accept.isPending}
                 >
                   {job.data.kind === "translation"
-                    ? `人工确认并写入 .${job.data.target_language}.txt`
-                    : "人工确认并写入 TXT"}
+                    ? `人工确认并写入 ${job.data.target_language} 译文通道`
+                    : `人工确认并写入${job.data.output_channel === "tags" ? " Tags" : " LLM 描述"}通道`}
                 </Button>
               ) : null}
             </article>

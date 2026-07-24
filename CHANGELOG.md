@@ -6,6 +6,12 @@ changes.
 
 ## Unreleased
 
+- Replaced runtime annotation sidecars with revisioned SQLite channels for imported
+  annotations, structured Tags, LLM descriptions, and translations.
+- Added optional confirmed-Tag assistance for LLM jobs with per-asset input revision
+  snapshots.
+- Added channel-aware TXT and JSON export, including independent training variants for
+  multi-channel TXT output.
 - Prepared the repository for an Apache-2.0 source release.
 - Added a CPU-default and CUDA-opt-in source runtime layout.
 - Added Linux-aware application data paths, filesystem path identity, credential-store

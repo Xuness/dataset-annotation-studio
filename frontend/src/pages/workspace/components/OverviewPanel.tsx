@@ -19,6 +19,16 @@ export function OverviewPanel({ projectId, workspace, asset, onDeleteAsset }: Ov
     : 0;
   const buckets = statistics.data?.buckets.slice(0, 8) ?? [];
   const maximum = buckets[0]?.count ?? 1;
+  const channelLabels: Record<string, string> = {
+    existing_annotation: "原有标注",
+    tags: "Tags",
+    description: "LLM 描述",
+  };
+  const activeChannels = asset
+    ? Object.entries(asset.annotation_channels)
+        .filter(([key, status]) => !key.startsWith("translation:") && status !== "missing")
+        .map(([key]) => channelLabels[key] ?? key)
+    : [];
 
   return (
     <>
@@ -35,7 +45,7 @@ export function OverviewPanel({ projectId, workspace, asset, onDeleteAsset }: Ov
             <strong>
               {workspace.annotated_count} / {workspace.asset_count}
             </strong>
-            <span>图片已有同名标注</span>
+            <span>图片已有活动主标注</span>
             <small>{workspace.invalid_count} 个异常项</small>
           </div>
         </div>
@@ -45,25 +55,25 @@ export function OverviewPanel({ projectId, workspace, asset, onDeleteAsset }: Ov
       </section>
 
       <section className="inspector-section">
-        <span className="section-kicker">标记结构 · 只读统计</span>
+        <span className="section-kicker">已确认 Tags · 只读统计</span>
         {buckets.length ? (
           <div className="tag-frequency">
             {buckets.map((bucket) => (
               <div className="tag-frequency__row" key={bucket.value}>
                 <div>
-                  <code>&lt;{bucket.value}&gt;</code>
+                  <code>{bucket.value}</code>
                   <span>{bucket.count}</span>
                 </div>
                 <i style={{ width: `${Math.max(4, (bucket.count / maximum) * 100)}%` }} />
               </div>
             ))}
             <small>
-              {statistics.data?.document_count ?? 0} 份标注 · 共识别
-              {statistics.data?.occurrence_count ?? 0} 个开始标签
+              {statistics.data?.document_count ?? 0} 份 Tags 标注 · 共
+              {statistics.data?.occurrence_count ?? 0} 次 Tag 出现
             </small>
           </div>
         ) : (
-          <p className="quiet-copy">当前标注中还没有可统计的标签结构。</p>
+          <p className="quiet-copy">当前还没有可统计的已确认 Tags。</p>
         )}
       </section>
 
@@ -86,8 +96,8 @@ export function OverviewPanel({ projectId, workspace, asset, onDeleteAsset }: Ov
               <dd>{asset.suffix.slice(1).toUpperCase()}</dd>
             </div>
             <div>
-              <dt>标注</dt>
-              <dd>{asset.annotation_relative_path}</dd>
+              <dt>标注通道</dt>
+              <dd>{activeChannels.length ? activeChannels.join("、") : "无"}</dd>
             </div>
             <div>
               <dt>JSON</dt>

@@ -74,7 +74,7 @@ export function useAssetDestructiveActions({
       editorDirty && selectedAssetId && assetIds.includes(selectedAssetId),
     );
     const confirmed = await confirmDialog(
-      `删除所选 ${assetIds.length} 张图片的同名标注文件？内部版本历史仍会保留。${
+      `删除所选 ${assetIds.length} 张图片的所有主标注通道（不含译文）？修订历史仍会保留。${
         discardsDraft ? " 当前编辑器中的未保存修改也会丢失。" : ""
       }`,
       {
@@ -88,7 +88,7 @@ export function useAssetDestructiveActions({
       const result = await deleteAnnotations.mutateAsync(assetIds);
       if (discardsDraft) discardEditorDraft();
       await alertDialog(
-        `已删除 ${result.deleted_count} 份标注；${result.missing_count} 张图片原本没有标注。`,
+        `已删除 ${result.deleted_count} 个活动标注通道；${result.missing_count} 张图片没有可删除的主标注。`,
         { title: "批量删除完成" },
       );
     } catch (error) {

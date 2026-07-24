@@ -1,9 +1,21 @@
+import type { AnnotationChannel } from "./annotations";
+
 export type ExportScope = "all" | "selected";
+export type ExportRevisionMode = "confirmed" | "head";
+export type ExportFormat = "txt" | "json";
+
+export interface ExportChannelSelection {
+  channel: AnnotationChannel;
+  language: string;
+  revision: ExportRevisionMode;
+}
 
 export interface ExportRequest {
   scope: ExportScope;
   asset_ids: string[];
   destination_path: string;
+  channels: ExportChannelSelection[];
+  formats: ExportFormat[];
 }
 
 export interface ExportPreviewItem {
@@ -11,6 +23,8 @@ export interface ExportPreviewItem {
   source_relative_path: string;
   target_image_name: string;
   target_annotation_name: string;
+  target_outputs: string[];
+  channel_statuses: Record<string, string>;
   annotation_status: string;
   image_bytes: number;
   annotation_bytes: number;
@@ -31,6 +45,8 @@ export interface ExportPreview {
   empty_count: number;
   invalid_count: number;
   encoding_error_count: number;
+  unreviewed_count: number;
+  stale_count: number;
   warning_count: number;
   blocking_issue_count: number;
   blocking_issues: string[];
@@ -51,6 +67,10 @@ export interface ExportOperation {
   copied_bytes: number;
   warning_count: number;
   allow_warnings: boolean;
+  configuration_snapshot: {
+    channels?: ExportChannelSelection[];
+    formats?: ExportFormat[];
+  };
   current_relative_path: string | null;
   created_at: string;
   updated_at: string;

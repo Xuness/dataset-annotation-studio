@@ -50,6 +50,7 @@ export function NewJobPanel({
   const [scope, setScope] = useState<"all" | "selected">("all");
   const [targetLanguage, setTargetLanguage] = useState("zh-CN");
   const [translationPolicy, setTranslationPolicy] = useState<ExistingTranslationPolicy>("skip");
+  const [useConfirmedTags, setUseConfirmedTags] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const executionBackend = kind === "translation" ? "provider" : annotationBackend;
   const selectedProvider = providerProfiles.data?.find(
@@ -121,6 +122,8 @@ export function NewJobPanel({
           kind === "translation" ? translationPromptPresetId : undefined,
         target_language: targetLanguage,
         translation_policy: translationPolicy,
+        use_confirmed_tags:
+          kind === "annotation" && executionBackend === "provider" && useConfirmedTags,
       });
       onCreated(job);
     } catch (reason) {
@@ -239,20 +242,36 @@ export function NewJobPanel({
           </div>
         </>
       ) : executionBackend === "provider" ? (
-        <div className={`job-prompt-source ${promptConfigurationIssue ? "has-error" : ""}`}>
-          <span>项目提示词</span>
-          <strong>
-            {systemPresets.isLoading
-              ? "正在读取项目配置…"
-              : (configuredSystemPreset?.name ?? promptConfigurationIssue)}
-          </strong>
-          <small>System Prompt 与 User Prompt 均沿用素材页最后保存的配置。</small>
-          {promptConfigurationIssue ? (
-            <button onClick={() => navigate(`/workspace/${projectId}?panel=prompt`)}>
-              回到素材页配置
-            </button>
-          ) : null}
-        </div>
+        <>
+          <div className={`job-prompt-source ${promptConfigurationIssue ? "has-error" : ""}`}>
+            <span>项目提示词</span>
+            <strong>
+              {systemPresets.isLoading
+                ? "正在读取项目配置…"
+                : (configuredSystemPreset?.name ?? promptConfigurationIssue)}
+            </strong>
+            <small>System Prompt 与 User Prompt 均沿用素材页最后保存的配置。</small>
+            {promptConfigurationIssue ? (
+              <button onClick={() => navigate(`/workspace/${projectId}?panel=prompt`)}>
+                回到素材页配置
+              </button>
+            ) : null}
+          </div>
+          <label className="job-assist-option">
+            <input
+              type="checkbox"
+              checked={useConfirmedTags}
+              onChange={(event) => setUseConfirmedTags(event.target.checked)}
+            />
+            <span>
+              <strong>使用已确认 Tags 辅助 LLM</strong>
+              <small>
+                创建任务时逐图冻结与当前图片一致的已确认 Tag 修订，并追加到 User Prompt；没有可用
+                Tags 的图片仍会正常处理。
+              </small>
+            </span>
+          </label>
+        </>
       ) : (
         <div className={`job-prompt-source ${selectedTaggerProfile ? "" : "has-error"}`}>
           <span>本地执行快照</span>
@@ -363,12 +382,8 @@ export function NewJobPanel({
       <div className="scope-selector">
         <span>处理范围</span>
         <button className={scope === "all" ? "is-active" : ""} onClick={() => setScope("all")}>
-          {kind === "annotation" ? "全部未标注" : "全部有源标注"}
-          <small>
-            {kind === "annotation"
-              ? Math.max(workspace.asset_count - workspace.annotated_count, 0)
-              : workspace.annotated_count}
-          </small>
+          全项目范围
+          <small>{workspace.asset_count}</small>
         </button>
         <button
           className={scope === "selected" ? "is-active" : ""}
@@ -380,8 +395,14 @@ export function NewJobPanel({
 
       <dl className="job-rules">
         <div>
-          <dt>{kind === "annotation" ? "已有 TXT" : "文件命名"}</dt>
-          <dd>{kind === "annotation" ? "自动跳过" : `*.${targetLanguage}.txt`}</dd>
+          <dt>目标通道</dt>
+          <dd>
+            {kind === "translation"
+              ? `翻译 · ${targetLanguage}`
+              : executionBackend === "local_tagger"
+                ? "Tags"
+                : "LLM 描述"}
+          </dd>
         </div>
         <div>
           <dt>失败重试</dt>
@@ -391,10 +412,10 @@ export function NewJobPanel({
           <dt>输出处理</dt>
           <dd>
             {executionBackend === "local_tagger"
-              ? "Danbooru 标签列表"
+              ? "结构化 Tag 修订"
               : kind === "annotation"
-                ? "原样写入"
-                : "标签结构校验"}
+                ? "数据库描述修订"
+                : "数据库译文修订"}
           </dd>
         </div>
         <div>
@@ -410,9 +431,11 @@ export function NewJobPanel({
               ? "无"
               : kind === "annotation"
                 ? workspace.settings.user_prompt
-                  ? "项目内已设置"
+                  ? useConfirmedTags
+                    ? "项目配置 + 已确认 Tags"
+                    : "仅项目配置"
                   : "当前为空"
-                : "只读读取同名 TXT"}
+                : "已确认描述 / 原有标注"}
           </dd>
         </div>
       </dl>

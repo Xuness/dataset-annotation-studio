@@ -45,6 +45,7 @@ class AssetSummary(BaseModel):
     metadata_relative_path: str | None = None
     generation_status: Literal["failed"] | None = None
     generation_error: str | None = None
+    annotation_channels: dict[str, str] = Field(default_factory=dict)
 
 
 class AssetListResponse(BaseModel):

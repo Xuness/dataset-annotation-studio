@@ -140,8 +140,9 @@ whether the session is native Wayland, and which compatibility mode changes the 
 
 ## Filesystem and desktop notes
 
-- The selected dataset directory must be writable. Recovery files, SQLite state, and
-  annotation sidecars are stored beside the images.
+- The selected dataset directory must be writable. Recovery files and SQLite annotation
+  state live under `.annotation-workspace/`; runtime annotation jobs do not write sidecars
+  beside the images.
 - Linux treats names such as `image.png` and `Image.png` as different files. The
   application preserves that identity on Linux, but such projects may not move cleanly
   to case-insensitive filesystems.

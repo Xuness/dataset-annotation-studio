@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
+from dataset_studio.modules.annotations.models import AnnotationChannel
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.jobs.execution_repository import (
     ItemCompletion,
@@ -74,10 +75,6 @@ class LocalTaggerJobExecutor:
         for item in items:
             item_id = str(item["id"])
             try:
-                annotation_path = resolve_workspace_path(
-                    workspace_root,
-                    str(item["annotation_relative_path"]),
-                )
                 image_path = resolve_workspace_path(
                     workspace_root,
                     str(item["relative_path"]),
@@ -92,13 +89,20 @@ class LocalTaggerJobExecutor:
                     )
                 )
                 continue
-            if annotation_path.is_file() and not overwrite_existing:
+            current_document = self._container.annotations.get_channel(
+                project_id,
+                str(item["asset_id"]),
+                AnnotationChannel.TAGS,
+            )
+            if current_document.exists and not overwrite_existing:
                 precompleted.append(ItemCompletion(item_id=item_id, status=JobItemStatus.SKIPPED))
                 continue
-            expected_modified_at = (
-                str(annotation_path.stat().st_mtime_ns) if annotation_path.is_file() else None
+            expected_revision_id = (
+                str(item["output_base_revision_id"])
+                if item.get("output_base_revision_id")
+                else None
             )
-            candidates.append((item, image_path, expected_modified_at))
+            candidates.append((item, image_path, expected_revision_id))
         repository.finish_batch([], precompleted)
         if not candidates:
             return
@@ -137,7 +141,6 @@ class LocalTaggerJobExecutor:
                 workspace_root=workspace_root,
                 runs_root=runs_root,
                 job_id=job_id,
-                overwrite_existing=overwrite_existing,
                 started=started,
                 report=report,
                 repository=repository,

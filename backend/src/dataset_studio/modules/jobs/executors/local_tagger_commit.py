@@ -6,12 +6,11 @@ from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
-from dataset_studio.core.errors import FileRollbackError, ResourceConflictError
+from dataset_studio.core.errors import ResourceConflictError
 from dataset_studio.core.files import atomic_write_text
+from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationTag
 from dataset_studio.modules.annotations.service import (
-    AnnotationBatchRollbackError,
     AnnotationService,
-    GeneratedAnnotation,
 )
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
 from dataset_studio.modules.jobs.execution_repository import (
@@ -80,7 +79,6 @@ class LocalTaggerBatchCommitter:
         workspace_root: Path,
         runs_root: Path,
         job_id: str,
-        overwrite_existing: bool,
         started: Sequence[StartedTaggerItem],
         report: TaggerPipelineReport,
         repository: JobExecutionRepository,
@@ -89,8 +87,6 @@ class LocalTaggerBatchCommitter:
         outcome_by_id = {outcome.key: outcome for outcome in report.outcomes}
         evaluated = [
             self._evaluate_outcome(
-                workspace_root,
-                overwrite_existing,
                 item,
                 outcome_by_id[item.item_id],
                 report,
@@ -185,9 +181,6 @@ class LocalTaggerBatchCommitter:
             if isinstance(error, ResourceConflictError):
                 attempt_status = "output_changed"
                 validation_status = "output_changed"
-            elif isinstance(error, FileRollbackError):
-                attempt_status = "rollback_failed"
-                validation_status = "rollback_failed"
             else:
                 attempt_status = "internal_error"
                 validation_status = "write_failed"
@@ -303,8 +296,6 @@ class LocalTaggerBatchCommitter:
 
     def _evaluate_outcome(
         self,
-        workspace_root: Path,
-        overwrite_existing: bool,
         started: StartedTaggerItem,
         outcome: TaggerPipelineOutcome,
         report: TaggerPipelineReport,
@@ -355,20 +346,6 @@ class LocalTaggerBatchCommitter:
             result,
             report.effective_batch_size,
         )
-        annotation_path = resolve_workspace_path(
-            workspace_root,
-            str(started.item["annotation_relative_path"]),
-        )
-        if annotation_path.is_file() and not overwrite_existing:
-            return _EvaluatedItem(
-                started=started,
-                result=result,
-                artifact_payload=artifact_payload,
-                attempt_status="skipped_existing",
-                item_status=JobItemStatus.SKIPPED,
-                error=None,
-                validation_status=None,
-            )
         return _EvaluatedItem(
             started=started,
             result=result,
@@ -386,39 +363,37 @@ class LocalTaggerBatchCommitter:
     ) -> tuple[list[_SuccessfulItem], list[tuple[_SuccessfulItem, Exception]]]:
         if not successful:
             return [], []
-        annotations = [
-            GeneratedAnnotation(
-                asset_id=item.started.asset_id,
-                content=item.result.content,
-                expected_modified_at=item.started.expected_annotation_modified_at,
-                lease_owner_id=item.started.item_id,
-            )
-            for item in successful
-        ]
-        try:
-            self._annotations.save_generated_batch(project_id, annotations)
-            return list(successful), []
-        except AnnotationBatchRollbackError as error:
-            return [], [(item, error) for item in successful]
-        except Exception:
-            # The batch writer has already rolled back every file and DB row.
-            # Retry individually so one bad target does not discard unrelated work.
-            committed: list[_SuccessfulItem] = []
-            failed: list[tuple[_SuccessfulItem, Exception]] = []
-            for item in successful:
-                try:
-                    self._annotations.save_generated(
-                        project_id,
-                        item.started.asset_id,
-                        item.result.content,
-                        expected_modified_at=item.started.expected_annotation_modified_at,
-                        lease_owner_id=item.started.item_id,
-                    )
-                except Exception as error:
-                    failed.append((item, error))
-                else:
-                    committed.append(item)
-            return committed, failed
+        committed: list[_SuccessfulItem] = []
+        failed: list[tuple[_SuccessfulItem, Exception]] = []
+        for item in successful:
+            try:
+                self._annotations.save_generated(
+                    project_id,
+                    item.started.asset_id,
+                    item.result.content,
+                    channel=AnnotationChannel.TAGS,
+                    tags=[
+                        AnnotationTag(
+                            name=tag.name,
+                            category=tag.category,
+                            confidence=tag.confidence,
+                            origin="tagger",
+                        )
+                        for tag in item.result.tags
+                    ],
+                    expected_modified_at=item.started.expected_annotation_modified_at,
+                    lease_owner_id=item.started.item_id,
+                    source_job_item_id=item.started.item_id,
+                    metadata={
+                        "provider": item.result.provider,
+                        "inference_ms": item.result.inference_ms,
+                    },
+                )
+            except Exception as error:
+                failed.append((item, error))
+            else:
+                committed.append(item)
+        return committed, failed
 
     @staticmethod
     def _response_payload(

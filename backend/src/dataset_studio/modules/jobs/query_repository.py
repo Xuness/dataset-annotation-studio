@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from dataset_studio.core.sqlite import connect
@@ -15,6 +16,14 @@ from dataset_studio.modules.jobs.models import (
 )
 from dataset_studio.modules.providers.config import ProviderExecutionProfile
 from dataset_studio.modules.taggers.models import TaggerExecutionProfile
+
+
+@dataclass(frozen=True, slots=True)
+class FailedResponseCandidate:
+    asset_id: str
+    content: str
+    source_hash: str | None
+    output_base_revision_id: str | None
 
 
 class JobQueryRepository:
@@ -80,14 +89,13 @@ class JobQueryRepository:
         finally:
             connection.close()
 
-    def latest_failed_response(
-        self, job_id: str, item_id: str
-    ) -> tuple[str, str, str | None] | None:
+    def latest_failed_response(self, job_id: str, item_id: str) -> FailedResponseCandidate | None:
         connection = connect(self._database_path)
         try:
             row = connection.execute(
                 """
-                SELECT ji.asset_id, ja.response_content, ja.source_annotation_hash
+                SELECT ji.asset_id, ji.output_base_revision_id,
+                       ja.response_content, ja.source_annotation_hash
                 FROM job_items ji
                 JOIN job_attempts ja ON ja.job_item_id = ji.id
                 WHERE ji.job_id = ?
@@ -102,10 +110,15 @@ class JobQueryRepository:
             ).fetchone()
             if row is None:
                 return None
-            return (
-                str(row["asset_id"]),
-                str(row["response_content"]),
-                str(row["source_annotation_hash"]) if row["source_annotation_hash"] else None,
+            return FailedResponseCandidate(
+                asset_id=str(row["asset_id"]),
+                content=str(row["response_content"]),
+                source_hash=(
+                    str(row["source_annotation_hash"]) if row["source_annotation_hash"] else None
+                ),
+                output_base_revision_id=(
+                    str(row["output_base_revision_id"]) if row["output_base_revision_id"] else None
+                ),
             )
         finally:
             connection.close()
@@ -233,6 +246,8 @@ class JobQueryRepository:
             model=model,
             scope=str(row["scope"]),
             overwrite_existing=bool(row["overwrite_existing"]),
+            output_channel=str(row["output_channel"]),
+            use_confirmed_tags=bool(row["use_confirmed_tags"]),
             target_language=(
                 str(configuration["target_language"])
                 if kind == "translation" and configuration.get("target_language")

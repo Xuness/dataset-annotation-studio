@@ -2,20 +2,35 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { xml } from "@codemirror/lang-xml";
-import { FileText, History, RotateCcw, Save, Trash2, TriangleAlert } from "lucide-react";
+import {
+  BadgeCheck,
+  FileText,
+  History,
+  RotateCcw,
+  Save,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 
 import {
-  useAnnotation,
-  useAnnotationHistory,
-  useDeleteAnnotation,
-  useSaveAnnotation,
+  useAnnotationBundle,
+  useAnnotationChannel,
+  useAnnotationChannelHistory,
+  useConfirmAnnotationChannel,
+  useDeleteAnnotationChannel,
+  useSaveAnnotationChannel,
 } from "../../../features/annotations/hooks";
 import { useTranslation, useTranslations } from "../../../features/translations/hooks";
+import type {
+  AnnotationChannel,
+  AnnotationDocument,
+  AnnotationReviewStatus,
+  AnnotationTag,
+} from "../../../shared/api/types";
 import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
-import { StatusDot } from "../../../shared/ui/StatusDot";
 import { reconcilePersistedContent } from "./annotationEditorState";
 
 interface AnnotationEditorProps {
@@ -24,24 +39,38 @@ interface AnnotationEditorProps {
   onDirtyChange: (dirty: boolean) => void;
 }
 
-type EditorMode = "source" | "translation" | "compare";
+type EditorMode = AnnotationChannel | "compare";
 
 const FONT_SIZE_STORAGE_KEY = "dataset-studio.annotation-font-size";
+const DEFAULT_LANGUAGES = ["zh-CN", "zh-TW", "en", "ja", "ko"];
+const CHANNEL_TABS: Array<{ value: EditorMode; label: string }> = [
+  { value: "existing_annotation", label: "原有标注" },
+  { value: "tags", label: "Tags" },
+  { value: "description", label: "LLM 描述" },
+  { value: "translation", label: "翻译" },
+  { value: "compare", label: "对照" },
+];
 const REVISION_SOURCE_LABELS: Record<string, string> = {
   manual_edit: "手动保存",
-  model_response: "模型生成",
+  model_response: "LLM 生成",
+  local_tagger: "Tagger 生成",
   manual_accept: "人工采用",
-  deleted_snapshot: "删除前快照",
+  manual_reconfirm: "图片变化后复核",
+  manual_delete: "删除",
+  legacy_txt_import: "旧 TXT 导入",
 };
-const DEFAULT_LANGUAGES = ["zh-CN", "zh-TW", "en", "ja", "ko"];
+const REVIEW_LABELS: Record<AnnotationReviewStatus, string> = {
+  missing: "缺失",
+  unreviewed: "待确认",
+  confirmed: "已确认",
+  stale: "图片已变化",
+};
 const TRANSLATION_STATUS_LABELS = {
   missing: "尚无译文",
-  current: "译文最新",
-  stale: "译文已过期",
-  untracked: "外部译文",
-  source_missing: "缺少源标注",
-  source_invalid: "源标注编码异常",
-  conflict: "文件名冲突",
+  current: "译文源版本一致",
+  stale: "译文源版本已变化",
+  source_missing: "缺少已确认的源标注",
+  source_invalid: "已确认的源标注无效",
 } as const;
 
 function readFontSize(): number {
@@ -49,21 +78,86 @@ function readFontSize(): number {
   return Number.isFinite(stored) ? Math.min(22, Math.max(10, stored)) : 12;
 }
 
+function tagsToDraft(tags: AnnotationTag[]): string {
+  return tags.map((tag) => tag.name).join(", ");
+}
+
+function draftToTags(draft: string, previous: AnnotationTag[]): AnnotationTag[] {
+  const existing = new Map(previous.map((tag) => [tag.name.toLowerCase(), tag]));
+  const seen = new Set<string>();
+  const result: AnnotationTag[] = [];
+  for (const part of draft.replaceAll("\n", ",").split(",")) {
+    const name = part.trim();
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    result.push(
+      existing.has(key)
+        ? { ...existing.get(key)!, name }
+        : {
+            name,
+            category: null,
+            confidence: null,
+            origin: "manual",
+          },
+    );
+  }
+  return result;
+}
+
+function documentDraft(document: AnnotationDocument | undefined): string {
+  if (!document) return "";
+  return document.content_kind === "tags" ? tagsToDraft(document.tags) : document.content;
+}
+
+function revisionSourceLabel(source: string): string {
+  if (source.startsWith("legacy_history:")) {
+    const original = source.slice("legacy_history:".length);
+    return `旧数据库历史 · ${REVISION_SOURCE_LABELS[original] ?? original}`;
+  }
+  return REVISION_SOURCE_LABELS[source] ?? source;
+}
+
 export function AnnotationEditor({ projectId, assetId, onDirtyChange }: AnnotationEditorProps) {
-  const annotation = useAnnotation(projectId, assetId);
-  const save = useSaveAnnotation(projectId, assetId ?? "");
-  const remove = useDeleteAnnotation(projectId, assetId ?? "");
-  const translations = useTranslations(projectId, assetId);
+  const [mode, setMode] = useState<EditorMode>("existing_annotation");
   const [language, setLanguage] = useState("zh-CN");
-  const translation = useTranslation(projectId, assetId, language);
-  const [mode, setMode] = useState<EditorMode>("source");
+  const activeChannel: AnnotationChannel = mode === "compare" ? "description" : mode;
+  const activeLanguage = activeChannel === "translation" ? language : "";
+  const bundle = useAnnotationBundle(projectId, assetId);
+  const document = useAnnotationChannel(projectId, assetId, activeChannel, activeLanguage);
+  const compareTranslation = useAnnotationChannel(projectId, assetId, "translation", language);
+  const translations = useTranslations(projectId, assetId);
+  const translationState = useTranslation(projectId, assetId, language);
+  const save = useSaveAnnotationChannel(projectId, assetId ?? "", activeChannel, activeLanguage);
+  const confirm = useConfirmAnnotationChannel(
+    projectId,
+    assetId ?? "",
+    activeChannel,
+    activeLanguage,
+  );
+  const remove = useDeleteAnnotationChannel(
+    projectId,
+    assetId ?? "",
+    activeChannel,
+    activeLanguage,
+  );
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
-  const [savedModifiedAt, setSavedModifiedAt] = useState<string | null>(null);
+  const [savedRevisionId, setSavedRevisionId] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState(readFontSize);
   const [showHistory, setShowHistory] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const history = useAnnotationHistory(projectId, assetId, showHistory);
+  const dirty = mode !== "compare" && content !== savedContent;
+  const dirtyRef = useRef(dirty);
+  const loadedDocumentKey = useRef("");
+  dirtyRef.current = dirty;
+  const history = useAnnotationChannelHistory(
+    projectId,
+    assetId,
+    activeChannel,
+    activeLanguage,
+    showHistory && mode !== "compare",
+  );
   const languageOptions = useMemo(
     () =>
       Array.from(
@@ -72,9 +166,6 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
     [translations.data],
   );
 
-  const dirty = content !== savedContent;
-  const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
   useUnsavedScope(`annotation:${projectId}`, dirty);
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
 
@@ -83,37 +174,43 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
   }, [fontSize]);
 
   useEffect(() => {
-    if (dirtyRef.current) return;
-    if (annotation.data) {
-      setContent(annotation.data.content);
-      setSavedContent(annotation.data.content);
-      setSavedModifiedAt(annotation.data.modified_at);
-    } else if (!assetId) {
+    const key = `${assetId ?? ""}:${activeChannel}:${activeLanguage}`;
+    if (!assetId) {
+      loadedDocumentKey.current = key;
       setContent("");
       setSavedContent("");
-      setSavedModifiedAt(null);
+      setSavedRevisionId(null);
+      return;
     }
-  }, [annotation.data, assetId]);
+    if (!document.data || mode === "compare") return;
+    if (loadedDocumentKey.current !== key || !dirtyRef.current) {
+      const next = documentDraft(document.data);
+      loadedDocumentKey.current = key;
+      setContent(next);
+      setSavedContent(next);
+      setSavedRevisionId(document.data.head_revision_id);
+    }
+  }, [activeChannel, activeLanguage, assetId, document.data, mode]);
 
   useEffect(() => {
     function handleSave(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        if (assetId && dirty && !save.isPending) void handleSaveClick();
+        if (assetId && dirty && !save.isPending) {
+          void handleSaveClick();
+        }
       }
     }
     window.addEventListener("keydown", handleSave);
     return () => window.removeEventListener("keydown", handleSave);
   });
 
-  const extensions = useMemo(
+  const commonExtensions = useMemo(
     () => [
-      xml(),
       EditorView.lineWrapping,
       EditorView.domEventHandlers({
         wheel(event, view) {
           if (!event.ctrlKey || event.deltaY === 0) return false;
-
           event.preventDefault();
           setFontSize((current) =>
             Math.min(22, Math.max(10, current + (event.deltaY < 0 ? 1 : -1))),
@@ -125,46 +222,125 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
     ],
     [],
   );
+  const editorExtensions = useMemo(
+    () => (activeChannel === "tags" ? commonExtensions : [xml(), ...commonExtensions]),
+    [activeChannel, commonExtensions],
+  );
+
+  function reviewStatus(channel: AnnotationChannel, targetLanguage = "") {
+    return bundle.data?.documents.find(
+      (item) => item.channel === channel && (item.language ?? "") === targetLanguage,
+    )?.review_status;
+  }
+
+  async function changeMode(next: EditorMode) {
+    if (next === mode) return;
+    if (dirty) {
+      const discard = await confirmDialog("当前通道有尚未保存的修改。确定放弃后切换吗？", {
+        title: "切换标注通道",
+        tone: "danger",
+        confirmLabel: "放弃并切换",
+      });
+      if (!discard) return;
+    }
+    loadedDocumentKey.current = "";
+    setContent("");
+    setSavedContent("");
+    setSavedRevisionId(null);
+    setActionError(null);
+    setShowHistory(false);
+    setMode(next);
+  }
+
+  async function changeLanguage(next: string) {
+    if (next === language) return;
+    if (dirty) {
+      const discard = await confirmDialog("当前译文有尚未保存的修改。确定放弃后切换吗？", {
+        title: "切换译文语言",
+        tone: "danger",
+        confirmLabel: "放弃并切换",
+      });
+      if (!discard) return;
+    }
+    loadedDocumentKey.current = "";
+    setContent("");
+    setSavedContent("");
+    setSavedRevisionId(null);
+    setLanguage(next);
+  }
 
   async function handleSaveClick() {
-    if (!assetId) return;
+    if (!assetId || mode === "compare") return;
     const submittedContent = content;
     setActionError(null);
     try {
-      const result = await save.mutateAsync({
-        content: submittedContent,
-        expectedModifiedAt: savedModifiedAt,
-      });
-      setContent((current) => reconcilePersistedContent(current, submittedContent, result.content));
-      setSavedContent(result.content);
-      setSavedModifiedAt(result.modified_at);
+      const result = await save.mutateAsync(
+        activeChannel === "tags"
+          ? {
+              tags: draftToTags(submittedContent, document.data?.tags ?? []),
+              expectedHeadRevisionId: savedRevisionId,
+            }
+          : {
+              content: submittedContent,
+              expectedHeadRevisionId: savedRevisionId,
+            },
+      );
+      const persisted = documentDraft(result);
+      setContent((current) => reconcilePersistedContent(current, submittedContent, persisted));
+      setSavedContent(persisted);
+      setSavedRevisionId(result.head_revision_id);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : "保存标注失败。");
     }
   }
 
+  async function handleConfirm() {
+    if (!savedRevisionId || dirty) return;
+    setActionError(null);
+    try {
+      if (activeChannel === "translation" && translationStatus === "stale") {
+        const result = await save.mutateAsync({
+          content,
+          expectedHeadRevisionId: savedRevisionId,
+          confirm: true,
+        });
+        const persisted = documentDraft(result);
+        setContent(persisted);
+        setSavedContent(persisted);
+        setSavedRevisionId(result.head_revision_id);
+      } else {
+        const result = await confirm.mutateAsync(savedRevisionId);
+        setSavedRevisionId(result.head_revision_id);
+      }
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : "确认标注失败。");
+    }
+  }
+
   async function handleDelete() {
-    if (!assetId || !annotation.data?.exists) return;
-    const confirmed = await confirmDialog("删除当前图片旁的同名标注文件？内部历史仍会保留。", {
-      title: "删除标注",
-      tone: "danger",
-      confirmLabel: "删除",
-    });
-    if (!confirmed) return;
-    const contentBeforeDelete = content;
+    if (!assetId || !document.data?.exists || mode === "compare") return;
+    const accepted = await confirmDialog(
+      `删除“${document.data.display_name}”的当前版本？历史修订仍会保留。`,
+      {
+        title: "删除标注通道",
+        tone: "danger",
+        confirmLabel: "删除",
+      },
+    );
+    if (!accepted) return;
     setActionError(null);
     try {
       await remove.mutateAsync();
-      setContent((current) => reconcilePersistedContent(current, contentBeforeDelete, ""));
+      setContent("");
       setSavedContent("");
-      setSavedModifiedAt(null);
+      setSavedRevisionId(null);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : "删除标注失败。");
     }
   }
 
-  function restoreRevision(revisionContent: string) {
-    setContent(revisionContent);
+  function restoreRevision(revisionContent: string, tags: AnnotationTag[]) {
+    setContent(activeChannel === "tags" ? tagsToDraft(tags) : revisionContent);
     setShowHistory(false);
   }
 
@@ -175,7 +351,7 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
         value={value}
         height="100%"
         maxHeight="100%"
-        extensions={extensions}
+        extensions={[xml(), ...commonExtensions]}
         editable={false}
         placeholder={placeholder}
         basicSetup={{
@@ -188,65 +364,72 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
     );
   }
 
-  const translationStatus = translation.data?.status;
-  const translationUnavailable =
-    !translation.data?.exists ||
-    translation.data.status === "source_missing" ||
-    translation.data.status === "source_invalid" ||
-    translation.data.status === "conflict";
+  const compareSource =
+    bundle.data?.documents.find(
+      (item) => item.channel === "description" && item.exists && item.review_status === "confirmed",
+    ) ??
+    bundle.data?.documents.find(
+      (item) =>
+        item.channel === "existing_annotation" && item.exists && item.review_status === "confirmed",
+    );
+  const translationStatus = translationState.data?.status;
+  const translationNeedsSourceRefresh =
+    activeChannel === "translation" && translationStatus === "stale";
+  const activeReviewStatus = document.data?.review_status ?? "missing";
+  const tagCount = draftToTags(content, document.data?.tags ?? []).length;
 
   return (
     <section className="annotation-editor" data-surface-region="content">
       <header className="annotation-editor__header">
         <div className="annotation-editor__title">
           <FileText size={15} />
-          <strong>标注与译文</strong>
-          {mode === "source" && annotation.data ? (
-            <StatusDot status={annotation.data.status} showLabel />
+          <strong>数据库标注</strong>
+          {mode !== "compare" ? (
+            <span
+              className={`annotation-review annotation-review--${activeReviewStatus}`}
+              title="当前通道审核状态"
+            >
+              {REVIEW_LABELS[activeReviewStatus]}
+            </span>
           ) : null}
-          {mode !== "source" && translationStatus ? (
+          {mode === "translation" && translationStatus ? (
             <span className={`translation-status translation-status--${translationStatus}`}>
               {TRANSLATION_STATUS_LABELS[translationStatus]}
             </span>
           ) : null}
           {dirty ? <span className="unsaved-mark">尚未保存</span> : null}
         </div>
+
         <div className="annotation-editor__view-controls">
           <div className="annotation-view-tabs">
-            <button
-              className={mode === "source" ? "is-active" : ""}
-              onClick={() => {
-                setMode("source");
-                setShowHistory(false);
-              }}
-            >
-              原文
-            </button>
-            <button
-              className={mode === "translation" ? "is-active" : ""}
-              onClick={() => {
-                setMode("translation");
-                setShowHistory(false);
-              }}
-            >
-              译文
-            </button>
-            <button
-              className={mode === "compare" ? "is-active" : ""}
-              onClick={() => {
-                setMode("compare");
-                setShowHistory(false);
-              }}
-            >
-              对照
-            </button>
+            {CHANNEL_TABS.map((tab) => {
+              const tabStatus =
+                tab.value === "compare"
+                  ? undefined
+                  : reviewStatus(tab.value, tab.value === "translation" ? language : "");
+              return (
+                <button
+                  key={tab.value}
+                  className={mode === tab.value ? "is-active" : ""}
+                  onClick={() => void changeMode(tab.value)}
+                >
+                  {tab.label}
+                  {tabStatus ? (
+                    <i
+                      className={`annotation-channel-dot annotation-channel-dot--${tabStatus}`}
+                      title={REVIEW_LABELS[tabStatus]}
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
-          {mode !== "source" ? (
+          {mode === "translation" || mode === "compare" ? (
             <select
               className="annotation-language-select"
               aria-label="译文语言"
               value={language}
-              onChange={(event) => setLanguage(event.target.value)}
+              onChange={(event) => void changeLanguage(event.target.value)}
             >
               {languageOptions.map((value) => (
                 <option key={value} value={value}>
@@ -256,8 +439,9 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
             </select>
           ) : null}
         </div>
+
         <div className="annotation-editor__actions">
-          {mode === "source" ? (
+          {mode !== "compare" ? (
             <>
               <Button
                 icon={<History size={14} />}
@@ -270,9 +454,22 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
                 tone="danger"
                 icon={<Trash2 size={14} />}
                 onClick={() => void handleDelete()}
-                disabled={!annotation.data?.exists || remove.isPending}
+                disabled={!document.data?.exists || remove.isPending}
               >
                 删除
+              </Button>
+              <Button
+                icon={confirm.isPending ? <Spinner /> : <BadgeCheck size={14} />}
+                onClick={() => void handleConfirm()}
+                disabled={
+                  !document.data?.exists ||
+                  dirty ||
+                  (document.data.review_status === "confirmed" && !translationNeedsSourceRefresh) ||
+                  confirm.isPending ||
+                  save.isPending
+                }
+              >
+                确认
               </Button>
               <Button
                 tone="primary"
@@ -291,16 +488,16 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
         className="annotation-editor__body"
         style={{ "--annotation-font-size": `${fontSize}px` } as CSSProperties}
       >
-        {assetId && annotation.isLoading ? (
+        {assetId && document.isLoading && mode !== "compare" ? (
           <div className="annotation-editor__empty">
-            <Spinner label="读取标注" />
+            <Spinner label="读取标注通道" />
           </div>
-        ) : assetId && annotation.isError && !annotation.data ? (
+        ) : assetId && document.isError && !document.data && mode !== "compare" ? (
           <div className="annotation-editor__empty validation-warning">
             无法读取标注：
-            {annotation.error instanceof Error ? annotation.error.message : "未知错误"}
+            {document.error instanceof Error ? document.error.message : "未知错误"}
           </div>
-        ) : assetId && showHistory && mode === "source" ? (
+        ) : assetId && showHistory && mode !== "compare" ? (
           <div className="annotation-editor__history">
             {history.isLoading ? <Spinner label="读取历史" /> : null}
             {history.isError ? (
@@ -309,125 +506,115 @@ export function AnnotationEditor({ projectId, assetId, onDirtyChange }: Annotati
               </p>
             ) : null}
             {history.data?.map((revision) => (
-              <article key={revision.id}>
+              <article key={revision.id} className={revision.is_candidate ? "is-candidate" : ""}>
                 <header>
                   <div>
-                    <strong>{REVISION_SOURCE_LABELS[revision.source] ?? revision.source}</strong>
-                    <small>{new Date(revision.created_at).toLocaleString()}</small>
+                    <strong>{revisionSourceLabel(revision.source)}</strong>
+                    <small>
+                      {new Date(revision.created_at).toLocaleString()}
+                      {revision.is_candidate ? " · 候选版本" : ""}
+                    </small>
                   </div>
                   <Button
                     icon={<RotateCcw size={12} />}
-                    onClick={() => restoreRevision(revision.content)}
+                    onClick={() => restoreRevision(revision.content, revision.tags)}
+                    disabled={revision.is_tombstone}
                   >
                     恢复到编辑器
                   </Button>
                 </header>
-                <pre>{revision.content}</pre>
+                <pre>
+                  {revision.is_tombstone
+                    ? "已删除"
+                    : activeChannel === "tags"
+                      ? tagsToDraft(revision.tags)
+                      : revision.content}
+                </pre>
               </article>
             ))}
-            {!history.isLoading && !history.data?.length ? <p>当前还没有历史版本。</p> : null}
+            {!history.isLoading && !history.data?.length ? <p>当前通道还没有历史版本。</p> : null}
           </div>
-        ) : assetId && mode === "source" ? (
+        ) : assetId && mode !== "compare" ? (
           <CodeMirror
             className="annotation-editor__codemirror"
             value={content}
             height="100%"
             maxHeight="100%"
-            extensions={extensions}
+            extensions={editorExtensions}
             onChange={setContent}
-            placeholder="当前图片还没有标注。你可以在这里手动填写，或稍后创建批量标注任务。"
+            placeholder={
+              activeChannel === "tags"
+                ? "输入逗号或换行分隔的 Tags。保存后会写入结构化 Tag 记录。"
+                : activeChannel === "existing_annotation"
+                  ? "这里存放迁移时确认存在的旧 TXT，也可以继续人工修订。"
+                  : activeChannel === "description"
+                    ? "LLM 返回的描述会进入这里；模型结果需要人工确认。"
+                    : `输入或修订 ${language} 译文。`
+            }
             basicSetup={{
-              lineNumbers: true,
-              foldGutter: true,
+              lineNumbers: activeChannel !== "tags",
+              foldGutter: activeChannel !== "tags",
               highlightActiveLine: true,
               highlightActiveLineGutter: false,
             }}
           />
-        ) : assetId && mode === "translation" ? (
-          translation.isLoading ? (
-            <div className="annotation-editor__empty">
-              <Spinner label="读取译文" />
-            </div>
-          ) : translation.isError && !translation.data ? (
-            <div className="annotation-editor__empty validation-warning">
-              无法读取译文：
-              {translation.error instanceof Error ? translation.error.message : "未知错误"}
-            </div>
-          ) : translationUnavailable ? (
-            <div className="annotation-editor__empty annotation-editor__translation-empty">
-              <strong>{TRANSLATION_STATUS_LABELS[translation.data?.status ?? "missing"]}</strong>
-              <span>
-                {translation.data?.issue ?? `在任务页选择素材并创建 ${language} 翻译任务。`}
-              </span>
-            </div>
-          ) : (
-            readonlyEditor(translation.data?.content ?? "", "当前没有译文。")
-          )
         ) : assetId && mode === "compare" ? (
           <div className="annotation-editor__compare">
             <section>
               <header>
-                <strong>原文</strong>
-                <small>{annotation.data?.path}</small>
+                <strong>{compareSource?.display_name ?? "源标注"}</strong>
+                <small>{compareSource?.review_status ?? "missing"}</small>
               </header>
-              <div>{readonlyEditor(content, "当前没有源标注。")}</div>
+              <div>{readonlyEditor(compareSource?.content ?? "", "当前没有可用源标注。")}</div>
             </section>
             <section>
               <header>
                 <strong>{language} 译文</strong>
-                <small>{translation.data?.path}</small>
+                <small>
+                  {translationStatus ? TRANSLATION_STATUS_LABELS[translationStatus] : ""}
+                </small>
               </header>
               <div>
-                {translation.isLoading ? (
+                {compareTranslation.isLoading ? (
                   <div className="annotation-editor__empty">
                     <Spinner label="读取译文" />
                   </div>
-                ) : translationUnavailable ? (
-                  <div className="annotation-editor__empty">尚无可对照的译文</div>
                 ) : (
-                  readonlyEditor(translation.data?.content ?? "", "当前没有译文。")
+                  readonlyEditor(compareTranslation.data?.content ?? "", "当前没有译文。")
                 )}
               </div>
             </section>
           </div>
         ) : (
-          <div className="annotation-editor__empty">选择图片后可查看和编辑同名 .txt</div>
+          <div className="annotation-editor__empty">选择图片后可查看各标注通道。</div>
         )}
       </div>
 
       <footer className="annotation-editor__footer">
         {actionError ? <span className="validation-warning">{actionError}</span> : null}
-        {mode === "source" ? (
+        {mode !== "compare" ? (
           <>
-            <span>{content.length.toLocaleString()} 字符</span>
-            {dirty ? (
-              <span>保存后重新校验标签</span>
-            ) : (
-              <span>{annotation.data?.validation?.tag_count ?? 0} 个标签</span>
-            )}
-            {!dirty && annotation.data?.validation?.issues.length ? (
+            <span>
+              {activeChannel === "tags"
+                ? `${tagCount} 个 Tag`
+                : `${content.length.toLocaleString()} 字符`}
+            </span>
+            <span>{REVIEW_LABELS[activeReviewStatus]}</span>
+            {document.data?.source ? (
+              <span>{revisionSourceLabel(document.data.source)}</span>
+            ) : null}
+            {!dirty && document.data?.validation?.issues.length ? (
               <span className="validation-warning">
-                <TriangleAlert size={12} /> {annotation.data.validation.issues[0].message}
+                <TriangleAlert size={12} /> {document.data.validation.issues[0].message}
               </span>
             ) : null}
           </>
         ) : (
-          <>
-            <span>{translation.data?.content.length.toLocaleString() ?? 0} 个译文字符</span>
-            <span>{translation.data?.path ?? `*.${language}.txt`}</span>
-            {dirty ? (
-              <span className="translation-stale-warning">原文尚未保存；保存后现有译文会过期</span>
-            ) : null}
-            {translation.data?.provider_profile_name ? (
-              <span>
-                {translation.data.provider_profile_name} · {translation.data.model}
-              </span>
-            ) : null}
-          </>
+          <span>对照视图只读；源标注优先使用已确认的 LLM 描述，其次使用原有标注。</span>
         )}
         <span className="annotation-editor__shortcut">
           {fontSize}px · Ctrl+滚轮调整字号
-          {mode === "source" ? " · Ctrl+S 保存" : " · 译文只读"}
+          {mode !== "compare" ? " · Ctrl+S 保存" : ""}
         </span>
       </footer>
     </section>

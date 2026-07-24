@@ -52,7 +52,7 @@ class AppContainer:
         initialize_global_database(global_database)
         workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
         annotations = AnnotationService(workspaces)
-        translations = TranslationService(workspaces)
+        translations = TranslationService(workspaces, annotations)
         assets = AssetService(workspaces)
         asset_deletions = AssetDeletionService(workspaces)
         secrets = KeyringSecretStore()

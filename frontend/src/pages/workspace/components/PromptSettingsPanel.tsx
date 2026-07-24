@@ -96,10 +96,10 @@ function AnnotationTraceView({ trace }: { trace: AssetAnnotationTrace }) {
           }`}
         >
           {trace.matches_current_annotation
-            ? "匹配当前 TXT"
+            ? "匹配当前通道"
             : trace.annotation_exists
-              ? "与当前 TXT 不同"
-              : "当前无 TXT"}
+              ? "与当前通道不同"
+              : "当前通道为空"}
         </span>
       </div>
 
@@ -186,7 +186,7 @@ function AnnotationTraceView({ trace }: { trace: AssetAnnotationTrace }) {
           label={localTagger ? "TAGS" : "FINAL"}
           detail={
             localTagger
-              ? "本地模型写入 TXT 的标签列表"
+              ? "本地模型写入 Tags 通道的标签列表"
               : trace.response.finish_reason
                 ? `结束原因：${trace.response.finish_reason}`
                 : "最终输出"
