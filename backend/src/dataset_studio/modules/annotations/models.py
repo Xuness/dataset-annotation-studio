@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from dataset_studio.core.languages import normalize_language_code
 
 
 class AnnotationStatus(StrEnum):
@@ -30,9 +32,14 @@ class AnnotationContentKind(StrEnum):
 
 
 class AnnotationReviewStatus(StrEnum):
-    MISSING = "missing"
     UNREVIEWED = "unreviewed"
-    CONFIRMED = "confirmed"
+    REVIEWED = "reviewed"
+
+
+class AnnotationAvailabilityStatus(StrEnum):
+    MISSING = "missing"
+    USABLE = "usable"
+    INVALID = "invalid"
     STALE = "stale"
 
 
@@ -104,12 +111,13 @@ class AnnotationDocument(BaseModel):
     content: str = ""
     tags: list[AnnotationTag] = Field(default_factory=list)
     status: AnnotationStatus
-    review_status: AnnotationReviewStatus = AnnotationReviewStatus.MISSING
+    availability_status: AnnotationAvailabilityStatus = AnnotationAvailabilityStatus.MISSING
+    review_status: AnnotationReviewStatus | None = None
     validation: ValidationResult | None = None
     validation_status: AnnotationStatus | None = None
     modified_at: str | None = None
     head_revision_id: str | None = None
-    confirmed_revision_id: str | None = None
+    reviewed_revision_id: str | None = None
     image_content_hash: str | None = None
     current_image_hash: str | None = None
     source: str | None = None
@@ -143,7 +151,10 @@ class AnnotationChannelUpdate(BaseModel):
     content: str | None = None
     tags: list[AnnotationTag] | None = None
     expected_head_revision_id: str | None = None
-    confirm: bool | None = None
+    review: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("review", "confirm"),
+    )
 
     @model_validator(mode="after")
     def validate_payload(self) -> AnnotationChannelUpdate:
@@ -152,10 +163,67 @@ class AnnotationChannelUpdate(BaseModel):
         return self
 
 
-class AnnotationConfirmRequest(BaseModel):
+class AnnotationReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_head_revision_id: str = Field(min_length=1)
+
+
+class AnnotationChannelTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channel: AnnotationChannel
+    language: str = ""
+
+    @model_validator(mode="after")
+    def validate_language(self) -> AnnotationChannelTarget:
+        if self.channel == AnnotationChannel.TRANSLATION:
+            if not self.language:
+                raise ValueError("翻译标注通道必须指定语言。")
+            try:
+                self.language = normalize_language_code(self.language)
+            except ValueError as error:
+                raise ValueError("翻译标注通道的语言代码无效。") from error
+        elif self.language:
+            raise ValueError("只有翻译标注通道可以指定语言。")
+        return self
+
+    @property
+    def key(self) -> str:
+        return f"{self.channel.value}:{self.language}" if self.language else self.channel.value
+
+
+def _normalize_asset_ids(value: list[str]) -> list[str]:
+    normalized = list(dict.fromkeys(asset_id for asset_id in value if asset_id))
+    if not normalized:
+        raise ValueError("至少需要选择一个素材。")
+    return normalized
+
+
+def _validate_targets(value: list[AnnotationChannelTarget]) -> list[AnnotationChannelTarget]:
+    if len({target.key for target in value}) != len(value):
+        raise ValueError("同一个标注通道不能重复选择。")
+    return value
+
+
+def _validate_optional_targets(
+    value: list[AnnotationChannelTarget] | None,
+) -> list[AnnotationChannelTarget] | None:
+    return _validate_targets(value) if value is not None else None
+
+
+class AnnotationBatchOptionsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_ids: list[str]
+
+    _normalize_asset_ids = field_validator("asset_ids")(_normalize_asset_ids)
+
+
+class AnnotationBatchTargetRequest(AnnotationBatchOptionsRequest):
+    targets: list[AnnotationChannelTarget] = Field(min_length=1)
+
+    _validate_targets = field_validator("targets")(_validate_targets)
 
 
 class AnnotationBatchDeleteRequest(BaseModel):
@@ -164,40 +232,52 @@ class AnnotationBatchDeleteRequest(BaseModel):
     asset_ids: list[str]
     channel: AnnotationChannel | None = None
     language: str | None = None
+    targets: list[AnnotationChannelTarget] | None = Field(
+        default=None,
+        min_length=1,
+    )
 
-    @field_validator("asset_ids")
-    @classmethod
-    def normalize_asset_ids(cls, value: list[str]) -> list[str]:
-        normalized = list(dict.fromkeys(asset_id for asset_id in value if asset_id))
-        if not normalized:
-            raise ValueError("至少需要选择一个素材。")
-        return normalized
+    _normalize_asset_ids = field_validator("asset_ids")(_normalize_asset_ids)
+    _validate_target_selection = field_validator("targets")(_validate_optional_targets)
 
-
-class AnnotationBatchConfirmRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    asset_ids: list[str]
-
-    @field_validator("asset_ids")
-    @classmethod
-    def normalize_asset_ids(cls, value: list[str]) -> list[str]:
-        normalized = list(dict.fromkeys(asset_id for asset_id in value if asset_id))
-        if not normalized:
-            raise ValueError("至少需要选择一个素材。")
-        return normalized
+    @model_validator(mode="after")
+    def validate_scope(self) -> AnnotationBatchDeleteRequest:
+        if self.targets is not None and (self.channel is not None or self.language):
+            raise ValueError("批量删除不能同时使用单通道参数和多通道范围。")
+        return self
 
 
-class AnnotationBatchConfirmResult(BaseModel):
+class AnnotationBatchReviewRequest(AnnotationBatchOptionsRequest):
+    pass
+
+
+class AnnotationBatchTargetOption(BaseModel):
+    channel: AnnotationChannel
+    language: str | None = None
+    display_name: str
+    active_count: int
+    reviewable_count: int
+    reviewed_count: int
+    stale_count: int
+
+
+class AnnotationBatchOptions(BaseModel):
     requested_count: int
-    confirmed_count: int
-    already_confirmed_count: int
+    targets: list[AnnotationBatchTargetOption] = Field(default_factory=list)
+
+
+class AnnotationBatchReviewResult(BaseModel):
+    requested_count: int
+    target_count: int = 1
+    reviewed_count: int
+    already_reviewed_count: int
     missing_count: int
     asset_ids: list[str]
 
 
 class AnnotationBatchDeleteResult(BaseModel):
     requested_count: int
+    target_count: int = 0
     deleted_count: int
     missing_count: int
     asset_ids: list[str]

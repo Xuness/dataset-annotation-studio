@@ -23,12 +23,15 @@ class StatisticsService:
                     FROM annotation_documents d
                     JOIN assets a ON a.id = d.asset_id
                     JOIN annotation_document_revisions r
-                      ON r.id = d.confirmed_revision_id
+                      ON r.id = d.head_revision_id
                     WHERE a.is_present = 1
                       AND d.channel = 'tags'
                       AND d.language = ''
                       AND r.is_tombstone = 0
                       AND r.image_content_hash = a.content_hash
+                      AND r.validation_status NOT IN (
+                          'invalid', 'encoding_error', 'empty', 'unchecked'
+                      )
                     """
                 ).fetchone()[0]
             )
@@ -38,7 +41,7 @@ class StatisticsService:
                 FROM annotation_documents d
                 JOIN assets a ON a.id = d.asset_id
                 JOIN annotation_document_revisions r
-                  ON r.id = d.confirmed_revision_id
+                  ON r.id = d.head_revision_id
                 JOIN annotation_tag_items ti
                   ON ti.revision_id = r.id
                 WHERE a.is_present = 1
@@ -46,6 +49,9 @@ class StatisticsService:
                   AND d.language = ''
                   AND r.is_tombstone = 0
                   AND r.image_content_hash = a.content_hash
+                  AND r.validation_status NOT IN (
+                      'invalid', 'encoding_error', 'empty', 'unchecked'
+                  )
                 GROUP BY ti.normalized_name
                 ORDER BY count DESC, ti.normalized_name
                 """

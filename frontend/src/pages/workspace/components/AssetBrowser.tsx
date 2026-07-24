@@ -52,7 +52,7 @@ interface AssetBrowserProps {
   onSetChecked: (assetIds: string[], checked: boolean) => void;
   onToggleAll: () => void;
   onRecursiveChange: (value: boolean) => void;
-  onConfirmCheckedTags: () => void;
+  onReviewCheckedAnnotations: () => void;
   onDeleteCheckedAnnotations: () => void;
   onDeleteCheckedAssets: () => void;
   onOpenDeletionHistory: () => void;
@@ -66,8 +66,8 @@ const assetFilters: Array<{ value: StatusFilter; label: string; icon: typeof Che
 ];
 
 const reviewFilters: Array<{ value: StatusFilter; label: string; icon: typeof CheckCircle2 }> = [
-  { value: "needs_review", label: "全部待审核", icon: CircleAlert },
-  { value: "unreviewed", label: "待确认", icon: FileQuestion },
+  { value: "needs_review", label: "复核与异常", icon: CircleAlert },
+  { value: "unreviewed", label: "尚未复核", icon: FileQuestion },
   { value: "stale", label: "已过期", icon: CircleAlert },
   { value: "failed", label: "生成失败", icon: CircleAlert },
   { value: "invalid", label: "结构异常", icon: CircleAlert },
@@ -104,7 +104,7 @@ export function AssetBrowser({
   onSetChecked,
   onToggleAll,
   onRecursiveChange,
-  onConfirmCheckedTags,
+  onReviewCheckedAnnotations,
   onDeleteCheckedAnnotations,
   onDeleteCheckedAssets,
   onOpenDeletionHistory,
@@ -317,10 +317,10 @@ export function AssetBrowser({
           <button
             type="button"
             disabled={!checkedAssetIds.length || bulkActionPending}
-            onClick={onConfirmCheckedTags}
+            onClick={onReviewCheckedAnnotations}
           >
             <BadgeCheck size={13} />
-            确认 Tags
+            标记已复核
           </button>
           <button
             type="button"

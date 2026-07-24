@@ -29,7 +29,7 @@ export interface JobSummary {
   scope: "all" | "selected";
   overwrite_existing: boolean;
   output_channel: "tags" | "description" | "translation";
-  use_confirmed_tags: boolean;
+  use_tags_as_context: boolean;
   target_language: string | null;
   translation_policy: ExistingTranslationPolicy | null;
   retry_limit: number;

@@ -1,9 +1,11 @@
 import { apiRequest } from "../../shared/api/client";
 import type {
-  AnnotationBatchConfirmResult,
   AnnotationBatchDeleteResult,
+  AnnotationBatchOptions,
+  AnnotationBatchReviewResult,
   AnnotationBundle,
   AnnotationChannel,
+  AnnotationChannelTarget,
   AnnotationDocument,
   AnnotationRevision,
   AnnotationTag,
@@ -43,7 +45,7 @@ export function saveAnnotationChannel(
     content?: string;
     tags?: AnnotationTag[];
     expectedHeadRevisionId: string | null;
-    confirm?: boolean;
+    review?: boolean;
     language?: string;
   },
 ): Promise<AnnotationDocument> {
@@ -53,12 +55,12 @@ export function saveAnnotationChannel(
       content: input.content,
       tags: input.tags,
       expected_head_revision_id: input.expectedHeadRevisionId,
-      confirm: input.confirm,
+      review: input.review,
     }),
   });
 }
 
-export function confirmAnnotationChannel(
+export function reviewAnnotationChannel(
   projectId: string,
   assetId: string,
   channel: AnnotationChannel,
@@ -67,7 +69,7 @@ export function confirmAnnotationChannel(
 ): Promise<AnnotationDocument> {
   const base = channelPath(projectId, assetId, channel, language);
   const [path, query = ""] = base.split("?");
-  return apiRequest(`${path}/confirm${query ? `?${query}` : ""}`, {
+  return apiRequest(`${path}/review${query ? `?${query}` : ""}`, {
     method: "POST",
     body: JSON.stringify({ expected_head_revision_id: expectedHeadRevisionId }),
   });
@@ -96,19 +98,31 @@ export function getAnnotationChannelHistory(
 export function deleteAnnotations(
   projectId: string,
   assetIds: string[],
+  targets: AnnotationChannelTarget[],
 ): Promise<AnnotationBatchDeleteResult> {
   return apiRequest(`/api/v1/workspaces/${projectId}/annotations/delete`, {
+    method: "POST",
+    body: JSON.stringify({ asset_ids: assetIds, targets }),
+  });
+}
+
+export function getAnnotationBatchOptions(
+  projectId: string,
+  assetIds: string[],
+): Promise<AnnotationBatchOptions> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/annotations/options`, {
     method: "POST",
     body: JSON.stringify({ asset_ids: assetIds }),
   });
 }
 
-export function confirmTagAnnotations(
+export function reviewAnnotations(
   projectId: string,
   assetIds: string[],
-): Promise<AnnotationBatchConfirmResult> {
-  return apiRequest(`/api/v1/workspaces/${projectId}/annotations/tags/confirm`, {
+  targets: AnnotationChannelTarget[],
+): Promise<AnnotationBatchReviewResult> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/annotations/review`, {
     method: "POST",
-    body: JSON.stringify({ asset_ids: assetIds }),
+    body: JSON.stringify({ asset_ids: assetIds, targets }),
   });
 }

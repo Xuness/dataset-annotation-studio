@@ -58,7 +58,7 @@ def _single_item_job(
     tmp_path: Path,
     *,
     extra_assets: int = 0,
-    use_confirmed_tags: bool = False,
+    use_tags_as_context: bool = False,
 ):
     settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
     settings.ensure_directories()
@@ -81,11 +81,11 @@ def _single_item_job(
         workspace.project_id,
         WorkspaceSettingsUpdate(
             system_preset_id=system.id,
-            use_confirmed_tags=use_confirmed_tags,
+            use_tags_as_context=use_tags_as_context,
         ),
     )
     paths, _ = workspaces.get(workspace.project_id)
-    if use_confirmed_tags:
+    if use_tags_as_context:
         connection = connect(paths.database)
         try:
             asset_id = str(
@@ -99,7 +99,6 @@ def _single_item_job(
             workspace.project_id,
             asset_id,
             [AnnotationTag(name="blue_hair", origin="manual")],
-            confirm=True,
         )
     provider = presets.create_provider(
         ProviderProfileCreate(
@@ -427,7 +426,7 @@ def test_manual_accept_uses_validation_failure_and_completes_job(tmp_path: Path)
     try:
         stored = connection.execute(
             """
-            SELECT t.content, d.channel, d.confirmed_revision_id, d.head_revision_id
+            SELECT t.content, d.channel, d.reviewed_revision_id, d.head_revision_id
             FROM annotation_documents d
             JOIN annotation_text_contents t ON t.revision_id = d.head_revision_id
             WHERE d.asset_id = ? AND d.channel = 'description'
@@ -438,7 +437,7 @@ def test_manual_accept_uses_validation_failure_and_completes_job(tmp_path: Path)
         connection.close()
     assert stored is not None
     assert str(stored["content"]) == invalid_response
-    assert stored["confirmed_revision_id"] == stored["head_revision_id"]
+    assert stored["reviewed_revision_id"] == stored["head_revision_id"]
     assert accepted.status == JobStatus.COMPLETED
     assert accepted.manually_accepted == 1
     assert accepted.failed == 0
@@ -448,7 +447,7 @@ def test_manual_accept_uses_validation_failure_and_completes_job(tmp_path: Path)
 def test_manual_accept_preserves_frozen_tag_dependency(tmp_path: Path) -> None:
     jobs, project_id, job, database, _ = _single_item_job(
         tmp_path,
-        use_confirmed_tags=True,
+        use_tags_as_context=True,
     )
     item = job.items[0]
     _fail_item(
@@ -500,7 +499,7 @@ def test_manual_accept_does_not_overwrite_a_newer_annotation(tmp_path: Path) -> 
         AnnotationChannel.DESCRIPTION,
         "<caption>new manual edit</caption>",
         expected_head_revision_id=None,
-        confirm=True,
+        review=True,
     )
     _fail_item(
         database,
@@ -518,7 +517,7 @@ def test_manual_accept_does_not_overwrite_a_newer_annotation(tmp_path: Path) -> 
         AnnotationChannel.DESCRIPTION,
     )
     assert current.content == "<caption>new manual edit</caption>"
-    assert current.review_status.value == "confirmed"
+    assert current.review_status.value == "reviewed"
     failed = jobs.get(project_id, job.id)
     assert failed.status == JobStatus.COMPLETED_WITH_ERRORS
     assert failed.manually_accepted == 0

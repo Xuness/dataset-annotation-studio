@@ -39,7 +39,7 @@ describe("asset browser rows", () => {
     const user = userEvent.setup();
     const onSelect = vi.fn(async () => true);
     const onSetChecked = vi.fn();
-    const onConfirmCheckedTags = vi.fn();
+    const onReviewCheckedAnnotations = vi.fn();
 
     render(
       <AssetBrowser
@@ -84,7 +84,7 @@ describe("asset browser rows", () => {
         onSetChecked={onSetChecked}
         onToggleAll={() => undefined}
         onRecursiveChange={() => undefined}
-        onConfirmCheckedTags={onConfirmCheckedTags}
+        onReviewCheckedAnnotations={onReviewCheckedAnnotations}
         onDeleteCheckedAnnotations={() => undefined}
         onDeleteCheckedAssets={() => undefined}
         onOpenDeletionHistory={() => undefined}
@@ -100,8 +100,8 @@ describe("asset browser rows", () => {
     expect(onSetChecked).toHaveBeenCalledWith(["asset-1"], false);
     expect(onSelect).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "确认 Tags" }));
-    expect(onConfirmCheckedTags).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "标记已复核" }));
+    expect(onReviewCheckedAnnotations).toHaveBeenCalledOnce();
 
     await user.click(openButton);
     expect(onSelect).toHaveBeenCalledWith("asset-1");

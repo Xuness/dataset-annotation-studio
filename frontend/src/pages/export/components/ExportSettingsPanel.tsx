@@ -132,11 +132,13 @@ export function ExportSettingsPanel({
               onChange({ revision: event.target.value as ExportFormState["revision"] })
             }
           >
-            <option value="confirmed">仅导出已确认版本</option>
-            <option value="head">导出当前版本（可能待确认）</option>
+            <option value="current">导出当前版本（默认）</option>
+            <option value="reviewed">仅导出已人工复核版本</option>
           </select>
         </label>
-        <small>所选通道统一采用此修订策略；预览会冻结实际 revision ID，执行时不会漂移。</small>
+        <small>
+          当前版本无需人工复核即可导出；所选通道会冻结实际 revision ID，执行时不会漂移。
+        </small>
       </section>
 
       <section className="export-option">

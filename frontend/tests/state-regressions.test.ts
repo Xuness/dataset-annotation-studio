@@ -10,7 +10,10 @@ import {
   type DesktopExitDependencies,
 } from "../src/app/desktopExit.ts";
 import { providerCredentialCacheToken } from "../src/features/presets/queryKeys.ts";
-import { reconcilePersistedContent } from "../src/pages/workspace/components/annotationEditorState.ts";
+import {
+  hasExistingAnnotationDocument,
+  reconcilePersistedContent,
+} from "../src/pages/workspace/components/annotationEditorState.ts";
 import {
   createDesktopFullscreenToggle,
   isFullscreenShortcut,
@@ -53,6 +56,24 @@ test("save reconciliation accepts the persisted response when the draft did not 
   assert.equal(
     reconcilePersistedContent("submitted draft", "submitted draft", "normalized draft"),
     "normalized draft",
+  );
+});
+
+test("existing annotation tab is exposed only when the current asset has imported content", () => {
+  assert.equal(hasExistingAnnotationDocument(undefined), false);
+  assert.equal(
+    hasExistingAnnotationDocument([
+      { channel: "description", exists: true },
+      { channel: "existing_annotation", exists: false },
+    ]),
+    false,
+  );
+  assert.equal(
+    hasExistingAnnotationDocument([
+      { channel: "description", exists: false },
+      { channel: "existing_annotation", exists: true },
+    ]),
+    true,
   );
 });
 

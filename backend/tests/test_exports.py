@@ -95,14 +95,12 @@ def test_export_materializes_multiple_database_channels_as_variants_and_json(
                 AnnotationTag(name="character", category="general", origin="manual"),
                 AnnotationTag(name=asset.filename.split(".")[0], origin="manual"),
             ],
-            confirm=True,
         )
         annotations.save_text(
             workspace.project_id,
             asset.id,
             AnnotationChannel.DESCRIPTION,
             f"<caption>{asset.filename}</caption>",
-            confirm=True,
         )
 
     destination = tmp_path / "export"
@@ -118,9 +116,11 @@ def test_export_materializes_multiple_database_channels_as_variants_and_json(
     preview = exports.preview(workspace.project_id, request)
 
     assert preview.total_items == 2
-    assert preview.valid_count == 2
+    assert preview.usable_count == 2
+    assert preview.reviewed_count == 0
+    assert preview.unreviewed_count == 2
     assert preview.warning_count == 0
-    assert set(preview.items[0].channel_statuses.values()) == {"confirmed"}
+    assert set(preview.items[0].channel_statuses.values()) == {"usable"}
     assert any(target.startswith("tags/") for target in preview.items[0].target_outputs)
     assert any(target.startswith("description/") for target in preview.items[0].target_outputs)
     assert any(target.startswith("metadata/") for target in preview.items[0].target_outputs)
@@ -249,7 +249,6 @@ def test_export_preview_is_invalidated_by_a_new_revision_even_with_same_content(
         selected.id,
         AnnotationChannel.DESCRIPTION,
         "same content",
-        confirm=True,
     )
     destination = tmp_path / "selected-export"
     destination.mkdir()
@@ -260,7 +259,7 @@ def test_export_preview_is_invalidated_by_a_new_revision_even_with_same_content(
         channels=[
             ExportChannelSelection(
                 channel=AnnotationChannel.DESCRIPTION,
-                revision=ExportRevisionMode.CONFIRMED,
+                revision=ExportRevisionMode.CURRENT,
             )
         ],
     )
@@ -273,7 +272,6 @@ def test_export_preview_is_invalidated_by_a_new_revision_even_with_same_content(
         AnnotationChannel.DESCRIPTION,
         "same content",
         expected_head_revision_id=first.revision_id,
-        confirm=True,
     )
     with pytest.raises(ValueError, match="预览已失效"):
         exports.create(
@@ -339,7 +337,7 @@ def test_export_api_uses_persistent_active_state_and_blocks_annotation_edits(
                 {
                     "channel": "existing_annotation",
                     "language": "",
-                    "revision": "confirmed",
+                    "revision": "current",
                 }
             ],
             "formats": ["txt"],

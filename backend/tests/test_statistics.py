@@ -30,7 +30,6 @@ def test_tag_frequency_is_a_read_only_replaceable_projection(tmp_path: Path) -> 
         workspace.project_id,
         by_name["one.png"].id,
         [AnnotationTag(name="caption"), AnnotationTag(name="subject")],
-        confirm=True,
     )
     annotations.save_tags(
         workspace.project_id,
@@ -40,7 +39,6 @@ def test_tag_frequency_is_a_read_only_replaceable_projection(tmp_path: Path) -> 
             AnnotationTag(name="subject"),
             AnnotationTag(name="garden"),
         ],
-        confirm=True,
     )
 
     result = StatisticsService(workspaces).tag_frequency(workspace.project_id)

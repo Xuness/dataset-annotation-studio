@@ -79,7 +79,7 @@ export function ExportHistoryPanel({
                 </small>
               ) : null}
               {operation.warning_count ? (
-                <small>包含 {operation.warning_count} 个已确认警告</small>
+                <small>包含 {operation.warning_count} 个已接受警告</small>
               ) : null}
               {operation.error_message ? (
                 <p className="form-error">{operation.error_message}</p>

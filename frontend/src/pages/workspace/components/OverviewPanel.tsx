@@ -55,7 +55,7 @@ export function OverviewPanel({ projectId, workspace, asset, onDeleteAsset }: Ov
       </section>
 
       <section className="inspector-section">
-        <span className="section-kicker">已确认 Tags · 只读统计</span>
+        <span className="section-kicker">当前可用 Tags · 只读统计</span>
         {buckets.length ? (
           <div className="tag-frequency">
             {buckets.map((bucket) => (
@@ -73,7 +73,7 @@ export function OverviewPanel({ projectId, workspace, asset, onDeleteAsset }: Ov
             </small>
           </div>
         ) : (
-          <p className="quiet-copy">当前还没有可统计的已确认 Tags。</p>
+          <p className="quiet-copy">当前还没有可统计的有效 Tags。</p>
         )}
       </section>
 

@@ -541,7 +541,7 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
     finally:
         connection.close()
     assert row["image_metadata_version"] == 1
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     assert "idx_job_items_asset_updated" in indexes
     assert {
         "cache_read_tokens",
@@ -573,7 +573,7 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
         "execution_profile_id",
         "execution_snapshot",
         "output_channel",
-        "use_confirmed_tags",
+        "use_tags_as_context",
     }.issubset(job_columns)
     assert "output_base_revision_id" in job_item_columns
     assert "configuration_snapshot" in export_operation_columns
@@ -652,24 +652,130 @@ def test_annotation_store_migration_backfills_existing_job_output_channels(
     finally:
         connection.close()
 
+    migrate_database(database, WORKSPACE_MIGRATIONS[:11])
+    connection = connect(database)
+    try:
+        connection.execute(
+            "UPDATE jobs SET use_confirmed_tags = 1 WHERE id = 'provider-annotation'"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
     initialize_workspace_database(database)
 
     connection = connect(database)
     try:
-        channels = {
-            str(row["id"]): str(row["output_channel"])
+        jobs = {
+            str(row["id"]): (
+                str(row["output_channel"]),
+                bool(row["use_tags_as_context"]),
+            )
             for row in connection.execute(
-                "SELECT id, output_channel FROM jobs ORDER BY id"
+                "SELECT id, output_channel, use_tags_as_context FROM jobs ORDER BY id"
             ).fetchall()
         }
     finally:
         connection.close()
 
-    assert channels == {
-        "local-tagger": "tags",
-        "provider-annotation": "description",
-        "provider-translation": "translation",
+    assert jobs == {
+        "local-tagger": ("tags", False),
+        "provider-annotation": ("description", True),
+        "provider-translation": ("translation", False),
     }
+
+
+def test_review_decoupling_migration_clears_automatic_confirmation_markers(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "workspace.sqlite3"
+    migrate_database(database, WORKSPACE_MIGRATIONS[:11])
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            INSERT INTO assets (
+                id, relative_path, filename, stem, suffix, content_hash,
+                byte_size, modified_ns, width, height, annotation_relative_path,
+                annotation_status, created_at, updated_at
+            ) VALUES (
+                'asset', 'sample.png', 'sample.png', 'sample', '.png', 'image-hash',
+                1, 1, 32, 32, 'sample.txt',
+                'valid', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'
+            )
+            """
+        )
+        documents = (
+            ("description", "text", "model_response"),
+            ("tags", "tags", "local_tagger"),
+            ("existing_annotation", "text", "legacy_txt_import"),
+        )
+        for channel, content_kind, source in documents:
+            document_id = f"document-{channel}"
+            revision_id = f"revision-{channel}"
+            connection.execute(
+                """
+                INSERT INTO annotation_documents (
+                    id, asset_id, channel, language, display_name, content_kind,
+                    created_at, updated_at
+                ) VALUES (?, 'asset', ?, '', ?, ?, ?, ?)
+                """,
+                (
+                    document_id,
+                    channel,
+                    channel,
+                    content_kind,
+                    "2026-01-01T00:00:00Z",
+                    "2026-01-01T00:00:00Z",
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO annotation_document_revisions (
+                    id, document_id, source, image_content_hash,
+                    validation_status, created_at
+                ) VALUES (?, ?, ?, 'image-hash', 'valid', ?)
+                """,
+                (
+                    revision_id,
+                    document_id,
+                    source,
+                    "2026-01-01T00:00:00Z",
+                ),
+            )
+            connection.execute(
+                """
+                UPDATE annotation_documents
+                SET head_revision_id = ?, confirmed_revision_id = ?
+                WHERE id = ?
+                """,
+                (revision_id, revision_id, document_id),
+            )
+        connection.commit()
+    finally:
+        connection.close()
+
+    initialize_workspace_database(database)
+
+    connection = connect(database)
+    try:
+        rows = {
+            str(row["channel"]): row
+            for row in connection.execute(
+                """
+                SELECT channel, head_revision_id, reviewed_revision_id
+                FROM annotation_documents
+                """
+            ).fetchall()
+        }
+        foreign_key_violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+    finally:
+        connection.close()
+
+    assert rows["description"]["reviewed_revision_id"] == rows["description"]["head_revision_id"]
+    assert rows["tags"]["reviewed_revision_id"] is None
+    assert rows["existing_annotation"]["reviewed_revision_id"] is None
+    assert foreign_key_violations == []
 
 
 def test_workspace_migration_is_safe_when_api_and_worker_start_together(tmp_path: Path) -> None:
@@ -696,7 +802,7 @@ def test_workspace_migration_is_safe_when_api_and_worker_start_together(tmp_path
         ]
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 
 def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None:
@@ -750,7 +856,7 @@ def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None
         ]
         imported = connection.execute(
             """
-            SELECT t.content, d.channel, d.confirmed_revision_id, d.head_revision_id
+            SELECT t.content, d.channel, d.reviewed_revision_id, d.head_revision_id
             FROM annotation_documents d
             JOIN annotation_text_contents t ON t.revision_id = d.head_revision_id
             WHERE d.asset_id = 'asset'
@@ -758,11 +864,27 @@ def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None
         ).fetchone()
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     assert imported is not None
     assert imported["content"] == "<caption>legacy</caption>"
     assert imported["channel"] == "existing_annotation"
-    assert imported["confirmed_revision_id"] == imported["head_revision_id"]
+    assert imported["reviewed_revision_id"] is None
+
+
+def test_workspace_manifest_accepts_the_legacy_tag_context_setting_name() -> None:
+    manifest = WorkspaceManifest.model_validate(
+        {
+            "project_id": "legacy-project",
+            "name": "dataset",
+            "created_at": "2026-01-01T00:00:00Z",
+            "settings": {"use_confirmed_tags": True},
+        }
+    )
+
+    assert manifest.settings.use_tags_as_context is True
+    serialized_settings = manifest.model_dump()["settings"]
+    assert serialized_settings["use_tags_as_context"] is True
+    assert "use_confirmed_tags" not in serialized_settings
 
 
 def test_recent_workspace_list_applies_missing_migrations_before_summary(
@@ -800,4 +922,4 @@ def test_recent_workspace_list_applies_missing_migrations_before_summary(
     finally:
         connection.close()
     assert [summary.project_id for summary in summaries] == [manifest.project_id]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]

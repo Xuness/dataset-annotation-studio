@@ -8,12 +8,16 @@ changes.
 
 - Replaced runtime annotation sidecars with revisioned SQLite channels for imported
   annotations, structured Tags, LLM descriptions, and translations.
-- Made Tags immediately confirmed after Tagger or manual writes, with batch confirmation
-  for selected legacy, edited, or stale Tag revisions.
+- Decoupled current usability from optional human review: validated Tagger, LLM, and
+  translation results can immediately feed downstream workflows.
+- Added database-backed batch action scopes so users can review or delete Tags, LLM
+  descriptions, imported annotations, and individual translation languages explicitly.
 - Added project-level Tag assistance beside the prompt settings, exact User Prompt
   previews, and per-asset input revision snapshots for LLM jobs.
 - Added channel-aware TXT and JSON export, including independent training variants for
   multi-channel TXT output.
+- Hid the imported-annotation editor tab unless the current asset actually contains that
+  channel.
 - Prepared the repository for an Apache-2.0 source release.
 - Added a CPU-default and CUDA-opt-in source runtime layout.
 - Added Linux-aware application data paths, filesystem path identity, credential-store

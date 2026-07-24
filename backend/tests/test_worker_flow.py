@@ -220,7 +220,7 @@ def test_idle_job_scheduler_does_not_scan_recent_workspaces(
     AnnotationWorker(container)._schedule_available_items()
 
 
-def test_llm_job_does_not_freeze_confirmed_tags_for_an_old_image(
+def test_llm_job_does_not_freeze_usable_tags_for_an_old_image(
     tmp_path: Path,
 ) -> None:
     container, workspaces, presets, jobs = _runtime(tmp_path)
@@ -236,7 +236,7 @@ def test_llm_job_does_not_freeze_confirmed_tags_for_an_old_image(
         workspace.project_id,
         WorkspaceSettingsUpdate(
             system_preset_id=system.id,
-            use_confirmed_tags=True,
+            use_tags_as_context=True,
         ),
     )
     asset = container.assets.list_assets(workspace.project_id).items[0]
@@ -244,7 +244,6 @@ def test_llm_job_does_not_freeze_confirmed_tags_for_an_old_image(
         workspace.project_id,
         asset.id,
         [AnnotationTag(name="old_image_tag", origin="manual")],
-        confirm=True,
     )
 
     Image.new("RGB", (64, 48), "black").save(image_path)
@@ -254,7 +253,8 @@ def test_llm_job_does_not_freeze_confirmed_tags_for_an_old_image(
         asset.id,
         AnnotationChannel.TAGS,
     )
-    assert stale_tags.review_status.value == "stale"
+    assert stale_tags.availability_status.value == "stale"
+    assert stale_tags.review_status.value == "unreviewed"
 
     provider = presets.create_provider(
         ProviderProfileCreate(
@@ -364,7 +364,8 @@ async def test_worker_runs_local_tagger_without_prompt_or_provider(
         assert [tag.name for tag in document.tags] == ["alice", "blue_hair"]
         assert document.tags[0].category == "character"
         assert document.tags[0].confidence == 0.91
-        assert document.review_status.value == "confirmed"
+        assert document.availability_status.value == "usable"
+        assert document.review_status.value == "unreviewed"
     assert all(not image_path.with_suffix(".txt").exists() for image_path in image_paths)
     trace = container.annotation_traces.get(workspace.project_id, detail.items[0].asset_id)
     assert trace is not None
@@ -392,7 +393,7 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
             system_preset_id=system.id,
             user_prompt="Describe the image.",
             json_fields=["artist"],
-            use_confirmed_tags=True,
+            use_tags_as_context=True,
         ),
     )
     asset = container.assets.list_assets(workspace.project_id).items[0]
@@ -403,7 +404,6 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
             AnnotationTag(name="blue_hair", category="general", origin="manual"),
             AnnotationTag(name="alice", category="character", origin="manual"),
         ],
-        confirm=True,
     )
     container.annotations.save_text(
         workspace.project_id,
@@ -457,7 +457,6 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
         asset.id,
         [AnnotationTag(name="changed_after_job_creation", origin="manual")],
         expected_head_revision_id=frozen_tags.head_revision_id,
-        confirm=True,
     )
     presets.update_provider(
         profile.id,
@@ -613,7 +612,6 @@ async def test_worker_translates_annotation_without_sending_image(tmp_path: Path
         asset.id,
         AnnotationChannel.DESCRIPTION,
         source,
-        confirm=True,
     )
     profile = presets.create_provider(
         ProviderProfileCreate(

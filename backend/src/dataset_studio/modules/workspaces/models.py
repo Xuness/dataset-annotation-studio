@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class WorkspaceSettings(BaseModel):
@@ -12,7 +12,10 @@ class WorkspaceSettings(BaseModel):
     system_preset_id: str | None = None
     user_prompt: str = ""
     json_fields: list[str] = Field(default_factory=list)
-    use_confirmed_tags: bool = False
+    use_tags_as_context: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("use_tags_as_context", "use_confirmed_tags"),
+    )
     validation_mode: Literal["tag_balance"] = "tag_balance"
 
 
@@ -52,7 +55,10 @@ class WorkspaceSettingsUpdate(BaseModel):
     system_preset_id: str | None = None
     user_prompt: str | None = None
     json_fields: list[str] | None = None
-    use_confirmed_tags: bool | None = None
+    use_tags_as_context: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("use_tags_as_context", "use_confirmed_tags"),
+    )
     validation_mode: Literal["tag_balance"] | None = None
 
 

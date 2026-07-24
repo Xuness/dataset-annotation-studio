@@ -232,7 +232,7 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
   const systemPresets = useSystemPresets();
   const [systemPresetId, setSystemPresetId] = useState(workspace.settings.system_preset_id ?? "");
   const [prompt, setPrompt] = useState(workspace.settings.user_prompt);
-  const [useConfirmedTags, setUseConfirmedTags] = useState(workspace.settings.use_confirmed_tags);
+  const [useTagsAsContext, setUseTagsAsContext] = useState(workspace.settings.use_tags_as_context);
   const [recordView, setRecordView] = useState<"trace" | "preview">("trace");
   const [error, setError] = useState<string | null>(null);
   const update = useUpdateWorkspace(projectId);
@@ -242,16 +242,16 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
   useEffect(() => {
     setSystemPresetId(workspace.settings.system_preset_id ?? "");
     setPrompt(workspace.settings.user_prompt);
-    setUseConfirmedTags(workspace.settings.use_confirmed_tags);
+    setUseTagsAsContext(workspace.settings.use_tags_as_context);
   }, [
     workspace.settings.system_preset_id,
-    workspace.settings.use_confirmed_tags,
+    workspace.settings.use_tags_as_context,
     workspace.settings.user_prompt,
   ]);
   const dirty =
     systemPresetId !== (workspace.settings.system_preset_id ?? "") ||
     prompt !== workspace.settings.user_prompt ||
-    useConfirmedTags !== workspace.settings.use_confirmed_tags;
+    useTagsAsContext !== workspace.settings.use_tags_as_context;
   useUnsavedScope(`workspace-prompt:${projectId}`, dirty);
 
   const selectedPresetExists = Boolean(
@@ -288,7 +288,7 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
       await update.mutateAsync({
         system_preset_id: systemPresetId,
         user_prompt: prompt,
-        use_confirmed_tags: useConfirmedTags,
+        use_tags_as_context: useTagsAsContext,
       });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "保存项目提示词配置失败。");
@@ -348,13 +348,13 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
         <label className="prompt-tag-assist">
           <input
             type="checkbox"
-            checked={useConfirmedTags}
-            onChange={(event) => setUseConfirmedTags(event.target.checked)}
+            checked={useTagsAsContext}
+            onChange={(event) => setUseTagsAsContext(event.target.checked)}
           />
           <span>
             <strong>使用 Tags 辅助 LLM</strong>
             <small>
-              每张图片创建任务时会冻结其已确认 Tags，并在 JSON 元数据之后以
+              每张图片创建任务时会冻结其当前可用 Tags，并在 JSON 元数据之后以
               <code>tags: [&quot;tag_a&quot;,&quot;tag_b&quot;]</code> 形式追加到 User
               Prompt。没有可用 Tags 时不会追加这一行。
             </small>
@@ -453,7 +453,7 @@ export function PromptSettingsPanel({ projectId, workspace, asset }: PromptSetti
                       {preview.data.tag_line ??
                         (preview.data.tag_context_status === "disabled"
                           ? "不会向 User Prompt 追加 Tags 行。"
-                          : "当前图片没有与现有图片版本一致的已确认 Tags；实际请求将省略 Tags 行。")}
+                          : "当前图片没有与现有图片版本一致且通过校验的 Tags；实际请求将省略 Tags 行。")}
                     </pre>
                   </article>
                   <article className="prompt-message-card">

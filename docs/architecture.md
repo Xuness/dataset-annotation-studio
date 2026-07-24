@@ -40,9 +40,9 @@ Windows 主窗口的关闭请求只隐藏窗口，不销毁 WebView，也不停�
 
 - `modules/workspaces`：项目清单、路径解析、可携带身份和设置。
 - `modules/assets`：图片发现、增量索引、目录投影、缩略图、元数据读取，以及素材文件包的可恢复删除。
-- `modules/annotations`：多通道文档、不可变修订、结构化 Tags、确认状态、旧 TXT 一次性导入和轻量校验。
-- `modules/translations`：数据库译文通道、确认源修订追踪、结构校验和翻译 Prompt 模板渲染。
-- `modules/prompts`：User Prompt、选定 JSON 字段和可选已确认 Tags 的纯函数组合。
+- `modules/annotations`：多通道文档、不可变修订、结构化 Tags、可用性、人工复核、旧 TXT 一次性导入和轻量校验。
+- `modules/translations`：数据库译文通道、当前可用源修订追踪、结构校验和翻译 Prompt 模板渲染。
+- `modules/prompts`：User Prompt、选定 JSON 字段和可选当前可用 Tags 的纯函数组合。
 - `modules/presets`：全局 System Prompt / 模型连接聚合的持久化；API 密钥通过 `SecretStore` 隔离。
 - `modules/providers`：供应商协议类型、单模型参数、统一 `ModelProvider` 协议、各供应商适配器，以及惰性共享的 Codex Runtime。
 - `modules/taggers`：本地模型适配器注册、受管安装、完整性清单、审核下载计划、全局下载队列、可复用打标配置与惰性 ONNX Runtime；不依赖页面或项目任务仓储。
@@ -59,20 +59,23 @@ Windows 主窗口的关闭请求只隐藏窗口，不销毁 WebView，也不停�
 
 `annotation_documents` 按“素材 + 通道 + 语言”定义逻辑文档，
 `annotation_document_revisions` 保存不可变修订；文本和 Tags 分别进入
-`annotation_text_contents` 与 `annotation_tag_items`。文档只保存当前 head 和已确认 revision
+`annotation_text_contents` 与 `annotation_tag_items`。文档只保存当前 head 和已人工复核 revision
 指针，删除使用墓碑修订。生成修订还通过 `annotation_revision_inputs` 记录所依赖的 Tag 或翻译源修订。
 
 固定通道为“原有标注”、`Tags`、`LLM 描述` 和按语言区分的“翻译”。Tagger 只写 Tags，
 远端标注模型只写 LLM 描述，翻译器只写目标语言通道；协议适配器不理解通道仓储，通道服务也不依赖具体模型。
-LLM 描述和译文生成结果默认待确认；Tagger 与人工保存的 Tags 默认同步更新 confirmed 指针。
-普通确认只移动指针，图片变化后的复核才复制内容到绑定当前图片哈希的新修订。
+可用性由当前 head 的校验状态、墓碑状态和图片内容哈希决定；人工复核由 `reviewed_revision_id` 独立表达。
+因此 Tagger、LLM 描述和译文结果即使默认尚未复核，只要校验通过并匹配当前图片就可立即参与下游流程。
+普通复核只移动 reviewed 指针，图片变化后的复核才复制内容到绑定当前图片哈希的新修订；复核不会覆盖校验结果。
+批量操作先按所选素材聚合当前活动文档，再用“通道 + 语言”的显式目标一次提交；复核和删除都在取得全部目标租约后
+以单个 SQLite 事务写入，避免前端逐通道循环造成部分成功。“原有标注”和各语言译文只有实际存在时才进入范围响应。
 
 数据库迁移首次启用该存储时，扫描当时实际存在的旧 TXT 并导入保留名称的通道。迁移前 SQLite
 备份进入项目 `history/`；无效 UTF-8 同时保留原始字节，确保以后仍可原样导出。导入完成后应用不再扫描外部
 TXT 作为活动状态，也不删除旧文件。
 
 任务创建会在同一个 SQLite 事务内冻结目标通道的 base revision。项目提示词设置启用 Tags 辅助 LLM 时，还逐图
-冻结当时已确认的 Tag revision；Worker 只从该修订读取 Tag 名称，并在 JSON 元数据之后以可预览的 `tags: [...]`
+冻结当时通过校验且匹配当前图片的 Tag head revision；Worker 只从该修订读取 Tag 名称，并在 JSON 元数据之后以可预览的 `tags: [...]`
 行追加到 User Prompt。后续编辑 Tags 不会改变既有任务，也不会把 LLM 结果写回 Tags 通道。
 
 ## 模型连接与执行快照
@@ -109,6 +112,8 @@ OpenRouter 目录仍使用其扩展元数据；两个协议各自由适配器映
 素材页保持两类选择状态分离：`selectedAssetId` 只表示编辑器当前打开的图片，
 `checkedAssetIds` 只表示跨列表页保留的批量操作范围。目录树是后端索引的只读投影，选中目录只给素材查询和
 “全选当前筛选”增加子树边界，不会隐式清空或改写批量选择。
+“标记已复核”和“删标注”都会先打开共享的类别选择层；若当前编辑器的对应通道存在未保存草稿，该类别会暂时禁用，
+其它类别仍可独立执行。
 
 ## 素材删除与目录边界
 
@@ -209,7 +214,7 @@ staging，统一安装器负责适配器验证、清单和原子发布。新增�
 
 ### 新校验与统计
 
-标注修订正文始终保持不变。校验器输出统一状态与问题列表；统计器消费已确认的结构化 Tags 并产生只读投影。
+标注修订正文始终保持不变。校验器输出统一状态与问题列表；统计器消费当前可用的结构化 Tags 并产生只读投影。
 其它正文分析器可以新增，但不能反向改写修订。
 
 ### 新预处理操作
@@ -220,10 +225,11 @@ staging，统一安装器负责适配器验证、清单和原子发布。新增�
 
 ### 数据集导出
 
-导出请求显式选择一个或多个通道、`confirmed` 或 `head` 修订策略，以及 TXT、JSON 或两者。预览解析并冻结具体
+导出请求显式选择一个或多个通道、`current` 或 `reviewed` 修订策略，以及 TXT、JSON 或两者。默认使用当前 head；
+`reviewed` 仅用于需要人工复核门槛的导出。预览解析并冻结具体
 revision ID、结构化内容和目标路径；创建任务时重新规划，任一 revision 指针变化都会令预览失效，即使新旧正文相同。
-图片缺失或变化、目标目录非空以及最终目标名称冲突属于不可绕过错误；通道缺失、待确认、过期、空内容、结构异常或
-非 UTF-8 属于警告。
+图片缺失或变化、目标目录非空以及最终目标名称冲突属于不可绕过错误；通道缺失、过期、空内容、结构异常或
+非 UTF-8 属于警告，尚未人工复核本身不阻止默认导出。
 
 单通道 TXT 物化为常见的扁平图片 + 同名 TXT。多通道 TXT 为每个通道建立独立训练集目录并复制对应图片，避免把
 Tags 与描述合并成含义不清的文本；逐图 JSON 可以在一个对象中保留多个通道、revision ID 和结构化 Tags。

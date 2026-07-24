@@ -11,7 +11,6 @@ import {
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useConfirmTagAnnotations } from "../../features/annotations/hooks";
 import { useAssetFolders, useAssetIds, useInfiniteAssets } from "../../features/assets/hooks";
 import {
   useRescanWorkspace,
@@ -19,11 +18,15 @@ import {
   useWorkspace,
 } from "../../features/workspaces/hooks";
 import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
-import type { AssetFilterStatus } from "../../shared/api/types";
+import type { AnnotationChannelTarget, AssetFilterStatus } from "../../shared/api/types";
 import { useAppStore } from "../../shared/store/appStore";
 import { Button } from "../../shared/ui/Button";
 import { alertDialog, confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
+import {
+  AnnotationBulkActionDialog,
+  type AnnotationBulkAction,
+} from "./components/AnnotationBulkActionDialog";
 import { AssetDeletionDialog } from "./components/AssetDeletionDialog";
 import { AssetBrowser } from "./components/AssetBrowser";
 import { ImageStage } from "./components/ImageStage";
@@ -49,13 +52,24 @@ interface WorkspacePageProps {
   mode?: "assets" | "review";
 }
 
+interface AnnotationBulkDialogState {
+  open: boolean;
+  action: AnnotationBulkAction;
+  assetIds: string[];
+}
+
+const CLOSED_ANNOTATION_DIALOG: AnnotationBulkDialogState = {
+  open: false,
+  action: "review",
+  assetIds: [],
+};
+
 export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const { projectId = "" } = useParams();
   const navigate = useNavigate();
   const workspace = useWorkspace(projectId);
   const rescan = useRescanWorkspace(projectId);
   const updateWorkspace = useUpdateWorkspace(projectId);
-  const confirmTags = useConfirmTagAnnotations(projectId);
   const selectedAssetId = useAppStore((state) => state.selectedAssetId);
   const selectAsset = useAppStore((state) => state.selectAsset);
   const checkedAssetIds = useAppStore((state) => state.checkedAssetIds);
@@ -67,7 +81,13 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   );
   const [folderPath, setFolderPath] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
+  const [editorTarget, setEditorTarget] = useState<AnnotationChannelTarget>({
+    channel: "description",
+    language: "",
+  });
   const [editorRevision, setEditorRevision] = useState(0);
+  const [annotationDialog, setAnnotationDialog] =
+    useState<AnnotationBulkDialogState>(CLOSED_ANNOTATION_DIALOG);
   const workspaceBodyRef = useRef<HTMLDivElement>(null);
   const mediaColumnRef = useRef<HTMLDivElement>(null);
   const { layout, setLayout } = useWorkspaceLayout(projectId);
@@ -84,7 +104,6 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     setEditorRevision((current) => current + 1);
   }, []);
   const assetActions = useAssetDestructiveActions({
-    projectId,
     contextKey: `${projectId}:${mode}`,
     selectedAssetId,
     editorDirty,
@@ -122,6 +141,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     setFolderPath("");
     setEditorDirty(false);
     setEditorRevision(0);
+    setAnnotationDialog(CLOSED_ANNOTATION_DIALOG);
   }, [mode, projectId, setActiveProject]);
 
   useEffect(() => {
@@ -219,32 +239,20 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     setAssetsChecked(assetIds, shouldCheck);
   }, [knownMatchingAssetIds, matchingAssetIds, setAssetsChecked]);
 
-  const confirmCheckedTags = useCallback(async () => {
+  const openAnnotationDialog = useCallback((action: AnnotationBulkAction) => {
     const assetIds = [...useAppStore.getState().checkedAssetIds];
     if (!assetIds.length) return;
-    if (editorDirty && selectedAssetId && assetIds.includes(selectedAssetId)) {
-      const proceed = await confirmDialog(
-        "批量确认只会采用数据库中已保存的 Tags，不包含当前编辑器尚未保存的修改。仍要继续吗？",
-        {
-          title: "存在未保存修改",
-          confirmLabel: "确认已保存 Tags",
-          cancelLabel: "继续编辑",
-        },
-      );
-      if (!proceed) return;
-    }
-    try {
-      const result = await confirmTags.mutateAsync(assetIds);
-      await alertDialog(
-        `已确认 ${result.confirmed_count} 张图片的 Tags；${result.already_confirmed_count} 张原本已确认，${result.missing_count} 张没有可确认的 Tags。`,
-        { title: "批量确认完成" },
-      );
-    } catch (error) {
-      await alertDialog(error instanceof Error ? error.message : "批量确认 Tags 失败。", {
-        title: "批量确认失败",
-      });
-    }
-  }, [confirmTags, editorDirty, selectedAssetId]);
+    setAnnotationDialog({ open: true, action, assetIds });
+  }, []);
+
+  const closeAnnotationDialog = useCallback(() => {
+    setAnnotationDialog((current) => ({ ...current, open: false }));
+  }, []);
+
+  const blockedAnnotationTarget =
+    editorDirty && selectedAssetId && annotationDialog.assetIds.includes(selectedAssetId)
+      ? editorTarget
+      : null;
 
   const layoutStyle = {
     "--asset-pane-width": `${layout.assetPaneWidth}px`,
@@ -313,7 +321,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         selectAllPending={matchingAssetIds.isFetching}
         allMatchingSelected={allMatchingSelected}
         error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
-        bulkActionPending={assetActions.annotationDeletePending || confirmTags.isPending}
+        bulkActionPending={annotationDialog.open}
         onLoadMore={loadMoreAssets}
         recursive={workspace.data.settings.recursive_scan}
         onSearchChange={setSearch}
@@ -322,8 +330,8 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         onSelect={requestSelectAsset}
         onSetChecked={setAssetsChecked}
         onToggleAll={() => void toggleAllMatchingAssets()}
-        onConfirmCheckedTags={() => void confirmCheckedTags()}
-        onDeleteCheckedAnnotations={() => void assetActions.deleteCheckedAnnotations()}
+        onReviewCheckedAnnotations={() => openAnnotationDialog("review")}
+        onDeleteCheckedAnnotations={() => openAnnotationDialog("delete")}
         onDeleteCheckedAssets={assetActions.openCheckedAssetDeletion}
         onOpenDeletionHistory={assetActions.openDeletionHistory}
         onRecursiveChange={(recursive_scan) =>
@@ -406,6 +414,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
             projectId={projectId}
             assetId={selectedAssetId}
             onDirtyChange={setEditorDirty}
+            onActiveTargetChange={setEditorTarget}
           />
         </Suspense>
       </div>
@@ -455,6 +464,14 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         beforeExecute={assetActions.beforeDeleteAssets}
         onDeleted={assetActions.handleAssetsDeleted}
         onClose={assetActions.closeDeletionDialog}
+      />
+      <AnnotationBulkActionDialog
+        projectId={projectId}
+        open={annotationDialog.open}
+        action={annotationDialog.action}
+        assetIds={annotationDialog.assetIds}
+        blockedTarget={blockedAnnotationTarget}
+        onClose={closeAnnotationDialog}
       />
     </WorkspaceFrame>
   );

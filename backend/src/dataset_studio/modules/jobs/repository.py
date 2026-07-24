@@ -32,7 +32,7 @@ class JobCreationRepository:
         scope: str,
         overwrite_existing: bool,
         output_channel: str,
-        use_confirmed_tags: bool,
+        use_tags_as_context: bool,
         output_language: str = "",
         retry_limit: int,
         asset_ids: list[str],
@@ -47,7 +47,7 @@ class JobCreationRepository:
                     system_preset_id, system_prompt_snapshot,
                     provider_profile_id, provider_snapshot, user_prompt_snapshot,
                     json_fields_snapshot, scope, overwrite_existing, retry_limit, stop_requested,
-                    output_channel, use_confirmed_tags, created_at, updated_at
+                    output_channel, use_tags_as_context, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
                 """,
                 (
@@ -68,7 +68,7 @@ class JobCreationRepository:
                     int(overwrite_existing),
                     retry_limit,
                     output_channel,
-                    int(use_confirmed_tags),
+                    int(use_tags_as_context),
                     now,
                     now,
                 ),
@@ -106,28 +106,31 @@ class JobCreationRepository:
                         now,
                     ),
                 )
-                if use_confirmed_tags:
+                if use_tags_as_context:
                     tag_document = connection.execute(
                         """
-                        SELECT d.confirmed_revision_id
+                        SELECT d.head_revision_id
                         FROM annotation_documents d
                         JOIN annotation_document_revisions r
-                          ON r.id = d.confirmed_revision_id
+                          ON r.id = d.head_revision_id
                         JOIN assets a ON a.id = d.asset_id
                         WHERE d.asset_id = ?
                           AND d.channel = 'tags'
                           AND d.language = ''
                           AND r.is_tombstone = 0
                           AND r.image_content_hash = a.content_hash
+                          AND r.validation_status NOT IN (
+                              'invalid', 'encoding_error', 'empty', 'unchecked'
+                          )
                         """,
                         (asset_id,),
                     ).fetchone()
-                    if tag_document and tag_document["confirmed_revision_id"]:
+                    if tag_document and tag_document["head_revision_id"]:
                         connection.execute(
                             """
                             INSERT INTO job_item_annotation_inputs (
                                 job_item_id, revision_id, role
                             ) VALUES (?, ?, 'tag_context')
                             """,
-                            (item_id, str(tag_document["confirmed_revision_id"])),
+                            (item_id, str(tag_document["head_revision_id"])),
                         )

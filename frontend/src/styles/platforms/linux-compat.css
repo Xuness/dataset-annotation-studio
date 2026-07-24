@@ -18,7 +18,7 @@
  * as Windows.
  */
 :root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
-  :where(.settings-center-backdrop, .asset-deletion-backdrop) {
+  :where(.settings-center-backdrop, .asset-deletion-backdrop, .annotation-bulk-backdrop) {
   backdrop-filter: none !important;
   animation: none !important;
 }
@@ -30,7 +30,7 @@
 }
 
 :root[data-runtime-platform="linux"][data-linux-graphics-mode="software"]
-  :where(.asset-deletion-dialog, .dialog) {
+  :where(.asset-deletion-dialog, .annotation-bulk-dialog, .dialog) {
   background: color-mix(in srgb, var(--surface) 98%, transparent) !important;
   animation: none !important;
 }

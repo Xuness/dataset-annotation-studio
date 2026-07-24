@@ -141,7 +141,7 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
             json={
                 "system_preset_id": preset.json()["id"],
                 "user_prompt": "Describe this image.",
-                "use_confirmed_tags": True,
+                "use_tags_as_context": True,
             },
         )
         assert configured.status_code == 200
@@ -203,7 +203,8 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
             },
         )
         assert saved_tags.status_code == 200
-        assert saved_tags.json()["review_status"] == "confirmed"
+        assert saved_tags.json()["availability_status"] == "usable"
+        assert saved_tags.json()["review_status"] == "unreviewed"
         edited_tags = client.put(
             tags_path,
             json={
@@ -222,17 +223,11 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
                     },
                 ],
                 "expected_head_revision_id": saved_tags.json()["head_revision_id"],
-                "confirm": False,
+                "review": False,
             },
         )
         assert edited_tags.status_code == 200
         assert edited_tags.json()["review_status"] == "unreviewed"
-        batch_confirmed = client.post(
-            f"/api/v1/workspaces/{project_id}/annotations/tags/confirm",
-            json={"asset_ids": [asset_id]},
-        )
-        assert batch_confirmed.status_code == 200
-        assert batch_confirmed.json()["confirmed_count"] == 1
         assisted_preview = client.get(
             f"/api/v1/workspaces/{project_id}/assets/{asset_id}/prompt-preview"
         )
@@ -240,11 +235,39 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
         assert assisted_preview.json()["final_user_prompt"] == (
             'Describe this image.\n\ntags: ["blue_hair","alice"]'
         )
-        batch_deleted = client.post(
-            f"/api/v1/workspaces/{project_id}/annotations/delete",
+        batch_options = client.post(
+            f"/api/v1/workspaces/{project_id}/annotations/options",
             json={"asset_ids": [asset_id]},
         )
+        assert batch_options.status_code == 200
+        assert {
+            (item["channel"], item["language"]) for item in batch_options.json()["targets"]
+        } == {("description", None), ("tags", None)}
+        batch_reviewed = client.post(
+            f"/api/v1/workspaces/{project_id}/annotations/review",
+            json={
+                "asset_ids": [asset_id],
+                "targets": [
+                    {"channel": "tags", "language": ""},
+                    {"channel": "description", "language": ""},
+                ],
+            },
+        )
+        assert batch_reviewed.status_code == 200
+        assert batch_reviewed.json()["target_count"] == 2
+        assert batch_reviewed.json()["reviewed_count"] == 2
+        batch_deleted = client.post(
+            f"/api/v1/workspaces/{project_id}/annotations/delete",
+            json={
+                "asset_ids": [asset_id],
+                "targets": [
+                    {"channel": "tags", "language": ""},
+                    {"channel": "description", "language": ""},
+                ],
+            },
+        )
         assert batch_deleted.status_code == 200
+        assert batch_deleted.json()["target_count"] == 2
         assert batch_deleted.json()["deleted_count"] == 2
 
         deletion_preview = client.post(

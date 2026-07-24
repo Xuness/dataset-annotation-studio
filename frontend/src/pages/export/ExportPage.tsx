@@ -24,7 +24,7 @@ const initialForm: ExportFormState = {
   destinationPath: "",
   channels: ["existing_annotation"],
   translationLanguage: "zh-CN",
-  revision: "confirmed",
+  revision: "current",
   formats: ["txt"],
 };
 
@@ -124,7 +124,7 @@ export function ExportPage() {
         [
           `所选 ${previewData.total_items} 张图片中发现 ${previewData.warning_count} 个标注警告：`,
           `未标注 ${previewData.missing_count}，空内容 ${previewData.empty_count}，`,
-          `待确认 ${previewData.unreviewed_count}，已过期 ${previewData.stale_count}，`,
+          `已过期 ${previewData.stale_count}，`,
           `结构异常 ${previewData.invalid_count}，编码异常 ${previewData.encoding_error_count}。`,
           "继续后会严格使用当前预览冻结的数据库修订；缺失通道不会生成对应标注文件。",
         ].join("\n"),

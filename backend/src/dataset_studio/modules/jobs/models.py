@@ -98,7 +98,7 @@ class JobSummary(BaseModel):
     scope: JobScope
     overwrite_existing: bool
     output_channel: AnnotationChannel
-    use_confirmed_tags: bool = False
+    use_tags_as_context: bool = False
     target_language: str | None = None
     translation_policy: ExistingTranslationPolicy | None = None
     retry_limit: int

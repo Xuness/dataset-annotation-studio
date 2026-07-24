@@ -54,7 +54,7 @@ def _translation_services(tmp_path: Path, filenames: tuple[str, ...] = ("sample.
     return project, workspace.project_id, asset_items, workspaces, annotations, translations
 
 
-def _save_confirmed_source(
+def _save_usable_source(
     annotations: AnnotationService,
     project_id: str,
     asset_id: str,
@@ -65,17 +65,23 @@ def _save_confirmed_source(
         asset_id,
         AnnotationChannel.DESCRIPTION,
         content,
-        confirm=True,
     )
 
 
-def test_translation_tracks_confirmed_source_revision_without_writing_sidecars(
+def test_translation_tracks_current_usable_source_revision_without_writing_sidecars(
     tmp_path: Path,
 ) -> None:
     project, project_id, assets, _, annotations, translations = _translation_services(tmp_path)
     asset = assets[0]
     source = '<caption mood="quiet">a small garden</caption>'
-    source_write = _save_confirmed_source(annotations, project_id, asset.id, source)
+    source_write = _save_usable_source(annotations, project_id, asset.id, source)
+    source_document = annotations.get_channel(
+        project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+    )
+    assert source_document.availability_status.value == "usable"
+    assert source_document.review_status.value == "unreviewed"
     source_revision = translations.read_source_revision(project_id, asset.id)
     assert source_revision is not None
     source_hash = source_revision[2]
@@ -105,6 +111,7 @@ def test_translation_tracks_confirmed_source_revision_without_writing_sidecars(
         "zh-CN",
     )
     assert stored.content == '<caption mood="quiet">一座小花园</caption>'
+    assert stored.availability_status.value == "usable"
     assert stored.review_status.value == "unreviewed"
 
     with pytest.raises(ValueError, match="标签、属性或标签顺序"):
@@ -117,31 +124,32 @@ def test_translation_tracks_confirmed_source_revision_without_writing_sidecars(
         )
     assert translations.get(project_id, asset.id, "zh-CN").content == stored.content
 
-    pending_source = annotations.save_text(
+    annotations.review(
+        project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        source_write.revision_id,
+    )
+    assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.CURRENT
+
+    annotations.save_text(
         project_id,
         asset.id,
         AnnotationChannel.DESCRIPTION,
         '<caption mood="quiet">a larger garden</caption>',
         expected_head_revision_id=source_write.revision_id,
     )
-    assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.CURRENT
-    annotations.confirm(
-        project_id,
-        asset.id,
-        AnnotationChannel.DESCRIPTION,
-        pending_source.revision_id,
-    )
     stale = translations.get(project_id, asset.id, "zh-CN")
     assert stale.status == TranslationStatus.STALE
     assert stale.source_hash != stale.current_source_hash
 
 
-def test_manual_translation_edit_tracks_the_confirmed_source_revision(
+def test_manual_translation_edit_tracks_the_current_usable_source_revision(
     tmp_path: Path,
 ) -> None:
     _, project_id, assets, workspaces, annotations, translations = _translation_services(tmp_path)
     asset = assets[0]
-    source = _save_confirmed_source(
+    source = _save_usable_source(
         annotations,
         project_id,
         asset.id,
@@ -159,19 +167,12 @@ def test_manual_translation_edit_tracks_the_confirmed_source_revision(
     assert saved.language == "zh-CN"
     assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.CURRENT
 
-    changed = annotations.save_text(
+    annotations.save_text(
         project_id,
         asset.id,
         AnnotationChannel.DESCRIPTION,
         "<caption>changed</caption>",
         expected_head_revision_id=source.revision_id,
-    )
-    assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.CURRENT
-    annotations.confirm(
-        project_id,
-        asset.id,
-        AnnotationChannel.DESCRIPTION,
-        changed.revision_id,
     )
     assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.STALE
     stale_assets = AssetService(workspaces).list_assets(
@@ -181,7 +182,7 @@ def test_manual_translation_edit_tracks_the_confirmed_source_revision(
     assert [item.id for item in stale_assets.items] == [asset.id]
 
 
-def test_translation_requires_a_valid_confirmed_source(tmp_path: Path) -> None:
+def test_translation_requires_a_valid_current_source(tmp_path: Path) -> None:
     _, project_id, assets, _, annotations, translations = _translation_services(tmp_path)
     asset = assets[0]
     annotations.save_text(
@@ -189,7 +190,6 @@ def test_translation_requires_a_valid_confirmed_source(tmp_path: Path) -> None:
         asset.id,
         AnnotationChannel.DESCRIPTION,
         "<caption>broken",
-        confirm=True,
     )
 
     assert translations.read_source(project_id, asset.id) is None
@@ -206,7 +206,7 @@ def test_translation_requires_a_valid_confirmed_source(tmp_path: Path) -> None:
         )
 
 
-def test_translation_job_uses_confirmed_sources_and_existing_policy(tmp_path: Path) -> None:
+def test_translation_job_uses_current_usable_sources_and_existing_policy(tmp_path: Path) -> None:
     (
         _,
         project_id,
@@ -217,7 +217,7 @@ def test_translation_job_uses_confirmed_sources_and_existing_policy(tmp_path: Pa
     ) = _translation_services(tmp_path, ("current.png", "missing.png"))
     by_name = {asset.filename: asset for asset in assets}
     for asset in assets:
-        _save_confirmed_source(annotations, project_id, asset.id, "<caption>source</caption>")
+        _save_usable_source(annotations, project_id, asset.id, "<caption>source</caption>")
     current_source = translations.read_source_revision(project_id, by_name["current.png"].id)
     assert current_source is not None
     translations.save_generated(
@@ -298,18 +298,12 @@ def test_translation_job_uses_confirmed_sources_and_existing_policy(tmp_path: Pa
         by_name["current.png"].id,
         AnnotationChannel.DESCRIPTION,
     )
-    changed = annotations.save_text(
+    annotations.save_text(
         project_id,
         by_name["current.png"].id,
         AnnotationChannel.DESCRIPTION,
         "<caption>changed</caption>",
         expected_head_revision_id=current.head_revision_id,
-    )
-    annotations.confirm(
-        project_id,
-        by_name["current.png"].id,
-        AnnotationChannel.DESCRIPTION,
-        changed.revision_id,
     )
     stale_job = jobs.create(
         project_id,
@@ -337,13 +331,13 @@ def test_translation_channels_are_isolated_per_asset_and_ignore_legacy_filename_
         translations,
     ) = _translation_services(tmp_path, ("sample.png", "sample.zh-CN.png"))
     by_name = {asset.filename: asset for asset in assets}
-    _save_confirmed_source(
+    _save_usable_source(
         annotations,
         project_id,
         by_name["sample.png"].id,
         "<caption>source</caption>",
     )
-    _save_confirmed_source(
+    _save_usable_source(
         annotations,
         project_id,
         by_name["sample.zh-CN.png"].id,

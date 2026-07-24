@@ -421,7 +421,7 @@ class AnnotationWorker:
             selected_fields = json.loads(str(job["json_fields_snapshot"]))
             tag_revision_id = (
                 repository.annotation_input_revision(item_id, "tag_context")
-                if bool(job["use_confirmed_tags"])
+                if bool(job["use_tags_as_context"])
                 else None
             )
             auxiliary_tags = (

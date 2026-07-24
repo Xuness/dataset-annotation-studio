@@ -48,13 +48,18 @@
   white-space: nowrap;
 }
 
-.annotation-review--confirmed {
+.annotation-review--usable {
   color: var(--sage);
   background: var(--sage-soft);
 }
 
-.annotation-review--unreviewed,
-.annotation-review--stale {
+.annotation-review--reviewed {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.annotation-review--stale,
+.annotation-review--invalid {
   color: var(--warning);
   background: var(--warning-soft);
 }
@@ -107,12 +112,16 @@
   background: var(--faint);
 }
 
-.annotation-channel-dot--confirmed {
+.annotation-channel-dot--usable {
   background: var(--sage);
 }
 
-.annotation-channel-dot--unreviewed,
-.annotation-channel-dot--stale {
+.annotation-channel-dot--reviewed {
+  background: var(--accent);
+}
+
+.annotation-channel-dot--stale,
+.annotation-channel-dot--invalid {
   background: var(--warning);
 }
 

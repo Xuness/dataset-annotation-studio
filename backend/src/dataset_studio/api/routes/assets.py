@@ -88,10 +88,10 @@ def get_prompt_preview(project_id: str, asset_id: str, container: Container):
     metadata = container.assets.metadata(project_id, asset_id)
     tag_revision_id = None
     auxiliary_tags: list[str] = []
-    if workspace.settings.use_confirmed_tags:
-        confirmed_tags = container.annotations.confirmed_tags(project_id, asset_id)
-        if confirmed_tags:
-            tag_revision_id, tags = confirmed_tags
+    if workspace.settings.use_tags_as_context:
+        usable_tags = container.annotations.usable_tags(project_id, asset_id)
+        if usable_tags:
+            tag_revision_id, tags = usable_tags
             auxiliary_tags = [tag.name for tag in tags]
     preset_id = workspace.settings.system_preset_id
     preset = None
@@ -111,7 +111,7 @@ def get_prompt_preview(project_id: str, asset_id: str, container: Container):
         metadata=metadata.value if metadata.exists and not metadata.error else None,
         selected_fields=workspace.settings.json_fields,
         auxiliary_tags=auxiliary_tags,
-        tag_assistance_enabled=workspace.settings.use_confirmed_tags,
+        tag_assistance_enabled=workspace.settings.use_tags_as_context,
         tag_revision_id=tag_revision_id,
         configuration_issue=configuration_issue,
     )

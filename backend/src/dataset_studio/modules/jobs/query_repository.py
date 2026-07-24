@@ -247,7 +247,7 @@ class JobQueryRepository:
             scope=str(row["scope"]),
             overwrite_existing=bool(row["overwrite_existing"]),
             output_channel=str(row["output_channel"]),
-            use_confirmed_tags=bool(row["use_confirmed_tags"]),
+            use_tags_as_context=bool(row["use_tags_as_context"]),
             target_language=(
                 str(configuration["target_language"])
                 if kind == "translation" and configuration.get("target_language")

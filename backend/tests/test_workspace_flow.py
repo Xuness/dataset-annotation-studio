@@ -8,7 +8,11 @@ from dataset_studio.api.app import create_app
 from dataset_studio.core.config import Settings
 from dataset_studio.core.errors import ResourceConflictError
 from dataset_studio.core.sqlite import connect
-from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationTag
+from dataset_studio.modules.annotations.models import (
+    AnnotationChannel,
+    AnnotationChannelTarget,
+    AnnotationTag,
+)
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.assets.service import AssetService
@@ -54,7 +58,7 @@ def test_workspace_is_portable_and_scans_recursive_assets(tmp_path: Path) -> Non
     listed = assets.list_assets(summary.project_id)
     assert [item.relative_path for item in listed.items] == ["first.png", "nested/second.webp"]
     assert listed.items[0].metadata_relative_path == "first.json"
-    assert listed.items[0].annotation_channels["existing_annotation"] == "confirmed"
+    assert listed.items[0].annotation_channels["existing_annotation"] == "unreviewed"
 
     moved = tmp_path / "Style" / "MovedExample"
     moved.parent.mkdir()
@@ -112,7 +116,7 @@ def test_remove_recent_clears_idle_worker_candidates(tmp_path: Path) -> None:
     assert (project / "sample.png").is_file()
 
 
-def test_annotation_channels_save_confirm_delete_and_keep_history_in_database(
+def test_annotation_channels_save_review_delete_and_keep_history_in_database(
     tmp_path: Path,
 ) -> None:
     workspaces, assets, annotations = _services(tmp_path)
@@ -127,15 +131,16 @@ def test_annotation_channels_save_confirm_delete_and_keep_history_in_database(
         AnnotationChannel.DESCRIPTION,
         "<root>text</root>",
     )
+    assert description.document.availability_status.value == "usable"
     assert description.document.review_status.value == "unreviewed"
     assert not (project / "image.txt").exists()
-    confirmed = annotations.confirm(
+    reviewed = annotations.review(
         summary.project_id,
         asset.id,
         AnnotationChannel.DESCRIPTION,
         description.revision_id,
     )
-    assert confirmed.review_status.value == "confirmed"
+    assert reviewed.review_status.value == "reviewed"
 
     tags = annotations.save_tags(
         summary.project_id,
@@ -149,15 +154,15 @@ def test_annotation_channels_save_confirm_delete_and_keep_history_in_database(
             ),
             AnnotationTag(name="alice", category="character", origin="manual"),
         ],
-        confirm=True,
+        review=True,
     )
     assert [tag.name for tag in tags.document.tags] == ["blue_hair", "alice"]
     assert tags.document.tags[0].confidence == 0.92
 
     bundle = annotations.list(summary.project_id, asset.id)
     assert {document.channel: document.review_status.value for document in bundle.documents} == {
-        AnnotationChannel.TAGS: "confirmed",
-        AnnotationChannel.DESCRIPTION: "confirmed",
+        AnnotationChannel.TAGS: "reviewed",
+        AnnotationChannel.DESCRIPTION: "reviewed",
     }
 
     deleted = annotations.delete(
@@ -236,7 +241,8 @@ def test_invalid_utf8_legacy_annotation_is_visible_but_not_a_translation_source(
 
     assert asset.annotation_status.value == "encoding_error"
     assert document.status.value == "encoding_error"
-    assert document.review_status.value == "confirmed"
+    assert document.availability_status.value == "invalid"
+    assert document.review_status.value == "unreviewed"
     assert document.validation is not None
     assert document.validation.issues[0].code == "invalid_encoding"
     translation = translations.get(summary.project_id, asset.id, "zh-CN")
@@ -266,7 +272,7 @@ def test_workspace_scan_skips_broken_images_and_reports_them(tmp_path: Path) -> 
     assert [item.filename for item in assets.list_assets(summary.project_id).items] == ["valid.png"]
 
 
-def test_moved_asset_keeps_confirmed_database_annotation_status(tmp_path: Path) -> None:
+def test_moved_asset_keeps_reviewed_database_annotation_status(tmp_path: Path) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
     _write_image(project / "before.png")
@@ -277,7 +283,7 @@ def test_moved_asset_keeps_confirmed_database_annotation_status(tmp_path: Path) 
         asset.id,
         AnnotationChannel.DESCRIPTION,
         "<caption>accepted despite review</caption>",
-        confirm=True,
+        review=True,
     )
 
     (project / "before.png").rename(project / "after.png")
@@ -286,8 +292,8 @@ def test_moved_asset_keeps_confirmed_database_annotation_status(tmp_path: Path) 
     moved = assets.list_assets(summary.project_id).items[0]
     assert moved.id == asset.id
     assert moved.relative_path == "after.png"
-    assert moved.annotation_status.value == "manually_accepted"
-    assert moved.annotation_channels["description"] == "confirmed"
+    assert moved.annotation_status.value == "valid"
+    assert moved.annotation_channels["description"] == "reviewed"
 
 
 def test_legacy_txt_import_is_one_time_and_preserves_the_source_file(tmp_path: Path) -> None:
@@ -305,7 +311,8 @@ def test_legacy_txt_import_is_one_time_and_preserves_the_source_file(tmp_path: P
         AnnotationChannel.EXISTING,
     )
     assert imported.content == "<caption>imported</caption>"
-    assert imported.review_status.value == "confirmed"
+    assert imported.availability_status.value == "usable"
+    assert imported.review_status.value == "unreviewed"
 
     paths, _ = workspaces.get(workspace.project_id)
     assert list(paths.history.glob("pre-annotation-store-v2-*.sqlite3"))
@@ -394,7 +401,6 @@ def test_same_stem_assets_have_independent_database_channels(tmp_path: Path) -> 
         indexed[0].id,
         AnnotationChannel.DESCRIPTION,
         "<caption>first only</caption>",
-        confirm=True,
     )
     second = annotations.get_channel(
         summary.project_id,
@@ -450,6 +456,150 @@ def test_batch_delete_reports_channels_and_assets_without_primary_annotations(
     assert result.missing_count == 1
 
 
+def test_batch_annotation_options_review_and_delete_support_explicit_channels(
+    tmp_path: Path,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    for name in ("first.png", "second.png", "missing.png"):
+        _write_image(project / name)
+    (project / "first.txt").write_text("<caption>legacy</caption>", encoding="utf-8")
+    workspace, _ = workspaces.open(str(project))
+    by_name = {asset.filename: asset for asset in assets.list_assets(workspace.project_id).items}
+    selected_ids = [
+        by_name["first.png"].id,
+        by_name["second.png"].id,
+        by_name["missing.png"].id,
+    ]
+
+    annotations.save_tags(
+        workspace.project_id,
+        by_name["first.png"].id,
+        [AnnotationTag(name="first", origin="tagger")],
+        review=True,
+    )
+    annotations.save_tags(
+        workspace.project_id,
+        by_name["second.png"].id,
+        [AnnotationTag(name="second", origin="tagger")],
+    )
+    annotations.save_text(
+        workspace.project_id,
+        by_name["first.png"].id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>description</caption>",
+    )
+    annotations.save_text(
+        workspace.project_id,
+        by_name["first.png"].id,
+        AnnotationChannel.TRANSLATION,
+        "<caption>译文</caption>",
+        language="zh-cn",
+    )
+    annotations.save_text(
+        workspace.project_id,
+        by_name["second.png"].id,
+        AnnotationChannel.TRANSLATION,
+        "<caption>翻訳</caption>",
+        language="ja",
+    )
+
+    options = annotations.batch_options(workspace.project_id, selected_ids)
+    by_target = {(option.channel, option.language or ""): option for option in options.targets}
+
+    assert options.requested_count == 3
+    assert set(by_target) == {
+        (AnnotationChannel.EXISTING, ""),
+        (AnnotationChannel.TAGS, ""),
+        (AnnotationChannel.DESCRIPTION, ""),
+        (AnnotationChannel.TRANSLATION, "ja"),
+        (AnnotationChannel.TRANSLATION, "zh-CN"),
+    }
+    assert by_target[(AnnotationChannel.TAGS, "")].active_count == 2
+    assert by_target[(AnnotationChannel.TAGS, "")].reviewable_count == 1
+    assert by_target[(AnnotationChannel.TAGS, "")].reviewed_count == 1
+
+    reviewed = annotations.review_targets_many(
+        workspace.project_id,
+        selected_ids,
+        [
+            AnnotationChannelTarget(channel=AnnotationChannel.TAGS),
+            AnnotationChannelTarget(channel=AnnotationChannel.DESCRIPTION),
+            AnnotationChannelTarget(
+                channel=AnnotationChannel.TRANSLATION,
+                language="zh-cn",
+            ),
+        ],
+    )
+
+    assert reviewed.target_count == 3
+    assert reviewed.reviewed_count == 3
+    assert reviewed.already_reviewed_count == 1
+    assert reviewed.missing_count == 5
+
+    delete_targets = [
+        AnnotationChannelTarget(channel=AnnotationChannel.DESCRIPTION),
+        AnnotationChannelTarget(
+            channel=AnnotationChannel.TRANSLATION,
+            language="zh-CN",
+        ),
+    ]
+    paths, _ = workspaces.get(workspace.project_id)
+    translation_claim = OutputResourceClaim(
+        annotation_document_resource_key(
+            by_name["first.png"].id,
+            AnnotationChannel.TRANSLATION.value,
+            "zh-CN",
+        )
+    )
+    with (
+        hold_output_resources(paths.database, [translation_claim]),
+        pytest.raises(ResourceConflictError, match="写入"),
+    ):
+        annotations.delete_many(
+            workspace.project_id,
+            selected_ids,
+            targets=delete_targets,
+        )
+    assert annotations.get_channel(
+        workspace.project_id,
+        by_name["first.png"].id,
+        AnnotationChannel.DESCRIPTION,
+    ).exists
+
+    deleted = annotations.delete_many(
+        workspace.project_id,
+        selected_ids,
+        targets=delete_targets,
+    )
+
+    assert deleted.target_count == 2
+    assert deleted.deleted_count == 2
+    assert deleted.missing_count == 2
+    assert annotations.get_channel(
+        workspace.project_id,
+        by_name["first.png"].id,
+        AnnotationChannel.TAGS,
+    ).exists
+    assert not annotations.get_channel(
+        workspace.project_id,
+        by_name["first.png"].id,
+        AnnotationChannel.DESCRIPTION,
+    ).exists
+    assert not annotations.get_channel(
+        workspace.project_id,
+        by_name["first.png"].id,
+        AnnotationChannel.TRANSLATION,
+        "zh-CN",
+    ).exists
+    assert annotations.get_channel(
+        workspace.project_id,
+        by_name["second.png"].id,
+        AnnotationChannel.TRANSLATION,
+        "ja",
+    ).exists
+
+
 def test_review_queue_tracks_unreviewed_and_stale_database_channels(
     tmp_path: Path,
 ) -> None:
@@ -464,20 +614,20 @@ def test_review_queue_tracks_unreviewed_and_stale_database_channels(
         asset.id,
         [AnnotationTag(name="subject", origin="tagger")],
     )
-    assert tags.document.review_status.value == "confirmed"
+    assert tags.document.availability_status.value == "usable"
+    assert tags.document.review_status.value == "unreviewed"
     assert (
         assets.list_assets(
             workspace.project_id,
             annotation_status="needs_review",
         ).total
-        == 0
+        == 1
     )
     tags = annotations.save_tags(
         workspace.project_id,
         asset.id,
         [AnnotationTag(name="subject"), AnnotationTag(name="updated")],
         expected_head_revision_id=tags.revision_id,
-        confirm=False,
     )
 
     unreviewed = assets.list_assets(
@@ -488,7 +638,7 @@ def test_review_queue_tracks_unreviewed_and_stale_database_channels(
     assert unreviewed.status_counts["unreviewed"] == 1
     assert unreviewed.status_counts["stale"] == 0
 
-    annotations.confirm(
+    annotations.review(
         workspace.project_id,
         asset.id,
         AnnotationChannel.TAGS,
@@ -510,15 +660,27 @@ def test_review_queue_tracks_unreviewed_and_stale_database_channels(
     )
     assert [item.id for item in stale.items] == [asset.id]
     assert stale.status_counts["needs_review"] == 1
-
-    reconfirmed = annotations.confirm(
+    stale_document = annotations.get_channel(
         workspace.project_id,
         asset.id,
         AnnotationChannel.TAGS,
-        tags.revision_id,
     )
-    assert reconfirmed.review_status.value == "confirmed"
-    assert reconfirmed.head_revision_id != tags.revision_id
+    assert stale_document.availability_status.value == "stale"
+    assert stale_document.review_status.value == "reviewed"
+
+    batch_review = annotations.review_tags_many(
+        workspace.project_id,
+        [asset.id],
+    )
+    assert batch_review.reviewed_count == 1
+    assert batch_review.already_reviewed_count == 0
+    reviewed_for_current_image = annotations.get_channel(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.TAGS,
+    )
+    assert reviewed_for_current_image.review_status.value == "reviewed"
+    assert reviewed_for_current_image.head_revision_id != tags.revision_id
     assert (
         assets.list_assets(
             workspace.project_id,
@@ -532,41 +694,46 @@ def test_review_queue_tracks_unreviewed_and_stale_database_channels(
             asset.id,
             AnnotationChannel.TAGS,
         )[0].source
-        == "manual_reconfirm"
+        == "manual_review_current_image"
     )
 
 
-def test_batch_confirm_tags_reports_confirmed_existing_and_missing_assets(
+def test_batch_review_tags_reports_reviewed_existing_and_missing_assets(
     tmp_path: Path,
 ) -> None:
     workspaces, assets, annotations = _services(tmp_path)
     project = tmp_path / "dataset"
-    for name in ("confirmed.png", "pending.png", "missing.png"):
+    for name in ("reviewed.png", "pending.png", "missing.png"):
         _write_image(project / name)
     workspace, _ = workspaces.open(str(project))
     by_name = {asset.filename: asset for asset in assets.list_assets(workspace.project_id).items}
-    annotations.save_tags(
+    already_reviewed = annotations.save_tags(
         workspace.project_id,
-        by_name["confirmed.png"].id,
-        [AnnotationTag(name="confirmed", origin="tagger")],
+        by_name["reviewed.png"].id,
+        [AnnotationTag(name="reviewed", origin="tagger")],
+    )
+    annotations.review(
+        workspace.project_id,
+        by_name["reviewed.png"].id,
+        AnnotationChannel.TAGS,
+        already_reviewed.revision_id,
     )
     annotations.save_tags(
         workspace.project_id,
         by_name["pending.png"].id,
         [AnnotationTag(name="pending", origin="manual")],
-        confirm=False,
     )
 
     selected_ids = [
-        by_name["confirmed.png"].id,
+        by_name["reviewed.png"].id,
         by_name["pending.png"].id,
         by_name["missing.png"].id,
     ]
-    result = annotations.confirm_tags_many(workspace.project_id, selected_ids)
+    result = annotations.review_tags_many(workspace.project_id, selected_ids)
 
     assert result.requested_count == 3
-    assert result.confirmed_count == 1
-    assert result.already_confirmed_count == 1
+    assert result.reviewed_count == 1
+    assert result.already_reviewed_count == 1
     assert result.missing_count == 1
     assert result.asset_ids == selected_ids
     assert (
@@ -575,7 +742,7 @@ def test_batch_confirm_tags_reports_confirmed_existing_and_missing_assets(
             by_name["pending.png"].id,
             AnnotationChannel.TAGS,
         ).review_status.value
-        == "confirmed"
+        == "reviewed"
     )
 
 

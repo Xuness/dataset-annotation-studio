@@ -4,8 +4,9 @@ import type { ExportPreview } from "../../../shared/api/types";
 import { formatBytes } from "../../../shared/format/bytes";
 
 const statusLabels: Record<string, string> = {
-  confirmed: "已确认",
-  unreviewed: "待确认",
+  usable: "当前可用",
+  reviewed: "已复核",
+  unreviewed: "尚未复核",
   stale: "已过期",
   missing: "通道缺失",
   empty: "内容为空",
@@ -38,8 +39,9 @@ export function ExportPreviewPanel({ preview }: { preview: ExportPreview | undef
 
       {preview ? (
         <div className="export-status-strip">
-          <span>已确认 {preview.valid_count}</span>
-          <span>待确认 {preview.unreviewed_count}</span>
+          <span>当前可用 {preview.usable_count}</span>
+          <span>已复核 {preview.reviewed_count}</span>
+          <span>尚未复核 {preview.unreviewed_count}</span>
           <span>已过期 {preview.stale_count}</span>
           <span>通道缺失 {preview.missing_count}</span>
           <span>内容为空 {preview.empty_count}</span>

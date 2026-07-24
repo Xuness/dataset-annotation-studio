@@ -487,12 +487,16 @@
   line-height: 1;
 }
 
-.asset-row__channels i.is-confirmed {
+.asset-row__channels i.is-reviewed {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.asset-row__channels i.is-unreviewed {
   color: var(--sage);
   background: var(--sage-soft);
 }
 
-.asset-row__channels i.is-unreviewed,
 .asset-row__channels i.is-stale {
   color: var(--warning);
   background: var(--warning-soft);

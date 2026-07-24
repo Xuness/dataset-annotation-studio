@@ -78,7 +78,7 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
             {job.data.execution_profile_name} · {job.data.model}
             {job.data.kind === "translation" ? ` · ${job.data.system_preset_name}` : ""}
             {job.data.kind === "annotation" && job.data.execution_backend === "provider"
-              ? ` · Tags 辅助${job.data.use_confirmed_tags ? "已启用" : "未启用"}`
+              ? ` · Tags 辅助${job.data.use_tags_as_context ? "已启用" : "未启用"}`
               : ""}
           </p>
         </div>

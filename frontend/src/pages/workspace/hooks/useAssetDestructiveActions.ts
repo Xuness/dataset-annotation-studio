@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { useDeleteAnnotations } from "../../../features/annotations/hooks";
 import { useAppStore } from "../../../shared/store/appStore";
-import { alertDialog, confirmDialog } from "../../../shared/ui/dialogs";
+import { confirmDialog } from "../../../shared/ui/dialogs";
 
 interface UseAssetDestructiveActionsOptions {
-  projectId: string;
   contextKey: string;
   selectedAssetId: string | null;
   editorDirty: boolean;
@@ -25,7 +23,6 @@ const CLOSED_DIALOG: AssetDeletionDialogState = {
 };
 
 export function useAssetDestructiveActions({
-  projectId,
   contextKey,
   selectedAssetId,
   editorDirty,
@@ -33,7 +30,6 @@ export function useAssetDestructiveActions({
 }: UseAssetDestructiveActionsOptions) {
   const selectAsset = useAppStore((state) => state.selectAsset);
   const setAssetsChecked = useAppStore((state) => state.setAssetsChecked);
-  const deleteAnnotations = useDeleteAnnotations(projectId);
   const [deletionDialog, setDeletionDialog] = useState<AssetDeletionDialogState>(CLOSED_DIALOG);
 
   useEffect(() => {
@@ -67,37 +63,6 @@ export function useAssetDestructiveActions({
     [discardEditorDraft, selectAsset, selectedAssetId, setAssetsChecked],
   );
 
-  const deleteCheckedAnnotations = useCallback(async () => {
-    const assetIds = [...useAppStore.getState().checkedAssetIds];
-    if (!assetIds.length) return;
-    const discardsDraft = Boolean(
-      editorDirty && selectedAssetId && assetIds.includes(selectedAssetId),
-    );
-    const confirmed = await confirmDialog(
-      `删除所选 ${assetIds.length} 张图片的所有主标注通道（不含译文）？修订历史仍会保留。${
-        discardsDraft ? " 当前编辑器中的未保存修改也会丢失。" : ""
-      }`,
-      {
-        title: "批量删除标注",
-        tone: "danger",
-        confirmLabel: "删除标注",
-      },
-    );
-    if (!confirmed) return;
-    try {
-      const result = await deleteAnnotations.mutateAsync(assetIds);
-      if (discardsDraft) discardEditorDraft();
-      await alertDialog(
-        `已删除 ${result.deleted_count} 个活动标注通道；${result.missing_count} 张图片没有可删除的主标注。`,
-        { title: "批量删除完成" },
-      );
-    } catch (error) {
-      await alertDialog(error instanceof Error ? error.message : "批量删除标注失败。", {
-        title: "删除标注失败",
-      });
-    }
-  }, [deleteAnnotations, discardEditorDraft, editorDirty, selectedAssetId]);
-
   const openCheckedAssetDeletion = useCallback(() => {
     const assetIds = [...useAppStore.getState().checkedAssetIds];
     if (!assetIds.length) return;
@@ -122,10 +87,8 @@ export function useAssetDestructiveActions({
 
   return {
     deletionDialog,
-    annotationDeletePending: deleteAnnotations.isPending,
     beforeDeleteAssets,
     handleAssetsDeleted,
-    deleteCheckedAnnotations,
     openCheckedAssetDeletion,
     openAssetDeletion,
     openDeletionHistory,

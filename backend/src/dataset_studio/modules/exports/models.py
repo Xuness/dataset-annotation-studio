@@ -25,8 +25,8 @@ class ExportOperationStatus(StrEnum):
 
 
 class ExportRevisionMode(StrEnum):
-    CONFIRMED = "confirmed"
-    HEAD = "head"
+    CURRENT = "current"
+    REVIEWED = "reviewed"
 
 
 class ExportFormat(StrEnum):
@@ -39,7 +39,16 @@ class ExportChannelSelection(BaseModel):
 
     channel: AnnotationChannel
     language: str = ""
-    revision: ExportRevisionMode = ExportRevisionMode.CONFIRMED
+    revision: ExportRevisionMode = ExportRevisionMode.CURRENT
+
+    @field_validator("revision", mode="before")
+    @classmethod
+    def normalize_legacy_revision_mode(cls, value: object) -> object:
+        if value == "head":
+            return ExportRevisionMode.CURRENT
+        if value == "confirmed":
+            return ExportRevisionMode.REVIEWED
+        return value
 
     @field_validator("language")
     @classmethod
@@ -68,7 +77,7 @@ def _default_channels() -> list[ExportChannelSelection]:
     return [
         ExportChannelSelection(
             channel=AnnotationChannel.EXISTING,
-            revision=ExportRevisionMode.CONFIRMED,
+            revision=ExportRevisionMode.CURRENT,
         )
     ]
 
@@ -151,8 +160,8 @@ class ExportPreview(BaseModel):
     truncated: bool = False
     image_bytes: int
     annotation_bytes: int
-    valid_count: int
-    manually_accepted_count: int
+    usable_count: int
+    reviewed_count: int
     missing_count: int
     empty_count: int
     invalid_count: int

@@ -3,7 +3,8 @@ export type AnnotationStatus =
 
 export type AnnotationChannel = "existing_annotation" | "tags" | "description" | "translation";
 export type AnnotationContentKind = "text" | "tags";
-export type AnnotationReviewStatus = "missing" | "unreviewed" | "confirmed" | "stale";
+export type AnnotationAvailabilityStatus = "missing" | "usable" | "invalid" | "stale";
+export type AnnotationReviewStatus = "unreviewed" | "reviewed";
 
 export interface ValidationIssue {
   code: string;
@@ -38,12 +39,13 @@ export interface AnnotationDocument {
   content: string;
   tags: AnnotationTag[];
   status: AnnotationStatus;
-  review_status: AnnotationReviewStatus;
+  availability_status: AnnotationAvailabilityStatus;
+  review_status: AnnotationReviewStatus | null;
   validation: ValidationResult | null;
   validation_status: AnnotationStatus | null;
   modified_at: string | null;
   head_revision_id: string | null;
-  confirmed_revision_id: string | null;
+  reviewed_revision_id: string | null;
   image_content_hash: string | null;
   current_image_hash: string | null;
   source: string | null;
@@ -71,17 +73,39 @@ export interface AnnotationRevision {
   source_job_item_id: string | null;
 }
 
+export interface AnnotationChannelTarget {
+  channel: AnnotationChannel;
+  language: string;
+}
+
+export interface AnnotationBatchTargetOption {
+  channel: AnnotationChannel;
+  language: string | null;
+  display_name: string;
+  active_count: number;
+  reviewable_count: number;
+  reviewed_count: number;
+  stale_count: number;
+}
+
+export interface AnnotationBatchOptions {
+  requested_count: number;
+  targets: AnnotationBatchTargetOption[];
+}
+
 export interface AnnotationBatchDeleteResult {
   requested_count: number;
+  target_count: number;
   deleted_count: number;
   missing_count: number;
   asset_ids: string[];
 }
 
-export interface AnnotationBatchConfirmResult {
+export interface AnnotationBatchReviewResult {
   requested_count: number;
-  confirmed_count: number;
-  already_confirmed_count: number;
+  target_count: number;
+  reviewed_count: number;
+  already_reviewed_count: number;
   missing_count: number;
   asset_ids: string[];
 }

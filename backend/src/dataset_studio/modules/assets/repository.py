@@ -85,8 +85,8 @@ EXISTS (
       AND r.is_tombstone = 0
       AND r.image_content_hash = assets.content_hash
       AND (
-          d.confirmed_revision_id IS NULL
-          OR d.confirmed_revision_id != d.head_revision_id
+          d.reviewed_revision_id IS NULL
+          OR d.reviewed_revision_id != d.head_revision_id
       )
 )
 """
@@ -116,31 +116,31 @@ STALE_DOCUMENT_SQL = """
                 AND dependency.role = 'translation_source'
                 AND dependency.input_revision_id = COALESCE(
                     (
-                        SELECT description.confirmed_revision_id
+                        SELECT description.head_revision_id
                         FROM annotation_documents description
                         JOIN annotation_document_revisions source_revision
-                          ON source_revision.id = description.confirmed_revision_id
+                          ON source_revision.id = description.head_revision_id
                         WHERE description.asset_id = assets.id
                           AND description.channel = 'description'
                           AND description.language = ''
                           AND source_revision.is_tombstone = 0
                           AND source_revision.image_content_hash = assets.content_hash
                           AND source_revision.validation_status NOT IN (
-                              'invalid', 'encoding_error', 'empty'
+                              'invalid', 'encoding_error', 'empty', 'unchecked'
                           )
                     ),
                     (
-                        SELECT existing.confirmed_revision_id
+                        SELECT existing.head_revision_id
                         FROM annotation_documents existing
                         JOIN annotation_document_revisions source_revision
-                          ON source_revision.id = existing.confirmed_revision_id
+                          ON source_revision.id = existing.head_revision_id
                         WHERE existing.asset_id = assets.id
                           AND existing.channel = 'existing_annotation'
                           AND existing.language = ''
                           AND source_revision.is_tombstone = 0
                           AND source_revision.image_content_hash = assets.content_hash
                           AND source_revision.validation_status NOT IN (
-                              'invalid', 'encoding_error', 'empty'
+                              'invalid', 'encoding_error', 'empty', 'unchecked'
                           )
                     )
                 )
@@ -157,11 +157,6 @@ EXISTS (
     WHERE d.asset_id = assets.id
       AND r.is_tombstone = 0
       AND r.validation_status IN ('invalid', 'encoding_error', 'empty', 'unchecked')
-      AND (
-          d.confirmed_revision_id IS NULL
-          OR d.confirmed_revision_id != d.head_revision_id
-          OR r.source = 'legacy_txt_import'
-      )
 )
 """
 
@@ -544,7 +539,7 @@ class AssetRepository:
             rows = connection.execute(
                 f"""
                 SELECT d.asset_id, d.channel, d.language,
-                       d.head_revision_id, d.confirmed_revision_id,
+                       d.head_revision_id, d.reviewed_revision_id,
                        r.is_tombstone, r.image_content_hash,
                        a.content_hash AS current_image_hash
                 FROM annotation_documents d
@@ -563,8 +558,8 @@ class AssetRepository:
                     status = "missing"
                 elif str(row["image_content_hash"]) != str(row["current_image_hash"]):
                     status = "stale"
-                elif row["confirmed_revision_id"] == row["head_revision_id"]:
-                    status = "confirmed"
+                elif row["reviewed_revision_id"] == row["head_revision_id"]:
+                    status = "reviewed"
                 else:
                     status = "unreviewed"
                 statuses[str(row["asset_id"])][key] = status

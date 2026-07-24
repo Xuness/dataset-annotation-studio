@@ -1,7 +1,7 @@
 import type { AnnotationChannel } from "./annotations";
 
 export type ExportScope = "all" | "selected";
-export type ExportRevisionMode = "confirmed" | "head";
+export type ExportRevisionMode = "current" | "reviewed";
 export type ExportFormat = "txt" | "json";
 
 export interface ExportChannelSelection {
@@ -39,8 +39,8 @@ export interface ExportPreview {
   truncated: boolean;
   image_bytes: number;
   annotation_bytes: number;
-  valid_count: number;
-  manually_accepted_count: number;
+  usable_count: number;
+  reviewed_count: number;
   missing_count: number;
   empty_count: number;
   invalid_count: number;

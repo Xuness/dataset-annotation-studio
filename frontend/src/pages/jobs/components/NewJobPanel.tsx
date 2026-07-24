@@ -414,13 +414,13 @@ export function NewJobPanel({
               ? "无"
               : kind === "annotation"
                 ? workspace.settings.user_prompt
-                  ? workspace.settings.use_confirmed_tags
-                    ? "项目配置 + 已确认 Tags"
+                  ? workspace.settings.use_tags_as_context
+                    ? "项目配置 + 当前可用 Tags"
                     : "仅项目配置"
-                  : workspace.settings.use_confirmed_tags
-                    ? "按图追加已确认 Tags"
+                  : workspace.settings.use_tags_as_context
+                    ? "按图追加当前可用 Tags"
                     : "当前为空"
-                : "已确认描述 / 原有标注"}
+                : "当前可用描述 / 原有标注"}
           </dd>
         </div>
       </dl>

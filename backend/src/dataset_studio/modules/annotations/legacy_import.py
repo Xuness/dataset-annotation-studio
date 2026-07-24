@@ -74,7 +74,7 @@ def ensure_database_annotation_store(paths: WorkspacePaths) -> int:
                 validation_status=item.validation_status,
                 image_content_hash=item.image_hash,
                 expected_head_revision_id=EXPECTED_HEAD_UNSET,
-                confirm=True,
+                review=False,
                 source_job_item_id=None,
                 input_revisions=(
                     [(revision_by_asset[item.asset_id], "translation_source")]
@@ -272,7 +272,7 @@ def _import_legacy_history(
             validation_status=AnnotationStatus(str(row["validation_status"])),
             image_content_hash=str(row["content_hash"]),
             expected_head_revision_id=EXPECTED_HEAD_UNSET,
-            confirm=False,
+            review=False,
             source_job_item_id=None,
             input_revisions=(),
             metadata={"legacy_revision_id": str(row["id"])},
@@ -292,7 +292,7 @@ def _import_legacy_history(
         connection.execute(
             """
             UPDATE annotation_documents
-            SET head_revision_id = NULL, confirmed_revision_id = NULL
+            SET head_revision_id = NULL, reviewed_revision_id = NULL
             WHERE id = ?
             """,
             (write.document_id,),

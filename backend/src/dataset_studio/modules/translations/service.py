@@ -117,7 +117,7 @@ class TranslationService:
             raise AssetNotFoundError(f"找不到素材：{asset_id}")
         repository = AnnotationRepository(paths.database)
         for channel in (AnnotationChannel.DESCRIPTION, AnnotationChannel.EXISTING):
-            revision_id = repository.confirmed_revision_id(
+            revision_id = repository.usable_revision_id(
                 asset_id,
                 channel,
                 require_current_image=True,
@@ -207,7 +207,7 @@ class TranslationService:
         content: str,
         *,
         expected_head_revision_id: str | None,
-        confirm: bool = False,
+        review: bool = False,
     ) -> AnnotationDocument:
         language = self.normalize_language(language)
         paths, _ = self._workspaces.get(project_id)
@@ -227,7 +227,7 @@ class TranslationService:
                 language=language,
                 source="manual_edit",
                 expected_head_revision_id=expected_head_revision_id,
-                confirm=confirm,
+                review=review,
                 input_revisions=input_revisions,
                 metadata=metadata,
             ).document
@@ -278,16 +278,20 @@ class TranslationService:
         paths, _ = self._workspaces.get(project_id)
         repository = AnnotationRepository(paths.database)
         for channel in (AnnotationChannel.DESCRIPTION, AnnotationChannel.EXISTING):
-            revision_id = repository.confirmed_revision_id(asset_id, channel)
+            revision_id = repository.head_revision_id(asset_id, channel)
             if revision_id and not repository.revision_matches_current_image(revision_id):
-                return "已确认的源标注对应旧图片版本，重新确认当前图片的标注后才能翻译。"
+                return "当前源标注对应旧图片版本，请重新生成或复核到当前图片后再翻译。"
             validation_status = (
                 repository.revision_validation_status(revision_id) if revision_id else None
             )
             if validation_status == AnnotationStatus.ENCODING_ERROR:
-                return "已确认的源标注不是有效的 UTF-8，修复编码后才能生成译文。"
-            if validation_status in {AnnotationStatus.INVALID, AnnotationStatus.EMPTY}:
-                return "已确认的源标注结构无效或为空，修复后才能生成译文。"
+                return "当前源标注不是有效的 UTF-8，修复编码后才能生成译文。"
+            if validation_status in {
+                AnnotationStatus.INVALID,
+                AnnotationStatus.EMPTY,
+                AnnotationStatus.UNCHECKED,
+            }:
+                return "当前源标注结构无效、为空或尚未校验，修复后才能生成译文。"
         return None
 
     @staticmethod

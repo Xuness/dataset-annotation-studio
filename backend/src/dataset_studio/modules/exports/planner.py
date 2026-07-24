@@ -66,7 +66,8 @@ class ExportPlan:
 class _SelectedAnnotation:
     selection: ExportChannelSelection
     revision_id: str | None
-    review_status: str
+    availability_status: str
+    review_status: str | None
     validation_status: str | None
     content: str | None
     raw_bytes: bytes | None
@@ -164,13 +165,13 @@ def to_preview(request: ExportRequest, plan: ExportPlan) -> ExportPreview:
             if artifact.kind == "image"
         ),
         annotation_bytes=sum(item.annotation_size for item in plan.items),
-        valid_count=statuses.count("confirmed"),
-        manually_accepted_count=statuses.count("confirmed"),
+        usable_count=statuses.count("usable") + statuses.count("reviewed"),
+        reviewed_count=statuses.count("reviewed"),
         missing_count=statuses.count("missing"),
         empty_count=statuses.count("empty"),
         invalid_count=statuses.count("invalid"),
         encoding_error_count=statuses.count("encoding_error"),
-        unreviewed_count=statuses.count("unreviewed"),
+        unreviewed_count=statuses.count("usable"),
         stale_count=statuses.count("stale"),
         warning_count=sum(item.warning_code is not None for item in plan.items),
         blocking_issue_count=blocking_issue_count,
@@ -285,8 +286,8 @@ def _selected_annotation(
     if document is None:
         return _missing_selection(selection)
     pointer = (
-        document["confirmed_revision_id"]
-        if selection.revision == ExportRevisionMode.CONFIRMED
+        document["reviewed_revision_id"]
+        if selection.revision == ExportRevisionMode.REVIEWED
         else document["head_revision_id"]
     )
     if not pointer:
@@ -301,12 +302,16 @@ def _selected_annotation(
     ).fetchone()
     if revision is None or bool(revision["is_tombstone"]):
         return _missing_selection(selection)
+    validation_status = str(revision["validation_status"])
     if str(revision["image_content_hash"]) != str(document["current_image_hash"]):
-        review_status = "stale"
-    elif str(document["confirmed_revision_id"] or "") == str(pointer):
-        review_status = "confirmed"
+        availability_status = "stale"
+    elif validation_status in {"invalid", "encoding_error", "empty", "unchecked"}:
+        availability_status = "invalid"
     else:
-        review_status = "unreviewed"
+        availability_status = "usable"
+    review_status = (
+        "reviewed" if str(document["reviewed_revision_id"] or "") == str(pointer) else "unreviewed"
+    )
 
     if selection.channel == AnnotationChannel.TAGS:
         tags = [
@@ -343,8 +348,9 @@ def _selected_annotation(
     return _SelectedAnnotation(
         selection=selection,
         revision_id=str(pointer),
+        availability_status=availability_status,
         review_status=review_status,
-        validation_status=str(revision["validation_status"]),
+        validation_status=validation_status,
         content=content,
         raw_bytes=raw_bytes,
         tags=tags,
@@ -355,7 +361,8 @@ def _missing_selection(selection: ExportChannelSelection) -> _SelectedAnnotation
     return _SelectedAnnotation(
         selection=selection,
         revision_id=None,
-        review_status="missing",
+        availability_status="missing",
+        review_status=None,
         validation_status=None,
         content=None,
         raw_bytes=None,
@@ -386,7 +393,7 @@ def _plan_item(
     source_name = PurePosixPath(source_relative_path).name
     stem = PurePosixPath(source_name).stem
     artifacts: list[ExportArtifact] = []
-    statuses = {key: selected.review_status for key, selected in annotations.items()}
+    statuses = {key: _selection_status(selected) for key, selected in annotations.items()}
     multiple_txt_channels = ExportFormat.TXT in request.formats and len(request.channels) > 1
 
     if ExportFormat.TXT in request.formats:
@@ -411,6 +418,7 @@ def _plan_item(
             "annotations": {
                 key: {
                     "revision_id": selected.revision_id,
+                    "availability_status": selected.availability_status,
                     "review_status": selected.review_status,
                     "validation_status": selected.validation_status,
                     **(
@@ -441,14 +449,12 @@ def _plan_item(
     warnings: list[str] = []
     if any(status == "missing" for status in statuses.values()):
         warnings.append("部分所选标注通道缺少可导出的版本。")
-    if any(status == "unreviewed" for status in statuses.values()):
-        warnings.append("导出范围包含尚未确认的标注版本。")
     if any(status == "stale" for status in statuses.values()):
         warnings.append("导出范围包含图片变化后的过期标注。")
     invalid_statuses = {
         selected.validation_status
         for selected in annotations.values()
-        if selected.validation_status in {"invalid", "encoding_error", "empty"}
+        if selected.validation_status in {"invalid", "encoding_error", "empty", "unchecked"}
     }
     if invalid_statuses:
         warnings.append("导出范围包含校验异常的标注。")
@@ -537,13 +543,23 @@ def _annotation_artifact(
 
 def _aggregate_status(values) -> str:
     selections = list(values)
-    for validation in ("encoding_error", "invalid", "empty"):
+    for validation in ("encoding_error", "invalid", "empty", "unchecked"):
         if any(selected.validation_status == validation for selected in selections):
             return validation
-    for review in ("stale", "missing", "unreviewed"):
-        if any(selected.review_status == review for selected in selections):
-            return review
-    return "confirmed"
+    for availability in ("stale", "missing"):
+        if any(selected.availability_status == availability for selected in selections):
+            return availability
+    if selections and all(selected.review_status == "reviewed" for selected in selections):
+        return "reviewed"
+    return "usable"
+
+
+def _selection_status(selected: _SelectedAnnotation) -> str:
+    if selected.availability_status != "usable":
+        if selected.availability_status == "invalid" and selected.validation_status:
+            return selected.validation_status
+        return selected.availability_status
+    return "reviewed" if selected.review_status == "reviewed" else "usable"
 
 
 def _channel_directory(selection: ExportChannelSelection) -> str:

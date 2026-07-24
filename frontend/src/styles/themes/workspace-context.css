@@ -4,7 +4,12 @@
   --paper-deep: var(--surface-sunken);
 }
 
-:where(.workspace-page, .settings-center-backdrop, .asset-deletion-backdrop) {
+:where(
+  .workspace-page,
+  .settings-center-backdrop,
+  .asset-deletion-backdrop,
+  .annotation-bulk-backdrop
+) {
   --app-backdrop: var(--work-backdrop);
   --app-backdrop-elevated: var(--work-backdrop-elevated);
   --surface-sunken: var(--work-sunken);
