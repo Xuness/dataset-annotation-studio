@@ -69,8 +69,41 @@ if [[ $SKIP_SYNC -eq 0 ]]; then
   uv sync --project "$BACKEND" --extra "$RUNTIME" --all-groups --locked --exact
 fi
 
-configure_cuda_library_path() {
+resolve_python_environment_dir() {
   local environment_dir="${UV_PROJECT_ENVIRONMENT:-$BACKEND/.venv}"
+  if [[ "$environment_dir" != /* ]]; then
+    environment_dir="$ROOT/$environment_dir"
+  fi
+  printf '%s\n' "$environment_dir"
+}
+
+validate_backend_entrypoints() {
+  local environment_dir
+  local entrypoint
+  local -a missing_entrypoints=()
+
+  environment_dir="$(resolve_python_environment_dir)"
+  for entrypoint in dataset-studio-api dataset-studio-worker; do
+    if [[ ! -x "$environment_dir/bin/$entrypoint" ]]; then
+      missing_entrypoints+=("$entrypoint")
+    fi
+  done
+  if ((${#missing_entrypoints[@]} > 0)); then
+    echo "错误：当前 Python 环境缺少 Dataset Studio 后端入口：${missing_entrypoints[*]}" >&2
+    echo "  Python 环境: $environment_dir" >&2
+    if [[ $SKIP_SYNC -eq 1 ]]; then
+      echo "  你使用了 --skip-sync；该选项不会安装项目本身或后端依赖。" >&2
+      echo "  请先执行：UV_PROJECT_ENVIRONMENT=\"$environment_dir\" uv pip install -e backend" >&2
+      echo "  或去掉 --skip-sync，让启动器执行 uv sync。" >&2
+    else
+      echo "  请重新执行 uv sync --project backend --extra $RUNTIME --all-groups --locked --exact。" >&2
+    fi
+    exit 1
+  fi
+}
+
+configure_cuda_library_path() {
+  local environment_dir="$(resolve_python_environment_dir)"
   local python_bin
   local site_packages=""
   local cuda_site
@@ -78,9 +111,6 @@ configure_cuda_library_path() {
   local joined_paths=""
   local -a cuda_library_dirs=()
 
-  if [[ "$environment_dir" != /* ]]; then
-    environment_dir="$ROOT/$environment_dir"
-  fi
   python_bin="$environment_dir/bin/python"
 
   # Prefer the selected uv environment so this also works with an isolated
@@ -124,6 +154,7 @@ configure_cuda_library_path() {
 if [[ "$RUNTIME" == "cuda" ]]; then
   configure_cuda_library_path
 fi
+validate_backend_entrypoints
 
 if [[ $CHECK_ONLY -eq 1 ]]; then
   echo "[Dataset Studio] 开发环境检查通过（runtime=$RUNTIME, graphics=$GRAPHICS）。"
