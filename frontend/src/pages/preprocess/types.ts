@@ -1,4 +1,4 @@
-import type { ResizeAlgorithm } from "../../shared/api/types";
+import type { PreprocessDevice, ResizeAlgorithm } from "../../shared/api/types";
 
 export interface PreprocessFormState {
   scope: "all" | "selected";
@@ -10,6 +10,7 @@ export interface PreprocessFormState {
   format: "webp" | "jpeg" | "png";
   quality: number;
   effort: number;
+  processingDevice: PreprocessDevice;
   concurrencyMode: "auto" | "manual";
   maxWorkers: number;
   renameEnabled: boolean;

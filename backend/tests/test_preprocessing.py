@@ -11,9 +11,11 @@ from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.preprocessing import executor as preprocessing_executor
 from dataset_studio.modules.preprocessing import image_pipeline as preprocessing_image_pipeline
 from dataset_studio.modules.preprocessing import planner as preprocessing_planner
+from dataset_studio.modules.preprocessing import resize_runtime as preprocessing_resize_runtime
 from dataset_studio.modules.preprocessing.models import (
     ConvertOptions,
     OutputFormat,
+    PreprocessDevice,
     PreprocessExecuteRequest,
     PreprocessExecutionOptions,
     PreprocessItemPhase,
@@ -87,6 +89,76 @@ def test_preview_uses_indexed_hash_and_reports_cpu_runtime(tmp_path: Path, monke
     operation = _execute(preprocessing, summary.project_id, request, preview)
     assert operation.status == "completed"
     assert hash_calls >= 1
+
+
+def test_cuda_resize_selection_reports_supported_path_and_fallback(monkeypatch) -> None:
+    monkeypatch.setattr(preprocessing_resize_runtime, "cuda_resize_status", lambda: (True, None))
+
+    cuda = preprocessing_resize_runtime.select_resize_runtime(
+        PreprocessDevice.AUTO,
+        ResizeAlgorithm.LANCZOS3,
+        resize_needed=True,
+    )
+    assert cuda.resize_device == "cuda"
+    assert cuda.pipeline_device == "mixed"
+    assert cuda.cuda_available is True
+
+    cpu = preprocessing_resize_runtime.select_resize_runtime(
+        PreprocessDevice.CUDA,
+        ResizeAlgorithm.ANIME_LOW_HALO,
+        resize_needed=True,
+    )
+    assert cpu.resize_device == "cpu"
+    assert cpu.fallback_reason == "anime_low_halo 暂不支持 CUDA，已回退 CPU。"
+
+
+def test_cuda_resize_executor_falls_back_after_runtime_failure(monkeypatch) -> None:
+    monkeypatch.setattr(preprocessing_resize_runtime, "cuda_resize_status", lambda: (True, None))
+    monkeypatch.setattr(
+        preprocessing_resize_runtime,
+        "resize_image_cuda",
+        lambda *_args: (_ for _ in ()).throw(
+            preprocessing_resize_runtime.CudaResizeError("测试 CUDA kernel 失败")
+        ),
+    )
+
+    executor = preprocessing_resize_runtime.ResizeExecutor.create(
+        PreprocessDevice.CUDA,
+        ResizeAlgorithm.LANCZOS3,
+        resize_needed=True,
+    )
+    image = Image.new("RGB", (4, 4), "white")
+    cpu_calls = 0
+
+    def cpu_resize(source, target_size, algorithm):
+        nonlocal cpu_calls
+        cpu_calls += 1
+        assert algorithm == ResizeAlgorithm.LANCZOS3
+        return source.resize(target_size)
+
+    result = executor.resize(image, (2, 2), ResizeAlgorithm.LANCZOS3, cpu_resize)
+
+    assert result.size == (2, 2)
+    assert cpu_calls == 1
+    assert executor.selection.resize_device == "cpu"
+    assert "测试 CUDA kernel 失败" in (executor.selection.fallback_reason or "")
+
+
+def test_cuda_resize_selection_falls_back_when_runtime_is_missing(monkeypatch) -> None:
+    monkeypatch.setattr(
+        preprocessing_resize_runtime,
+        "cuda_resize_status",
+        lambda: (False, "测试环境没有 CUDA"),
+    )
+
+    selection = preprocessing_resize_runtime.select_resize_runtime(
+        PreprocessDevice.CUDA,
+        ResizeAlgorithm.LANCZOS4,
+        resize_needed=True,
+    )
+
+    assert selection.resize_device == "cpu"
+    assert selection.fallback_reason == "测试环境没有 CUDA"
 
 
 def test_resize_algorithm_defaults_and_low_halo_filter_selection() -> None:

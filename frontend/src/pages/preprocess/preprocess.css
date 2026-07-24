@@ -414,3 +414,12 @@
     grid-template-columns: var(--workspace-rail-width) 280px minmax(420px, 1fr) 260px;
   }
 }
+
+.preprocess-runtime-card > .preprocess-runtime-card__warning {
+  margin: 8px 0 0;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--warning) 38%, var(--line));
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  color: var(--ink-soft);
+}

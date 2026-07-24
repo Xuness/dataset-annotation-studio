@@ -1,5 +1,6 @@
 import { apiRequest } from "../../shared/api/client";
 import type {
+  PreprocessDevice,
   PreprocessExecutionOptions,
   PreprocessOperation,
   PreprocessPreview,
@@ -11,8 +12,9 @@ const path = (projectId: string) => `/api/v1/workspaces/${projectId}/preprocessi
 export function previewPreprocessing(
   projectId: string,
   request: PreprocessRequest,
+  device: PreprocessDevice,
 ): Promise<PreprocessPreview> {
-  return apiRequest(`${path(projectId)}/preview`, {
+  return apiRequest(`${path(projectId)}/preview?device=${encodeURIComponent(device)}`, {
     method: "POST",
     body: JSON.stringify(request),
   });

@@ -1,3 +1,5 @@
+export type PreprocessDevice = "auto" | "cpu" | "cuda";
+
 export type ResizeAlgorithm = "lanczos3" | "lanczos4" | "anime_low_halo";
 
 export interface ResizeOptions {
@@ -38,7 +40,12 @@ export interface PreprocessPreviewItem {
 }
 
 export interface PreprocessRuntimeInfo {
-  device: "cpu";
+  device: "cpu" | "mixed";
+  requested_device: PreprocessDevice;
+  resize_device: "cpu" | "cuda";
+  encoding_device: "cpu";
+  cuda_available: boolean;
+  fallback_reason: string | null;
   preview_duration_ms: number;
   source_bytes: number;
   render_count: number;
@@ -58,7 +65,17 @@ export interface PreprocessPreview {
 }
 
 export interface PreprocessExecutionOptions {
+  device: PreprocessDevice;
   max_workers: number | null;
+}
+
+export interface PreprocessExecutionRuntimeInfo {
+  requested_device: PreprocessDevice;
+  resize_device: "cpu" | "cuda";
+  encoding_device: "cpu";
+  fallback_reason: string | null;
+  worker_count: number;
+  duration_ms: number;
 }
 
 export interface PreprocessOperation {
@@ -70,4 +87,5 @@ export interface PreprocessOperation {
   completed_at: string | null;
   undone_at: string | null;
   error_message: string | null;
+  runtime: PreprocessExecutionRuntimeInfo | null;
 }

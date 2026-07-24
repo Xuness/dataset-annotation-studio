@@ -11,6 +11,12 @@ class OutputFormat(StrEnum):
     PNG = "png"
 
 
+class PreprocessDevice(StrEnum):
+    AUTO = "auto"
+    CPU = "cpu"
+    CUDA = "cuda"
+
+
 class ResizeAlgorithm(StrEnum):
     LANCZOS3 = "lanczos3"
     LANCZOS4 = "lanczos4"
@@ -84,6 +90,11 @@ class PreprocessPreviewItem(BaseModel):
 
 class PreprocessRuntimeInfo(BaseModel):
     device: str = "cpu"
+    requested_device: PreprocessDevice = PreprocessDevice.AUTO
+    resize_device: str = "cpu"
+    encoding_device: str = "cpu"
+    cuda_available: bool = False
+    fallback_reason: str | None = None
     preview_duration_ms: int = Field(ge=0)
     source_bytes: int = Field(ge=0)
     render_count: int = Field(ge=0)
@@ -105,7 +116,17 @@ class PreprocessPreview(BaseModel):
 class PreprocessExecutionOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    device: PreprocessDevice = PreprocessDevice.AUTO
     max_workers: int | None = Field(default=None, ge=1, le=16)
+
+
+class PreprocessExecutionRuntimeInfo(BaseModel):
+    requested_device: PreprocessDevice
+    resize_device: str
+    encoding_device: str = "cpu"
+    fallback_reason: str | None = None
+    worker_count: int = Field(ge=1)
+    duration_ms: int = Field(ge=0)
 
 
 class PreprocessExecuteRequest(BaseModel):
@@ -125,3 +146,4 @@ class PreprocessOperation(BaseModel):
     completed_at: str | None = None
     undone_at: str | None = None
     error_message: str | None = None
+    runtime: PreprocessExecutionRuntimeInfo | None = None

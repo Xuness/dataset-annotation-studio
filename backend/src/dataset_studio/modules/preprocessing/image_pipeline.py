@@ -16,6 +16,7 @@ from dataset_studio.modules.preprocessing.models import (
     ResizeOptions,
 )
 from dataset_studio.modules.preprocessing.planner import PlanItem
+from dataset_studio.modules.preprocessing.resize_runtime import ResizeExecutor
 
 _LOW_HALO_BOX_THRESHOLD = 2.0
 _BYTE_IMAGE_MODES = {
@@ -48,6 +49,7 @@ def render_image_to_staging(
     item: PlanItem,
     resize: ResizeOptions | None,
     convert: ConvertOptions | None,
+    resize_executor: ResizeExecutor | None = None,
 ) -> None:
     staging.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
@@ -60,10 +62,11 @@ def render_image_to_staging(
             image = ImageOps.exif_transpose(opened)
             if image.size != (item.after_width, item.after_height):
                 algorithm = resize.algorithm if resize else ResizeAlgorithm.LANCZOS3
-                image = _resize_image(
-                    image,
-                    (item.after_width, item.after_height),
-                    algorithm,
+                target_size = (item.after_width, item.after_height)
+                image = (
+                    resize_executor.resize(image, target_size, algorithm, _resize_image_cpu)
+                    if resize_executor is not None
+                    else _resize_image_cpu(image, target_size, algorithm)
                 )
             image, save_options = _encoding_options(image, staging.suffix, convert)
             image.save(temporary, **save_options)
@@ -73,7 +76,7 @@ def render_image_to_staging(
         raise
 
 
-def _resize_image(
+def _resize_image_cpu(
     image: Image.Image,
     target_size: tuple[int, int],
     algorithm: ResizeAlgorithm,
@@ -204,3 +207,7 @@ def _rgb_or_rgba(image: Image.Image) -> Image.Image:
     if image.mode in {"RGB", "RGBA"}:
         return image
     return image.convert("RGBA" if "transparency" in image.info else "RGB")
+
+
+# Kept as a testable compatibility seam for the CPU implementation.
+_resize_image = _resize_image_cpu

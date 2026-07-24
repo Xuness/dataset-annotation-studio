@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
 from dataset_studio.modules.preprocessing.models import (
+    PreprocessDevice,
     PreprocessExecuteRequest,
+    PreprocessExecutionOptions,
     PreprocessOperation,
     PreprocessPreview,
     PreprocessRequest,
@@ -16,8 +18,17 @@ Container = Annotated[AppContainer, Depends(get_container)]
 
 
 @router.post("/preview", response_model=PreprocessPreview)
-def preview(project_id: str, request: PreprocessRequest, container: Container):
-    return container.preprocessing.preview(project_id, request)
+def preview(
+    project_id: str,
+    request: PreprocessRequest,
+    container: Container,
+    device: PreprocessDevice = PreprocessDevice.AUTO,
+):
+    return container.preprocessing.preview(
+        project_id,
+        request,
+        PreprocessExecutionOptions(device=device),
+    )
 
 
 @router.post("/execute", response_model=PreprocessOperation)

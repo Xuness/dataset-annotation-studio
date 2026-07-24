@@ -30,21 +30,27 @@ if ($Running) {
 New-Item -ItemType Directory -Force -Path $Binaries | Out-Null
 New-Item -ItemType Directory -Force -Path $WorkPath | Out-Null
 
-& uv run --project (Join-Path $Root "backend") --extra $Runtime --exact pyinstaller `
-    --noconfirm `
-    --clean `
-    --onefile `
-    --windowed `
-    --name $Name `
-    --paths (Join-Path $Root "backend/src") `
-    --collect-all openai_codex `
-    --collect-all codex_cli_bin `
-    --hidden-import onnx `
-    --hidden-import onnxruntime `
-    --distpath $Binaries `
-    --workpath $WorkPath `
-    --specpath $WorkPath `
-    $EntryPoint
+$PyInstallerArgs = @(
+    "--noconfirm",
+    "--clean",
+    "--onefile",
+    "--windowed",
+    "--name", $Name,
+    "--paths", (Join-Path $Root "backend/src"),
+    "--collect-all", "openai_codex",
+    "--collect-all", "codex_cli_bin",
+    "--hidden-import", "onnx",
+    "--hidden-import", "onnxruntime",
+    "--distpath", $Binaries,
+    "--workpath", $WorkPath,
+    "--specpath", $WorkPath
+)
+if ($Runtime -eq "cuda") {
+    $PyInstallerArgs += @("--collect-all", "cupy")
+}
+$PyInstallerArgs += $EntryPoint
+
+& uv run --project (Join-Path $Root "backend") --extra $Runtime --exact pyinstaller @PyInstallerArgs
 
 if ($LASTEXITCODE -ne 0) {
     throw "Python sidecar 构建失败，退出码：$LASTEXITCODE"

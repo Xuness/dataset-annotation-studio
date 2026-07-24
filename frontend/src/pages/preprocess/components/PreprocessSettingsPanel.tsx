@@ -1,6 +1,6 @@
 import { Clock3, Cpu, Eye, ImageDown, Play } from "lucide-react";
 
-import type { PreprocessPreview } from "../../../shared/api/types";
+import type { PreprocessExecutionRuntimeInfo, PreprocessPreview } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { formatByteSize, formatElapsed, formatPreviewDuration } from "../runtimeFeedback";
@@ -22,6 +22,7 @@ interface Props {
   previewElapsedMs: number;
   executePending: boolean;
   executeElapsedMs: number;
+  lastExecutionRuntime: PreprocessExecutionRuntimeInfo | null | undefined;
   error: string | null;
   onPreview: () => void;
   onExecute: () => void;
@@ -37,6 +38,7 @@ export function PreprocessSettingsPanel({
   previewElapsedMs,
   executePending,
   executeElapsedMs,
+  lastExecutionRuntime,
   error,
   onPreview,
   onExecute,
@@ -89,12 +91,14 @@ export function PreprocessSettingsPanel({
       <section className="preprocess-runtime-card" aria-label="预处理运行信息">
         <div className="preprocess-runtime-card__title">
           <Cpu size={15} />
-          <strong>CPU 本地处理</strong>
-          <span>不使用 GPU / CUDA</span>
+          <strong>
+            {preview?.runtime.resize_device === "cuda" ? "CUDA 缩放 + CPU 编码" : "CPU 本地处理"}
+          </strong>
+          <span>编码始终使用 CPU</span>
         </div>
         <p>
-          预览只检查图片信息、文件状态和目标尺寸，不会执行缩放或重新编码；应用处理才会使用 Pillow /
-          OpenCV 的 CPU 多线程。
+          预览只检查图片信息、文件状态和目标尺寸，不会真正缩放或编码。CUDA 模式使用 CuPy 执行
+          Lanczos 3/4 缩放，PNG、WebP 和 JPEG 保存仍由 Pillow 在 CPU 上完成。
         </p>
         <dl>
           <div>
@@ -112,15 +116,27 @@ export function PreprocessSettingsPanel({
             </dd>
           </div>
           <div>
+            <dt>处理路径</dt>
+            <dd>
+              {preview
+                ? `缩放 ${preview.runtime.resize_device.toUpperCase()} · 编码 CPU`
+                : form.processingDevice === "cpu"
+                  ? "缩放 CPU · 编码 CPU"
+                  : "等待预览检测 CUDA"}
+            </dd>
+          </div>
+          <div>
             <dt>实际处理</dt>
             <dd>
               {executeElapsedMs > 0
-                ? `CPU 处理中 · 已用时 ${formatElapsed(executeElapsedMs)}`
-                : selectedWorkerCount
-                  ? `${selectedWorkerCount} 个 CPU 线程 · ${preview?.runtime.render_count ?? 0} 张需渲染`
-                  : form.concurrencyMode === "auto"
-                    ? "CPU 自动并发，最多 8 线程"
-                    : `CPU 最多 ${form.maxWorkers} 线程`}
+                ? `${preview?.runtime.resize_device === "cuda" ? "CUDA 缩放 / CPU 编码" : "CPU"} 处理中 · 已用时 ${formatElapsed(executeElapsedMs)}`
+                : lastExecutionRuntime
+                  ? `完成于 ${formatPreviewDuration(lastExecutionRuntime.duration_ms)} · ${lastExecutionRuntime.worker_count} 线程`
+                  : selectedWorkerCount
+                    ? `${selectedWorkerCount} 个工作线程 · ${preview?.runtime.render_count ?? 0} 张需渲染`
+                    : form.concurrencyMode === "auto"
+                      ? "自动并发，最多 8 线程"
+                      : `最多 ${form.maxWorkers} 线程`}
             </dd>
           </div>
           {preview ? (
@@ -130,9 +146,17 @@ export function PreprocessSettingsPanel({
             </div>
           ) : null}
         </dl>
+        {preview?.runtime.fallback_reason ? (
+          <p className="preprocess-runtime-card__warning">{preview.runtime.fallback_reason}</p>
+        ) : null}
+        {lastExecutionRuntime?.fallback_reason ? (
+          <p className="preprocess-runtime-card__warning">
+            实际执行：{lastExecutionRuntime.fallback_reason}
+          </p>
+        ) : null}
         <small>
-          完成时间取决于图片总容量、分辨率、磁盘速度和输出格式；执行开始后会持续显示已用时间，
-          预览不会占用显卡。
+          GPU 适合大图批处理；小图可能因显存传输开销而不比 CPU 快。自动模式在 CUDA
+          不可用、图片模式不支持或运行失败时会安全回退 CPU。
         </small>
       </section>
       <section className="preprocess-option">
@@ -237,7 +261,23 @@ export function PreprocessSettingsPanel({
         </label>
       </section>
       <section className="preprocess-option">
-        <span className="preprocess-option-title">图片处理并发</span>
+        <span className="preprocess-option-title">处理设备与并发</span>
+        <label className="form-field">
+          <span>缩放设备</span>
+          <select
+            value={form.processingDevice}
+            disabled={!form.resizeEnabled}
+            onChange={(event) =>
+              onChange({
+                processingDevice: event.target.value as PreprocessFormState["processingDevice"],
+              })
+            }
+          >
+            <option value="auto">自动（优先 CUDA）</option>
+            <option value="cuda">CUDA（不可用时回退）</option>
+            <option value="cpu">CPU</option>
+          </select>
+        </label>
         <div className="preprocess-inline-fields preprocess-concurrency-fields">
           <label className="form-field">
             <span>线程模式</span>
@@ -267,8 +307,8 @@ export function PreprocessSettingsPanel({
           </label>
         </div>
         <small>
-          仅并行执行图片解码、缩放和重新编码；重命名、数据库写入与回滚仍按顺序执行。
-          自动模式最多使用 8 个线程，并会根据图片尺寸降低并发。
+          CUDA 只加速 Lanczos 3/4 缩放，解码和编码仍使用 CPU；多个工作线程可让 CPU 编码与串行 GPU
+          缩放重叠。重命名、数据库写入与回滚仍按顺序执行。
         </small>
       </section>
       <section className="preprocess-option">

@@ -16,6 +16,10 @@ from dataset_studio.modules.preprocessing.models import (
     PreprocessRequest,
 )
 from dataset_studio.modules.preprocessing.planner import PlanItem
+from dataset_studio.modules.preprocessing.resize_runtime import (
+    ResizeExecutor,
+    ResizeRuntimeSelection,
+)
 
 _AUTO_WORKER_LIMIT = 8
 _IN_FLIGHT_PIXEL_BUDGET = 160_000_000
@@ -82,6 +86,15 @@ class PreprocessItemPreparer:
         self._operation_root = operation_root
         self._items = tuple(items)
         self._request = request
+        resize_needed = any(
+            item.before_width != item.after_width or item.before_height != item.after_height
+            for item in self._items
+        )
+        self._resize_executor = ResizeExecutor.create(
+            execution.device,
+            request.resize.algorithm if request.resize else None,
+            resize_needed=resize_needed,
+        )
         self._worker_count = resolve_resize_worker_count(self._items, request, execution)
         self._pool: ThreadPoolExecutor | None = None
         self._futures: dict[int, Future[PreparedItem]] = {}
@@ -90,6 +103,10 @@ class PreprocessItemPreparer:
     @property
     def worker_count(self) -> int:
         return self._worker_count
+
+    @property
+    def runtime_selection(self) -> ResizeRuntimeSelection:
+        return self._resize_executor.selection
 
     def __enter__(self) -> PreprocessItemPreparer:
         if self._worker_count > 1:
@@ -165,6 +182,7 @@ class PreprocessItemPreparer:
                     item,
                     self._request.resize,
                     self._request.convert,
+                    self._resize_executor,
                 )
                 after_hash = sha256(staging)
             else:

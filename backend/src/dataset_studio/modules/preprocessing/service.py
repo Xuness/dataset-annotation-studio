@@ -26,6 +26,7 @@ from dataset_studio.modules.preprocessing.image_pipeline import sha256
 from dataset_studio.modules.preprocessing.models import (
     PreprocessExecuteRequest,
     PreprocessExecutionOptions,
+    PreprocessExecutionRuntimeInfo,
     PreprocessItemPhase,
     PreprocessOperation,
     PreprocessPreview,
@@ -39,6 +40,7 @@ from dataset_studio.modules.preprocessing.recovery import (
     RecoveryFileOperations,
 )
 from dataset_studio.modules.preprocessing.repository import PreprocessRepository
+from dataset_studio.modules.preprocessing.resize_runtime import select_resize_runtime
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
@@ -69,8 +71,14 @@ class PreprocessService:
         self._active_lock = threading.Lock()
         self._active_operations: dict[tuple[str, str], bool] = {}
 
-    def preview(self, project_id: str, request: PreprocessRequest) -> PreprocessPreview:
+    def preview(
+        self,
+        project_id: str,
+        request: PreprocessRequest,
+        execution: PreprocessExecutionOptions | None = None,
+    ) -> PreprocessPreview:
         started = time.perf_counter()
+        execution = execution or PreprocessExecutionOptions()
         paths, _ = self._workspaces.get(project_id)
         plan = build_plan(paths.database, paths.root, request, verify_content=False)
         visible_plan = plan[:1000]
@@ -81,6 +89,15 @@ class PreprocessService:
         visible_plan = visible_plan[:2000]
         source_bytes = sum((paths.root / item.before_relative_path).stat().st_size for item in plan)
         render_count = sum(requires_render(item, request) for item in plan)
+        resize_needed = any(
+            item.before_width != item.after_width or item.before_height != item.after_height
+            for item in plan
+        )
+        runtime_selection = select_resize_runtime(
+            execution.device,
+            request.resize.algorithm if request.resize else None,
+            resize_needed=resize_needed,
+        )
         automatic_worker_count = resolve_resize_worker_count(
             plan,
             request,
@@ -101,6 +118,12 @@ class PreprocessService:
             warning_count=sum(item.warning is not None for item in plan),
             preview_token=preview_token(request, plan),
             runtime=PreprocessRuntimeInfo(
+                device=runtime_selection.pipeline_device,
+                requested_device=runtime_selection.requested_device,
+                resize_device=runtime_selection.resize_device,
+                encoding_device="cpu",
+                cuda_available=runtime_selection.cuda_available,
+                fallback_reason=runtime_selection.fallback_reason,
                 preview_duration_ms=preview_duration_ms,
                 source_bytes=source_bytes,
                 render_count=render_count,
@@ -114,6 +137,7 @@ class PreprocessService:
         project_id: str,
         execution: PreprocessExecuteRequest,
     ) -> PreprocessOperation:
+        started = time.perf_counter()
         request = execution.request
         paths, manifest = self._workspaces.get(project_id)
         operation_id = str(uuid.uuid4())
@@ -132,6 +156,9 @@ class PreprocessService:
                 raise ValueError("当前参数不会修改任何图片，无需执行预处理。")
             repository.start(operation_id, request)
             operation_root = paths.recovery / operation_id
+            execution_runtime: PreprocessExecutionRuntimeInfo | None = None
+            runtime_selection = None
+            worker_count = 1
             try:
                 changed_items = [item for item in plan if item.will_change]
                 with PreprocessItemPreparer(
@@ -160,8 +187,19 @@ class PreprocessService:
                             item_id,
                             PreprocessItemPhase.COMMITTED.value,
                         )
+                    runtime_selection = preparer.runtime_selection
+                    worker_count = preparer.worker_count
                 repository.complete(operation_id)
                 self._scanner.scan(paths, manifest)
+                if runtime_selection is not None:
+                    execution_runtime = PreprocessExecutionRuntimeInfo(
+                        requested_device=runtime_selection.requested_device,
+                        resize_device=runtime_selection.resize_device,
+                        encoding_device="cpu",
+                        fallback_reason=runtime_selection.fallback_reason,
+                        worker_count=worker_count,
+                        duration_ms=round((time.perf_counter() - started) * 1000),
+                    )
             except Exception as error:
                 compensation_errors: list[str] = []
                 try:
@@ -185,6 +223,8 @@ class PreprocessService:
         operation = repository.get(operation_id)
         if operation is None:
             raise RuntimeError("预处理操作记录创建失败。")
+        if execution_runtime is not None:
+            return operation.model_copy(update={"runtime": execution_runtime})
         return operation
 
     def list_operations(self, project_id: str) -> list[PreprocessOperation]:

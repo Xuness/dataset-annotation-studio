@@ -31,7 +31,7 @@ export function PreprocessPreviewPanel({ preview, pending, elapsedMs }: Props) {
         {preview ? (
           <p className="preview-runtime-summary">
             <span>
-              <Cpu size={13} /> CPU
+              <Cpu size={13} /> 缩放 {preview.runtime.resize_device.toUpperCase()} · 编码 CPU
             </span>
             <span>预览耗时 {formatPreviewDuration(preview.runtime.preview_duration_ms)}</span>
             <span>{preview.runtime.render_count} 张需要实际渲染</span>

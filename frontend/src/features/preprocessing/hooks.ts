@@ -8,7 +8,11 @@ import {
   previewPreprocessing,
   undoPreprocessOperation,
 } from "./api";
-import type { PreprocessExecutionOptions, PreprocessRequest } from "../../shared/api/types";
+import type {
+  PreprocessDevice,
+  PreprocessExecutionOptions,
+  PreprocessRequest,
+} from "../../shared/api/types";
 import { preprocessingKeys } from "./queryKeys";
 
 export function usePreprocessOperations(projectId: string) {
@@ -27,7 +31,8 @@ export function usePreprocessingActions(projectId: string) {
   };
   return {
     preview: useMutation({
-      mutationFn: (request: PreprocessRequest) => previewPreprocessing(projectId, request),
+      mutationFn: ({ request, device }: { request: PreprocessRequest; device: PreprocessDevice }) =>
+        previewPreprocessing(projectId, request, device),
     }),
     execute: useMutation({
       mutationFn: ({

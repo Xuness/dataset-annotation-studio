@@ -27,6 +27,15 @@ uv sync --project backend --extra cuda --all-groups --locked --exact
 pnpm dev:cuda
 ```
 
+The CUDA extra also installs the optional CuPy resize backend. Preprocessing can use CUDA
+for Lanczos 3/4 resizing while image decoding and PNG/WebP/JPEG encoding remain on the
+CPU. The backend reports the selected path and falls back to CPU when CUDA is unavailable,
+the image mode is unsupported, or a CUDA operation fails.
+
+On Linux, `./启动开发版.sh --cuda` performs the same dependency synchronization and starts
+the CUDA desktop development session. Add `--graphics dmabuf-off` or `--graphics software`
+when testing WebKitGTK compatibility modes.
+
 When switching an existing checkout between the mutually exclusive CPU and CUDA
 extras, run `uv venv --clear backend/.venv` before the selected `uv sync` command.
 

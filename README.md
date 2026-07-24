@@ -67,6 +67,18 @@ uv sync --project backend --extra cuda --all-groups --locked --exact
 pnpm dev:cuda
 ```
 
+CUDA Runtime 也会安装可选的 CuPy 图片预处理后端。预处理页面可以选择“自动（优先
+CUDA）”、“CUDA”或“CPU”：CUDA 目前只负责 Lanczos 3/4 缩放，PNG、WebP、JPEG
+解码/编码仍由 Pillow 在 CPU 上完成；CUDA 不可用、图片模式不支持或运行失败时会自动
+回退到 CPU，并在预览和执行结果中显示实际路径。
+
+Linux 也可以直接使用仓库根目录的 `启动开发版.sh`：
+
+```bash
+./启动开发版.sh --cuda
+./启动开发版.sh --cuda --graphics dmabuf-off
+```
+
 `onnxruntime` 与 `onnxruntime-gpu` 不能在同一环境中并存，uv 配置会阻止同时选择两个
 extra。CUDA extra 将 cuDNN 固定在仍支持 Tesla V100/Volta 的 9.10 系列；CUDA Runtime
 还受 NVIDIA 软件条款约束，本仓库不分发其二进制文件。

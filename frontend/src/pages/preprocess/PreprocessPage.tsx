@@ -45,6 +45,7 @@ const initialForm: PreprocessFormState = {
   format: "webp",
   quality: 90,
   effort: 4,
+  processingDevice: "auto",
   concurrencyMode: "auto",
   maxWorkers: 8,
   renameEnabled: false,
@@ -100,13 +101,14 @@ export function PreprocessPage() {
   );
   const execution = useMemo<PreprocessExecutionOptions>(
     () => ({
+      device: form.processingDevice,
       max_workers: form.concurrencyMode === "manual" ? form.maxWorkers : null,
     }),
-    [form.concurrencyMode, form.maxWorkers],
+    [form.concurrencyMode, form.maxWorkers, form.processingDevice],
   );
   const requestFingerprint = useMemo(
-    () => JSON.stringify([projectId, request]),
-    [projectId, request],
+    () => JSON.stringify([projectId, request, form.processingDevice]),
+    [form.processingDevice, projectId, request],
   );
   const validPreview = previewFingerprint === requestFingerprint ? actions.preview.data : undefined;
   const filesChanging = actions.execute.isPending || actions.undo.isPending;
@@ -135,7 +137,7 @@ export function PreprocessPage() {
     setError(null);
     setPreviewFingerprint(null);
     try {
-      await actions.preview.mutateAsync(request);
+      await actions.preview.mutateAsync({ request, device: form.processingDevice });
       setPreviewFingerprint(requestFingerprint);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法生成预览。");
@@ -205,6 +207,7 @@ export function PreprocessPage() {
         previewElapsedMs={previewElapsedMs}
         executePending={workspaceBusy}
         executeElapsedMs={executeElapsedMs}
+        lastExecutionRuntime={actions.execute.data?.runtime}
         error={error}
         onPreview={() => void preview()}
         onExecute={() => void execute()}
