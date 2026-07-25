@@ -1,8 +1,11 @@
+use std::path::{Path, PathBuf};
+
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     App, AppHandle, Emitter, Manager, Runtime, Window, WindowEvent,
 };
+use tauri_plugin_opener::OpenerExt;
 
 const MAIN_WINDOW_LABEL: &str = "main";
 const SHOW_MENU_ID: &str = "show-main-window";
@@ -96,6 +99,26 @@ pub(crate) fn handle_window_event<R: Runtime>(window: &Window<R>, event: &Window
     }
 }
 
+fn existing_directory(path: &Path) -> Result<PathBuf, String> {
+    if path.as_os_str().is_empty() {
+        return Err("目录路径不能为空。".to_owned());
+    }
+    let metadata =
+        std::fs::metadata(path).map_err(|error| format!("目录不存在或无法访问：{error}"))?;
+    if !metadata.is_dir() {
+        return Err("目标路径不是目录。".to_owned());
+    }
+    Ok(path.to_path_buf())
+}
+
+#[tauri::command]
+pub(crate) fn open_directory(app: AppHandle, path: PathBuf) -> Result<(), String> {
+    let directory = existing_directory(&path)?;
+    app.opener()
+        .open_path(directory.to_string_lossy().into_owned(), None::<&str>)
+        .map_err(|error| format!("无法调用系统文件管理器：{error}"))
+}
+
 #[tauri::command]
 pub(crate) fn exit_application(app: AppHandle) {
     app.exit(0);
@@ -104,8 +127,10 @@ pub(crate) fn exit_application(app: AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{
-        tray_menu_action, TrayMenuAction, EXIT_MENU_ID, EXIT_REQUESTED_EVENT, SHOW_MENU_ID,
+        existing_directory, tray_menu_action, TrayMenuAction, EXIT_MENU_ID, EXIT_REQUESTED_EVENT,
+        SHOW_MENU_ID,
     };
+    use std::path::Path;
 
     #[test]
     fn tray_menu_ids_map_to_explicit_lifecycle_actions() {
@@ -113,5 +138,13 @@ mod tests {
         assert_eq!(tray_menu_action(EXIT_MENU_ID), TrayMenuAction::RequestExit);
         assert_eq!(tray_menu_action("unknown"), TrayMenuAction::Ignore);
         assert_eq!(EXIT_REQUESTED_EVENT, "desktop-exit-requested");
+    }
+
+    #[test]
+    fn directory_opening_rejects_files_and_missing_paths() {
+        let current = std::env::current_dir().expect("current directory should exist");
+        assert_eq!(existing_directory(&current), Ok(current));
+        assert!(existing_directory(Path::new(file!())).is_err());
+        assert!(existing_directory(Path::new("definitely-missing-directory")).is_err());
     }
 }

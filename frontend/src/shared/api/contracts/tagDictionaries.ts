@@ -84,6 +84,28 @@ export interface TagDictionarySearchResult {
   limit: number;
 }
 
+export interface TagDictionaryResolvedEntry {
+  requested_tag: string;
+  normalized_tag: string;
+  translation: string | null;
+  matched: boolean;
+  source_kind: "override" | "dictionary" | "fallback";
+  installation_id: string | null;
+  installation_name: string | null;
+  adapter_id: string | null;
+  source_version: string | null;
+  category: string | null;
+  post_count: number | null;
+  override_revision: number | null;
+}
+
+export interface TagDictionaryResolution {
+  language: string;
+  entries: TagDictionaryResolvedEntry[];
+  resolution_hash: string;
+  unmatched_count: number;
+}
+
 export interface TagDictionaryDownloadOffer {
   offer_id: string;
   adapter_id: string;

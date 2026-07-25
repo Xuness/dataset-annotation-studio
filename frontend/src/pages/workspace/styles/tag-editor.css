@@ -9,6 +9,24 @@
   font-size: var(--annotation-font-size, 12px);
 }
 
+.tag-editor--readonly {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.tag-editor--compact .tag-editor__toolbar {
+  gap: 5px;
+  padding: 6px;
+}
+
+.tag-editor--compact .tag-editor__combobox {
+  min-width: 130px;
+}
+
+.tag-editor--compact .tag-editor__vocabulary-select {
+  min-width: 120px;
+  max-width: 42%;
+}
+
 .tag-editor__toolbar {
   position: relative;
   z-index: 2;
@@ -290,6 +308,12 @@
   border-color: var(--accent);
   background: var(--accent-soft);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.tag-editor__chip.is-linked {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 82%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 19%, transparent);
 }
 
 .tag-editor__empty {

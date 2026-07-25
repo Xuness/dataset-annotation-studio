@@ -134,6 +134,7 @@ pub fn run() {
             clipboard::write_clipboard_text_with_history,
             background::install_custom_background,
             background::clear_custom_background,
+            desktop::open_directory,
             desktop::exit_application
         ])
         .plugin(tauri_plugin_dialog::init())

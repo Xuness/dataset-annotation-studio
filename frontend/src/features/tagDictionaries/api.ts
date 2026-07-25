@@ -5,6 +5,7 @@ import type {
   TagDictionaryInstallation,
   TagDictionaryLibrary,
   TagDictionaryOverride,
+  TagDictionaryResolution,
   TagDictionarySearchResult,
 } from "../../shared/api/types";
 
@@ -53,6 +54,18 @@ export function searchTagDictionaryEntries(
     limit: "80",
   });
   return apiRequest(`/api/v1/tag-dictionaries/entries/search?${parameters}`, { signal });
+}
+
+export function resolveTagDictionaryEntries(
+  tags: string[],
+  language = "zh-CN",
+  signal?: AbortSignal,
+): Promise<TagDictionaryResolution> {
+  return apiRequest("/api/v1/tag-dictionaries/resolve", {
+    method: "POST",
+    body: JSON.stringify({ tags, language }),
+    signal,
+  });
 }
 
 export function upsertTagDictionaryOverride(input: {

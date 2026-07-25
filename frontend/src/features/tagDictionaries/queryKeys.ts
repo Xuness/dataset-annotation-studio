@@ -5,4 +5,6 @@ export const tagDictionaryKeys = {
   downloadTasks: ["tag-dictionaries", "downloads", "tasks"] as const,
   search: (query: string, language: string) =>
     ["tag-dictionaries", "search", query, language] as const,
+  resolution: (tagsSignature: string, language: string) =>
+    ["tag-dictionaries", "resolution", tagsSignature, language] as const,
 };

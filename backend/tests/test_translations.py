@@ -31,7 +31,14 @@ from dataset_studio.modules.providers.config import (
     ProviderModelConfig,
     ProviderType,
 )
+from dataset_studio.modules.tag_dictionaries.models import TagDictionaryOverrideUpsert
+from dataset_studio.modules.tag_dictionaries.repository import TagDictionaryRepository
+from dataset_studio.modules.tag_dictionaries.service import TagDictionaryService
+from dataset_studio.modules.taggers.repository import TaggerRepository
+from dataset_studio.modules.taggers.service import TaggerService
+from dataset_studio.modules.translations.identity import TranslationSourceKind
 from dataset_studio.modules.translations.models import TranslationStatus
+from dataset_studio.modules.translations.prompt import render_translation_system_prompt
 from dataset_studio.modules.translations.service import (
     TranslationService,
     TranslationSourceChangedError,
@@ -64,6 +71,29 @@ def _translation_services(tmp_path: Path, filenames: tuple[str, ...] = ("sample.
     workspace, _ = workspaces.open(str(project))
     asset_items = assets.list_assets(workspace.project_id).items
     return project, workspace.project_id, asset_items, workspaces, annotations, translations
+
+
+def _translation_services_with_dictionary(tmp_path: Path):
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+    settings.ensure_directories()
+    global_database = settings.app_data_dir / "global.sqlite3"
+    initialize_global_database(global_database)
+    workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
+    annotations = AnnotationService(workspaces)
+    taggers = TaggerService(settings, TaggerRepository(global_database))
+    dictionaries = TagDictionaryService(
+        settings,
+        TagDictionaryRepository(global_database),
+        taggers,
+    )
+    translations = TranslationService(workspaces, annotations, dictionaries)
+    assets = AssetService(workspaces)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (32, 32), "white").save(project / "sample.png")
+    workspace, _ = workspaces.open(str(project))
+    asset = assets.list_assets(workspace.project_id).items[0]
+    return workspace.project_id, asset, annotations, translations, dictionaries
 
 
 def _save_usable_source(
@@ -107,6 +137,27 @@ def test_description_translation_alignment_preserves_exact_structure() -> None:
     assert changed is False
     assert "XML、换行或标点结构" in changed_issue
     assert changed_parts == []
+
+
+def test_effective_translation_system_prompt_locks_description_and_tag_structure() -> None:
+    description_prompt = render_translation_system_prompt(
+        "Translate to {target_language} ({language_code}). Return JSON.",
+        "zh-CN",
+    )
+    assert description_prompt.startswith("Translate to 简体中文 (zh-CN). Return JSON.")
+    assert "highest priority" in description_prompt
+    assert '"," must not become "，"' in description_prompt
+    assert "do not reindent, reflow, wrap, join, or split lines" in description_prompt
+    assert "silently compare the source and output sequences" in description_prompt
+
+    tags_prompt = render_translation_system_prompt(
+        "Translate to {target_language}.",
+        "zh-CN",
+        TranslationSourceKind.TAGS,
+    )
+    assert "Mandatory Tags envelope protocol" in tags_prompt
+    assert "Never merge, split, omit, duplicate, or reorder Tags" in tags_prompt
+    assert "output count, child count, indexes" in tags_prompt
 
 
 def test_tag_translation_protocol_and_alignment_keep_tag_identity() -> None:
@@ -153,6 +204,91 @@ def test_tag_translation_protocol_and_alignment_keep_tag_identity() -> None:
     assert malformed is False
     assert "XML 结构" in malformed_issue
     assert malformed_content == ""
+
+
+def test_foreground_local_dictionary_refresh_tracks_the_saved_tags_revision(
+    tmp_path: Path,
+) -> None:
+    project_id, asset, annotations, translations, dictionaries = (
+        _translation_services_with_dictionary(tmp_path)
+    )
+    dictionaries.upsert_override(TagDictionaryOverrideUpsert(tag="blue_hair", translation="蓝发"))
+    tag_write = annotations.save_tags(
+        project_id,
+        asset.id,
+        [
+            AnnotationTag(name="blue_hair", category="general", origin="manual"),
+            AnnotationTag(name="unknown_tag", category=None, origin="manual"),
+        ],
+    )
+
+    refreshed = translations.refresh_local_dictionary(
+        project_id,
+        asset.id,
+        "zh-cn",
+        expected_source_revision_id=tag_write.revision_id,
+        expected_translation_revision_id=None,
+    )
+
+    assert refreshed.status == TranslationStatus.CURRENT
+    assert refreshed.content == "蓝发\nunknown_tag"
+    assert refreshed.source_revision_id == tag_write.revision_id
+    assert refreshed.dictionary_override_count == 1
+    assert refreshed.dictionary_unmatched_count == 1
+    assert refreshed.modified_at is not None
+    assert len(annotations.history(project_id, asset.id, AnnotationChannel.TAGS)) == 1
+    assert (
+        len(
+            annotations.history(
+                project_id,
+                asset.id,
+                AnnotationChannel.TRANSLATION,
+                "zh-CN",
+                "tags",
+                "local_dictionary",
+            )
+        )
+        == 1
+    )
+
+    updated_tags = annotations.save_tags(
+        project_id,
+        asset.id,
+        [AnnotationTag(name="blue_hair", category="general", origin="manual")],
+        expected_head_revision_id=tag_write.revision_id,
+    )
+    with pytest.raises(TranslationSourceChangedError, match="源 Tags 已发生变化"):
+        translations.refresh_local_dictionary(
+            project_id,
+            asset.id,
+            "zh-CN",
+            expected_source_revision_id=tag_write.revision_id,
+            expected_translation_revision_id=refreshed.modified_at,
+        )
+    assert (
+        len(
+            annotations.history(
+                project_id,
+                asset.id,
+                AnnotationChannel.TRANSLATION,
+                "zh-CN",
+                "tags",
+                "local_dictionary",
+            )
+        )
+        == 1
+    )
+
+    latest = translations.refresh_local_dictionary(
+        project_id,
+        asset.id,
+        "zh-CN",
+        expected_source_revision_id=updated_tags.revision_id,
+        expected_translation_revision_id=refreshed.modified_at,
+    )
+    assert latest.status == TranslationStatus.CURRENT
+    assert latest.content == "蓝发"
+    assert latest.source_revision_id == updated_tags.revision_id
 
 
 def test_translation_variants_coexist_and_only_follow_their_own_source(

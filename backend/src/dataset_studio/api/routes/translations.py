@@ -10,7 +10,10 @@ from dataset_studio.modules.translations.identity import (
     TranslationProducerKind,
     TranslationSourceKind,
 )
-from dataset_studio.modules.translations.models import TranslationDocument
+from dataset_studio.modules.translations.models import (
+    LocalDictionaryTranslationRefreshRequest,
+    TranslationDocument,
+)
 
 router = APIRouter(
     prefix="/workspaces/{project_id}/assets/{asset_id}/translations",
@@ -39,4 +42,21 @@ def get_translation(
         language,
         source_kind=source_kind,
         producer_kind=producer_kind,
+    )
+
+
+@router.post("/{language}/local-dictionary/refresh", response_model=TranslationDocument)
+def refresh_local_dictionary_translation(
+    project_id: str,
+    asset_id: str,
+    language: str,
+    data: LocalDictionaryTranslationRefreshRequest,
+    container: Container,
+):
+    return container.translations.refresh_local_dictionary(
+        project_id,
+        asset_id,
+        language,
+        expected_source_revision_id=data.expected_source_revision_id,
+        expected_translation_revision_id=data.expected_translation_revision_id,
     )

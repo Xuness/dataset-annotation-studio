@@ -709,7 +709,10 @@ async def test_worker_translates_annotation_without_sending_image(tmp_path: Path
     assert stored_translation.content == "<caption>安静的花园</caption>"
     assert provider.requests[0].image_path is None
     assert provider.requests[0].system_prompt.startswith("Translate into 简体中文; locale=zh-CN.")
-    assert "Preserve every punctuation character" in provider.requests[0].system_prompt
+    assert "every punctuation character" in provider.requests[0].system_prompt
+    assert "do not reindent, reflow, wrap, join, or split lines" in (
+        provider.requests[0].system_prompt
+    )
     assert source in provider.requests[0].user_prompt
     translation = container.translations.get(workspace.project_id, asset.id, "zh-CN")
     assert translation.status.value == "current"

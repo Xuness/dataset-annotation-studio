@@ -8,9 +8,30 @@ import {
 } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 
-import type { TranslationAlignmentPart, TranslationDocument } from "../../../shared/api/types";
+import type {
+  AnnotationTag,
+  AnnotationTaggerSource,
+  TagDictionaryResolution,
+  TranslationAlignmentPart,
+  TranslationDocument,
+} from "../../../shared/api/types";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { TRANSLATION_STATUS_LABELS } from "./annotationLabels";
+import { groupTags, normalizeTagKey } from "./tagEditorState";
+import { TagEditorPanel } from "./TagEditorPanel";
+import { annotationTagTitle, tagCategoryLabel, tagCategoryTone } from "./tagPresentation";
+
+interface TranslationTagEditor {
+  projectId: string;
+  assetId: string;
+  tags: AnnotationTag[];
+  taggerSource: AnnotationTaggerSource | null;
+  fontSize: number;
+  dirty: boolean;
+  readOnly: boolean;
+  onChange: (tags: AnnotationTag[]) => void;
+  onFontSizeChange: (fontSize: number) => void;
+}
 
 interface TranslationComparePanelProps {
   translation: TranslationDocument | undefined;
@@ -20,6 +41,10 @@ interface TranslationComparePanelProps {
   editContent: string;
   editorExtensions: NonNullable<ComponentProps<typeof CodeMirror>["extensions"]>;
   onEditContentChange: (content: string) => void;
+  tagEditor?: TranslationTagEditor;
+  dictionaryPreview?: TagDictionaryResolution;
+  dictionaryPreviewLoading?: boolean;
+  dictionaryPreviewError?: unknown;
 }
 
 type AlignmentSide = "source" | "translated";
@@ -54,14 +79,19 @@ function sourceLabel(document: TranslationDocument): string {
   return document.resolved_source_channel === "existing_annotation" ? "原有标注" : "LLM 描述";
 }
 
-function categoryTone(category: string | null): string {
-  if (category === "character") return "accent";
-  if (category === "copyright") return "sage";
-  if (category === "artist" || category === "quality" || category === "year") {
-    return "warning";
+function dictionaryEntryTitle(
+  tag: AnnotationTag,
+  resolution: TagDictionaryResolution | undefined,
+  index: number,
+): string {
+  const entry = resolution?.entries[index];
+  if (!entry) return `类别：${tagCategoryLabel(tag.category)}`;
+  if (!entry.matched) {
+    return `类别：${tagCategoryLabel(tag.category)} · 本地词典未命中，暂时保留原 Tag`;
   }
-  if (category === "rating") return "danger";
-  return "neutral";
+  const source =
+    entry.source_kind === "override" ? "词条修正" : (entry.installation_name ?? "本地 Tag 词典");
+  return `类别：${tagCategoryLabel(tag.category)} · 来源：${source}`;
 }
 
 export function TranslationComparePanel({
@@ -72,13 +102,38 @@ export function TranslationComparePanel({
   editContent,
   editorExtensions,
   onEditContentChange,
+  tagEditor,
+  dictionaryPreview,
+  dictionaryPreviewLoading = false,
+  dictionaryPreviewError,
 }: TranslationComparePanelProps) {
   const sourceRef = useRef<HTMLDivElement>(null);
   const translatedRef = useRef<HTMLDivElement>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
-  const aligned =
+  const isTags = translation?.source_kind === "tags";
+  const fallbackTags =
+    translation?.source_tags.length || !isTags
+      ? (translation?.source_tags ?? [])
+      : (translation?.alignment_parts
+          .filter((part) => part.kind === "tag")
+          .map((part) => ({
+            name: part.source_text,
+            category: part.category,
+            confidence: part.confidence,
+            origin: "translation_source",
+          })) ?? []);
+  const tags = tagEditor?.tags ?? fallbackTags;
+  const tagSignature = tags
+    .map((tag) => `${normalizeTagKey(tag.name)}:${tag.category ?? ""}`)
+    .join("\u0000");
+  const persistedAligned =
     !editing && translation?.status === "current" && translation.alignment_status === "aligned";
+  const previewAligned =
+    isTags &&
+    translation?.producer_kind === "local_dictionary" &&
+    dictionaryPreview?.entries.length === tags.length;
+  const aligned = Boolean(persistedAligned || previewAligned);
   const activeIds = useMemo(
     () => new Set(pinnedIds.length ? pinnedIds : hoveredId ? [hoveredId] : []),
     [hoveredId, pinnedIds],
@@ -93,6 +148,7 @@ export function TranslationComparePanel({
     translation?.source_kind,
     translation?.producer_kind,
     translation?.modified_at,
+    tagSignature,
     editing,
   ]);
 
@@ -123,14 +179,22 @@ export function TranslationComparePanel({
     captureSelection(side);
   }
 
-  function renderAlignedParts(side: AlignmentSide, parts: TranslationAlignmentPart[]) {
-    const isTags = translation?.source_kind === "tags";
+  function setTagSelection(keys: string[]) {
+    if (!aligned || !keys.length) return;
+    setPinnedIds(Array.from(new Set(keys)));
+    setHoveredId(null);
+  }
+
+  function setTagHover(key: string | null) {
+    if (!aligned || pinnedIds.length) return;
+    setHoveredId(key);
+  }
+
+  function renderDescriptionParts(side: AlignmentSide, parts: TranslationAlignmentPart[]) {
     return (
       <div
         ref={side === "source" ? sourceRef : translatedRef}
-        className={`translation-compare__aligned translation-compare__aligned--${
-          isTags ? "tags" : "description"
-        }`}
+        className="translation-compare__aligned translation-compare__aligned--description"
         onMouseUp={() => captureSelection(side)}
         onKeyUp={(event) => handleKeyUp(side, event)}
         onPointerDown={(event) => {
@@ -152,25 +216,100 @@ export function TranslationComparePanel({
                 .filter(Boolean)
                 .join(" ")}
               data-alignment-id={alignable ? part.id : undefined}
-              data-category-tone={part.kind === "tag" ? categoryTone(part.category) : undefined}
               onPointerEnter={() => {
                 if (alignable && !pinnedIds.length) setHoveredId(part.id);
               }}
               onPointerLeave={() => {
                 if (alignable && !pinnedIds.length) setHoveredId(null);
               }}
-              title={
-                isTags && part.category
-                  ? `${part.category}${
-                      part.confidence == null ? "" : ` · ${(part.confidence * 100).toFixed(1)}%`
-                    }`
-                  : undefined
-              }
             >
               {value}
             </span>
           );
         })}
+      </div>
+    );
+  }
+
+  const persistedTagParts =
+    translation?.alignment_parts.filter((part) => part.kind === "tag") ?? [];
+  const canRenderPersistedTags = Boolean(
+    !tagEditor?.dirty && persistedAligned && persistedTagParts.length === tags.length,
+  );
+
+  function renderTagGroups(side: AlignmentSide) {
+    const groups = groupTags(tags);
+    const ref = side === "source" ? sourceRef : translatedRef;
+    return (
+      <div
+        ref={ref}
+        className="tag-editor__groups translation-compare__tag-groups"
+        onMouseUp={() => captureSelection(side)}
+        onKeyUp={(event) => handleKeyUp(side, event)}
+        onPointerDown={(event) => {
+          if (event.target === event.currentTarget) setPinnedIds([]);
+        }}
+        tabIndex={0}
+      >
+        {groups.length ? (
+          groups.map((group) => (
+            <section
+              key={`${side}:${group.category ?? "uncategorized"}`}
+              className="tag-editor__group translation-compare__tag-group"
+              data-category-tone={tagCategoryTone(group.category)}
+            >
+              <header>
+                <strong>{tagCategoryLabel(group.category)}</strong>
+                <span>{group.items.length}</span>
+              </header>
+              <div className="tag-editor__chips">
+                {group.items.map(({ index, key, tag }) => {
+                  const entry = previewAligned ? dictionaryPreview?.entries[index] : undefined;
+                  const part = canRenderPersistedTags ? persistedTagParts[index] : undefined;
+                  const value =
+                    side === "source"
+                      ? tag.name
+                      : (entry?.translation ?? entry?.requested_tag ?? part?.translated_text ?? "");
+                  if (side === "translated" && !value) return null;
+                  return (
+                    <span
+                      key={`${side}:${key}`}
+                      className={[
+                        "tag-editor__chip",
+                        "translation-compare__tag-chip",
+                        activeIds.has(key) ? "is-linked" : "",
+                        side === "translated" && entry && !entry.matched ? "is-unmatched" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      data-alignment-id={key}
+                      title={
+                        side === "source"
+                          ? annotationTagTitle(tag)
+                          : dictionaryEntryTitle(tag, dictionaryPreview, index)
+                      }
+                      onPointerEnter={() => setTagHover(key)}
+                      onPointerLeave={() => setTagHover(null)}
+                    >
+                      <span>{value}</span>
+                      {side === "source" && tag.confidence !== null ? (
+                        <small>{Math.round(tag.confidence * 100)}%</small>
+                      ) : null}
+                      {side === "translated" && entry && !entry.matched ? (
+                        <small>未命中</small>
+                      ) : null}
+                    </span>
+                  );
+                })}
+              </div>
+            </section>
+          ))
+        ) : (
+          <div className="tag-editor__empty">
+            <strong>还没有 Tag</strong>
+            <span>{side === "source" ? "可以从上方快速添加。" : "没有可预览的词典译文。"}</span>
+          </div>
+        )}
       </div>
     );
   }
@@ -191,7 +330,9 @@ export function TranslationComparePanel({
   }
 
   const hasSource = Boolean(translation?.source_exists);
-  const canRenderAligned = Boolean(aligned && translation?.alignment_parts.length);
+  const canRenderDescription = Boolean(
+    !isTags && persistedAligned && translation?.alignment_parts.length,
+  );
   const sourceContent = translation?.source_content ?? "";
   const translatedContent = translation?.content ?? "";
   const mismatch = translation?.status === "source_mismatch";
@@ -211,6 +352,113 @@ export function TranslationComparePanel({
           .filter(Boolean)
           .join(" · ")
       : "";
+  const previewSummary = previewAligned
+    ? [
+        tagEditor?.dirty ? "未保存预览" : "本地词典实时预览",
+        dictionaryPreview?.unmatched_count
+          ? `未命中 ${dictionaryPreview.unmatched_count} 项`
+          : "全部命中",
+      ].join(" · ")
+    : "";
+  const translatedHeaderStatus =
+    previewSummary || (translation ? TRANSLATION_STATUS_LABELS[translation.status] : "尚无译文");
+
+  function renderTranslatedContent() {
+    if (editing) {
+      return (
+        <CodeMirror
+          className="annotation-editor__codemirror"
+          value={editContent}
+          height="100%"
+          maxHeight="100%"
+          extensions={editorExtensions}
+          onChange={onEditContentChange}
+          placeholder={
+            isTags
+              ? "每行填写一个 Tag 译文，行数与左侧 Tags 一致。"
+              : "输入译文；XML、换行与标点结构必须和左侧一致。"
+          }
+          basicSetup={{
+            lineNumbers: true,
+            foldGutter: true,
+            highlightActiveLine: true,
+            highlightActiveLineGutter: false,
+          }}
+        />
+      );
+    }
+    if (isTags && tagEditor?.dirty && translation?.producer_kind !== "local_dictionary") {
+      return (
+        <div className="translation-compare__mismatch" role="status">
+          <strong>Tags 尚未保存</strong>
+          <span>保存当前 Tags 后，原有 LLM 译文会变为“当前不匹配”。</span>
+          <small>为了避免参照错误内容，这里不会继续显示旧译文。</small>
+        </div>
+      );
+    }
+    if (isTags && translation?.producer_kind === "local_dictionary") {
+      if (!tags.length) {
+        return (
+          <div className="translation-compare__mismatch" role="status">
+            <strong>当前没有 Tag</strong>
+            <span>添加 Tag 后，本地词典译文会在这里实时出现。</span>
+          </div>
+        );
+      }
+      if (dictionaryPreviewLoading) {
+        return (
+          <div className="annotation-editor__empty">
+            <Spinner label="查询本地词典" />
+          </div>
+        );
+      }
+      if (dictionaryPreviewError) {
+        return (
+          <div className="translation-compare__mismatch" role="status">
+            <strong>词典预览失败</strong>
+            <span>
+              {dictionaryPreviewError instanceof Error
+                ? dictionaryPreviewError.message
+                : "无法读取本地 Tag 词典。"}
+            </span>
+            <small>没有显示旧译文，以免与当前 Tags 不匹配。</small>
+          </div>
+        );
+      }
+      if (previewAligned) return renderTagGroups("translated");
+    }
+    if (mismatch) {
+      return (
+        <div className="translation-compare__mismatch" role="status">
+          <strong>当前不匹配</strong>
+          <span>{translation?.issue}</span>
+          <small>旧译文没有在这里显示，可在“历史”中追溯。</small>
+        </div>
+      );
+    }
+    if (translation?.status === "missing") {
+      return <div className="annotation-editor__empty">当前来源尚无译文。</div>;
+    }
+    if (isTags && canRenderPersistedTags) return renderTagGroups("translated");
+    if (canRenderDescription) {
+      return renderDescriptionParts("translated", translation!.alignment_parts);
+    }
+    if (translatedContent) {
+      return (
+        <div className="translation-compare__unaligned">
+          {translation?.issue ? (
+            <div className="translation-compare__warning">{translation.issue}</div>
+          ) : null}
+          <pre className="translation-compare__plain">{translatedContent}</pre>
+        </div>
+      );
+    }
+    return (
+      <div className="annotation-editor__empty">
+        {translation?.issue ?? "当前没有可显示的译文。"}
+      </div>
+    );
+  }
 
   return (
     <div className="annotation-editor__compare translation-compare">
@@ -218,18 +466,37 @@ export function TranslationComparePanel({
         <header>
           <strong>{translation ? sourceLabel(translation) : "源标注"}</strong>
           <small>
-            {translation?.source_revision_id
-              ? `当前源 · ${translation.source_revision_id.slice(0, 8)}`
-              : "缺失"}
+            {tagEditor?.dirty
+              ? `未保存修改 · ${tags.length} Tags`
+              : translation?.source_revision_id
+                ? `当前源 · ${translation.source_revision_id.slice(0, 8)}`
+                : "缺失"}
           </small>
         </header>
         <div>
-          {!hasSource ? (
+          {isTags && tagEditor ? (
+            <TagEditorPanel
+              projectId={tagEditor.projectId}
+              assetId={tagEditor.assetId}
+              tags={tagEditor.tags}
+              taggerSource={tagEditor.taggerSource}
+              fontSize={tagEditor.fontSize}
+              onChange={tagEditor.onChange}
+              onFontSizeChange={tagEditor.onFontSizeChange}
+              readOnly={tagEditor.readOnly}
+              linkedTagKeys={activeIds}
+              onTagHoverChange={setTagHover}
+              onTagSelectionChange={setTagSelection}
+              compact
+            />
+          ) : !hasSource ? (
             <div className="annotation-editor__empty">
               {translation?.issue ?? "当前没有可用的源标注。"}
             </div>
-          ) : canRenderAligned ? (
-            renderAlignedParts("source", translation!.alignment_parts)
+          ) : isTags ? (
+            renderTagGroups("source")
+          ) : canRenderDescription ? (
+            renderDescriptionParts("source", translation!.alignment_parts)
           ) : (
             <pre className="translation-compare__plain">{sourceContent}</pre>
           )}
@@ -239,55 +506,12 @@ export function TranslationComparePanel({
       <section>
         <header>
           <strong>{translation?.language ?? ""} 译文</strong>
-          <small title={dictionarySummary || undefined}>
-            {translation ? TRANSLATION_STATUS_LABELS[translation.status] : "尚无译文"}
-            {dictionarySummary ? ` · ${dictionarySummary}` : ""}
+          <small title={previewSummary || dictionarySummary || undefined}>
+            {translatedHeaderStatus}
+            {!previewSummary && dictionarySummary ? ` · ${dictionarySummary}` : ""}
           </small>
         </header>
-        <div>
-          {editing ? (
-            <CodeMirror
-              className="annotation-editor__codemirror"
-              value={editContent}
-              height="100%"
-              maxHeight="100%"
-              extensions={editorExtensions}
-              onChange={onEditContentChange}
-              placeholder={
-                translation?.source_kind === "tags"
-                  ? "每行填写一个 Tag 译文，行数与左侧 Tags 一致。"
-                  : "输入译文；XML、换行与标点结构必须和左侧一致。"
-              }
-              basicSetup={{
-                lineNumbers: true,
-                foldGutter: true,
-                highlightActiveLine: true,
-                highlightActiveLineGutter: false,
-              }}
-            />
-          ) : mismatch ? (
-            <div className="translation-compare__mismatch" role="status">
-              <strong>当前不匹配</strong>
-              <span>{translation?.issue}</span>
-              <small>旧译文没有在这里显示，可在“历史”中追溯。</small>
-            </div>
-          ) : translation?.status === "missing" ? (
-            <div className="annotation-editor__empty">当前来源尚无译文。</div>
-          ) : canRenderAligned ? (
-            renderAlignedParts("translated", translation!.alignment_parts)
-          ) : translatedContent ? (
-            <div className="translation-compare__unaligned">
-              {translation?.issue ? (
-                <div className="translation-compare__warning">{translation.issue}</div>
-              ) : null}
-              <pre className="translation-compare__plain">{translatedContent}</pre>
-            </div>
-          ) : (
-            <div className="annotation-editor__empty">
-              {translation?.issue ?? "当前没有可显示的译文。"}
-            </div>
-          )}
-        </div>
+        <div>{renderTranslatedContent()}</div>
       </section>
     </div>
   );

@@ -399,6 +399,10 @@ test("fullscreen toggle restores a maximized Windows window without carrying its
 
 test("desktop capabilities allow opening verified local folders", () => {
   const capabilityPath = new URL("../../src-tauri/capabilities/default.json", import.meta.url);
+  const folderBridge = readFileSync(
+    new URL("../src/shared/desktop/openLocalFolder.ts", import.meta.url),
+    "utf8",
+  );
   const capability = JSON.parse(readFileSync(capabilityPath, "utf8")) as {
     permissions: Array<
       | string
@@ -421,6 +425,8 @@ test("desktop capabilities allow opening verified local folders", () => {
   assert.equal(capability.permissions.includes("core:window:allow-maximize"), true);
   assert.equal(capability.permissions.includes("core:window:allow-unmaximize"), true);
   assert.equal(capability.permissions.includes("core:window:allow-destroy"), false);
+  assert.match(folderBridge, /invoke\(OPEN_DIRECTORY_COMMAND,\s*\{\s*path\s*\}\)/);
+  assert.doesNotMatch(folderBridge, /\bopenPath\(/);
 });
 
 test("preprocess scope controls use eager route-independent styles", () => {

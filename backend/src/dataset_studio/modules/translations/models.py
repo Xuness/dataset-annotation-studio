@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from dataset_studio.modules.annotations.models import AnnotationTag
 from dataset_studio.modules.translations.identity import (
@@ -41,6 +41,23 @@ class TranslationDictionarySource(BaseModel):
     adapter_id: str | None = None
     source_version: str | None = None
     matched_count: int = Field(ge=1)
+
+
+class LocalDictionaryTranslationRefreshRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_source_revision_id: str = Field(min_length=1)
+    expected_translation_revision_id: str | None = None
+
+    @field_validator("expected_source_revision_id", "expected_translation_revision_id")
+    @classmethod
+    def validate_revision_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("修订 ID 不能为空。")
+        return normalized
 
 
 class TranslationDocument(BaseModel):

@@ -406,6 +406,60 @@ class TranslationService:
             producer_kind=normalized_producer_kind,
         )
 
+    def refresh_local_dictionary(
+        self,
+        project_id: str,
+        asset_id: str,
+        language: str,
+        *,
+        expected_source_revision_id: str,
+        expected_translation_revision_id: str | None,
+    ) -> TranslationDocument:
+        if self._tag_dictionaries is None:
+            raise ValueError("当前本地服务没有启用本地 Tag 词典模块。")
+        normalized_language = self.normalize_language(language)
+        with self._tag_dictionaries.catalog_guard():
+            source = self.read_source_revision(
+                project_id,
+                asset_id,
+                TranslationSourceKind.TAGS,
+            )
+            if source is None:
+                raise TranslationSourceChangedError("源 Tags 已不存在，无法刷新本地词典译文。")
+            if source.revision_id != expected_source_revision_id:
+                raise TranslationSourceChangedError("源 Tags 已发生变化，请基于最新内容重试。")
+
+            execution_profile = self._tag_dictionaries.execution_profile(normalized_language)
+            if not execution_profile.sources and execution_profile.override_count == 0:
+                raise ValueError("当前语言没有已启用的本地词典或修正词条。")
+            resolution = self._tag_dictionaries.resolve(
+                [tag.name for tag in source.tags],
+                normalized_language,
+            )
+            content = "\n".join(
+                entry.translation or entry.requested_tag for entry in resolution.entries
+            )
+            return self.save_generated(
+                project_id,
+                asset_id,
+                normalized_language,
+                content,
+                expected_source_hash=source.content_hash,
+                source_kind=TranslationSourceKind.TAGS,
+                producer_kind=TranslationProducerKind.LOCAL_DICTIONARY,
+                expected_modified_at=expected_translation_revision_id,
+                allow_candidate_on_conflict=False,
+                producer_metadata={
+                    "dictionary_resolution_hash": resolution.resolution_hash,
+                    "dictionary_unmatched_count": resolution.unmatched_count,
+                    "dictionary_entries": [
+                        entry.model_dump(mode="json") for entry in resolution.entries
+                    ],
+                    "dictionary_execution_snapshot": execution_profile.model_dump(mode="json"),
+                },
+                content_is_normalized=True,
+            )
+
     def save_manual(
         self,
         project_id: str,

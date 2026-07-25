@@ -30,3 +30,24 @@ export function getTranslation(
     `${translationsPath(projectId, assetId)}/${encodeURIComponent(language)}?${query}`,
   );
 }
+
+export function refreshLocalDictionaryTranslation(
+  projectId: string,
+  assetId: string,
+  language: string,
+  input: {
+    expectedSourceRevisionId: string;
+    expectedTranslationRevisionId: string | null;
+  },
+): Promise<TranslationDocument> {
+  return apiRequest(
+    `${translationsPath(projectId, assetId)}/${encodeURIComponent(language)}/local-dictionary/refresh`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        expected_source_revision_id: input.expectedSourceRevisionId,
+        expected_translation_revision_id: input.expectedTranslationRevisionId,
+      }),
+    },
+  );
+}

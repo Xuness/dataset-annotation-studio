@@ -75,6 +75,10 @@ export function TagDictionarySettings({ onClose }: { onClose: () => void }) {
     await run(() => actions.importLocal.mutateAsync({ path }), "词典已规范化导入到受管词典库。");
   }
 
+  async function openManagedDirectory(path: string, success: string) {
+    await run(() => openLocalFolder(path), success);
+  }
+
   async function removeInstallation(installation: TagDictionaryInstallation) {
     const accepted = await confirmDialog(
       `将删除“${installation.name}”的受管副本和原始来源文件。全局修正词条会保留；由它生成的译文会显示为当前不匹配。`,
@@ -212,7 +216,12 @@ export function TagDictionarySettings({ onClose }: { onClose: () => void }) {
                 <Button
                   icon={<FolderOpen size={13} />}
                   disabled={!isTauri()}
-                  onClick={() => void openLocalFolder(library.data.dictionary_root)}
+                  onClick={() =>
+                    void openManagedDirectory(
+                      library.data.dictionary_root,
+                      "已打开受管词典库目录。",
+                    )
+                  }
                 >
                   打开目录
                 </Button>
@@ -347,7 +356,9 @@ export function TagDictionarySettings({ onClose }: { onClose: () => void }) {
                           <Button
                             icon={<FolderOpen size={13} />}
                             disabled={!isTauri()}
-                            onClick={() => void openLocalFolder(selected.path)}
+                            onClick={() =>
+                              void openManagedDirectory(selected.path, "已打开词典安装目录。")
+                            }
                           >
                             文件
                           </Button>

@@ -372,6 +372,25 @@
   outline: none;
 }
 
+.translation-compare__tag-groups {
+  box-sizing: border-box;
+  height: 100%;
+  color: var(--ink);
+  background: var(--editor-surface);
+  font-family: var(--font-mono);
+  font-size: var(--annotation-font-size, 12px);
+  outline: none;
+}
+
+.translation-compare__tag-chip {
+  cursor: text;
+}
+
+.translation-compare__tag-chip.is-unmatched {
+  border-style: dashed;
+  color: var(--muted);
+}
+
 .translation-compare__part {
   border-radius: 3px;
   transition:

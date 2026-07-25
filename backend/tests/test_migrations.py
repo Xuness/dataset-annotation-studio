@@ -187,7 +187,10 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     }
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    assert (
+        "mandatory source-specific structure-lock protocol" in translation_prompt["system_prompt"]
+    )
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
 
 
 def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> None:
@@ -221,7 +224,41 @@ def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> 
 
     assert {"local_tagger_hf_settings", "local_tagger_downloads"}.issubset(tables)
     assert "idx_local_tagger_downloads_active_plan" in indexes
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+
+
+def test_translation_prompt_structure_lock_migration_preserves_custom_default(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "global.sqlite3"
+    migrate_database(database, GLOBAL_MIGRATIONS[:12])
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            UPDATE translation_prompt_presets
+            SET system_prompt = 'My customized translation prompt.'
+            WHERE id = 'default-translation-prompt'
+            """
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    initialize_global_database(database)
+
+    connection = connect(database)
+    try:
+        prompt = connection.execute(
+            """
+            SELECT system_prompt
+            FROM translation_prompt_presets
+            WHERE id = 'default-translation-prompt'
+            """
+        ).fetchone()
+    finally:
+        connection.close()
+    assert prompt["system_prompt"] == "My customized translation prompt."
 
 
 def test_global_dictionary_migration_adds_catalog_overrides_and_download_queue(

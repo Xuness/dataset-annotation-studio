@@ -81,6 +81,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   );
   const [folderPath, setFolderPath] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
+  const [editorDirtyKind, setEditorDirtyKind] = useState<"tags" | "annotation" | null>(null);
   const [editorTarget, setEditorTarget] = useState<AnnotationChannelTarget>({
     channel: "description",
     language: "",
@@ -101,7 +102,12 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const folders = useAssetFolders(projectId);
   const discardEditorDraft = useCallback(() => {
     setEditorDirty(false);
+    setEditorDirtyKind(null);
     setEditorRevision((current) => current + 1);
+  }, []);
+  const updateEditorDirty = useCallback((dirty: boolean, kind: "tags" | "annotation" | null) => {
+    setEditorDirty(dirty);
+    setEditorDirtyKind(dirty ? kind : null);
   }, []);
   const assetActions = useAssetDestructiveActions({
     contextKey: `${projectId}:${mode}`,
@@ -140,6 +146,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     setStatusFilter(mode === "review" ? "needs_review" : null);
     setFolderPath("");
     setEditorDirty(false);
+    setEditorDirtyKind(null);
     setEditorRevision(0);
     setAnnotationDialog(CLOSED_ANNOTATION_DIALOG);
   }, [mode, projectId, setActiveProject]);
@@ -188,7 +195,11 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         selectAsset(assetId);
         return true;
       }
-      const confirmed = await confirmDialog("当前标注尚未保存，切换图片会丢弃未保存的修改。", {
+      const message =
+        editorDirtyKind === "tags"
+          ? "当前 Tags 修改尚未保存，切换图片会丢弃这些修改。"
+          : "当前标注尚未保存，切换图片会丢弃未保存的修改。";
+      const confirmed = await confirmDialog(message, {
         title: "尚未保存",
         tone: "danger",
         confirmLabel: "丢弃并切换",
@@ -198,14 +209,18 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
       selectAsset(assetId);
       return true;
     },
-    [editorDirty, selectAsset],
+    [editorDirty, editorDirtyKind, selectAsset],
   );
 
   const requestFolderSelect = useCallback(
     async (nextFolderPath: string): Promise<boolean> => {
       if (nextFolderPath === folderPath) return true;
       if (editorDirty) {
-        const confirmed = await confirmDialog("当前标注尚未保存，切换目录会丢弃未保存的修改。", {
+        const message =
+          editorDirtyKind === "tags"
+            ? "当前 Tags 修改尚未保存，切换目录会丢弃这些修改。"
+            : "当前标注尚未保存，切换目录会丢弃未保存的修改。";
+        const confirmed = await confirmDialog(message, {
           title: "尚未保存",
           tone: "danger",
           confirmLabel: "丢弃并切换",
@@ -217,7 +232,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
       setFolderPath(nextFolderPath);
       return true;
     },
-    [discardEditorDraft, editorDirty, folderPath],
+    [discardEditorDraft, editorDirty, editorDirtyKind, folderPath],
   );
 
   const toggleAllMatchingAssets = useCallback(async () => {
@@ -413,7 +428,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
             key={`${selectedAssetId ?? "no-asset"}:${editorRevision}`}
             projectId={projectId}
             assetId={selectedAssetId}
-            onDirtyChange={setEditorDirty}
+            onDirtyChange={updateEditorDirty}
             onActiveTargetChange={setEditorTarget}
           />
         </Suspense>

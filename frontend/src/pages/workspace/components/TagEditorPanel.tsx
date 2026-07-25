@@ -10,7 +10,6 @@ import {
 import { Plus, Search, X } from "lucide-react";
 
 import { useTaggerLibrary, useTaggerVocabularySearch } from "../../../features/taggers/hooks";
-import { taggerCategoryLabel } from "../../../features/taggers/labels";
 import type {
   AnnotationTag,
   AnnotationTaggerSource,
@@ -25,6 +24,7 @@ import {
   removeTag,
   type AppendTagsResult,
 } from "./tagEditorState";
+import { annotationTagTitle, tagCategoryLabel, tagCategoryTone } from "./tagPresentation";
 
 interface TagEditorPanelProps {
   projectId: string;
@@ -34,6 +34,11 @@ interface TagEditorPanelProps {
   fontSize: number;
   onChange: (tags: AnnotationTag[]) => void;
   onFontSizeChange: (fontSize: number) => void;
+  readOnly?: boolean;
+  linkedTagKeys?: ReadonlySet<string>;
+  onTagHoverChange?: (key: string | null) => void;
+  onTagSelectionChange?: (keys: string[]) => void;
+  compact?: boolean;
 }
 
 const AUTO_VOCABULARY = "auto";
@@ -47,25 +52,26 @@ function readVocabularyMode(projectId: string): string {
   return window.localStorage.getItem(vocabularyStorageKey(projectId)) || AUTO_VOCABULARY;
 }
 
-function categoryLabel(category: string | null): string {
-  return category ? taggerCategoryLabel(category) : "未分类";
-}
-
-function categoryTone(category: string | null): string {
-  if (category === "character") return "accent";
-  if (category === "copyright") return "sage";
-  if (category === "artist" || category === "quality" || category === "year") return "warning";
-  if (category === "rating") return "danger";
-  return "neutral";
-}
-
-function tagTitle(tag: AnnotationTag): string {
-  const details = [`类别：${categoryLabel(tag.category)}`];
-  if (tag.confidence !== null) {
-    details.push(`置信度：${(tag.confidence * 100).toFixed(1)}%`);
+function collectSelectedTagKeys(container: HTMLElement, selection: Selection | null): string[] {
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return [];
+  const range = selection.getRangeAt(0);
+  if (
+    !container.contains(range.commonAncestorContainer) &&
+    !container.contains(range.startContainer) &&
+    !container.contains(range.endContainer)
+  ) {
+    return [];
   }
-  details.push(`来源：${tag.origin.includes("tagger") ? "模型推理" : "手动编辑"}`);
-  return details.join(" · ");
+  return Array.from(container.querySelectorAll<HTMLElement>("[data-tag-key]"))
+    .filter((element) => {
+      try {
+        return range.intersectsNode(element);
+      } catch {
+        return false;
+      }
+    })
+    .map((element) => element.dataset.tagKey)
+    .filter((value): value is string => Boolean(value));
 }
 
 export function TagEditorPanel({
@@ -76,6 +82,11 @@ export function TagEditorPanel({
   fontSize,
   onChange,
   onFontSizeChange,
+  readOnly = false,
+  linkedTagKeys,
+  onTagHoverChange,
+  onTagSelectionChange,
+  compact = false,
 }: TagEditorPanelProps) {
   const listboxId = `tag-vocabulary-${useId().replaceAll(":", "")}`;
   const library = useTaggerLibrary();
@@ -89,6 +100,7 @@ export function TagEditorPanel({
   const [statusMessage, setStatusMessage] = useState("");
   const highlightTimer = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const groupsRef = useRef<HTMLDivElement>(null);
 
   const readyInstallations = useMemo(
     () => library.data?.installations.filter((item) => item.status === "ready") ?? [],
@@ -223,6 +235,7 @@ export function TagEditorPanel({
   }
 
   function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (readOnly) return;
     if (event.nativeEvent.isComposing) return;
     if (event.key === "ArrowDown" && showSuggestions && suggestions.length) {
       event.preventDefault();
@@ -293,7 +306,13 @@ export function TagEditorPanel({
 
   return (
     <div
-      className="tag-editor"
+      className={[
+        "tag-editor",
+        readOnly ? "tag-editor--readonly" : "",
+        compact ? "tag-editor--compact" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       onWheel={handleWheel}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -301,119 +320,129 @@ export function TagEditorPanel({
         }
       }}
     >
-      <div className="tag-editor__toolbar">
-        <div className="tag-editor__combobox">
-          <Search size={14} aria-hidden="true" />
-          <input
-            ref={inputRef}
-            value={query}
-            role="combobox"
-            aria-label="搜索或添加 Tag"
-            aria-autocomplete="list"
-            aria-expanded={showSuggestions}
-            aria-controls={showSuggestions ? listboxId : undefined}
-            aria-activedescendant={
-              showSuggestions && currentOption
-                ? `${listboxId}-option-${activeSuggestion}`
-                : undefined
-            }
-            placeholder={
-              selectedInstallation ? "搜索模型词库或输入新 Tag…" : "输入新 Tag，支持批量粘贴…"
-            }
-            onFocus={() => setSuggestionsOpen(true)}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setSuggestionsOpen(true);
-              setArmedTag(null);
-            }}
-            onKeyDown={handleInputKeyDown}
-            onPaste={(event) => {
-              const pasted = event.clipboardData.getData("text");
-              if (!/[,\r\n]/u.test(pasted)) return;
-              event.preventDefault();
-              applyAppend(appendManualTags(tags, pasted));
-            }}
-          />
-          {vocabulary.isFetching && debouncedQuery ? (
-            <span className="tag-editor__search-state">搜索中</span>
-          ) : null}
-          <button
-            type="button"
-            className="tag-editor__add"
-            aria-label="添加输入的 Tag"
-            disabled={!query.trim()}
-            onClick={() =>
-              currentOption && showSuggestions ? addSuggestion(currentOption) : addManual()
-            }
+      {!readOnly ? (
+        <div className="tag-editor__toolbar">
+          <div className="tag-editor__combobox">
+            <Search size={14} aria-hidden="true" />
+            <input
+              ref={inputRef}
+              value={query}
+              role="combobox"
+              aria-label="搜索或添加 Tag"
+              aria-autocomplete="list"
+              aria-expanded={showSuggestions}
+              aria-controls={showSuggestions ? listboxId : undefined}
+              aria-activedescendant={
+                showSuggestions && currentOption
+                  ? `${listboxId}-option-${activeSuggestion}`
+                  : undefined
+              }
+              placeholder={
+                selectedInstallation ? "搜索模型词库或输入新 Tag…" : "输入新 Tag，支持批量粘贴…"
+              }
+              onFocus={() => setSuggestionsOpen(true)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setSuggestionsOpen(true);
+                setArmedTag(null);
+              }}
+              onKeyDown={handleInputKeyDown}
+              onPaste={(event) => {
+                const pasted = event.clipboardData.getData("text");
+                if (!/[,\r\n]/u.test(pasted)) return;
+                event.preventDefault();
+                applyAppend(appendManualTags(tags, pasted));
+              }}
+            />
+            {vocabulary.isFetching && debouncedQuery ? (
+              <span className="tag-editor__search-state">搜索中</span>
+            ) : null}
+            <button
+              type="button"
+              className="tag-editor__add"
+              aria-label="添加输入的 Tag"
+              disabled={!query.trim()}
+              onClick={() =>
+                currentOption && showSuggestions ? addSuggestion(currentOption) : addManual()
+              }
+            >
+              <Plus size={15} />
+            </button>
+
+            {showSuggestions ? (
+              <div id={listboxId} className="tag-editor__suggestions" role="listbox">
+                {vocabulary.isError ? (
+                  <p className="tag-editor__suggestion-message">无法读取模型词库。</p>
+                ) : suggestions.length ? (
+                  suggestions.map((item, index) => {
+                    const key = normalizeTagKey(item.name);
+                    const exists = existingKeys.has(key);
+                    return (
+                      <button
+                        id={`${listboxId}-option-${index}`}
+                        key={`${item.category}:${item.name}`}
+                        type="button"
+                        role="option"
+                        aria-selected={index === activeSuggestion}
+                        className={index === activeSuggestion ? "is-active" : ""}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseEnter={() => setActiveSuggestion(index)}
+                        onClick={() => addSuggestion(item)}
+                      >
+                        <span>{item.name}</span>
+                        <small>
+                          {tagCategoryLabel(item.category)}
+                          {exists ? " · 已存在" : ""}
+                        </small>
+                      </button>
+                    );
+                  })
+                ) : vocabulary.isFetching ? (
+                  <p className="tag-editor__suggestion-message">正在搜索词库…</p>
+                ) : (
+                  <p className="tag-editor__suggestion-message">
+                    词库中没有匹配项，按 Enter 可作为手动 Tag 添加。
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <select
+            className="tag-editor__vocabulary-select"
+            aria-label="自动补全词库"
+            title={vocabularyHint()}
+            value={vocabularyMode}
+            onChange={(event) => setVocabulary(event.target.value)}
           >
-            <Plus size={15} />
-          </button>
-
-          {showSuggestions ? (
-            <div id={listboxId} className="tag-editor__suggestions" role="listbox">
-              {vocabulary.isError ? (
-                <p className="tag-editor__suggestion-message">无法读取模型词库。</p>
-              ) : suggestions.length ? (
-                suggestions.map((item, index) => {
-                  const key = normalizeTagKey(item.name);
-                  const exists = existingKeys.has(key);
-                  return (
-                    <button
-                      id={`${listboxId}-option-${index}`}
-                      key={`${item.category}:${item.name}`}
-                      type="button"
-                      role="option"
-                      aria-selected={index === activeSuggestion}
-                      className={index === activeSuggestion ? "is-active" : ""}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onMouseEnter={() => setActiveSuggestion(index)}
-                      onClick={() => addSuggestion(item)}
-                    >
-                      <span>{item.name}</span>
-                      <small>
-                        {categoryLabel(item.category)}
-                        {exists ? " · 已存在" : ""}
-                      </small>
-                    </button>
-                  );
-                })
-              ) : vocabulary.isFetching ? (
-                <p className="tag-editor__suggestion-message">正在搜索词库…</p>
-              ) : (
-                <p className="tag-editor__suggestion-message">
-                  词库中没有匹配项，按 Enter 可作为手动 Tag 添加。
-                </p>
-              )}
-            </div>
-          ) : null}
+            <option value={AUTO_VOCABULARY}>{autoVocabularyLabel()}</option>
+            {readyInstallations.map((installation: TaggerInstallation) => (
+              <option key={installation.id} value={installation.id}>
+                {installation.name} · {installation.model_version}
+              </option>
+            ))}
+          </select>
         </div>
+      ) : null}
 
-        <select
-          className="tag-editor__vocabulary-select"
-          aria-label="自动补全词库"
-          title={vocabularyHint()}
-          value={vocabularyMode}
-          onChange={(event) => setVocabulary(event.target.value)}
-        >
-          <option value={AUTO_VOCABULARY}>{autoVocabularyLabel()}</option>
-          {readyInstallations.map((installation: TaggerInstallation) => (
-            <option key={installation.id} value={installation.id}>
-              {installation.name} · {installation.model_version}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="tag-editor__groups">
+      <div
+        ref={groupsRef}
+        className="tag-editor__groups"
+        onMouseUp={() => {
+          if (!onTagSelectionChange || !groupsRef.current) return;
+          const keys = collectSelectedTagKeys(groupsRef.current, window.getSelection());
+          if (keys.length) onTagSelectionChange(Array.from(new Set(keys)));
+        }}
+      >
         {groups.length ? (
           groups.map((group) => {
-            const label = categoryLabel(group.category);
+            const label = tagCategoryLabel(group.category);
             const headingId = `${listboxId}-group-${group.category ?? "uncategorized"}`;
             return (
               <section
                 key={group.category ?? "uncategorized"}
                 className="tag-editor__group"
-                data-category-tone={categoryTone(group.category)}
+                data-category-tone={tagCategoryTone(group.category)}
                 aria-labelledby={headingId}
               >
                 <header id={headingId}>
@@ -428,22 +457,28 @@ export function TagEditorPanel({
                         "tag-editor__chip",
                         highlightedTag === key ? "is-highlighted" : "",
                         armedTag === key ? "is-armed" : "",
+                        linkedTagKeys?.has(key) ? "is-linked" : "",
                       ]
                         .filter(Boolean)
                         .join(" ")}
-                      title={tagTitle(tag)}
+                      data-tag-key={key}
+                      title={annotationTagTitle(tag)}
+                      onPointerEnter={() => onTagHoverChange?.(key)}
+                      onPointerLeave={() => onTagHoverChange?.(null)}
                     >
                       <span>{tag.name}</span>
                       {tag.confidence !== null ? (
                         <small>{Math.round(tag.confidence * 100)}%</small>
                       ) : null}
-                      <button
-                        type="button"
-                        aria-label={`删除 Tag：${tag.name}`}
-                        onClick={() => deleteTag(key)}
-                      >
-                        <X size={12} />
-                      </button>
+                      {!readOnly ? (
+                        <button
+                          type="button"
+                          aria-label={`删除 Tag：${tag.name}`}
+                          onClick={() => deleteTag(key)}
+                        >
+                          <X size={12} />
+                        </button>
+                      ) : null}
                     </span>
                   ))}
                 </div>

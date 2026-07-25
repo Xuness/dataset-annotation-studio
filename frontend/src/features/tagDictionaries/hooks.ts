@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { TagDictionaryDownloadStatus } from "../../shared/api/types";
 import {
@@ -13,6 +13,7 @@ import {
   importTagDictionary,
   pauseTagDictionaryDownload,
   reorderTagDictionaries,
+  resolveTagDictionaryEntries,
   resumeTagDictionaryDownload,
   searchTagDictionaryEntries,
   updateTagDictionaryInstallation,
@@ -41,6 +42,42 @@ export function useTagDictionarySearch(query: string, language = "zh-CN") {
     enabled: query.trim().length > 0,
     staleTime: 30_000,
   });
+}
+
+export function useTagDictionaryResolution(
+  tags: ReadonlyArray<string>,
+  language: string,
+  enabled: boolean,
+) {
+  const signature = JSON.stringify(tags);
+  const [debouncedSignature, setDebouncedSignature] = useState(signature);
+
+  useEffect(() => {
+    if (!enabled) {
+      setDebouncedSignature(signature);
+      return;
+    }
+    const timer = window.setTimeout(() => setDebouncedSignature(signature), 180);
+    return () => window.clearTimeout(timer);
+  }, [enabled, signature]);
+
+  const requestTags = useMemo(
+    () => JSON.parse(debouncedSignature) as string[],
+    [debouncedSignature],
+  );
+  const settled = debouncedSignature === signature;
+  const query = useQuery({
+    queryKey: tagDictionaryKeys.resolution(debouncedSignature, language),
+    queryFn: ({ signal }) => resolveTagDictionaryEntries(requestTags, language, signal),
+    enabled: enabled && requestTags.length > 0,
+    staleTime: 30_000,
+  });
+
+  return {
+    ...query,
+    data: settled ? query.data : undefined,
+    isResolving: enabled && tags.length > 0 && (!settled || query.isFetching),
+  };
 }
 
 export function useTagDictionaryDownloadCenter() {
