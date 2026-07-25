@@ -36,7 +36,6 @@ from dataset_studio.modules.tag_dictionaries.repository import TagDictionaryRepo
 from dataset_studio.modules.tag_dictionaries.service import TagDictionaryService
 from dataset_studio.modules.taggers.repository import TaggerRepository
 from dataset_studio.modules.taggers.service import TaggerService
-from dataset_studio.modules.translations.identity import TranslationSourceKind
 from dataset_studio.modules.translations.models import TranslationStatus
 from dataset_studio.modules.translations.prompt import render_translation_system_prompt
 from dataset_studio.modules.translations.service import (
@@ -139,25 +138,12 @@ def test_description_translation_alignment_preserves_exact_structure() -> None:
     assert changed_parts == []
 
 
-def test_effective_translation_system_prompt_locks_description_and_tag_structure() -> None:
-    description_prompt = render_translation_system_prompt(
+def test_translation_system_prompt_only_renders_visible_template_variables() -> None:
+    prompt = render_translation_system_prompt(
         "Translate to {target_language} ({language_code}). Return JSON.",
         "zh-CN",
     )
-    assert description_prompt.startswith("Translate to 简体中文 (zh-CN). Return JSON.")
-    assert "highest priority" in description_prompt
-    assert '"," must not become "，"' in description_prompt
-    assert "do not reindent, reflow, wrap, join, or split lines" in description_prompt
-    assert "silently compare the source and output sequences" in description_prompt
-
-    tags_prompt = render_translation_system_prompt(
-        "Translate to {target_language}.",
-        "zh-CN",
-        TranslationSourceKind.TAGS,
-    )
-    assert "Mandatory Tags envelope protocol" in tags_prompt
-    assert "Never merge, split, omit, duplicate, or reorder Tags" in tags_prompt
-    assert "output count, child count, indexes" in tags_prompt
+    assert prompt == "Translate to 简体中文 (zh-CN). Return JSON."
 
 
 def test_tag_translation_protocol_and_alignment_keep_tag_identity() -> None:

@@ -203,7 +203,6 @@ class JobService:
                 system_prompt = render_translation_system_prompt(
                     translation_prompt.system_prompt,
                     language,
-                    source_kind,
                 )
                 system_prompt_snapshot = json.dumps(
                     {

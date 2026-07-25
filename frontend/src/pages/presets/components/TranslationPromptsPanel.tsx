@@ -140,7 +140,10 @@ export function TranslationPromptsPanel({ createSignal }: { createSignal: number
           <strong>可用变量</strong>
           <code>{"{target_language}"}</code>
           <code>{"{language_code}"}</code>
-          <small>源标注由任务作为只读 User Prompt 注入，不需要写进此模板。</small>
+          <small>
+            源标注由任务作为只读 User Prompt 注入。除替换以上变量外，模板会原样作为 System Prompt
+            发送，不会追加隐藏约束。
+          </small>
         </div>
         <label className="form-field form-field--grow">
           <span>System Prompt 模板</span>
