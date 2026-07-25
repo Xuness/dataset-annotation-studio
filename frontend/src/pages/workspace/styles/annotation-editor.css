@@ -503,6 +503,15 @@
   white-space: normal;
 }
 
+.translation-compare__quality-layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.translation-compare__quality-layout > .translation-compare__warning {
+  border-bottom-color: color-mix(in srgb, var(--warning) 34%, var(--workspace-divider));
+}
+
 .annotation-editor__compare > section > header {
   display: flex;
   min-width: 0;

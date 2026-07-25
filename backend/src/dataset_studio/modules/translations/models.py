@@ -82,6 +82,9 @@ class TranslationDocument(BaseModel):
     provider_profile_id: str | None = None
     provider_profile_name: str | None = None
     model: str | None = None
+    translation_protocol_version: int | None = None
+    quality_status: str = "unavailable"
+    quality_issues: list[str] = Field(default_factory=list)
     dictionary_resolution_hash: str | None = None
     current_dictionary_resolution_hash: str | None = None
     dictionary_sources: list[TranslationDictionarySource] = Field(default_factory=list)

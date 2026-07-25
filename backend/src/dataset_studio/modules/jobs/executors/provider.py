@@ -43,6 +43,8 @@ from dataset_studio.modules.translations.service import (
     TranslationSourceChangedError,
 )
 from dataset_studio.modules.translations.validation import (
+    DESCRIPTION_TRANSLATION_PROTOCOL_VERSION,
+    parse_description_translation_response,
     parse_tag_translation_response,
     validate_translation_structure,
 )
@@ -355,6 +357,9 @@ class ProviderJobExecutor:
                 source_content,
                 source_kind=translation_source_kind,
                 tags=source_tags,
+                protocol_version=int(
+                    translation_configuration.get("translation_protocol_version", 1)
+                ),
             )
         else:
             image_path = self._container.assets.image_path(project_id, asset_id)
@@ -424,6 +429,16 @@ class ProviderJobExecutor:
                     context.source_tags,
                 )
                 return valid, status, None if valid else status
+            protocol_version = int(
+                context.translation_configuration.get("translation_protocol_version", 1)
+            )
+            if protocol_version >= DESCRIPTION_TRANSLATION_PROTOCOL_VERSION:
+                result = parse_description_translation_response(
+                    context.source_content,
+                    content,
+                    str(context.translation_configuration["target_language"]),
+                )
+                return result.valid, result.status, result.issue
             valid, status = validate_translation_structure(context.source_content, content)
             return valid, status, None if valid else status
         validation = validate_tag_balance(content)
@@ -454,11 +469,36 @@ class ProviderJobExecutor:
             ):
                 return False
             assert context.source_hash is not None
+            normalized_content = content
+            content_is_normalized = False
+            producer_metadata: dict[str, object] | None = None
+            protocol_version = int(
+                context.translation_configuration.get("translation_protocol_version", 1)
+            )
+            if (
+                context.translation_source_kind == TranslationSourceKind.DESCRIPTION
+                and protocol_version >= DESCRIPTION_TRANSLATION_PROTOCOL_VERSION
+            ):
+                assert context.source_content is not None
+                parsed = parse_description_translation_response(
+                    context.source_content,
+                    content,
+                    language,
+                )
+                if not parsed.valid:
+                    raise ValueError(parsed.issue or "译文句段协议校验失败。")
+                normalized_content = parsed.content
+                content_is_normalized = True
+                producer_metadata = {
+                    "translation_protocol_version": DESCRIPTION_TRANSLATION_PROTOCOL_VERSION,
+                    "translation_segments": parsed.segment_translations,
+                    "translation_quality_issues": parsed.quality_issues,
+                }
             self._container.translations.save_generated(
                 context.project_id,
                 context.asset_id,
                 language,
-                content,
+                normalized_content,
                 expected_source_hash=context.source_hash,
                 source_kind=context.translation_source_kind,
                 producer_kind=context.translation_producer_kind,
@@ -468,6 +508,8 @@ class ProviderJobExecutor:
                 expected_modified_at=context.expected_output_revision_id,
                 lease_owner_id=context.item_id,
                 source_job_item_id=context.item_id,
+                producer_metadata=producer_metadata,
+                content_is_normalized=content_is_normalized,
             )
             return True
         if (

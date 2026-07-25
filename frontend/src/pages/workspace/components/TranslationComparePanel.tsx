@@ -361,7 +361,14 @@ export function TranslationComparePanel({
       ].join(" · ")
     : "";
   const translatedHeaderStatus =
-    previewSummary || (translation ? TRANSLATION_STATUS_LABELS[translation.status] : "尚无译文");
+    previewSummary ||
+    (translation?.status === "current" && translation.quality_status === "warning"
+      ? "译文需复核"
+      : translation
+        ? TRANSLATION_STATUS_LABELS[translation.status]
+        : "尚无译文");
+  const qualityIssues =
+    !editing && translation?.status === "current" ? translation.quality_issues : [];
 
   function renderTranslatedContent() {
     if (editing) {
@@ -511,7 +518,15 @@ export function TranslationComparePanel({
             {!previewSummary && dictionarySummary ? ` · ${dictionarySummary}` : ""}
           </small>
         </header>
-        <div>{renderTranslatedContent()}</div>
+        <div className={qualityIssues.length ? "translation-compare__quality-layout" : undefined}>
+          {qualityIssues.length ? (
+            <div className="translation-compare__warning" role="status">
+              <strong>译文质量提醒：</strong>
+              {qualityIssues.join(" ")}
+            </div>
+          ) : null}
+          {renderTranslatedContent()}
+        </div>
       </section>
     </div>
   );

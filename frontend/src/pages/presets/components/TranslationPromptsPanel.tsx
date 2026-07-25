@@ -141,7 +141,8 @@ export function TranslationPromptsPanel({ createSignal }: { createSignal: number
           <code>{"{target_language}"}</code>
           <code>{"{language_code}"}</code>
           <small>
-            源标注由任务作为只读 User Prompt 注入。除替换以上变量外，模板会原样作为 System Prompt
+            描述源会以带 ID 的 JSON 句段注入，Tags 源仍使用带序号的
+            XML。请在模板中保留对应的输出协议； 除替换以上变量外，模板会原样作为 System Prompt
             发送，不会追加隐藏约束。
           </small>
         </div>

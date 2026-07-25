@@ -44,6 +44,10 @@ from dataset_studio.modules.translations.prompt import (
     render_translation_system_prompt,
 )
 from dataset_studio.modules.translations.service import TranslationService
+from dataset_studio.modules.translations.validation import (
+    DESCRIPTION_TRANSLATION_PROTOCOL_VERSION,
+    parse_description_translation_response,
+)
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
@@ -221,6 +225,11 @@ class JobService:
                     "translation_prompt_preset_id": translation_prompt.id,
                     "translation_source_kind": source_kind.value,
                     "translation_producer_kind": producer_kind.value,
+                    "translation_protocol_version": (
+                        DESCRIPTION_TRANSLATION_PROTOCOL_VERSION
+                        if source_kind == TranslationSourceKind.DESCRIPTION
+                        else 1
+                    ),
                 }
                 asset_ids = self._select_translation_assets(
                     project_id,
@@ -527,13 +536,45 @@ class JobService:
             if not response.source_hash:
                 raise ValueError("这个译文响应缺少对应的源标注版本，无法安全采用。")
             profile = load_provider_snapshot(str(job["provider_snapshot"]))
+            source_kind = TranslationSourceKind(
+                str(configuration.get("translation_source_kind", "description"))
+            )
+            content = response.content
+            content_is_normalized = False
+            producer_metadata: dict[str, object] | None = None
+            if (
+                source_kind == TranslationSourceKind.DESCRIPTION
+                and int(configuration.get("translation_protocol_version", 1))
+                >= DESCRIPTION_TRANSLATION_PROTOCOL_VERSION
+            ):
+                source = self._translations.read_source_revision(
+                    project_id,
+                    response.asset_id,
+                    source_kind,
+                )
+                if source is None:
+                    raise ValueError("源标注已不存在，无法采用这个译文响应。")
+                parsed = parse_description_translation_response(
+                    source.content,
+                    response.content,
+                    str(configuration["target_language"]),
+                )
+                if not parsed.content or not parsed.alignment_parts:
+                    raise ValueError(parsed.issue or "这个响应无法重建为可用译文。")
+                content = parsed.content
+                content_is_normalized = True
+                producer_metadata = {
+                    "translation_protocol_version": DESCRIPTION_TRANSLATION_PROTOCOL_VERSION,
+                    "translation_segments": parsed.segment_translations,
+                    "translation_quality_issues": parsed.quality_issues,
+                }
             self._translations.save_generated(
                 project_id,
                 response.asset_id,
                 str(configuration["target_language"]),
-                response.content,
+                content,
                 expected_source_hash=response.source_hash,
-                source_kind=str(configuration.get("translation_source_kind", "description")),
+                source_kind=source_kind,
                 producer_kind=str(configuration.get("translation_producer_kind", "llm")),
                 provider_profile_id=str(job["provider_profile_id"]),
                 provider_profile_name=profile.name,
@@ -542,6 +583,8 @@ class JobService:
                 expected_modified_at=response.output_base_revision_id,
                 source_job_item_id=item_id,
                 allow_candidate_on_conflict=False,
+                producer_metadata=producer_metadata,
+                content_is_normalized=content_is_normalized,
             )
         else:
             tag_revision_id = execution.annotation_input_revision(item_id, "tag_context")

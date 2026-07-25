@@ -187,10 +187,10 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     }
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert "Protocol A: annotation text" in translation_prompt["system_prompt"]
+    assert "Protocol A: description segment JSON" in translation_prompt["system_prompt"]
     assert "Protocol B: Tags XML envelope" in translation_prompt["system_prompt"]
     assert "application appends" not in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 
 def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> None:
@@ -224,7 +224,7 @@ def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> 
 
     assert {"local_tagger_hf_settings", "local_tagger_downloads"}.issubset(tables)
     assert "idx_local_tagger_downloads_active_plan" in indexes
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 
 def test_translation_prompt_structure_lock_migration_preserves_custom_default(
@@ -263,9 +263,7 @@ def test_translation_prompt_structure_lock_migration_preserves_custom_default(
 
 def test_visible_translation_prompt_migration_expands_previous_default(tmp_path: Path) -> None:
     database = tmp_path / "global.sqlite3"
-    migrate_database(database, GLOBAL_MIGRATIONS[:13])
-
-    initialize_global_database(database)
+    migrate_database(database, GLOBAL_MIGRATIONS[:14])
 
     connection = connect(database)
     try:
@@ -283,6 +281,32 @@ def test_visible_translation_prompt_migration_expands_previous_default(tmp_path:
     assert "Protocol B: Tags XML envelope" in prompt["system_prompt"]
     assert '"," must not become "，"' in prompt["system_prompt"]
     assert "Never merge, split, omit, duplicate, or reorder Tags" in prompt["system_prompt"]
+
+
+def test_segmented_translation_prompt_migration_replaces_strict_punctuation_protocol(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "global.sqlite3"
+    migrate_database(database, GLOBAL_MIGRATIONS[:14])
+
+    initialize_global_database(database)
+
+    connection = connect(database)
+    try:
+        prompt = connection.execute(
+            """
+            SELECT system_prompt
+            FROM translation_prompt_presets
+            WHERE id = 'default-translation-prompt'
+            """
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert "Protocol A: description segment JSON" in prompt["system_prompt"]
+    assert "Target-language punctuation and spacing may differ" in prompt["system_prompt"]
+    assert "Do not leave a value unchanged" in prompt["system_prompt"]
+    assert "Do not localize punctuation" not in prompt["system_prompt"]
     assert "application appends" not in prompt["system_prompt"]
 
 

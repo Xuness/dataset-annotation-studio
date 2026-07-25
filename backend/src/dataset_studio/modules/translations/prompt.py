@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from dataset_studio.modules.annotations.models import AnnotationTag
 from dataset_studio.modules.translations.identity import TranslationSourceKind
-from dataset_studio.modules.translations.validation import render_tag_translation_source
+from dataset_studio.modules.translations.validation import (
+    DESCRIPTION_TRANSLATION_PROTOCOL_VERSION,
+    render_description_translation_source,
+    render_tag_translation_source,
+)
 
 LANGUAGE_LABELS = {
     "zh-CN": "简体中文",
@@ -29,6 +33,7 @@ def translation_user_prompt(
     *,
     source_kind: TranslationSourceKind = TranslationSourceKind.DESCRIPTION,
     tags: list[AnnotationTag] | None = None,
+    protocol_version: int = DESCRIPTION_TRANSLATION_PROTOCOL_VERSION,
 ) -> str:
     target = LANGUAGE_LABELS.get(language, language)
     if source_kind == TranslationSourceKind.TAGS:
@@ -39,6 +44,16 @@ def translation_user_prompt(
             "----- BEGIN SOURCE TAGS -----\n"
             f"{structured_source}\n"
             "----- END SOURCE TAGS -----"
+        )
+    if protocol_version >= DESCRIPTION_TRANSLATION_PROTOCOL_VERSION:
+        structured_source = render_description_translation_source(source)
+        return (
+            f"Target language: {target} ({language})\n"
+            "Translate every string value in the JSON object. Return only a JSON object "
+            "with exactly the same keys.\n"
+            "----- BEGIN SOURCE SEGMENTS -----\n"
+            f"{structured_source}\n"
+            "----- END SOURCE SEGMENTS -----"
         )
     return (
         f"Target language: {target} ({language})\n"

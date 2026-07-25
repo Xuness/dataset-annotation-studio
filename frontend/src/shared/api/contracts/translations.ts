@@ -44,6 +44,9 @@ export interface TranslationDocument {
   provider_profile_id: string | null;
   provider_profile_name: string | null;
   model: string | null;
+  translation_protocol_version: number | null;
+  quality_status: "unavailable" | "passed" | "warning";
+  quality_issues: string[];
   dictionary_resolution_hash: string | null;
   current_dictionary_resolution_hash: string | null;
   dictionary_sources: TranslationDictionarySource[];

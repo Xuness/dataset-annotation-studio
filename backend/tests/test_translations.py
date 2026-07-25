@@ -44,8 +44,11 @@ from dataset_studio.modules.translations.service import (
 )
 from dataset_studio.modules.translations.validation import (
     align_description_translation,
+    align_description_translation_segments,
     align_tag_translation,
+    parse_description_translation_response,
     parse_tag_translation_response,
+    render_description_translation_source,
     render_tag_translation_source,
 )
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
@@ -136,6 +139,78 @@ def test_description_translation_alignment_preserves_exact_structure() -> None:
     assert changed is False
     assert "XML、换行或标点结构" in changed_issue
     assert changed_parts == []
+
+
+def test_description_segment_protocol_rebuilds_structure_and_allows_natural_punctuation() -> None:
+    source = "<caption>Hello, quiet garden!\nNext scene?</caption>"
+
+    assert render_description_translation_source(source) == (
+        '{"segment-0":"Hello,","segment-1":" quiet garden!","segment-2":"Next scene?"}'
+    )
+    parsed = parse_description_translation_response(
+        source,
+        """```json
+{"segment-0":"你好，","segment-1":"安静的花园！","segment-2":"下一幕？"}
+```""",
+        "zh-CN",
+    )
+
+    assert parsed.valid is True
+    assert parsed.status == "aligned"
+    assert parsed.content == "<caption>你好，安静的花园！\n下一幕？</caption>"
+    assert [
+        (part.id, part.source_text, part.translated_text)
+        for part in parsed.alignment_parts
+        if part.kind == "segment"
+    ] == [
+        ("segment-0", "Hello,", "你好，"),
+        ("segment-1", " quiet garden!", "安静的花园！"),
+        ("segment-2", "Next scene?", "下一幕？"),
+    ]
+    aligned, issue, parts = align_description_translation_segments(
+        source,
+        parsed.content,
+        parsed.segment_translations,
+    )
+    assert aligned is True
+    assert issue == "aligned"
+    assert parts == parsed.alignment_parts
+
+
+def test_description_segment_protocol_rejects_untranslated_or_mismatched_output() -> None:
+    source = "<caption>quiet garden</caption>"
+
+    untranslated = parse_description_translation_response(
+        source,
+        '{"segment-0":"quiet garden"}',
+        "zh-CN",
+    )
+    assert untranslated.valid is False
+    assert untranslated.status == "untranslated"
+    assert untranslated.content == source
+    assert untranslated.quality_issues
+
+    mismatched = parse_description_translation_response(
+        source,
+        '{"segment-1":"安静的花园"}',
+        "zh-CN",
+    )
+    assert mismatched.valid is False
+    assert mismatched.status == "invalid_response"
+    assert "句段 ID 不匹配" in (mismatched.issue or "")
+
+
+def test_description_segment_protocol_keeps_partial_echo_as_visible_quality_warning() -> None:
+    parsed = parse_description_translation_response(
+        "<caption>Hello, quiet garden!</caption>",
+        '{"segment-0":"你好，","segment-1":" quiet garden!"}',
+        "zh-CN",
+    )
+
+    assert parsed.valid is True
+    assert parsed.status == "quality_warning"
+    assert parsed.content == "<caption>你好， quiet garden!</caption>"
+    assert "segment-1" in parsed.quality_issues[0]
 
 
 def test_translation_system_prompt_only_renders_visible_template_variables() -> None:
@@ -756,7 +831,7 @@ def test_translation_job_uses_batched_current_source_and_existing_policy(
     execution.finish_attempt(
         attempt_id,
         status="validation_failed",
-        response_content="<caption>broken",
+        response_content='{"segment-0":"source"}',
         error_message="simulated validation failure",
     )
     execution.finish_item(
@@ -770,6 +845,8 @@ def test_translation_job_uses_batched_current_source_and_existing_policy(
     accepted = translations.get(project_id, failed_item.asset_id, "zh-CN")
     assert accepted.model == "translation-quality"
     assert accepted.provider_profile_name == "Translator"
+    assert accepted.content == "<caption>source</caption>"
+    assert accepted.quality_status == "warning"
 
     current = annotations.get_channel(
         project_id,

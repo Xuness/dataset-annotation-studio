@@ -42,12 +42,14 @@ from dataset_studio.modules.translations.models import (
     TranslationStatus,
 )
 from dataset_studio.modules.translations.validation import (
-    TranslationAlignmentPart as AlignmentPartData,
-)
-from dataset_studio.modules.translations.validation import (
+    DESCRIPTION_TRANSLATION_PROTOCOL_VERSION,
     align_description_translation,
+    align_description_translation_segments,
     align_tag_translation,
     parse_tag_translation_response,
+)
+from dataset_studio.modules.translations.validation import (
+    TranslationAlignmentPart as AlignmentPartData,
 )
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
@@ -153,6 +155,22 @@ class TranslationService:
             else None
         )
         metadata = self._revision_metadata(project_id, document.head_revision_id)
+        translation_protocol_version = self._optional_int(
+            metadata.get("translation_protocol_version")
+        )
+        quality_issues = self._quality_issues(metadata)
+        quality_status = (
+            "warning"
+            if quality_issues
+            else (
+                "passed"
+                if (
+                    translation_protocol_version == DESCRIPTION_TRANSLATION_PROTOCOL_VERSION
+                    or normalized_producer_kind == TranslationProducerKind.LOCAL_DICTIONARY
+                )
+                else "unavailable"
+            )
+        )
         dictionary_resolution_hash = self._optional_text(metadata.get("dictionary_resolution_hash"))
         current_dictionary_resolution_hash: str | None = None
         current_dictionary_unmatched_count = 0
@@ -201,17 +219,26 @@ class TranslationService:
                 else "当前不匹配：源标注已经变化，请重新翻译。旧译文仅保留在历史记录中。"
             )
         elif source is not None and document.exists:
-            valid, alignment_issue, raw_parts = self._align(
-                source,
-                document.content,
-            )
+            if (
+                source.source_kind == TranslationSourceKind.DESCRIPTION
+                and translation_protocol_version == DESCRIPTION_TRANSLATION_PROTOCOL_VERSION
+            ):
+                valid, alignment_issue, raw_parts = align_description_translation_segments(
+                    source.content,
+                    document.content,
+                    metadata.get("translation_segments"),
+                )
+            else:
+                valid, alignment_issue, raw_parts = self._align(
+                    source,
+                    document.content,
+                )
             if valid:
                 alignment_status = TranslationAlignmentStatus.ALIGNED
                 alignment_parts = self._alignment_parts(raw_parts)
             else:
                 alignment_status = TranslationAlignmentStatus.INVALID
                 issue = alignment_issue
-                status = TranslationStatus.INVALID
 
         dictionary_sources, dictionary_override_count = self._dictionary_provenance(metadata)
         return TranslationDocument(
@@ -238,6 +265,9 @@ class TranslationService:
             provider_profile_id=self._optional_text(metadata.get("provider_profile_id")),
             provider_profile_name=self._optional_text(metadata.get("provider_profile_name")),
             model=self._optional_text(metadata.get("model")),
+            translation_protocol_version=translation_protocol_version,
+            quality_status=quality_status,
+            quality_issues=quality_issues,
             dictionary_resolution_hash=dictionary_resolution_hash,
             current_dictionary_resolution_hash=current_dictionary_resolution_hash,
             dictionary_sources=dictionary_sources,
@@ -344,7 +374,20 @@ class TranslationService:
                 raise TranslationSourceChangedError("源标注在翻译期间发生变化，未写入旧译文。")
 
             if content_is_normalized:
-                valid, validation_status, _ = self._align(source, content)
+                if (
+                    source.source_kind == TranslationSourceKind.DESCRIPTION
+                    and self._optional_int(
+                        (producer_metadata or {}).get("translation_protocol_version")
+                    )
+                    == DESCRIPTION_TRANSLATION_PROTOCOL_VERSION
+                ):
+                    valid, validation_status, _ = align_description_translation_segments(
+                        source.content,
+                        content,
+                        (producer_metadata or {}).get("translation_segments"),
+                    )
+                else:
+                    valid, validation_status, _ = self._align(source, content)
                 stored_content = content
             else:
                 valid, validation_status, stored_content = self._normalize_generated_content(
@@ -702,6 +745,13 @@ class TranslationService:
             )
         return list(sources.values()), override_count
 
+    @staticmethod
+    def _quality_issues(metadata: dict[str, object]) -> list[str]:
+        raw_issues = metadata.get("translation_quality_issues")
+        if not isinstance(raw_issues, list):
+            return []
+        return [str(issue) for issue in raw_issues if isinstance(issue, str) and issue.strip()]
+
     def _invalid_source_issue(
         self,
         project_id: str,
@@ -798,6 +848,15 @@ class TranslationService:
     @staticmethod
     def _optional_text(value: object) -> str | None:
         return str(value) if value is not None and str(value) else None
+
+    @staticmethod
+    def _optional_int(value: object) -> int | None:
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     @staticmethod
     def _source_claims(

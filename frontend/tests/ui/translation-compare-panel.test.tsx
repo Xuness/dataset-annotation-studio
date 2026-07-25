@@ -80,6 +80,9 @@ function translationDocument(update: Partial<TranslationDocument> = {}): Transla
     provider_profile_id: "provider",
     provider_profile_name: "Translator",
     model: "model",
+    translation_protocol_version: 2,
+    quality_status: "passed",
+    quality_issues: [],
     dictionary_resolution_hash: null,
     current_dictionary_resolution_hash: null,
     dictionary_sources: [],
@@ -207,6 +210,20 @@ describe("translation compare panel", () => {
         (element) => !element.classList.contains("is-linked"),
       ),
     ).toBe(true);
+  });
+
+  test("surfaces translation quality warnings without disabling linked highlighting", () => {
+    renderPanel(
+      translationDocument({
+        quality_status: "warning",
+        quality_issues: ["1 个句段与原文相同，请重点复核：segment-1。"],
+      }),
+    );
+
+    expect(screen.getByRole("status").textContent).toContain("译文质量提醒");
+    expect(screen.getByRole("status").textContent).toContain("segment-1");
+    expect(screen.getByText("译文需复核")).not.toBeNull();
+    expect(screen.getByText("安静").dataset.alignmentId).toBe("segment-0");
   });
 
   test("pins the matching Tags pair when text is selected on the translated side", () => {

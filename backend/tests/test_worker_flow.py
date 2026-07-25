@@ -99,7 +99,7 @@ class TranslationProvider(RecordingProvider):
     async def complete(self, _profile, _api_key, request):
         self.requests.append(request)
         return ProviderResponse(
-            content="<caption>安静的花园</caption>",
+            content='{"segment-0":"安静的花园"}',
             raw_payload={"source": "fake-translation"},
             finish_reason="stop",
             input_tokens=80,
@@ -709,10 +709,15 @@ async def test_worker_translates_annotation_without_sending_image(tmp_path: Path
     assert stored_translation.content == "<caption>安静的花园</caption>"
     assert provider.requests[0].image_path is None
     assert provider.requests[0].system_prompt == "Translate into 简体中文; locale=zh-CN."
-    assert source in provider.requests[0].user_prompt
+    assert '"segment-0":"quiet garden"' in provider.requests[0].user_prompt
     translation = container.translations.get(workspace.project_id, asset.id, "zh-CN")
     assert translation.status.value == "current"
     assert translation.provider_profile_name == "Fake translator"
+    assert translation.translation_protocol_version == 2
+    assert translation.quality_status == "passed"
+    assert translation.alignment_status.value == "aligned"
+    assert translation.alignment_parts[1].source_text == "quiet garden"
+    assert translation.alignment_parts[1].translated_text == "安静的花园"
 
 
 @pytest.mark.asyncio
