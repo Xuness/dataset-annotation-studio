@@ -263,6 +263,7 @@ class TagDictionaryResolveRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     tags: list[str] = Field(min_length=1, max_length=5000)
+    categories: list[str | None] | None = Field(default=None, max_length=5000)
     language: str = "zh-CN"
 
     @field_validator("tags")
@@ -275,10 +276,29 @@ class TagDictionaryResolveRequest(BaseModel):
             normalized.append(tag)
         return normalized
 
+    @field_validator("categories")
+    @classmethod
+    def validate_categories(cls, values: list[str | None] | None) -> list[str | None] | None:
+        if values is None:
+            return None
+        normalized: list[str | None] = []
+        for value in values:
+            category = value.strip().casefold() if value is not None else ""
+            if len(category) > 120:
+                raise ValueError("Tag 类别长度不能超过 120 个字符。")
+            normalized.append(category or None)
+        return normalized
+
     @field_validator("language")
     @classmethod
     def validate_language(cls, value: str) -> str:
         return normalize_language_code(value)
+
+    @model_validator(mode="after")
+    def validate_category_count(self) -> TagDictionaryResolveRequest:
+        if self.categories is not None and len(self.categories) != len(self.tags):
+            raise ValueError("Tag 类别数量必须与 Tag 数量一致。")
+        return self
 
 
 class TagDictionarySearchItem(BaseModel):

@@ -734,6 +734,7 @@ async def test_worker_generates_read_only_local_dictionary_translation_and_inval
         asset.id,
         [
             AnnotationTag(name="1girl", category="general", confidence=0.98),
+            AnnotationTag(name="explicit", category="rating", confidence=0.92),
             AnnotationTag(name="unknown_tag", category="general", confidence=0.75),
         ],
     )
@@ -782,9 +783,13 @@ async def test_worker_generates_read_only_local_dictionary_translation_and_inval
         producer_kind="local_dictionary",
     )
     assert translation.status.value == "current"
-    assert translation.content == "一个女孩\nunknown_tag"
+    assert translation.content == "一个女孩\n露骨\nunknown_tag"
     assert translation.dictionary_unmatched_count == 1
     assert translation.dictionary_sources[0].matched_count == 1
+    assert any(
+        source.installation_id == "builtin:tagger-ratings" and source.matched_count == 1
+        for source in translation.dictionary_sources
+    )
 
     container.tag_dictionaries.upsert_override(
         TagDictionaryOverrideUpsert(tag="unknown_tag", translation="未知标签")

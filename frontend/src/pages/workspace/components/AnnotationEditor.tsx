@@ -184,7 +184,7 @@ export function AnnotationEditor({
   );
   const hasExistingAnnotation = hasExistingAnnotationDocument(bundle.data?.documents);
   const dictionaryPreview = useTagDictionaryResolution(
-    useMemo(() => tagDraft.map((tag) => tag.name), [tagDraft]),
+    useMemo(() => tagDraft.map((tag) => ({ name: tag.name, category: tag.category })), [tagDraft]),
     language,
     mode === "translation" &&
       translationSourceKind === "tags" &&

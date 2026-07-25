@@ -86,6 +86,7 @@ class LocalDictionaryJobExecutor:
             resolution = self._container.tag_dictionaries.resolve(
                 [tag.name for tag in source.tags],
                 language,
+                categories=[tag.category for tag in source.tags],
             )
             content = "\n".join(
                 entry.translation or entry.requested_tag for entry in resolution.entries

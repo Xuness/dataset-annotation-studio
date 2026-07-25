@@ -77,7 +77,11 @@ def search_entries(
 
 @router.post("/resolve", response_model=TagDictionaryResolution)
 def resolve_entries(data: TagDictionaryResolveRequest, container: Container):
-    return container.tag_dictionaries.resolve(data.tags, data.language)
+    return container.tag_dictionaries.resolve(
+        data.tags,
+        data.language,
+        categories=data.categories,
+    )
 
 
 @router.put("/overrides", response_model=TagDictionaryOverride)

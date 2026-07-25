@@ -20,6 +20,17 @@ from dataset_studio.modules.tag_dictionaries.repository import (
 )
 
 _SQLITE_PARAMETER_CHUNK = 800
+_BUILTIN_RATING_DICTIONARY = {
+    "zh-CN": {
+        "general": "一般",
+        "sensitive": "敏感",
+        "questionable": "可疑",
+        "explicit": "露骨",
+    }
+}
+_BUILTIN_RATING_DICTIONARY_ID = "builtin:tagger-ratings"
+_BUILTIN_RATING_DICTIONARY_NAME = "内置 Tagger 分级词条"
+_BUILTIN_RATING_DICTIONARY_VERSION = "1"
 
 
 class TagDictionaryResolver:
@@ -27,9 +38,26 @@ class TagDictionaryResolver:
         self._repository = repository
         self._dictionary_root = dictionary_root
 
-    def resolve(self, tags: Sequence[str], language: str) -> TagDictionaryResolution:
-        normalized_by_tag = [(tag, normalize_tag_key(tag)) for tag in tags]
-        unique_keys = list(dict.fromkeys(normalized for _, normalized in normalized_by_tag))
+    def resolve(
+        self,
+        tags: Sequence[str],
+        language: str,
+        *,
+        categories: Sequence[str | None] | None = None,
+    ) -> TagDictionaryResolution:
+        requested_tags = [str(tag).strip() for tag in tags]
+        if categories is not None and len(categories) != len(requested_tags):
+            raise ValueError("Tag 类别数量必须与 Tag 数量一致。")
+        requested_categories = (
+            [_normalize_category(category) for category in categories]
+            if categories is not None
+            else [None] * len(requested_tags)
+        )
+        normalized_by_tag = [
+            (tag, normalize_tag_key(tag), category)
+            for tag, category in zip(requested_tags, requested_categories, strict=True)
+        ]
+        unique_keys = list(dict.fromkeys(normalized for _, normalized, _ in normalized_by_tag))
         resolved: dict[str, TagDictionaryResolvedEntry] = {}
 
         overrides = self._repository.get_overrides(unique_keys, language)
@@ -71,20 +99,26 @@ class TagDictionaryResolver:
                 )
 
         ordered: list[TagDictionaryResolvedEntry] = []
-        for requested_tag, normalized in normalized_by_tag:
+        for requested_tag, normalized, category in normalized_by_tag:
             matched = resolved.get(normalized)
             if matched is None:
-                ordered.append(
-                    TagDictionaryResolvedEntry(
-                        requested_tag=requested_tag,
-                        normalized_tag=normalized,
-                        translation=None,
-                        matched=False,
-                        source_kind="fallback",
-                    )
+                matched = _builtin_rating_entry(
+                    requested_tag,
+                    normalized,
+                    category,
+                    language,
                 )
-            else:
-                ordered.append(matched.model_copy(update={"requested_tag": requested_tag}))
+            ordered.append(
+                matched.model_copy(update={"requested_tag": requested_tag})
+                if matched is not None
+                else TagDictionaryResolvedEntry(
+                    requested_tag=requested_tag,
+                    normalized_tag=normalized,
+                    translation=None,
+                    matched=False,
+                    source_kind="fallback",
+                )
+            )
         digest = hashlib.sha256(
             json.dumps(
                 [entry.model_dump(mode="json") for entry in ordered],
@@ -164,6 +198,38 @@ class TagDictionaryResolver:
         if not directory.is_relative_to(root):
             return root / "__invalid__"
         return directory / DICTIONARY_DATABASE_NAME
+
+
+def _normalize_category(category: str | None) -> str | None:
+    if category is None:
+        return None
+    normalized = str(category).strip().casefold()
+    return normalized or None
+
+
+def _builtin_rating_entry(
+    requested_tag: str,
+    normalized_tag: str,
+    category: str | None,
+    language: str,
+) -> TagDictionaryResolvedEntry | None:
+    if category != "rating":
+        return None
+    translation = _BUILTIN_RATING_DICTIONARY.get(language, {}).get(normalized_tag)
+    if translation is None:
+        return None
+    return TagDictionaryResolvedEntry(
+        requested_tag=requested_tag,
+        normalized_tag=normalized_tag,
+        translation=translation,
+        matched=True,
+        source_kind="dictionary",
+        installation_id=_BUILTIN_RATING_DICTIONARY_ID,
+        installation_name=_BUILTIN_RATING_DICTIONARY_NAME,
+        adapter_id="builtin_tagger_ratings",
+        source_version=_BUILTIN_RATING_DICTIONARY_VERSION,
+        category=category,
+    )
 
 
 def _lookup_many(database: Path, normalized_tags: list[str]):

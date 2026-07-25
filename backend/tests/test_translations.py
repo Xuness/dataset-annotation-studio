@@ -218,6 +218,7 @@ def test_foreground_local_dictionary_refresh_tracks_the_saved_tags_revision(
         asset.id,
         [
             AnnotationTag(name="blue_hair", category="general", origin="manual"),
+            AnnotationTag(name="explicit", category="rating", origin="tagger"),
             AnnotationTag(name="unknown_tag", category=None, origin="manual"),
         ],
     )
@@ -231,10 +232,14 @@ def test_foreground_local_dictionary_refresh_tracks_the_saved_tags_revision(
     )
 
     assert refreshed.status == TranslationStatus.CURRENT
-    assert refreshed.content == "蓝发\nunknown_tag"
+    assert refreshed.content == "蓝发\n露骨\nunknown_tag"
     assert refreshed.source_revision_id == tag_write.revision_id
     assert refreshed.dictionary_override_count == 1
     assert refreshed.dictionary_unmatched_count == 1
+    assert any(
+        source.installation_id == "builtin:tagger-ratings" and source.matched_count == 1
+        for source in refreshed.dictionary_sources
+    )
     assert refreshed.modified_at is not None
     assert len(annotations.history(project_id, asset.id, AnnotationChannel.TAGS)) == 1
     assert (

@@ -74,6 +74,56 @@ def test_source_checkout_root_takes_precedence_for_dictionary_storage(tmp_path: 
     assert service.dictionary_root() == (source_root / "dictionaries").resolve()
 
 
+def test_resolve_trims_tag_boundaries_and_falls_back_to_builtin_rating_terms(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path)
+
+    resolved = service.resolve(
+        [" general\r\n", "sensitive", "questionable", "explicit\n", "general"],
+        "zh-CN",
+        categories=[" Rating ", "rating", "rating", "rating", "general"],
+    )
+
+    assert [entry.requested_tag for entry in resolved.entries] == [
+        "general",
+        "sensitive",
+        "questionable",
+        "explicit",
+        "general",
+    ]
+    assert [entry.translation for entry in resolved.entries] == [
+        "一般",
+        "敏感",
+        "可疑",
+        "露骨",
+        None,
+    ]
+    assert [entry.installation_id for entry in resolved.entries[:4]] == [
+        "builtin:tagger-ratings"
+    ] * 4
+    assert resolved.entries[-1].source_kind == "fallback"
+    assert resolved.unmatched_count == 1
+
+
+def test_managed_dictionary_and_override_take_priority_over_builtin_rating_terms(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path)
+    dictionary = tmp_path / "Tags-zh-full-pack.csv"
+    dictionary.write_text("explicit,限制内容\n", encoding="utf-8")
+    service.import_local(TagDictionaryImportRequest(path=str(dictionary)))
+
+    managed = service.resolve(["explicit"], "zh-CN", categories=["rating"]).entries[0]
+    assert managed.translation == "限制内容"
+    assert managed.installation_id != "builtin:tagger-ratings"
+
+    service.upsert_override(TagDictionaryOverrideUpsert(tag="explicit", translation="自定义分级"))
+    overridden = service.resolve(["explicit"], "zh-CN", categories=["rating"]).entries[0]
+    assert overridden.translation == "自定义分级"
+    assert overridden.source_kind == "override"
+
+
 def test_import_resolve_reorder_override_and_delete(tmp_path: Path) -> None:
     service = _service(tmp_path)
     tagcomplete = tmp_path / "Tags-zh-full-pack.csv"

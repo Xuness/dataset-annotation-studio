@@ -236,9 +236,15 @@ class TagDictionaryService:
                 shutil.rmtree(trash)
         return self.library()
 
-    def resolve(self, tags: list[str], language: str) -> TagDictionaryResolution:
+    def resolve(
+        self,
+        tags: list[str],
+        language: str,
+        *,
+        categories: list[str | None] | None = None,
+    ) -> TagDictionaryResolution:
         with self.catalog_guard():
-            return self._resolver.resolve(tags, language)
+            return self._resolver.resolve(tags, language, categories=categories)
 
     def execution_profile(self, language: str) -> TagDictionaryExecutionProfile:
         with self.catalog_guard():

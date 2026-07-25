@@ -45,7 +45,7 @@ export function useTagDictionarySearch(query: string, language = "zh-CN") {
 }
 
 export function useTagDictionaryResolution(
-  tags: ReadonlyArray<string>,
+  tags: ReadonlyArray<{ name: string; category: string | null }>,
   language: string,
   enabled: boolean,
 ) {
@@ -62,7 +62,7 @@ export function useTagDictionaryResolution(
   }, [enabled, signature]);
 
   const requestTags = useMemo(
-    () => JSON.parse(debouncedSignature) as string[],
+    () => JSON.parse(debouncedSignature) as Array<{ name: string; category: string | null }>,
     [debouncedSignature],
   );
   const settled = debouncedSignature === signature;

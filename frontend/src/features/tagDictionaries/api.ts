@@ -57,13 +57,17 @@ export function searchTagDictionaryEntries(
 }
 
 export function resolveTagDictionaryEntries(
-  tags: string[],
+  tags: Array<{ name: string; category: string | null }>,
   language = "zh-CN",
   signal?: AbortSignal,
 ): Promise<TagDictionaryResolution> {
   return apiRequest("/api/v1/tag-dictionaries/resolve", {
     method: "POST",
-    body: JSON.stringify({ tags, language }),
+    body: JSON.stringify({
+      tags: tags.map((tag) => tag.name),
+      categories: tags.map((tag) => tag.category),
+      language,
+    }),
     signal,
   });
 }

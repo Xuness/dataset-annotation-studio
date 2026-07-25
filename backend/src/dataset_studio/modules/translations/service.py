@@ -166,6 +166,7 @@ class TranslationService:
             current_resolution = self._tag_dictionaries.resolve(
                 [tag.name for tag in source.tags],
                 language,
+                categories=[tag.category for tag in source.tags],
             )
             current_dictionary_resolution_hash = current_resolution.resolution_hash
             current_dictionary_unmatched_count = current_resolution.unmatched_count
@@ -435,6 +436,7 @@ class TranslationService:
             resolution = self._tag_dictionaries.resolve(
                 [tag.name for tag in source.tags],
                 normalized_language,
+                categories=[tag.category for tag in source.tags],
             )
             content = "\n".join(
                 entry.translation or entry.requested_tag for entry in resolution.entries
