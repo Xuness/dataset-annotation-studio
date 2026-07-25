@@ -15,7 +15,8 @@
   },
   "packageManager": "pnpm@10.30.3",
   "scripts": {
-    "dev": "tauri dev",
+    "dev": "tauri dev --config src-tauri/tauri.cuda.conf.json",
+    "dev:cpu": "tauri dev",
     "dev:cuda": "tauri dev --config src-tauri/tauri.cuda.conf.json",
     "dev:frontend": "pnpm --dir frontend dev",
     "dev:api": "uv run --project backend --extra cpu --no-sync dataset-studio-api",

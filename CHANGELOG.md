@@ -19,7 +19,8 @@ changes.
 - Hid the imported-annotation editor tab unless the current asset actually contains that
   channel.
 - Prepared the repository for an Apache-2.0 source release.
-- Added a CPU-default and CUDA-opt-in source runtime layout.
+- Added isolated CPU/CUDA source environments with CUDA-first hardware detection and
+  matching Windows/Linux launchers.
 - Added Linux-aware application data paths, filesystem path identity, credential-store
   diagnostics, portable clipboard fallback, and desktop lifecycle behavior.
 - Kept credential-free provider profiles usable when a Linux Secret Service is absent.

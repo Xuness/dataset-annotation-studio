@@ -23,8 +23,8 @@
 
 | 平台                 | 当前状态     | 源码运行方式                         |
 | -------------------- | ------------ | ------------------------------------ |
-| Windows 10/11 x86_64 | 主要开发平台 | `pnpm dev` 或双击 `启动开发版.vbs`   |
-| Linux x86_64         | 实验性       | 安装 Tauri 系统依赖后运行 `pnpm dev` |
+| Windows 10/11 x86_64 | 主要开发平台 | 双击 `启动开发版.vbs`                 |
+| Linux x86_64         | 实验性       | 安装 Tauri 依赖后运行 `./启动开发版.sh` |
 | macOS / ARM64        | 尚未验证     | 暂不承诺支持                         |
 
 源码运行仍会在本机编译 Rust/Tauri 桌面壳，但不会生成或发布安装包。
@@ -39,39 +39,54 @@
 - Rust stable
 - 当前平台的 [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)
 
-克隆仓库并使用默认 CPU Runtime：
+克隆仓库并启用包管理工具：
 
 ```text
 git clone https://github.com/Xuness/dataset-annotation-studio.git
 cd dataset-annotation-studio
 corepack enable
-pnpm install --frozen-lockfile
-uv sync --project backend --extra cpu --all-groups --locked --exact
-pnpm dev
 ```
 
-首次启动会编译桌面壳，因此会比后续启动慢。Vite、本地 API、任务 Worker 和窗口都附着在
-当前终端；结束 `pnpm dev` 会停止整套源码服务。
+启动器默认自动探测运行时：检测到可用的 NVIDIA CUDA 设备时使用
+`backend/.venv-cuda`，否则使用 `backend/.venv-cpu`。两套环境独立同步，不会因为启动
+另一种模式而卸载或覆盖已有依赖。首次启动会下载依赖并编译桌面壳，因此会比后续启动慢。
 
 ### Windows 快捷入口
 
 安装好 Node.js、pnpm、uv、Rust 和 PowerShell 7 后，可以双击根目录的
-`启动开发版.vbs`。它会检查锁定依赖并在后台启动 CPU 源码环境。`启动开发版.bat`
-是兼容入口，会转交给同一个 VBS 启动器。
+`启动开发版.vbs`。它会自动选择 CUDA 或 CPU 环境并在后台启动源码服务；
+`启动开发版.bat` 是兼容入口。终端中也可以显式覆盖：
 
-### 可选 NVIDIA CUDA
-
-CPU 是默认且跨平台的基线。x86_64 NVIDIA 环境可以显式选择 CUDA：
-
-```text
-uv sync --project backend --extra cuda --all-groups --locked --exact
-pnpm dev:cuda
+```powershell
+pwsh -NoProfile -File scripts/start-dev.ps1 -Runtime cuda
+pwsh -NoProfile -File scripts/start-dev.ps1 -Runtime cpu
 ```
 
-`onnxruntime` 与 `onnxruntime-gpu` 不能在同一环境中并存，uv 配置会阻止同时选择两个
-extra。CUDA extra 还安装 CuPy、nvImageCodec 和 nvJPEG，并将 cuDNN 固定在仍支持
-Tesla V100/Volta 的 9.10 系列；CUDA Runtime 受 NVIDIA 软件条款约束，本仓库不分发其
-二进制文件。
+### Linux 快捷入口
+
+根目录的 Linux 启动脚本与 Windows 使用相同的运行时策略：
+
+```bash
+chmod +x ./启动开发版.sh
+./启动开发版.sh
+./启动开发版.sh --cuda
+./启动开发版.sh --cpu
+```
+
+脚本还保留 `--graphics nvidia-sync|dmabuf-off|software`、`--check-only` 和
+`--skip-sync`。详细系统依赖见 [Linux 源码指南](docs/linux.md)。
+
+### CPU 与 CUDA Runtime
+
+`onnxruntime` 与 `onnxruntime-gpu` 两个发行包不能安全安装到同一个 Python 环境，
+因此源码启动器分别维护 `.venv-cpu` 和 `.venv-cuda`。这不代表 CUDA 模式不能使用
+CPU：`onnxruntime-gpu` 同时提供 CUDA 和 CPU Execution Provider，图片预处理的
+Pillow/OpenCV CPU 路径也始终保留。
+
+CUDA 环境额外安装 CuPy、nvImageCodec 和 nvJPEG，并将 cuDNN 固定在仍支持 Tesla
+V100/Volta 的 9.10 系列；CUDA Runtime 受 NVIDIA 软件条款约束，本仓库不分发其
+二进制文件。显式请求 CUDA 但设备或运行时探针失败时，启动器会报告错误，不会把 CPU
+执行伪装成 CUDA。
 
 预处理页会动态探测设备，并提供“自动选择 / 仅 CPU / 硬件加速”。当前 CUDA 后端对
 8 位、非渐进式 JPEG 提供 GPU/混合编解码管线，对 L、LA、RGB、RGBA 图片的
@@ -79,12 +94,8 @@ Lanczos 3/4 缩放提供 GPU 路径。PNG、WebP 等格式仍可采用 CPU 解�
 CPU 编码；多帧、特殊位深、特殊颜色模式、低光晕算法或运行时失败会逐项安全回退 CPU，
 不会把回退结果伪装为 GPU 执行。
 
-如果已有 `.venv` 曾经切换或混装过 CPU/GPU Runtime，先运行
-`uv venv --clear backend/.venv`，再执行上面选定的一条 `uv sync` 命令。它只重建项目
-虚拟环境，不会删除数据集或应用数据。
-
-Linux 的系统包、XDG 数据目录、Secret Service 和桌面环境注意事项见
-[Linux 源码指南](docs/linux.md)。
+旧版 `backend/.venv` 不再由快捷启动器使用，可以在确认没有旧进程依赖它后自行删除；
+数据集和应用数据不在这些虚拟环境中。
 
 ## 五分钟上手
 
@@ -155,8 +166,9 @@ Linux 使用原生窗口边框，但默认保留与 Windows 相同的主题、�
 
 ### 本地模型只显示 CPU
 
-默认源码环境安装 CPU Runtime。需要 NVIDIA CUDA 时，重新执行 CUDA extra 同步命令并
-使用 `pnpm dev:cuda` 启动。
+先查看启动日志中的 `Runtime` 与 `Python 环境`。NVIDIA 机器正常应使用
+`backend/.venv-cuda`；可运行 `scripts/start-dev.ps1 -Runtime cuda -CheckOnly`
+（Linux 使用 `./启动开发版.sh --cuda --check-only`）执行严格探测。
 
 ### 数据集打开后无法写入
 

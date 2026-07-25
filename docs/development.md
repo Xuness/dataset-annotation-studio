@@ -12,37 +12,55 @@ Linux setup is documented separately in [`linux.md`](linux.md).
 
 ## Install and run
 
-Portable CPU baseline:
+The convenience launchers select CUDA by default when `nvidia-smi` reports at least one
+device. Machines without an NVIDIA CUDA device use the independent CPU environment:
 
-```text
-pnpm install --frozen-lockfile
-uv sync --project backend --extra cpu --all-groups --locked --exact
-pnpm dev
+```powershell
+# Windows: the VBS/BAT shortcuts call this script in auto mode.
+pwsh -NoProfile -File scripts/start-dev.ps1
+pwsh -NoProfile -File scripts/start-dev.ps1 -Runtime cuda
+pwsh -NoProfile -File scripts/start-dev.ps1 -Runtime cpu
 ```
 
-Optional CUDA development:
-
-```text
-uv sync --project backend --extra cuda --all-groups --locked --exact
-pnpm dev:cuda
+```bash
+# Linux
+./启动开发版.sh
+./启动开发版.sh --cuda
+./启动开发版.sh --cpu
 ```
 
-When switching an existing checkout between the mutually exclusive CPU and CUDA
-extras, run `uv venv --clear backend/.venv` before the selected `uv sync` command.
-The CUDA extra covers both ONNX inference and the optional CuPy + nvImageCodec image
-preprocessing backend.
+The launchers set `UV_PROJECT_ENVIRONMENT` to `backend/.venv-cuda` or
+`backend/.venv-cpu` before exact synchronization and service startup. The mutually
+exclusive `onnxruntime` distributions therefore never overwrite one another.
+`onnxruntime-gpu` still exposes the CPU Execution Provider, so the CUDA environment
+retains per-model and per-image CPU fallback. The CUDA extra also covers CuPy +
+nvImageCodec preprocessing.
 
-`pnpm dev` starts the frontend, loopback API, durable worker, and Tauri window. The
-Python services run directly from the uv environment; no sidecar is generated.
-The explicit `uv sync --exact` step selects and cleans the CPU or CUDA runtime once;
-development services and checks then use that environment without attempting to rewrite
-it while the API and worker are running.
+Explicit CUDA selection is strict: missing hardware or a failed CuPy/ONNX Runtime probe
+stops startup with a diagnostic. Auto mode chooses CPU only when the NVIDIA device probe
+is absent; it does not disguise a broken CUDA installation as a successful GPU launch.
 
-On Windows, `启动开发版.vbs` performs the CPU dependency checks and launches the same
-source workflow in the background. The BAT/VBS and `scripts/start-dev.ps1` helpers are
-Windows-only conveniences, not the portable entry point.
+`pnpm dev` and `pnpm dev:cuda` are the low-level CUDA Tauri commands;
+`pnpm dev:cpu` is the CPU equivalent. The launchers choose between them after setting
+the matching environment. All variants start the frontend, loopback API, durable worker,
+and Tauri window. The Python services run directly from the selected uv environment; no
+sidecar is generated.
 
 ## Checks
+
+Set the environment explicitly when running checks outside a launcher process:
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = "$PWD/backend/.venv-cuda" # or .venv-cpu
+pnpm check
+```
+
+```bash
+export UV_PROJECT_ENVIRONMENT="$PWD/backend/.venv-cuda" # or .venv-cpu
+pnpm check
+```
+
+The individual gates remain:
 
 ```text
 pnpm --dir frontend check
@@ -86,5 +104,6 @@ The public project currently promises source distribution only. `pnpm build` and
 source release support contract. PyInstaller/Tauri artifacts must be built and tested
 separately on each target operating system before they are published.
 
-Packaging performs an exact backend environment sync before PyInstaller runs. Stop any
-source-mode API or worker processes first so Windows can replace in-use executables.
+Packaging performs an exact sync in `backend/.venv-cpu` or `backend/.venv-cuda` before
+PyInstaller runs. Stop any source-mode API or worker processes first so Windows can
+replace in-use executables.

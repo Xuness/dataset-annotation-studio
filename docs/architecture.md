@@ -172,8 +172,9 @@ AnimeTimm DBv4 与 Camie Tagger v2，且各自拥有独立的目录契约与下�
 配置；模型文件后来发生变化时，旧任务不会静默改用新权重，而是拒绝执行并要求重新创建任务。
 
 Runtime 只在 Worker 真正处理本地任务时加载 ONNX Session，并用单项 LRU 约束常驻大模型数量。源码依赖把
-`onnxruntime` CPU 与 `onnxruntime-gpu[cuda,cudnn]` 声明为互斥 extra；CPU 是便携默认值，CUDA 必须由用户
-显式选择，因此两种 wheel 不会在同一环境并存。自动设备模式在 CUDA 环境中优先创建 CUDA + CPU 算子回退链；若 CUDA Session 因驱动或动态库问题无法初始化，
+`onnxruntime` CPU 与 `onnxruntime-gpu[cuda,cudnn]` 声明为互斥 extra；源码启动器分别使用
+`backend/.venv-cpu` 与 `backend/.venv-cuda`，检测到 NVIDIA CUDA 设备时默认选择后者，
+因此两种 wheel 不会互相覆盖。CUDA 环境仍同时提供 CUDA + CPU 算子回退链；若 CUDA Session 因驱动或动态库问题无法初始化，
 或在执行期间失效，则重建或切换为纯 CPU Session。显式选择 CUDA 时保持严格失败，不会把 CPU 降级伪装成
 GPU 执行；DirectML 仍作为替代 Runtime 构建可用时的兼容设备。
 单图产物仍进入统一的 `runs/` 追踪结构，其中保存阈值、类别、设备、标签置信度和推理耗时，不保存图片副本。

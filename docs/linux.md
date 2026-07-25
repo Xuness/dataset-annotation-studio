@@ -23,7 +23,8 @@ sudo apt install \
   libxdo-dev \
   libssl-dev \
   libayatana-appindicator3-dev \
-  librsvg2-dev
+  librsvg2-dev \
+  zlib1g
 ```
 
 Then install:
@@ -36,46 +37,36 @@ Then install:
 The upstream package list for other distributions is maintained in the
 [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
-## CPU source run
+## Source launcher
 
 ```bash
 corepack enable
-pnpm install --frozen-lockfile
-uv sync --project backend --extra cpu --all-groups --locked --exact
-pnpm dev
+chmod +x ./启动开发版.sh
+./启动开发版.sh
 ```
 
-The first `pnpm dev` compiles the desktop shell. Vite, the FastAPI service, and the task
-worker remain attached to the terminal and stop together.
+The launcher uses `backend/.venv-cuda` when `nvidia-smi` reports a CUDA device and
+`backend/.venv-cpu` otherwise. The environments remain independent, so starting on a
+CPU-only machine never removes CUDA packages from another environment. The first run
+downloads dependencies and compiles the desktop shell; Vite, the FastAPI service, and
+the task worker remain attached to the terminal and stop together.
 
-## Optional NVIDIA CUDA runtime
+Explicit overrides and validation modes are available:
 
-CPU is the portable default. On an x86_64 NVIDIA system with a compatible driver:
-
-```bash
-uv sync --project backend --extra cuda --all-groups --locked --exact
-pnpm dev:cuda
+```text
+./启动开发版.sh --cuda
+./启动开发版.sh --cpu
+./启动开发版.sh --cuda --check-only
+./启动开发版.sh --cuda --skip-sync
 ```
 
 The CPU and CUDA ONNX Runtime packages are intentionally conflicting choices and must
-not be installed together. The CUDA extra also installs NVIDIA runtime wheels; review
-their terms before redistributing an environment or a derived binary.
-It also enables the optional CuPy + nvImageCodec preprocessing backend. JPEG codec
-stages and Lanczos 3/4 resize are routed per image; unsupported inputs and runtime
-failures retain the CPU reference path.
-
-When changing an existing checkout between CPU and CUDA, rebuild the project virtual
-environment first so files shared by the two ONNX Runtime distributions cannot remain
-mixed:
-
-```bash
-uv venv --clear backend/.venv
-uv sync --project backend --extra cpu --all-groups --locked --exact
-```
-
-Replace `cpu` with `cuda` in the second command when that is the intended runtime. This
-clears only the repository-local dependency environment, not datasets or application
-data.
+not be installed together in one environment. The CUDA environment uses
+`onnxruntime-gpu`, which still provides CPU operator fallback, and also installs the
+NVIDIA runtime wheels, CuPy, and nvImageCodec. The launcher exposes wheel-provided
+NVIDIA library directories through `LD_LIBRARY_PATH` before probing or starting the
+services. Review NVIDIA package terms before redistributing an environment or derived
+binary.
 
 ## Application data and credentials
 
@@ -107,22 +98,26 @@ before starting Tauri. Start with the narrowest mode that matches the system:
 
 ```bash
 # NVIDIA explicit-sync workaround
-DATASET_STUDIO_LINUX_GRAPHICS=nvidia-sync pnpm dev
+./启动开发版.sh --graphics nvidia-sync
 
 # Disable only WebKitGTK's DMABUF renderer
-DATASET_STUDIO_LINUX_GRAPHICS=dmabuf-off pnpm dev
+./启动开发版.sh --graphics dmabuf-off
 
 # Last resort: disable DMABUF and accelerated compositing
-DATASET_STUDIO_LINUX_GRAPHICS=software pnpm dev
+./启动开发版.sh --graphics software
 ```
 
-For CUDA development, use the same prefix with `pnpm dev:cuda`, for example:
+Runtime and graphics choices are independent, for example:
 
 ```bash
-DATASET_STUDIO_LINUX_GRAPHICS=dmabuf-off pnpm dev:cuda
+./启动开发版.sh --cuda --graphics dmabuf-off
 ```
 
-`default` (or an unset variable) changes no WebKitGTK graphics environment variables.
+The script passes only the current `DATASET_STUDIO_LINUX_GRAPHICS` mode into Tauri.
+Rust applies the corresponding WebKitGTK/NVIDIA environment settings before creating
+the webview, so the launcher does not duplicate the older black-screen workaround.
+`native` (the default) leaves `DATASET_STUDIO_LINUX_GRAPHICS` unset and changes no
+WebKitGTK graphics environment variables.
 The `nvidia-sync` and `dmabuf-off` modes retain the full application visuals and
 animations. Depending on the installed WebKitGTK version, `dmabuf-off` can move the
 webview to a non-accelerated shared-memory presentation path, so it is an opt-in

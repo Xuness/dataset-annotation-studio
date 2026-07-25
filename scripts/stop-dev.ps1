@@ -70,7 +70,11 @@ function Test-KnownProjectProcess {
     $name = [string]$Process.Name
     $commandLine = [string]$Process.CommandLine
     $executablePath = [string]$Process.ExecutablePath
-    $backendRoot = Join-Path $Root "backend\.venv"
+    $backendRoots = @(
+        (Join-Path $Root "backend\.venv"),
+        (Join-Path $Root "backend\.venv-cpu"),
+        (Join-Path $Root "backend\.venv-cuda")
+    )
     $nodeModulesRoot = Join-Path $Root "node_modules"
     $tauriTargetRoot = Join-Path $Root "src-tauri\target"
 
@@ -79,12 +83,23 @@ function Test-KnownProjectProcess {
     }
 
     if ($name -in @("dataset-studio-api.exe", "dataset-studio-worker.exe", "codex.exe")) {
-        return Test-PathWithinRoot -Path $executablePath -ExpectedRoot $backendRoot
+        return @(
+            $backendRoots | Where-Object {
+                Test-PathWithinRoot -Path $executablePath -ExpectedRoot $_
+            }
+        ).Count -gt 0
     }
 
     if ($name -ieq "python.exe") {
-        return (Test-ContainsPath -Value $commandLine -Path (Join-Path $backendRoot "Scripts\dataset-studio-api.exe")) -or
-            (Test-ContainsPath -Value $commandLine -Path (Join-Path $backendRoot "Scripts\dataset-studio-worker.exe"))
+        foreach ($backendRoot in $backendRoots) {
+            if (
+                (Test-ContainsPath -Value $commandLine -Path (Join-Path $backendRoot "Scripts\dataset-studio-api.exe")) -or
+                (Test-ContainsPath -Value $commandLine -Path (Join-Path $backendRoot "Scripts\dataset-studio-worker.exe"))
+            ) {
+                return $true
+            }
+        }
+        return $false
     }
 
     if ($name -ieq "node.exe") {

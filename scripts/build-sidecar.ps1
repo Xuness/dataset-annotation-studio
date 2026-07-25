@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$Backend = Join-Path $Root "backend"
+$EnvironmentPath = Join-Path $Backend ".venv-$Runtime"
 $TargetTriple = (& rustc --print host-tuple).Trim()
 if (-not $TargetTriple) {
     throw "无法读取 Rust host target triple。"
@@ -15,7 +17,7 @@ if (-not $TargetTriple) {
 $Name = "dataset-studio-service-$TargetTriple"
 $ExecutableSuffix = if ($IsWindows) { ".exe" } else { "" }
 $ExecutableName = "$Name$ExecutableSuffix"
-$EntryPoint = Join-Path $Root "backend/src/dataset_studio/entrypoints/service.py"
+$EntryPoint = Join-Path $Backend "src/dataset_studio/entrypoints/service.py"
 $Binaries = Join-Path $Root "src-tauri/binaries"
 $WorkPath = Join-Path $Root "backend/build/pyinstaller"
 
@@ -56,10 +58,32 @@ if ($Runtime -eq "cuda") {
 }
 $PyInstallerArguments += $EntryPoint
 
-& uv run --project (Join-Path $Root "backend") --extra $Runtime --exact pyinstaller @PyInstallerArguments
+$HadUvProjectEnvironment = Test-Path Env:UV_PROJECT_ENVIRONMENT
+$PreviousUvProjectEnvironment = $env:UV_PROJECT_ENVIRONMENT
+$HadDatasetStudioRuntime = Test-Path Env:DATASET_STUDIO_RUNTIME
+$PreviousDatasetStudioRuntime = $env:DATASET_STUDIO_RUNTIME
+$BuildExitCode = 1
+try {
+    $env:UV_PROJECT_ENVIRONMENT = $EnvironmentPath
+    $env:DATASET_STUDIO_RUNTIME = $Runtime
+    Write-Host "Building $Runtime sidecar with environment: $EnvironmentPath"
+    & uv run --project $Backend --extra $Runtime --all-groups --locked --exact pyinstaller @PyInstallerArguments
+    $BuildExitCode = $LASTEXITCODE
+} finally {
+    if ($HadUvProjectEnvironment) {
+        $env:UV_PROJECT_ENVIRONMENT = $PreviousUvProjectEnvironment
+    } else {
+        Remove-Item Env:UV_PROJECT_ENVIRONMENT -ErrorAction SilentlyContinue
+    }
+    if ($HadDatasetStudioRuntime) {
+        $env:DATASET_STUDIO_RUNTIME = $PreviousDatasetStudioRuntime
+    } else {
+        Remove-Item Env:DATASET_STUDIO_RUNTIME -ErrorAction SilentlyContinue
+    }
+}
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Python sidecar 构建失败，退出码：$LASTEXITCODE"
+if ($BuildExitCode -ne 0) {
+    throw "Python sidecar 构建失败，退出码：$BuildExitCode"
 }
 
 $Executable = Join-Path $Binaries $ExecutableName

@@ -1,6 +1,9 @@
 [CmdletBinding()]
 param(
+    [ValidateSet("auto", "cpu", "cuda")]
+    [string]$Runtime = "auto",
     [switch]$CheckOnly,
+    [switch]$SkipSync,
     [string]$FailurePath
 )
 
@@ -13,6 +16,10 @@ $DevMutex = $null
 $OwnsDevMutex = $false
 $TranscriptStarted = $false
 $PreviousCargoIncremental = $env:CARGO_INCREMENTAL
+$HadUvProjectEnvironment = Test-Path Env:UV_PROJECT_ENVIRONMENT
+$PreviousUvProjectEnvironment = $env:UV_PROJECT_ENVIRONMENT
+$HadDatasetStudioRuntime = Test-Path Env:DATASET_STUDIO_RUNTIME
+$PreviousDatasetStudioRuntime = $env:DATASET_STUDIO_RUNTIME
 $ExitCode = 0
 
 $LogDirectory = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "DatasetAnnotationStudio\logs"
@@ -37,6 +44,97 @@ function Assert-LastExitCode {
     if ($LASTEXITCODE -ne 0) {
         throw "$Step 失败，退出码：$LASTEXITCODE"
     }
+}
+
+function Test-NvidiaCudaDevice {
+    $nvidiaSmi = Get-Command "nvidia-smi" -ErrorAction SilentlyContinue
+    if (-not $nvidiaSmi) {
+        return $false
+    }
+
+    try {
+        $deviceIds = @(
+            & $nvidiaSmi.Source "--query-gpu=index" "--format=csv,noheader,nounits" 2>$null
+        )
+        if ($LASTEXITCODE -ne 0) {
+            return $false
+        }
+        return @($deviceIds | Where-Object { $_ -match "^\s*\d+\s*$" }).Count -gt 0
+    } catch {
+        return $false
+    }
+}
+
+function Resolve-DevRuntime {
+    if ($Runtime -eq "cpu") {
+        return "cpu"
+    }
+
+    $cudaDeviceAvailable = Test-NvidiaCudaDevice
+    if ($Runtime -eq "cuda" -and -not $cudaDeviceAvailable) {
+        throw "显式请求了 CUDA Runtime，但没有检测到可用的 NVIDIA CUDA 设备。请检查驱动，或使用 -Runtime cpu。"
+    }
+    if ($cudaDeviceAvailable) {
+        return "cuda"
+    }
+    return "cpu"
+}
+
+function Assert-BackendEntrypoints {
+    param(
+        [Parameter(Mandatory)]
+        [string]$EnvironmentPath,
+        [Parameter(Mandatory)]
+        [string]$SelectedRuntime
+    )
+
+    $entrypoints = @("dataset-studio-api.exe", "dataset-studio-worker.exe")
+    $missing = @(
+        $entrypoints | Where-Object {
+            -not (Test-Path -LiteralPath (Join-Path $EnvironmentPath "Scripts\$_") -PathType Leaf)
+        }
+    )
+    if (-not $missing) {
+        return
+    }
+
+    $detail = $missing -join ", "
+    if ($SkipSync) {
+        throw "Python $SelectedRuntime 环境缺少后端入口：$detail。当前使用了 -SkipSync，请先去掉该参数完成依赖同步。"
+    }
+    throw "Python $SelectedRuntime 环境缺少后端入口：$detail。请重新同步该运行时环境。"
+}
+
+function Assert-CudaRuntime {
+    param([Parameter(Mandatory)][string]$EnvironmentPath)
+
+    $python = Join-Path $EnvironmentPath "Scripts\python.exe"
+    $probe = @'
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"CUDA path could not be detected\..*",
+    category=UserWarning,
+)
+import cupy as cp
+import onnxruntime as ort
+
+providers = ort.get_available_providers()
+if "CUDAExecutionProvider" not in providers:
+    raise SystemExit(
+        "ONNX Runtime 未提供 CUDAExecutionProvider：" + ", ".join(providers)
+    )
+if cp.cuda.runtime.getDeviceCount() < 1:
+    raise SystemExit("CuPy 没有检测到 CUDA 设备。")
+with cp.cuda.Device(0):
+    value = int(cp.arange(16, dtype=cp.int32).sum().get())
+if value != 120:
+    raise SystemExit(f"CuPy CUDA 探针结果异常：{value}")
+'@
+
+    & $python -c $probe
+    Assert-LastExitCode -Step "CUDA Runtime 探测"
 }
 
 function Enter-DevSession {
@@ -116,16 +214,33 @@ try {
 
     Push-Location $Root
     try {
-        Write-Host "[Dataset Studio] 检查前端依赖..." -ForegroundColor Cyan
-        & pnpm install --frozen-lockfile --prefer-offline --reporter=append-only
-        Assert-LastExitCode -Step "前端依赖同步"
+        $selectedRuntime = Resolve-DevRuntime
+        $environmentPath = Join-Path $Backend ".venv-$selectedRuntime"
+        $env:UV_PROJECT_ENVIRONMENT = $environmentPath
+        $env:DATASET_STUDIO_RUNTIME = $selectedRuntime
 
-        Write-Host "[Dataset Studio] 检查 Python 环境..." -ForegroundColor Cyan
-        & uv sync --project $Backend --extra cpu --all-groups --locked --exact
-        Assert-LastExitCode -Step "Python 依赖同步"
+        Write-Host "[Dataset Studio] Runtime：$selectedRuntime" -ForegroundColor Cyan
+        Write-Host "[Dataset Studio] Python 环境：$environmentPath" -ForegroundColor DarkCyan
+
+        if (-not $SkipSync) {
+            Write-Host "[Dataset Studio] 检查前端依赖..." -ForegroundColor Cyan
+            & pnpm install --frozen-lockfile --prefer-offline --reporter=append-only
+            Assert-LastExitCode -Step "前端依赖同步"
+
+            Write-Host "[Dataset Studio] 同步 Python $selectedRuntime Runtime..." -ForegroundColor Cyan
+            & uv sync --project $Backend --extra $selectedRuntime --all-groups --locked --exact
+            Assert-LastExitCode -Step "Python $selectedRuntime 依赖同步"
+        }
+
+        Assert-BackendEntrypoints `
+            -EnvironmentPath $environmentPath `
+            -SelectedRuntime $selectedRuntime
+        if ($selectedRuntime -eq "cuda") {
+            Assert-CudaRuntime -EnvironmentPath $environmentPath
+        }
 
         if ($CheckOnly) {
-            Write-Host "[Dataset Studio] 开发环境检查通过。" -ForegroundColor Green
+            Write-Host "[Dataset Studio] 开发环境检查通过（runtime=$selectedRuntime）。" -ForegroundColor Green
             return
         }
 
@@ -137,7 +252,11 @@ try {
         # Windows 上被强制中断的 Rust 增量缓存偶尔会让后续链接永久等待。
         # 桌面壳很小，禁用其增量编译可换取更稳定的双击启动；Cargo 仍会复用完整构建产物。
         $env:CARGO_INCREMENTAL = "0"
-        & pnpm dev
+        if ($selectedRuntime -eq "cuda") {
+            & pnpm dev
+        } else {
+            & pnpm dev:cpu
+        }
         Assert-LastExitCode -Step "Dataset Studio"
     } finally {
         Pop-Location
@@ -159,6 +278,16 @@ try {
         Remove-Item Env:CARGO_INCREMENTAL -ErrorAction SilentlyContinue
     } else {
         $env:CARGO_INCREMENTAL = $PreviousCargoIncremental
+    }
+    if ($HadUvProjectEnvironment) {
+        $env:UV_PROJECT_ENVIRONMENT = $PreviousUvProjectEnvironment
+    } else {
+        Remove-Item Env:UV_PROJECT_ENVIRONMENT -ErrorAction SilentlyContinue
+    }
+    if ($HadDatasetStudioRuntime) {
+        $env:DATASET_STUDIO_RUNTIME = $PreviousDatasetStudioRuntime
+    } else {
+        Remove-Item Env:DATASET_STUDIO_RUNTIME -ErrorAction SilentlyContinue
     }
 
     if ($TranscriptStarted) {

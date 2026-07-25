@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import warnings
 from functools import lru_cache
 from typing import Any
 
@@ -21,7 +22,16 @@ class CudaResizeError(RuntimeError):
 @lru_cache(maxsize=1)
 def load_cupy() -> tuple[Any | None, str | None]:
     try:
-        import cupy as cp
+        # The CUDA extra intentionally uses wheel-provided runtime/NVRTC libraries
+        # without requiring a full CUDA Toolkit installation. CuPy warns about the
+        # missing toolkit path even when this self-contained runtime is healthy.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"CUDA path could not be detected\..*",
+                category=UserWarning,
+            )
+            import cupy as cp
     except Exception as error:
         return None, f"未安装或无法加载 CuPy CUDA Runtime：{error}"
     return cp, None
