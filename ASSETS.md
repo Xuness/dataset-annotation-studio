@@ -16,8 +16,9 @@ To the extent that copyright or related rights in these assets exist and are hel
 project author, the assets are licensed under the
 [Apache License 2.0](LICENSE) together with the project.
 
-Model weights, user-supplied backgrounds, downloaded tagger weights, dependency logos,
-product names, and third-party trademarks are not covered by this statement. The use of
+Model weights, user-supplied backgrounds, downloaded tagger weights, downloaded Tag
+dictionaries and their entries, dependency logos, product names, and third-party
+trademarks are not covered by this statement. The use of
 AI-assisted tools does not transfer the licenses of those tools or model weights into
 the generated project files, and this provenance statement is not a warranty regarding
 the laws of every jurisdiction.

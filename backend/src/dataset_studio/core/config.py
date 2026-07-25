@@ -41,14 +41,19 @@ class Settings:
     port: int
     workspace_dir_name: str = WORKSPACE_DIR_NAME
     thumbnail_size: int = 320
+    source_root: Path | None = None
 
     @classmethod
     def from_environment(cls) -> Settings:
         configured_app_data = os.environ.get("DATASET_STUDIO_APP_DATA")
+        configured_source_root = os.environ.get("DATASET_STUDIO_SOURCE_ROOT")
         return cls(
             app_data_dir=Path(configured_app_data or _default_app_data_dir()).resolve(),
             host=os.environ.get("DATASET_STUDIO_HOST", "127.0.0.1"),
             port=int(os.environ.get("DATASET_STUDIO_PORT", "8765")),
+            source_root=(
+                Path(configured_source_root).resolve() if configured_source_root else None
+            ),
         )
 
     def ensure_directories(self) -> None:

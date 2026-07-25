@@ -17,6 +17,9 @@ from dataset_studio.modules.jobs.execution_repository import (
     JobExecutionRepository,
 )
 from dataset_studio.modules.jobs.execution_snapshot import load_execution_snapshot
+from dataset_studio.modules.jobs.executors.local_dictionary import (
+    LocalDictionaryJobExecutor,
+)
 from dataset_studio.modules.jobs.executors.local_tagger import LocalTaggerJobExecutor
 from dataset_studio.modules.jobs.executors.provider import ProviderJobExecutor
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
@@ -27,6 +30,7 @@ from dataset_studio.modules.providers.base import ModelProvider
 from dataset_studio.modules.providers.codex_runtime import CodexRuntime
 from dataset_studio.modules.providers.config import ProviderType
 from dataset_studio.modules.providers.factory import create_provider
+from dataset_studio.modules.tag_dictionaries.service import TagDictionaryService
 from dataset_studio.modules.taggers.models import TaggerExecutionProfile
 from dataset_studio.modules.taggers.runtime import TaggerRuntime
 from dataset_studio.modules.translations.service import TranslationService
@@ -48,6 +52,7 @@ class AnnotationWorkerContainer(Protocol):
     preprocessing: PreprocessService
     codex: CodexRuntime
     tagger_runtime: TaggerRuntime
+    tag_dictionaries: TagDictionaryService
 
 
 class AnnotationWorker:
@@ -63,6 +68,7 @@ class AnnotationWorker:
         self._active: set[asyncio.Task[None]] = set()
         self._active_profiles: dict[asyncio.Task[None], str] = {}
         self._local_tagger_executor = LocalTaggerJobExecutor(container)
+        self._local_dictionary_executor = LocalDictionaryJobExecutor(container)
         self._provider_executor = ProviderJobExecutor(
             container,
             resolved_provider_factory,
@@ -238,14 +244,23 @@ class AnnotationWorker:
         repository = JobExecutionRepository(database_path)
         item_id = str(item["id"])
         try:
-            await self._provider_executor.process_item(
-                project_id,
-                workspace_root,
-                runs_root,
-                job,
-                item,
-                repository,
-            )
+            backend = ExecutionBackend(str(job.get("execution_backend") or "provider"))
+            if backend == ExecutionBackend.LOCAL_DICTIONARY:
+                await self._local_dictionary_executor.process_item(
+                    project_id,
+                    job,
+                    item,
+                    repository,
+                )
+            else:
+                await self._provider_executor.process_item(
+                    project_id,
+                    workspace_root,
+                    runs_root,
+                    job,
+                    item,
+                    repository,
+                )
         except asyncio.CancelledError:
             with suppress(Exception):
                 repository.finish_item(item_id, JobItemStatus.INTERRUPTED)

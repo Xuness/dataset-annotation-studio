@@ -193,12 +193,32 @@ export function ExportSettingsPanel({
                       updateSelection(index, {
                         translation_source_kind: event.target
                           .value as ExportChannelSelection["translation_source_kind"],
-                        translation_producer_kind: "llm",
+                        translation_producer_kind:
+                          event.target.value === "description"
+                            ? "llm"
+                            : selection.translation_producer_kind,
                       })
                     }
                   >
                     <option value="description">LLM 描述</option>
                     <option value="tags">Tags</option>
+                  </select>
+                  <select
+                    aria-label={`译文生成方式 ${index + 1}`}
+                    value={selection.translation_producer_kind ?? "llm"}
+                    onChange={(event) =>
+                      updateSelection(index, {
+                        translation_producer_kind: event.target
+                          .value as ExportChannelSelection["translation_producer_kind"],
+                        translation_source_kind:
+                          event.target.value === "local_dictionary"
+                            ? "tags"
+                            : selection.translation_source_kind,
+                      })
+                    }
+                  >
+                    <option value="llm">LLM 翻译</option>
+                    <option value="local_dictionary">本地 Tag 词典</option>
                   </select>
                   <input
                     aria-label={`译文语言 ${index + 1}`}

@@ -1042,6 +1042,7 @@ function desktopJobs(overrides: Partial<ActiveDesktopJobs> = {}): ActiveDesktopJ
     export_count: 0,
     asset_deletion_count: 0,
     tagger_download_count: 0,
+    tag_dictionary_download_count: 0,
     ...overrides,
   };
 }

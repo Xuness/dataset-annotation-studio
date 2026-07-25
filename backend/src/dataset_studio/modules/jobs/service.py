@@ -31,10 +31,12 @@ from dataset_studio.modules.jobs.query_repository import JobQueryRepository
 from dataset_studio.modules.jobs.repository import JobCreationRepository
 from dataset_studio.modules.presets.models import TranslationPromptPreset
 from dataset_studio.modules.presets.service import PresetService
+from dataset_studio.modules.tag_dictionaries.service import TagDictionaryService
 from dataset_studio.modules.taggers.models import TaggerExecutionProfile
 from dataset_studio.modules.taggers.service import TaggerService
 from dataset_studio.modules.translations.identity import (
     DEFAULT_TRANSLATION_PRODUCER_KIND,
+    TranslationProducerKind,
     TranslationSourceKind,
 )
 from dataset_studio.modules.translations.prompt import (
@@ -53,12 +55,14 @@ class JobService:
         annotations: AnnotationService,
         translations: TranslationService | None = None,
         taggers: TaggerService | None = None,
+        tag_dictionaries: TagDictionaryService | None = None,
     ) -> None:
         self._workspaces = workspaces
         self._presets = presets
         self._annotations = annotations
         self._translations = translations or TranslationService(workspaces, annotations)
         self._taggers = taggers
+        self._tag_dictionaries = tag_dictionaries
 
     def create(
         self,
@@ -71,6 +75,11 @@ class JobService:
             if self._taggers is None:
                 raise ValueError("当前本地服务没有启用本地打标器模块。")
             with self._taggers.catalog_guard():
+                return self._create(project_id, request, include_items=include_items)
+        if request.execution_backend == ExecutionBackend.LOCAL_DICTIONARY:
+            if self._tag_dictionaries is None:
+                raise ValueError("当前本地服务没有启用本地 Tag 词典模块。")
+            with self._tag_dictionaries.catalog_guard():
                 return self._create(project_id, request, include_items=include_items)
         return self._create(project_id, request, include_items=include_items)
 
@@ -117,6 +126,53 @@ class JobService:
             user_prompt_snapshot = ""
             json_fields_snapshot = "[]"
             overwrite_existing = request.overwrite_existing
+            retry_limit = 0
+        elif request.execution_backend == ExecutionBackend.LOCAL_DICTIONARY:
+            assert self._tag_dictionaries is not None
+            output_channel = AnnotationChannel.TRANSLATION
+            language = self._translations.normalize_language(request.target_language)
+            source_kind = TranslationSourceKind.TAGS
+            producer_kind = TranslationProducerKind.LOCAL_DICTIONARY
+            local_snapshot = self._tag_dictionaries.execution_profile(language)
+            if not local_snapshot.sources and local_snapshot.override_count == 0:
+                raise ValueError("当前语言没有已启用的本地词典或修正词条。")
+            execution_profile_id = local_snapshot.id
+            execution_snapshot = local_snapshot.model_dump_json()
+            provider_profile_id = ""
+            provider_snapshot_json = "{}"
+            system_preset_id = ""
+            system_prompt_snapshot = json.dumps(
+                {
+                    "id": "",
+                    "name": local_snapshot.name,
+                    "system_prompt": "",
+                },
+                ensure_ascii=False,
+            )
+            configuration = {
+                "target_language": language,
+                "translation_policy": request.translation_policy.value,
+                "translation_source_kind": source_kind.value,
+                "translation_producer_kind": producer_kind.value,
+            }
+            output_language = language
+            output_translation_source_kind = source_kind.value
+            output_translation_producer_kind = producer_kind.value
+            asset_ids = self._select_translation_assets(
+                project_id,
+                paths.database,
+                request.scope,
+                request.asset_ids,
+                language=language,
+                policy=request.translation_policy,
+                source_kind=source_kind,
+                producer_kind=producer_kind,
+            )
+            if not asset_ids:
+                raise ValueError("当前范围内没有符合策略且带有 Tags 的素材可翻译。")
+            user_prompt_snapshot = ""
+            json_fields_snapshot = "[]"
+            overwrite_existing = request.translation_policy == ExistingTranslationPolicy.OVERWRITE
             retry_limit = 0
         else:
             assert request.provider_profile_id is not None
@@ -175,6 +231,7 @@ class JobService:
                     language=language,
                     policy=request.translation_policy,
                     source_kind=source_kind,
+                    producer_kind=producer_kind,
                 )
                 if not asset_ids:
                     raise ValueError("当前范围内没有符合策略且带有源标注的素材可翻译。")
@@ -585,6 +642,7 @@ class JobService:
         language: str,
         policy: ExistingTranslationPolicy,
         source_kind: TranslationSourceKind,
+        producer_kind: TranslationProducerKind = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> list[str]:
         unique_ids = list(dict.fromkeys(selected_ids)) if scope == JobScope.SELECTED else []
         if scope == JobScope.SELECTED and not unique_ids:
@@ -625,5 +683,5 @@ class JobService:
             language,
             policy.value,
             source_kind=source_kind,
-            producer_kind=DEFAULT_TRANSLATION_PRODUCER_KIND,
+            producer_kind=producer_kind,
         )

@@ -11,7 +11,7 @@ export type JobItemStatus =
   "pending" | "running" | "succeeded" | "failed" | "interrupted" | "skipped" | "manually_accepted";
 
 export type JobKind = "annotation" | "translation";
-export type ExecutionBackend = "provider" | "local_tagger";
+export type ExecutionBackend = "provider" | "local_tagger" | "local_dictionary";
 export type ExistingTranslationPolicy = "skip" | "stale" | "overwrite";
 
 export interface JobSummary {

@@ -61,8 +61,14 @@ afterEach(() => {
 });
 
 describe("settings overview sections", () => {
-  test("registers appearance, presets, local taggers and diagnostics in stable order", () => {
-    expect(SETTINGS_SECTION_IDS).toEqual(["appearance", "presets", "taggers", "about"]);
+  test("registers appearance, presets, local models, dictionaries and diagnostics in stable order", () => {
+    expect(SETTINGS_SECTION_IDS).toEqual([
+      "appearance",
+      "presets",
+      "taggers",
+      "tag-dictionaries",
+      "about",
+    ]);
   });
 
   test("summarizes preset resources and deep-links into creation", async () => {

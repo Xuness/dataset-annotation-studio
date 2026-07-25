@@ -45,6 +45,18 @@ from dataset_studio.modules.providers.config import (
 )
 from dataset_studio.modules.providers.models import ProviderResponse
 from dataset_studio.modules.statistics.service import StatisticsService
+from dataset_studio.modules.tag_dictionaries.downloads.repository import (
+    TagDictionaryDownloadRepository,
+)
+from dataset_studio.modules.tag_dictionaries.downloads.service import (
+    TagDictionaryDownloadService,
+)
+from dataset_studio.modules.tag_dictionaries.models import (
+    TagDictionaryImportRequest,
+    TagDictionaryOverrideUpsert,
+)
+from dataset_studio.modules.tag_dictionaries.repository import TagDictionaryRepository
+from dataset_studio.modules.tag_dictionaries.service import TagDictionaryService
 from dataset_studio.modules.taggers.downloads.repository import TaggerDownloadRepository
 from dataset_studio.modules.taggers.downloads.service import TaggerDownloadService
 from dataset_studio.modules.taggers.models import (
@@ -170,17 +182,33 @@ def _runtime(tmp_path: Path):
     initialize_global_database(global_database)
     workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
     annotations = AnnotationService(workspaces)
-    translations = TranslationService(workspaces)
     secrets = MemorySecrets()
     presets = PresetService(PresetRepository(global_database), secrets)
     taggers = TaggerService(settings, TaggerRepository(global_database))
+    tag_dictionaries = TagDictionaryService(
+        settings,
+        TagDictionaryRepository(global_database),
+        taggers,
+    )
+    tag_dictionary_downloads = TagDictionaryDownloadService(
+        TagDictionaryDownloadRepository(global_database),
+        tag_dictionaries,
+    )
+    translations = TranslationService(workspaces, annotations, tag_dictionaries)
     tagger_downloads = TaggerDownloadService(
         TaggerDownloadRepository(global_database),
         taggers,
         secrets,
     )
     taggers.set_download_activity_check(tagger_downloads.repository.has_blocking_tasks)
-    jobs = JobService(workspaces, presets, annotations, translations, taggers)
+    jobs = JobService(
+        workspaces,
+        presets,
+        annotations,
+        translations,
+        taggers,
+        tag_dictionaries,
+    )
     assets = AssetService(workspaces)
     container = AppContainer(
         settings=settings,
@@ -197,6 +225,8 @@ def _runtime(tmp_path: Path):
         statistics=StatisticsService(workspaces),
         codex=CodexRuntime(),
         taggers=taggers,
+        tag_dictionaries=tag_dictionaries,
+        tag_dictionary_downloads=tag_dictionary_downloads,
         tagger_downloads=tagger_downloads,
         tagger_runtime=TaggerRuntime(taggers),
     )
@@ -684,6 +714,88 @@ async def test_worker_translates_annotation_without_sending_image(tmp_path: Path
     translation = container.translations.get(workspace.project_id, asset.id, "zh-CN")
     assert translation.status.value == "current"
     assert translation.provider_profile_name == "Fake translator"
+
+
+@pytest.mark.asyncio
+async def test_worker_generates_read_only_local_dictionary_translation_and_invalidates_it(
+    tmp_path: Path,
+) -> None:
+    container, workspaces, _, jobs = _runtime(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (48, 48), "white").save(project / "sample.png")
+    workspace, _ = workspaces.open(str(project))
+    asset = container.assets.list_assets(workspace.project_id).items[0]
+    container.annotations.save_tags(
+        workspace.project_id,
+        asset.id,
+        [
+            AnnotationTag(name="1girl", category="general", confidence=0.98),
+            AnnotationTag(name="unknown_tag", category="general", confidence=0.75),
+        ],
+    )
+    source = tmp_path / "Tags-zh-full-pack.csv"
+    source.write_text("1girl,一个女孩\n", encoding="utf-8")
+    container.tag_dictionaries.import_local(TagDictionaryImportRequest(path=str(source)))
+
+    created = jobs.create(
+        workspace.project_id,
+        JobCreateRequest(
+            execution_backend=ExecutionBackend.LOCAL_DICTIONARY,
+            kind=JobKind.TRANSLATION,
+            scope=JobScope.SELECTED,
+            asset_ids=[asset.id],
+            translation_source_kind="tags",
+            target_language="zh-CN",
+            translation_policy=ExistingTranslationPolicy.SKIP,
+        ),
+    )
+
+    provider = RecordingProvider()
+    worker = AnnotationWorker(container, provider_factory=lambda _kind: provider)
+    stopped = asyncio.Event()
+    worker_task = asyncio.create_task(worker.run(stopped))
+    try:
+        for _ in range(80):
+            current = jobs.get(workspace.project_id, created.id)
+            if current.status in {JobStatus.COMPLETED, JobStatus.COMPLETED_WITH_ERRORS}:
+                break
+            await asyncio.sleep(0.05)
+        else:
+            pytest.fail("worker did not complete the local dictionary job")
+    finally:
+        stopped.set()
+        await asyncio.wait_for(worker_task, timeout=2)
+
+    detail = jobs.get(workspace.project_id, created.id)
+    assert detail.status == JobStatus.COMPLETED
+    assert detail.execution_backend == ExecutionBackend.LOCAL_DICTIONARY
+    assert provider.requests == []
+    translation = container.translations.get(
+        workspace.project_id,
+        asset.id,
+        "zh-CN",
+        source_kind="tags",
+        producer_kind="local_dictionary",
+    )
+    assert translation.status.value == "current"
+    assert translation.content == "一个女孩\nunknown_tag"
+    assert translation.dictionary_unmatched_count == 1
+    assert translation.dictionary_sources[0].matched_count == 1
+
+    container.tag_dictionaries.upsert_override(
+        TagDictionaryOverrideUpsert(tag="unknown_tag", translation="未知标签")
+    )
+    stale = container.translations.get(
+        workspace.project_id,
+        asset.id,
+        "zh-CN",
+        source_kind="tags",
+        producer_kind="local_dictionary",
+    )
+    assert stale.status.value == "source_mismatch"
+    assert stale.content == ""
+    assert "本地词典或修正词条已经变化" in (stale.issue or "")
 
 
 @pytest.mark.asyncio

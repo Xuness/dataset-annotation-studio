@@ -4,6 +4,7 @@ import hashlib
 import json
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from dataset_studio.core.errors import AssetNotFoundError
 from dataset_studio.core.languages import normalize_language_code
@@ -36,6 +37,7 @@ from dataset_studio.modules.translations.identity import (
 from dataset_studio.modules.translations.models import (
     TranslationAlignmentPart,
     TranslationAlignmentStatus,
+    TranslationDictionarySource,
     TranslationDocument,
     TranslationStatus,
 )
@@ -48,6 +50,9 @@ from dataset_studio.modules.translations.validation import (
     parse_tag_translation_response,
 )
 from dataset_studio.modules.workspaces.service import WorkspaceService
+
+if TYPE_CHECKING:
+    from dataset_studio.modules.tag_dictionaries.service import TagDictionaryService
 
 _EXPECTED_VERSION_UNSET = object()
 
@@ -81,9 +86,11 @@ class TranslationService:
         self,
         workspaces: WorkspaceService,
         annotations: AnnotationService | None = None,
+        tag_dictionaries: TagDictionaryService | None = None,
     ) -> None:
         self._workspaces = workspaces
         self._annotations = annotations or AnnotationService(workspaces)
+        self._tag_dictionaries = tag_dictionaries
 
     def list(self, project_id: str, asset_id: str) -> list[TranslationDocument]:
         bundle = self._annotations.list(project_id, asset_id)
@@ -145,6 +152,26 @@ class TranslationService:
             if source is None
             else None
         )
+        metadata = self._revision_metadata(project_id, document.head_revision_id)
+        dictionary_resolution_hash = self._optional_text(metadata.get("dictionary_resolution_hash"))
+        current_dictionary_resolution_hash: str | None = None
+        current_dictionary_unmatched_count = 0
+        dictionary_mismatch = False
+        if (
+            source is not None
+            and normalized_source_kind == TranslationSourceKind.TAGS
+            and normalized_producer_kind == TranslationProducerKind.LOCAL_DICTIONARY
+            and self._tag_dictionaries is not None
+        ):
+            current_resolution = self._tag_dictionaries.resolve(
+                [tag.name for tag in source.tags],
+                language,
+            )
+            current_dictionary_resolution_hash = current_resolution.resolution_hash
+            current_dictionary_unmatched_count = current_resolution.unmatched_count
+            dictionary_mismatch = bool(
+                document.exists and dictionary_resolution_hash != current_dictionary_resolution_hash
+            )
         if invalid_source_issue:
             status = TranslationStatus.SOURCE_INVALID
         elif source is None:
@@ -153,7 +180,10 @@ class TranslationService:
             status = TranslationStatus.MISSING
         elif document.availability_status == AnnotationAvailabilityStatus.INVALID:
             status = TranslationStatus.INVALID
-        elif document.availability_status == AnnotationAvailabilityStatus.STALE:
+        elif (
+            document.availability_status == AnnotationAvailabilityStatus.STALE
+            or dictionary_mismatch
+        ):
             status = TranslationStatus.SOURCE_MISMATCH
         else:
             status = TranslationStatus.CURRENT
@@ -164,7 +194,11 @@ class TranslationService:
         visible_content = document.content
         if status == TranslationStatus.SOURCE_MISMATCH:
             visible_content = ""
-            issue = "当前不匹配：源标注已经变化，请重新翻译。旧译文仅保留在历史记录中。"
+            issue = (
+                "当前不匹配：本地词典或修正词条已经变化，请重新生成对照。旧译文仅保留在历史记录中。"
+                if dictionary_mismatch
+                else "当前不匹配：源标注已经变化，请重新翻译。旧译文仅保留在历史记录中。"
+            )
         elif source is not None and document.exists:
             valid, alignment_issue, raw_parts = self._align(
                 source,
@@ -178,7 +212,7 @@ class TranslationService:
                 issue = alignment_issue
                 status = TranslationStatus.INVALID
 
-        metadata = self._revision_metadata(project_id, document.head_revision_id)
+        dictionary_sources, dictionary_override_count = self._dictionary_provenance(metadata)
         return TranslationDocument(
             asset_id=asset_id,
             language=language,
@@ -203,6 +237,11 @@ class TranslationService:
             provider_profile_id=self._optional_text(metadata.get("provider_profile_id")),
             provider_profile_name=self._optional_text(metadata.get("provider_profile_name")),
             model=self._optional_text(metadata.get("model")),
+            dictionary_resolution_hash=dictionary_resolution_hash,
+            current_dictionary_resolution_hash=current_dictionary_resolution_hash,
+            dictionary_sources=dictionary_sources,
+            dictionary_override_count=dictionary_override_count,
+            dictionary_unmatched_count=current_dictionary_unmatched_count,
             modified_at=document.head_revision_id,
             updated_at=document.updated_at,
             issue=issue,
@@ -282,6 +321,8 @@ class TranslationService:
         lease_owner_id: str | None = None,
         source_job_item_id: str | None = None,
         allow_candidate_on_conflict: bool = True,
+        producer_metadata: dict[str, object] | None = None,
+        content_is_normalized: bool = False,
     ) -> TranslationDocument:
         language = self.normalize_language(language)
         normalized_source_kind = TranslationSourceKind(source_kind)
@@ -301,10 +342,14 @@ class TranslationService:
             if source.content_hash != expected_source_hash:
                 raise TranslationSourceChangedError("源标注在翻译期间发生变化，未写入旧译文。")
 
-            valid, validation_status, stored_content = self._normalize_generated_content(
-                source,
-                content,
-            )
+            if content_is_normalized:
+                valid, validation_status, _ = self._align(source, content)
+                stored_content = content
+            else:
+                valid, validation_status, stored_content = self._normalize_generated_content(
+                    source,
+                    content,
+                )
             if not valid and not manually_accepted:
                 raise ValueError(validation_status)
             if not valid:
@@ -335,6 +380,7 @@ class TranslationService:
                 source_job_item_id=source_job_item_id,
                 input_revisions=((source.revision_id, "translation_source"),),
                 metadata={
+                    **(producer_metadata or {}),
                     "source_content_hash": source.content_hash,
                     "translation_source_kind": normalized_source_kind.value,
                     "translation_producer_kind": normalized_producer_kind.value,
@@ -375,6 +421,11 @@ class TranslationService:
         language = self.normalize_language(language)
         normalized_source_kind = TranslationSourceKind(source_kind)
         normalized_producer_kind = TranslationProducerKind(producer_kind)
+        if (
+            normalized_producer_kind == TranslationProducerKind.LOCAL_DICTIONARY
+            and normalized_source_kind == TranslationSourceKind.TAGS
+        ):
+            raise ValueError("本地词典译文为只读结果，请通过修正词条后重新生成。")
         paths, _ = self._workspaces.get(project_id)
         with hold_output_resources(
             paths.database,
@@ -454,6 +505,22 @@ class TranslationService:
         ordered_ids = list(dict.fromkeys(asset_id for asset_id in asset_ids if asset_id))
         if not ordered_ids:
             return []
+        if (
+            normalized_producer_kind == TranslationProducerKind.LOCAL_DICTIONARY
+            and policy == "stale"
+        ):
+            return [
+                asset_id
+                for asset_id in ordered_ids
+                if self.should_translate(
+                    project_id,
+                    asset_id,
+                    language,
+                    policy,
+                    source_kind=normalized_source_kind,
+                    producer_kind=normalized_producer_kind,
+                )
+            ]
         paths, _ = self._workspaces.get(project_id)
         selected: set[str] = set()
         connection = connect(paths.database)
@@ -544,6 +611,40 @@ class TranslationService:
             return {}
         paths, _ = self._workspaces.get(project_id)
         return AnnotationRepository(paths.database).revision_metadata(revision_id)
+
+    @staticmethod
+    def _dictionary_provenance(
+        metadata: dict[str, object],
+    ) -> tuple[list[TranslationDictionarySource], int]:
+        raw_entries = metadata.get("dictionary_entries")
+        if not isinstance(raw_entries, list):
+            return [], 0
+        sources: dict[str, TranslationDictionarySource] = {}
+        override_count = 0
+        for raw_entry in raw_entries:
+            if not isinstance(raw_entry, dict):
+                continue
+            source_kind = str(raw_entry.get("source_kind") or "")
+            if source_kind == "override":
+                override_count += 1
+                continue
+            installation_id = str(raw_entry.get("installation_id") or "")
+            if source_kind != "dictionary" or not installation_id:
+                continue
+            existing = sources.get(installation_id)
+            if existing is not None:
+                sources[installation_id] = existing.model_copy(
+                    update={"matched_count": existing.matched_count + 1}
+                )
+                continue
+            sources[installation_id] = TranslationDictionarySource(
+                installation_id=installation_id,
+                name=str(raw_entry.get("installation_name") or "本地词典"),
+                adapter_id=TranslationService._optional_text(raw_entry.get("adapter_id")),
+                source_version=TranslationService._optional_text(raw_entry.get("source_version")),
+                matched_count=1,
+            )
+        return list(sources.values()), override_count
 
     def _invalid_source_issue(
         self,

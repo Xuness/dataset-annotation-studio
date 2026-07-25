@@ -18,10 +18,12 @@ flowchart LR
     Worker["持久化任务 Worker"] --> Core
     Worker --> Provider["模型供应商适配器"]
     Worker --> Tagger["本地 Tagger Runtime"]
+    Worker --> Dictionary["本地 Tag 词典解析器"]
     Worker --> HuggingFace["Hugging Face 审核下载源"]
     Core --> Project["项目文件夹与项目 SQLite"]
     Core --> Global["全局预设 / Tagger SQLite 与系统凭据存储"]
     Tagger --> ModelLibrary["本机受管模型库"]
+    Dictionary --> DictionaryLibrary["源码根目录 dictionaries/"]
     Tauri["Tauri 桌面生命周期"] --> UI
     Tauri --> Sidecar["发行版 Python sidecar"]
     Sidecar --> API
@@ -46,6 +48,8 @@ Windows 主窗口的关闭请求只隐藏窗口，不销毁 WebView，也不停�
 - `modules/presets`：全局 System Prompt / 模型连接聚合的持久化；API 密钥通过 `SecretStore` 隔离。
 - `modules/providers`：供应商协议类型、单模型参数、统一 `ModelProvider` 协议、各供应商适配器，以及惰性共享的 Codex Runtime。
 - `modules/taggers`：本地模型适配器注册、受管安装、完整性清单、审核下载计划、全局下载队列、可复用打标配置与惰性 ONNX Runtime；不依赖页面或项目任务仓储。
+- `modules/tag_dictionaries`：第三方 Tag 词典适配器、只读规范化索引、来源与许可证清单、
+  固定版本下载、全局修正词条、优先级解析和逐图解析指纹；不改写上游词典。
 - `modules/jobs`：标注/翻译任务创建、通用执行后端与配置快照、查询投影、原子认领、尝试记录和单图调用追踪；Worker 只负责任务调度，本地 Tagger 与供应商请求由独立执行器处理。
 - `modules/preprocessing`：计划、图像渲染、恢复记录和撤销编排。
 - `modules/exports`：通道与修订快照、TXT / JSON 物化计划、目标冲突检查、持久化进度和可停止/继续的 Worker。
@@ -57,7 +61,7 @@ Windows 主窗口的关闭请求只隐藏窗口，不销毁 WebView，也不停�
 
 ## 数据库标注存储
 
-`annotation_documents` 按“素材 + 通道 + 语言”定义逻辑文档，
+`annotation_documents` 按“素材 + 通道 + 语言 + 翻译源类型 + 译文生产者”定义逻辑文档，
 `annotation_document_revisions` 保存不可变修订；文本和 Tags 分别进入
 `annotation_text_contents` 与 `annotation_tag_items`。文档只保存当前 head 和已人工复核 revision
 指针，删除使用墓碑修订。生成修订还通过 `annotation_revision_inputs` 记录所依赖的 Tag 或翻译源修订。
@@ -100,9 +104,11 @@ TXT 作为活动状态，也不删除旧文件。
 因此之后修改连接、默认模型或其它模型都不会改变已创建任务。旧任务快照由
 `modules/jobs/provider_snapshot.py` 在读取时兼容转换，不原地改写项目历史。
 
-任务表以 `execution_backend` 区分远端 `provider` 与 `local_tagger`，并把具体执行配置写入统一的
+任务表以 `execution_backend` 区分远端 `provider`、`local_tagger` 与
+`local_dictionary`，并把具体执行配置写入统一的
 `execution_snapshot`。旧项目迁移时会把已有供应商字段回填为通用执行字段，原供应商快照仍保留用于兼容；
-本地 Tagger 任务不需要 Prompt、API 凭据或网络请求，翻译任务则继续强制使用供应商后端。
+本地 Tagger 和本地词典任务都不需要 Prompt、API 凭据或网络请求；本地词典只接受 Tags
+作为翻译源，并写入独立的 `local_dictionary` 译文版本。
 
 OpenAI 兼容连接通过标准 `GET {base_url}/models` 拉取目录，并在本地按模型 ID、名称和描述搜索。
 标准目录通常不声明输入模态、参数或推理档位，界面会明确标记能力未知，且不会把缺失元数据解释为不支持。
@@ -178,6 +184,24 @@ Runtime 只在 Worker 真正处理本地任务时加载 ONNX Session，并用单
 或在执行期间失效，则重建或切换为纯 CPU Session。显式选择 CUDA 时保持严格失败，不会把 CPU 降级伪装成
 GPU 执行；DirectML 仍作为替代 Runtime 构建可用时的兼容设备。
 单图产物仍进入统一的 `runs/` 追踪结构，其中保存阈值、类别、设备、标签置信度和推理耗时，不保存图片副本。
+
+## 本地 Tag 词典库
+
+源码启动器通过 `DATASET_STUDIO_SOURCE_ROOT` 把默认词典库固定到仓库根目录
+`dictionaries/`，与 `models/` 同级；全局 SQLite 保存这一首次解析结果，后续 Tagger
+模型库位置变化不会悄悄搬动词典。非源码运行方式没有该变量时，回退到应用数据目录。
+
+词典适配器只负责读取受支持的 ffdkj SQLite、WeiLin SQL/ZIP、TagComplete 中文 CSV 和
+licyk CSV。导入先把必要原始文件复制到受管暂存目录，ZIP 使用文件数、解压体积、路径穿越
+和符号链接限制安全展开；WeiLin SQL 由严格语法解析器读取而不执行。随后统一建立只读
+`dictionary.sqlite3`，计算语义指纹、文件 SHA-256 和版本化 `installation.json`，再原子
+提升到 `installations/<id>/`。下载队列只为许可证状态和固定校验值均可审计的来源提供直接
+下载；授权未声明的来源只打开上游页面并允许用户手动导入。
+
+查询顺序固定为“用户修正 → 启用词典优先级 → 原 Tag 回退”。本地词典任务逐图保存实际
+命中来源、修正版本、未命中数和解析哈希。读取译文时会用当前 Tags 和当前词典重新计算该
+哈希；只有本图实际解析结果变化时才隐藏旧译文并显示“当前不匹配”。词典译文在标注区
+只读，用户必须修改全局修正词条后重新生成，以免项目译文和词典真值产生不可追踪分叉。
 
 ## 平台路径与应用数据
 

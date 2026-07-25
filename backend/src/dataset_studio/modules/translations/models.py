@@ -35,6 +35,14 @@ class TranslationAlignmentPart(BaseModel):
     confidence: float | None = None
 
 
+class TranslationDictionarySource(BaseModel):
+    installation_id: str
+    name: str
+    adapter_id: str | None = None
+    source_version: str | None = None
+    matched_count: int = Field(ge=1)
+
+
 class TranslationDocument(BaseModel):
     asset_id: str
     language: str
@@ -57,6 +65,11 @@ class TranslationDocument(BaseModel):
     provider_profile_id: str | None = None
     provider_profile_name: str | None = None
     model: str | None = None
+    dictionary_resolution_hash: str | None = None
+    current_dictionary_resolution_hash: str | None = None
+    dictionary_sources: list[TranslationDictionarySource] = Field(default_factory=list)
+    dictionary_override_count: int = Field(default=0, ge=0)
+    dictionary_unmatched_count: int = Field(default=0, ge=0)
     modified_at: str | None = None
     updated_at: str | None = None
     issue: str | None = None

@@ -12,6 +12,9 @@ from dataset_studio.core.config import settings
 from dataset_studio.modules.exports.worker import ExportWorker
 from dataset_studio.modules.jobs.worker import AnnotationWorker
 from dataset_studio.modules.output_resources import configure_output_resource_owner
+from dataset_studio.modules.tag_dictionaries.downloads.worker import (
+    TagDictionaryDownloadWorker,
+)
 from dataset_studio.modules.taggers.downloads.worker import TaggerDownloadWorker
 
 
@@ -22,10 +25,12 @@ async def run_service() -> None:
     annotation_worker = AnnotationWorker(worker_container)
     export_worker = ExportWorker(worker_container)
     tagger_download_worker = TaggerDownloadWorker(worker_container)
+    tag_dictionary_download_worker = TagDictionaryDownloadWorker(worker_container)
     worker_tasks = (
         asyncio.create_task(annotation_worker.run(stopped)),
         asyncio.create_task(export_worker.run(stopped)),
         asyncio.create_task(tagger_download_worker.run(stopped)),
+        asyncio.create_task(tag_dictionary_download_worker.run(stopped)),
     )
     server = uvicorn.Server(
         uvicorn.Config(

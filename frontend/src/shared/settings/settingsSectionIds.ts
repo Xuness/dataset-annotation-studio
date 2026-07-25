@@ -1,4 +1,10 @@
-export const SETTINGS_SECTION_IDS = ["appearance", "presets", "taggers", "about"] as const;
+export const SETTINGS_SECTION_IDS = [
+  "appearance",
+  "presets",
+  "taggers",
+  "tag-dictionaries",
+  "about",
+] as const;
 
 export type SettingsSection = (typeof SETTINGS_SECTION_IDS)[number];
 

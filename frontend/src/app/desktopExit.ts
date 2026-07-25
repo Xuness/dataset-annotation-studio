@@ -10,6 +10,7 @@ export interface ActiveDesktopJobs {
   export_count: number;
   asset_deletion_count: number;
   tagger_download_count: number;
+  tag_dictionary_download_count: number;
 }
 
 interface WarningDialogOptions {
@@ -33,7 +34,8 @@ function stoppableJobCount(active: ActiveDesktopJobs): number {
     active.annotation_job_count +
     active.translation_job_count +
     active.export_count +
-    active.tagger_download_count
+    active.tagger_download_count +
+    active.tag_dictionary_download_count
   );
 }
 
@@ -73,7 +75,7 @@ export async function runDesktopExit(
     const stoppableJobs = stoppableJobCount(active);
     if (stoppableJobs) {
       const accepted = await dependencies.confirm(
-        `还有 ${stoppableJobs} 个标注、翻译、导出或模型下载任务尚未结束。关闭软件会安全停止任务并保留断点，仍要退出吗？`,
+        `还有 ${stoppableJobs} 个标注、翻译、导出、模型或词典下载任务尚未结束。关闭软件会安全停止任务并保留断点，仍要退出吗？`,
         { title: "停止任务并退出", kind: "warning" },
       );
       if (!accepted) return "cancelled";

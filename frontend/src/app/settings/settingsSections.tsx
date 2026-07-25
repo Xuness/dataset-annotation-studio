@@ -1,5 +1,5 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
-import { BadgeInfo, Cable, Palette, Tags, type LucideIcon } from "lucide-react";
+import { BadgeInfo, BookOpenText, Cable, Palette, Tags, type LucideIcon } from "lucide-react";
 
 import {
   type SettingsSection,
@@ -24,6 +24,11 @@ const AboutSettings = lazy(async () => {
 const TaggerSettings = lazy(async () => {
   const module = await import("./sections/TaggerSettings");
   return { default: module.TaggerSettings };
+});
+
+const TagDictionarySettings = lazy(async () => {
+  const module = await import("./sections/TagDictionarySettings");
+  return { default: module.TagDictionarySettings };
 });
 
 type SettingsSectionComponent = LazyExoticComponent<ComponentType<{ onClose: () => void }>>;
@@ -57,6 +62,13 @@ const sectionDefinitions = {
     icon: Tags,
     component: TaggerSettings,
     sidebarNote: "模型文件集中保存在本机模型库，所有数据集项目可以共享。",
+  },
+  "tag-dictionaries": {
+    id: "tag-dictionaries",
+    label: "本地 Tag 词典",
+    icon: BookOpenText,
+    component: TagDictionarySettings,
+    sidebarNote: "词典与修正词条为全局资源；下载内容受各自上游许可证约束。",
   },
   about: {
     id: "about",

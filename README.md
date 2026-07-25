@@ -13,6 +13,8 @@
 - 使用本地 ONNX Tagger，或 OpenRouter、OpenAI 兼容接口、OpenCode Go、Gemini、
   Codex 等外部提供方生成标注。
 - 在项目 SQLite 中分别管理原有标注、结构化 Tags、LLM 描述和多语言译文，独立保留当前可用性、人工复核状态与完整修订历史。
+- 可把 ffdkj、WeiLin Prompt、TagComplete 中文整合包和 licyk CSV 规范化为本地只读
+  Tag 词典；用户修正词条独立覆盖原库，无需把 Tags 发送给 LLM。
 - 校验通过且匹配当前图片的 Tagger、LLM 和翻译结果可立即用于后续流程；人工复核是可选的质量标记，素材页可按 Tags、LLM 描述、原有标注或具体译文语言批量复核与删除。
 - 可在素材页提示词配置中选择把当前可用 Tags 冻结后追加到 LLM User Prompt，并预览实际拼接内容；任务创建后的 Tag 编辑不会改变既有任务。
 - 批量缩放、格式转换、重命名、恢复与撤销，文件写入带预览和冲突检查；CUDA
@@ -122,7 +124,7 @@ CPU 编码；多帧、特殊位深、特殊颜色模式、低光晕算法或运�
   建议先备份。
 - API Key 和 Hugging Face 连接秘密通过操作系统凭据库保存，不写入项目 SQLite。
 - Codex OAuth 凭据由官方 Codex Runtime 管理，本应用不读取、复制或转发 Token。
-- 本地 Tagger 不上传图片。选择外部提供方后，对应图片、Prompt 和所选元数据会发送给该
+- 本地 Tagger 与本地 Tag 词典不上传图片或 Tags。选择外部提供方后，对应图片、Prompt 和所选元数据会发送给该
   提供方；费用、保留策略和使用条款由用户与提供方之间的协议决定。
 - 本项目未实现遥测或使用分析。Hugging Face 模型下载和用户主动发起的外部模型请求是
   明确的联网行为。
@@ -142,6 +144,10 @@ API 与批处理产品。
 
 可以通过 `DATASET_STUDIO_APP_DATA` 指定绝对路径。项目数据仍位于用户选择的数据集目录，
 不会迁入全局应用目录。
+
+源码启动器会把本地 Tag 词典保存在仓库根目录的 `dictionaries/`，与 `models/` 同级。
+该目录包含规范化索引、保留的原始来源、下载断点与安装清单，已从 Git 排除。词典文件及
+词条内容继续受各自上游许可证和来源条款约束。
 
 ## 常见问题
 
@@ -183,6 +189,7 @@ Linux 使用原生窗口边框，但默认保留与 Windows 相同的主题、�
 - [架构与模块边界](docs/architecture.md)
 - [工作区文件格式](docs/workspace-layout.md)
 - [模型许可证说明](docs/model-licenses.md)
+- [本地 Tag 词典来源与授权](docs/dictionary-licenses.md)
 - [贡献指南](CONTRIBUTING.md)
 - [安全报告方式](SECURITY.md)
 - [变更记录](CHANGELOG.md)

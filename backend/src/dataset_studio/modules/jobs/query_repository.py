@@ -15,6 +15,7 @@ from dataset_studio.modules.jobs.models import (
     JobSummary,
 )
 from dataset_studio.modules.providers.config import ProviderExecutionProfile
+from dataset_studio.modules.tag_dictionaries.models import TagDictionaryExecutionProfile
 from dataset_studio.modules.taggers.models import TaggerExecutionProfile
 
 
@@ -256,6 +257,13 @@ class JobQueryRepository:
         if isinstance(execution, TaggerExecutionProfile):
             execution_profile_name = execution.name
             model = execution.model_label
+            system_preset_id = None
+            system_preset_name = None
+            provider_profile_id = None
+            provider_profile_name = None
+        elif isinstance(execution, TagDictionaryExecutionProfile):
+            execution_profile_name = execution.name
+            model = f"{len(execution.sources)} 个已启用词典"
             system_preset_id = None
             system_preset_name = None
             provider_profile_id = None

@@ -23,6 +23,31 @@ export async function pickTaggerLibraryFolder(): Promise<string | null> {
   return pickFolder("选择本地打标器模型库", "输入本地打标器模型库的绝对路径：");
 }
 
+export async function pickTagDictionaryFile(): Promise<string | null> {
+  if (isTauriRuntime()) {
+    const selected = await open({
+      directory: false,
+      multiple: false,
+      title: "选择本地 Tag 词典文件",
+      filters: [
+        {
+          name: "支持的 Tag 词典",
+          extensions: ["csv", "sqlite", "sqlite3", "db", "sql", "zip"],
+        },
+      ],
+    });
+    return typeof selected === "string" ? selected : null;
+  }
+  return window.prompt("输入本地 Tag 词典文件的绝对路径：")?.trim() || null;
+}
+
+export async function pickTagDictionaryFolder(): Promise<string | null> {
+  return pickFolder(
+    "选择本地 Tag 词典目录",
+    "输入包含 WeiLin Prompt 或其它受支持词典的目录绝对路径：",
+  );
+}
+
 async function pickFolder(title: string, fallbackPrompt: string): Promise<string | null> {
   if (isTauriRuntime()) {
     const selected = await open({

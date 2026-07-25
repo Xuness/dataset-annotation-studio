@@ -145,7 +145,20 @@
 }
 
 .annotation-source-select {
-  width: 92px;
+  width: 112px;
+}
+
+.annotation-editor__readonly {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: var(--text-xs);
+  white-space: nowrap;
 }
 
 .translation-status {

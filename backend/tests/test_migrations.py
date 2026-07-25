@@ -43,6 +43,7 @@ EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS = {
     14: "ec00973ffc0b07c4a531fe343cd88ab98b29b1511267bac0facca10edb4fe78e",
     15: "75e040ea6904594889def8a785ceecd13a6b4e5cddd17b234e96ee9dd70afdd5",
     16: "9b7e99492fe535f035db23760d3903be63c374abb5f21c3161412542b59fa12b",
+    17: "ed30a1d11d3d3cf01a49aee9ee739778d20db94e956f7117190272c2e6c1d6c2",
 }
 
 
@@ -186,7 +187,7 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     }
     assert translation_prompt["name"] == "默认结构保留翻译"
     assert "{target_language}" in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 
 def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> None:
@@ -220,7 +221,115 @@ def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> 
 
     assert {"local_tagger_hf_settings", "local_tagger_downloads"}.issubset(tables)
     assert "idx_local_tagger_downloads_active_plan" in indexes
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+
+def test_global_dictionary_migration_adds_catalog_overrides_and_download_queue(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "global.sqlite3"
+    migrate_database(database, GLOBAL_MIGRATIONS[:11])
+
+    initialize_global_database(database)
+
+    connection = connect(database)
+    try:
+        tables = {
+            str(row["name"])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        indexes = {
+            str(row["name"])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index'"
+            ).fetchall()
+        }
+    finally:
+        connection.close()
+
+    assert {
+        "local_tag_dictionary_settings",
+        "local_tag_dictionary_installations",
+        "local_tag_dictionary_overrides",
+        "local_tag_dictionary_downloads",
+    }.issubset(tables)
+    assert "idx_local_tag_dictionary_downloads_active_offer" in indexes
+
+
+def test_local_dictionary_job_migration_preserves_jobs_and_expands_backend(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "workspace.sqlite3"
+    migrate_database(database, WORKSPACE_MIGRATIONS[:16])
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            INSERT INTO jobs (
+                id, status,
+                system_preset_id, system_prompt_snapshot,
+                provider_profile_id, provider_snapshot,
+                user_prompt_snapshot, json_fields_snapshot,
+                scope, created_at, updated_at,
+                kind, configuration_snapshot,
+                execution_backend, execution_profile_id, execution_snapshot,
+                output_channel, use_tags_as_context
+            ) VALUES (
+                'legacy-job', 'completed',
+                'preset', '{}',
+                'provider', '{}',
+                '', '[]',
+                'all', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z',
+                'annotation', '{}',
+                'provider', 'provider', '{}',
+                'description', 0
+            )
+            """
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    initialize_workspace_database(database)
+
+    connection = connect(database)
+    try:
+        legacy = connection.execute(
+            "SELECT execution_backend, status FROM jobs WHERE id = 'legacy-job'"
+        ).fetchone()
+        connection.execute(
+            """
+            INSERT INTO jobs (
+                id, status,
+                system_preset_id, system_prompt_snapshot,
+                provider_profile_id, provider_snapshot,
+                user_prompt_snapshot, json_fields_snapshot,
+                scope, created_at, updated_at,
+                kind, configuration_snapshot,
+                execution_backend, execution_profile_id, execution_snapshot,
+                output_channel, use_tags_as_context
+            ) VALUES (
+                'dictionary-job', 'queued',
+                '', '{}',
+                '', '{}',
+                '', '[]',
+                'all', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z',
+                'translation', '{}',
+                'local_dictionary', 'local_dictionary', '{}',
+                'translation', 0
+            )
+            """
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    assert dict(legacy) == {
+        "execution_backend": "provider",
+        "status": "completed",
+    }
 
 
 def test_recent_workspace_activity_migration_hides_duplicate_roots(

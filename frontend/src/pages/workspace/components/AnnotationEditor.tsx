@@ -27,6 +27,7 @@ import type {
   AnnotationChannelTarget,
   AnnotationDocument,
   AnnotationTag,
+  TranslationProducerKind,
   TranslationSourceKind,
 } from "../../../shared/api/types";
 import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
@@ -85,6 +86,8 @@ export function AnnotationEditor({
   const [language, setLanguage] = useState("zh-CN");
   const [translationSourceKind, setTranslationSourceKind] =
     useState<TranslationSourceKind>("description");
+  const [translationProducerKind, setTranslationProducerKind] =
+    useState<TranslationProducerKind>("llm");
   const [translationEditing, setTranslationEditing] = useState(false);
   const activeLanguage = mode === "translation" ? language : "";
   const bundle = useAnnotationBundle(projectId, assetId);
@@ -94,7 +97,7 @@ export function AnnotationEditor({
     mode,
     activeLanguage,
     translationSourceKind,
-    "llm",
+    translationProducerKind,
   );
   const translations = useTranslations(projectId, assetId);
   const translationState = useTranslation(
@@ -102,7 +105,7 @@ export function AnnotationEditor({
     assetId,
     language,
     translationSourceKind,
-    "llm",
+    translationProducerKind,
   );
   const save = useSaveAnnotationChannel(
     projectId,
@@ -110,7 +113,7 @@ export function AnnotationEditor({
     mode,
     activeLanguage,
     translationSourceKind,
-    "llm",
+    translationProducerKind,
   );
   const review = useReviewAnnotationChannel(
     projectId,
@@ -118,7 +121,7 @@ export function AnnotationEditor({
     mode,
     activeLanguage,
     translationSourceKind,
-    "llm",
+    translationProducerKind,
   );
   const remove = useDeleteAnnotationChannel(
     projectId,
@@ -126,7 +129,7 @@ export function AnnotationEditor({
     mode,
     activeLanguage,
     translationSourceKind,
-    "llm",
+    translationProducerKind,
   );
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
@@ -152,7 +155,7 @@ export function AnnotationEditor({
     activeLanguage,
     showHistory,
     translationSourceKind,
-    "llm",
+    translationProducerKind,
   );
   const languageOptions = useMemo(
     () =>
@@ -178,9 +181,9 @@ export function AnnotationEditor({
         channel: mode,
         language: activeLanguage,
         translation_source_kind: mode === "translation" ? translationSourceKind : null,
-        translation_producer_kind: mode === "translation" ? "llm" : null,
+        translation_producer_kind: mode === "translation" ? translationProducerKind : null,
       }),
-    [activeLanguage, mode, onActiveTargetChange, translationSourceKind],
+    [activeLanguage, mode, onActiveTargetChange, translationProducerKind, translationSourceKind],
   );
 
   useEffect(() => {
@@ -188,7 +191,7 @@ export function AnnotationEditor({
   }, [fontSize]);
 
   useEffect(() => {
-    const key = `${assetId ?? ""}:${mode}:${activeLanguage}:${translationSourceKind}:llm`;
+    const key = `${assetId ?? ""}:${mode}:${activeLanguage}:${translationSourceKind}:${translationProducerKind}`;
     if (!assetId) {
       loadedDocumentKey.current = key;
       setContent("");
@@ -212,7 +215,15 @@ export function AnnotationEditor({
       setTagDraft([...document.data.tags]);
       setSavedTagDraft([...document.data.tags]);
     }
-  }, [activeLanguage, assetId, document.data, mode, translationSourceKind, translationState.data]);
+  }, [
+    activeLanguage,
+    assetId,
+    document.data,
+    mode,
+    translationProducerKind,
+    translationSourceKind,
+    translationState.data,
+  ]);
 
   useEffect(() => {
     if (
@@ -264,7 +275,7 @@ export function AnnotationEditor({
         (candidate.language ?? "") === targetLanguage &&
         (channel !== "translation" ||
           (candidate.translation_source_kind === translationSourceKind &&
-            candidate.translation_producer_kind === "llm")),
+            candidate.translation_producer_kind === translationProducerKind)),
     );
     if (!item || item.availability_status === "missing") return undefined;
     if (item.availability_status !== "usable") return item.availability_status;
@@ -317,6 +328,18 @@ export function AnnotationEditor({
     }
     resetDraft();
     setTranslationSourceKind(next);
+  }
+
+  async function changeTranslationProducer(next: TranslationProducerKind) {
+    if (next === translationProducerKind) return;
+    if (
+      !(await confirmDiscard("切换译文生成方式", "当前译文有尚未保存的修改。确定放弃后切换吗？"))
+    ) {
+      return;
+    }
+    resetDraft();
+    setTranslationProducerKind(next);
+    if (next === "local_dictionary") setTranslationSourceKind("tags");
   }
 
   async function cancelTranslationEdit() {
@@ -410,6 +433,8 @@ export function AnnotationEditor({
   const translationReviewBlocked =
     mode === "translation" &&
     (translationStatus !== "current" || translationState.data?.alignment_status !== "aligned");
+  const translationReadOnly =
+    mode === "translation" && translationProducerKind === "local_dictionary";
 
   return (
     <section className="annotation-editor" data-surface-region="content">
@@ -471,8 +496,20 @@ export function AnnotationEditor({
             <>
               <select
                 className="annotation-source-select"
+                aria-label="译文生成方式"
+                value={translationProducerKind}
+                onChange={(event) =>
+                  void changeTranslationProducer(event.target.value as TranslationProducerKind)
+                }
+              >
+                <option value="llm">LLM 翻译</option>
+                <option value="local_dictionary">本地 Tag 词典</option>
+              </select>
+              <select
+                className="annotation-source-select"
                 aria-label="译文来源"
                 value={translationSourceKind}
+                disabled={translationProducerKind === "local_dictionary"}
                 onChange={(event) =>
                   void changeTranslationSource(event.target.value as TranslationSourceKind)
                 }
@@ -528,7 +565,14 @@ export function AnnotationEditor({
             标记已复核
           </Button>
           {mode === "translation" ? (
-            translationEditing ? (
+            translationReadOnly ? (
+              <span
+                className="annotation-editor__readonly"
+                title="请在设置的“本地 Tag 词典 → 词条修正”中修改译法，然后重新运行任务"
+              >
+                只读词典结果
+              </span>
+            ) : translationEditing ? (
               <>
                 <Button
                   icon={<X size={14} />}
@@ -589,6 +633,7 @@ export function AnnotationEditor({
             loading={history.isLoading}
             error={history.isError ? history.error : null}
             sourceMismatch={mode === "translation" && translationStatus === "source_mismatch"}
+            readOnly={translationReadOnly}
             onRestore={restoreRevision}
           />
         ) : assetId && mode === "tags" ? (
@@ -640,7 +685,10 @@ export function AnnotationEditor({
         {actionError ? <span className="validation-warning">{actionError}</span> : null}
         {mode === "translation" ? (
           <>
-            <span>{translationSourceKind === "tags" ? "Tags 对照" : "描述对照"} · LLM</span>
+            <span>
+              {translationSourceKind === "tags" ? "Tags 对照" : "描述对照"} ·{" "}
+              {translationProducerKind === "local_dictionary" ? "本地词典" : "LLM"}
+            </span>
             <span>
               {translationState.data?.alignment_status === "aligned"
                 ? "支持悬停与划词联动"

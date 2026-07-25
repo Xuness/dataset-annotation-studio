@@ -70,14 +70,18 @@ export function JobList({
                 {job.kind === "translation"
                   ? `${
                       job.translation_source_kind === "tags" ? "Tags" : "LLM 描述"
-                    } · ${job.target_language ?? "目标语言"} 译文`
+                    } · ${job.target_language ?? "目标语言"} ${
+                      job.execution_backend === "local_dictionary" ? "本地词典译文" : "译文"
+                    }`
                   : job.execution_backend === "local_tagger"
                     ? "本地标签标注"
                     : job.system_preset_name}
               </strong>
               <span>
                 {job.execution_profile_name} · {job.model}
-                {job.kind === "translation" ? ` · ${job.system_preset_name}` : ""}
+                {job.kind === "translation" && job.system_preset_name
+                  ? ` · ${job.system_preset_name}`
+                  : ""}
               </span>
               <div className="job-card__progress">
                 <span style={{ width: `${progress}%` }} />

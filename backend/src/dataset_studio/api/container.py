@@ -14,6 +14,14 @@ from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.providers.codex_runtime import CodexRuntime
 from dataset_studio.modules.statistics.service import StatisticsService
+from dataset_studio.modules.tag_dictionaries.downloads.repository import (
+    TagDictionaryDownloadRepository,
+)
+from dataset_studio.modules.tag_dictionaries.downloads.service import (
+    TagDictionaryDownloadService,
+)
+from dataset_studio.modules.tag_dictionaries.repository import TagDictionaryRepository
+from dataset_studio.modules.tag_dictionaries.service import TagDictionaryService
 from dataset_studio.modules.taggers.downloads.repository import TaggerDownloadRepository
 from dataset_studio.modules.taggers.downloads.service import TaggerDownloadService
 from dataset_studio.modules.taggers.repository import TaggerRepository
@@ -42,6 +50,8 @@ class AppContainer:
     statistics: StatisticsService
     codex: CodexRuntime
     taggers: TaggerService
+    tag_dictionaries: TagDictionaryService
+    tag_dictionary_downloads: TagDictionaryDownloadService
     tagger_downloads: TaggerDownloadService
     tagger_runtime: TaggerRuntime
 
@@ -52,19 +62,35 @@ class AppContainer:
         initialize_global_database(global_database)
         workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
         annotations = AnnotationService(workspaces)
-        translations = TranslationService(workspaces, annotations)
         assets = AssetService(workspaces)
         asset_deletions = AssetDeletionService(workspaces)
         secrets = KeyringSecretStore()
         presets = PresetService(PresetRepository(global_database), secrets)
         taggers = TaggerService(settings, TaggerRepository(global_database))
+        tag_dictionaries = TagDictionaryService(
+            settings,
+            TagDictionaryRepository(global_database),
+            taggers,
+        )
+        translations = TranslationService(workspaces, annotations, tag_dictionaries)
+        tag_dictionary_downloads = TagDictionaryDownloadService(
+            TagDictionaryDownloadRepository(global_database),
+            tag_dictionaries,
+        )
         tagger_downloads = TaggerDownloadService(
             TaggerDownloadRepository(global_database),
             taggers,
             secrets,
         )
         taggers.set_download_activity_check(tagger_downloads.repository.has_blocking_tasks)
-        jobs = JobService(workspaces, presets, annotations, translations, taggers)
+        jobs = JobService(
+            workspaces,
+            presets,
+            annotations,
+            translations,
+            taggers,
+            tag_dictionaries,
+        )
         codex = CodexRuntime()
         tagger_runtime = TaggerRuntime(taggers)
         exports = ExportService(workspaces)
@@ -96,6 +122,8 @@ class AppContainer:
             statistics=StatisticsService(workspaces),
             codex=codex,
             taggers=taggers,
+            tag_dictionaries=tag_dictionaries,
+            tag_dictionary_downloads=tag_dictionary_downloads,
             tagger_downloads=tagger_downloads,
             tagger_runtime=tagger_runtime,
         )

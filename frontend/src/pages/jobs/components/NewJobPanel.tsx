@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Languages, Play, Settings2, Tags } from "lucide-react";
+import { BookOpenText, Bot, Languages, Play, Settings2, Tags } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useJobActions } from "../../../features/jobs/hooks";
@@ -9,6 +9,7 @@ import {
   useTranslationPromptPresets,
 } from "../../../features/presets/hooks";
 import { useTaggerLibrary } from "../../../features/taggers/hooks";
+import { useTagDictionaryLibrary } from "../../../features/tagDictionaries/hooks";
 import {
   TAGGER_DEVICE_LABELS,
   taggerCategoryLabel,
@@ -69,9 +70,13 @@ export function NewJobPanel({
   const translationPromptPresets = useTranslationPromptPresets();
   const providerProfiles = useProviderProfiles();
   const taggerLibrary = useTaggerLibrary();
+  const tagDictionaryLibrary = useTagDictionaryLibrary();
   const actions = useJobActions(projectId);
   const [kind, setKind] = useState<JobKind>("annotation");
   const [annotationBackend, setAnnotationBackend] = useState<ExecutionBackend>("provider");
+  const [translationBackend, setTranslationBackend] = useState<"provider" | "local_dictionary">(
+    "provider",
+  );
   const [providerProfileId, setProviderProfileId] = useState("");
   const [providerModelId, setProviderModelId] = useState("");
   const [taggerProfileId, setTaggerProfileId] = useState("");
@@ -82,7 +87,7 @@ export function NewJobPanel({
     useState<TranslationSourceKind>("description");
   const [translationPolicy, setTranslationPolicy] = useState<ExistingTranslationPolicy>("skip");
   const [error, setError] = useState<string | null>(null);
-  const executionBackend = kind === "translation" ? "provider" : annotationBackend;
+  const executionBackend = kind === "translation" ? translationBackend : annotationBackend;
   const selectedProvider = providerProfiles.data?.find(
     (profile) => profile.id === providerProfileId,
   );
@@ -139,20 +144,27 @@ export function NewJobPanel({
     }
   }, [translationPromptPresetId, translationPromptPresets.data]);
 
+  useEffect(() => {
+    if (translationBackend !== "local_dictionary") return;
+    if (translationSourceKind !== "tags") setTranslationSourceKind("tags");
+    if (targetLanguage !== "zh-CN") setTargetLanguage("zh-CN");
+  }, [targetLanguage, translationBackend, translationSourceKind]);
+
   async function create() {
     setError(null);
     try {
       const providerExecution = executionBackend === "provider";
+      const taggerExecution = executionBackend === "local_tagger";
       const job = await actions.create.mutateAsync({
         execution_backend: executionBackend,
         provider_profile_id: providerExecution ? providerProfileId : undefined,
         model_id: providerExecution ? providerModelId : undefined,
-        tagger_profile_id: providerExecution ? undefined : taggerProfileId,
+        tagger_profile_id: taggerExecution ? taggerProfileId : undefined,
         kind,
         scope,
         asset_ids: scope === "selected" ? checkedAssetIds : [],
         translation_prompt_preset_id:
-          kind === "translation" ? translationPromptPresetId : undefined,
+          kind === "translation" && providerExecution ? translationPromptPresetId : undefined,
         target_language: targetLanguage,
         translation_source_kind: translationSourceKind,
         translation_policy: translationPolicy,
@@ -185,8 +197,19 @@ export function NewJobPanel({
     selectedProvider && selectedProvider.models.some((model) => model.model_id === providerModelId),
   );
   const promptReady = kind === "translation" ? configuredTranslationPrompt : configuredSystemPreset;
+  const dictionaryReady = Boolean(
+    tagDictionaryLibrary.data &&
+    (tagDictionaryLibrary.data.override_count > 0 ||
+      tagDictionaryLibrary.data.installations.some(
+        (item) => item.enabled && item.status === "ready" && item.language === targetLanguage,
+      )),
+  );
   const ready = Boolean(
-    (executionBackend === "local_tagger" ? selectedTaggerProfile : providerReady && promptReady) &&
+    (executionBackend === "local_tagger"
+      ? selectedTaggerProfile
+      : executionBackend === "local_dictionary"
+        ? dictionaryReady
+        : providerReady && promptReady) &&
     (scope === "all" || checkedAssetIds.length > 0),
   );
 
@@ -195,7 +218,11 @@ export function NewJobPanel({
       <header>
         <span className="new-job-icon">
           {kind === "translation" ? (
-            <Languages size={18} />
+            executionBackend === "local_dictionary" ? (
+              <BookOpenText size={18} />
+            ) : (
+              <Languages size={18} />
+            )
           ) : annotationBackend === "local_tagger" ? (
             <Tags size={18} />
           ) : (
@@ -242,36 +269,78 @@ export function NewJobPanel({
 
       {kind === "translation" ? (
         <>
-          <label className="form-field">
-            <span>翻译 Prompt 预设</span>
-            <select
-              value={translationPromptPresetId}
-              onChange={(event) => setTranslationPromptPresetId(event.target.value)}
+          <div className="job-kind-switch job-executor-switch" aria-label="翻译执行方式">
+            <button
+              className={translationBackend === "provider" ? "is-active" : ""}
+              onClick={() => setTranslationBackend("provider")}
             >
-              {!translationPromptPresets.data?.length ? (
-                <option value="">尚未创建翻译 Prompt 预设</option>
-              ) : null}
-              {translationPromptPresets.data?.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className={`job-prompt-source ${translationPromptIssue ? "has-error" : ""}`}>
-            <span>任务快照</span>
-            <strong>
-              {translationPromptPresets.isLoading
-                ? "正在读取翻译 Prompt…"
-                : (configuredTranslationPrompt?.name ?? translationPromptIssue)}
-            </strong>
-            <small>目标语言变量会在创建任务时展开；后续修改预设不会影响本次任务。</small>
-            {translationPromptIssue ? (
-              <button onClick={() => navigate("/presets?tab=translation")}>
-                前往创建翻译 Prompt
-              </button>
-            ) : null}
+              <Languages size={14} /> LLM 翻译
+            </button>
+            <button
+              className={translationBackend === "local_dictionary" ? "is-active" : ""}
+              onClick={() => setTranslationBackend("local_dictionary")}
+            >
+              <BookOpenText size={14} /> 本地 Tag 词典
+            </button>
           </div>
+          {translationBackend === "provider" ? (
+            <>
+              <label className="form-field">
+                <span>翻译 Prompt 预设</span>
+                <select
+                  value={translationPromptPresetId}
+                  onChange={(event) => setTranslationPromptPresetId(event.target.value)}
+                >
+                  {!translationPromptPresets.data?.length ? (
+                    <option value="">尚未创建翻译 Prompt 预设</option>
+                  ) : null}
+                  {translationPromptPresets.data?.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className={`job-prompt-source ${translationPromptIssue ? "has-error" : ""}`}>
+                <span>任务快照</span>
+                <strong>
+                  {translationPromptPresets.isLoading
+                    ? "正在读取翻译 Prompt…"
+                    : (configuredTranslationPrompt?.name ?? translationPromptIssue)}
+                </strong>
+                <small>目标语言变量会在创建任务时展开；后续修改预设不会影响本次任务。</small>
+                {translationPromptIssue ? (
+                  <button onClick={() => navigate("/presets?tab=translation")}>
+                    前往创建翻译 Prompt
+                  </button>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <div className={`job-prompt-source ${dictionaryReady ? "" : "has-error"}`}>
+              <span>本地查询快照</span>
+              <strong>
+                {tagDictionaryLibrary.isLoading
+                  ? "正在读取本地词典库…"
+                  : dictionaryReady
+                    ? `${
+                        tagDictionaryLibrary.data?.installations.filter(
+                          (item) =>
+                            item.enabled &&
+                            item.status === "ready" &&
+                            item.language === targetLanguage,
+                        ).length ?? 0
+                      } 个启用词典 · ${
+                        tagDictionaryLibrary.data?.override_count.toLocaleString() ?? 0
+                      } 个修正`
+                    : "尚无可用于简体中文的本地词典或修正"}
+              </strong>
+              <small>逐 Tag 查询，不发送图片或文本到网络；未命中的 Tag 原样保留。</small>
+              {!dictionaryReady ? (
+                <button onClick={() => openSettings("tag-dictionaries")}>打开本地词典设置</button>
+              ) : null}
+            </div>
+          )}
         </>
       ) : executionBackend === "provider" ? (
         <>
@@ -370,7 +439,7 @@ export function NewJobPanel({
             <small>本次任务会固定模型及参数；之后修改连接不会影响任务快照。</small>
           </label>
         </>
-      ) : (
+      ) : executionBackend === "local_tagger" ? (
         <label className="form-field">
           <span>本地打标配置</span>
           <select
@@ -387,7 +456,7 @@ export function NewJobPanel({
           </select>
           <small>任务会固定模型指纹、阈值、类别、设备与批大小设置。</small>
         </label>
-      )}
+      ) : null}
 
       {kind === "translation" ? (
         <>
@@ -395,6 +464,7 @@ export function NewJobPanel({
             <span>翻译来源</span>
             <select
               value={translationSourceKind}
+              disabled={executionBackend === "local_dictionary"}
               onChange={(event) =>
                 setTranslationSourceKind(event.target.value as TranslationSourceKind)
               }
@@ -402,11 +472,15 @@ export function NewJobPanel({
               <option value="description">LLM 描述（无描述时回退原有标注）</option>
               <option value="tags">Tags（逐项对齐）</option>
             </select>
+            {executionBackend === "local_dictionary" ? (
+              <small>本地词典只处理 Tags，并保持逐项对齐。</small>
+            ) : null}
           </label>
           <label className="form-field">
             <span>目标语言</span>
             <select
               value={targetLanguage}
+              disabled={executionBackend === "local_dictionary"}
               onChange={(event) => setTargetLanguage(event.target.value)}
             >
               <option value="zh-CN">简体中文 · zh-CN</option>
@@ -415,6 +489,9 @@ export function NewJobPanel({
               <option value="ja">日本語 · ja</option>
               <option value="ko">한국어 · ko</option>
             </select>
+            {executionBackend === "local_dictionary" ? (
+              <small>当前内置适配器优先支持简体中文词典。</small>
+            ) : null}
           </label>
           <label className="form-field">
             <span>已有译文</span>
@@ -461,28 +538,30 @@ export function NewJobPanel({
         </div>
         <div>
           <dt>失败重试</dt>
-          <dd>{executionBackend === "local_tagger" ? "手动重试" : "首次 + 3 次"}</dd>
+          <dd>{executionBackend === "provider" ? "首次 + 3 次" : "手动重试"}</dd>
         </div>
         <div>
           <dt>输出处理</dt>
           <dd>
             {executionBackend === "local_tagger"
               ? "结构化 Tag 修订"
-              : kind === "annotation"
-                ? "数据库描述修订"
-                : "数据库译文修订"}
+              : executionBackend === "local_dictionary"
+                ? "只读本地词典译文修订"
+                : kind === "annotation"
+                  ? "数据库描述修订"
+                  : "数据库译文修订"}
           </dd>
         </div>
         <div>
           <dt>
-            {executionBackend === "local_tagger"
+            {executionBackend === "local_tagger" || executionBackend === "local_dictionary"
               ? "联网请求"
               : kind === "annotation"
                 ? "User Prompt"
                 : "源标注"}
           </dt>
           <dd>
-            {executionBackend === "local_tagger"
+            {executionBackend === "local_tagger" || executionBackend === "local_dictionary"
               ? "无"
               : kind === "annotation"
                 ? workspace.settings.user_prompt
@@ -492,7 +571,9 @@ export function NewJobPanel({
                   : workspace.settings.use_tags_as_context
                     ? "按图追加当前可用 Tags"
                     : "当前为空"
-                : "当前可用描述 / 原有标注"}
+                : translationSourceKind === "tags"
+                  ? "当前可用 Tags"
+                  : "当前可用描述 / 原有标注"}
           </dd>
         </div>
       </dl>
@@ -504,10 +585,16 @@ export function NewJobPanel({
           onClick={() =>
             executionBackend === "local_tagger"
               ? openSettings("taggers")
-              : navigate(kind === "translation" ? "/presets?tab=translation" : "/presets")
+              : executionBackend === "local_dictionary"
+                ? openSettings("tag-dictionaries")
+                : navigate(kind === "translation" ? "/presets?tab=translation" : "/presets")
           }
         >
-          {executionBackend === "local_tagger" ? "管理打标器" : "管理预设"}
+          {executionBackend === "local_tagger"
+            ? "管理打标器"
+            : executionBackend === "local_dictionary"
+              ? "管理词典"
+              : "管理预设"}
         </Button>
         <Button
           tone="primary"

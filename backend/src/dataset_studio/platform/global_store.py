@@ -344,7 +344,87 @@ BEGIN
 END;
 """
 
-GLOBAL_SCHEMA_VERSION = 11
+LOCAL_TAG_DICTIONARIES_MIGRATION = """
+CREATE TABLE local_tag_dictionary_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    dictionary_root TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE local_tag_dictionary_installations (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    adapter_id TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    source_version TEXT NOT NULL,
+    language TEXT NOT NULL,
+    relative_path TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    fingerprint TEXT NOT NULL CHECK (length(fingerprint) = 64),
+    entry_count INTEGER NOT NULL CHECK (entry_count > 0),
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+    priority INTEGER NOT NULL CHECK (priority >= 0),
+    manifest_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_local_tag_dictionary_installations_order
+ON local_tag_dictionary_installations(enabled DESC, priority, created_at);
+
+CREATE TABLE local_tag_dictionary_overrides (
+    normalized_tag TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    language TEXT NOT NULL,
+    translation TEXT NOT NULL,
+    category TEXT,
+    revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(normalized_tag, language)
+);
+
+CREATE INDEX idx_local_tag_dictionary_overrides_updated
+ON local_tag_dictionary_overrides(updated_at DESC);
+
+CREATE TABLE local_tag_dictionary_downloads (
+    id TEXT PRIMARY KEY,
+    offer_id TEXT NOT NULL,
+    offer_snapshot_json TEXT NOT NULL,
+    dictionary_root TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (
+        status IN (
+            'queued', 'downloading', 'verifying', 'installing',
+            'completed', 'paused', 'failed', 'interrupted'
+        )
+    ),
+    bytes_total INTEGER NOT NULL CHECK (bytes_total > 0),
+    bytes_downloaded INTEGER NOT NULL DEFAULT 0 CHECK (bytes_downloaded >= 0),
+    current_file TEXT,
+    speed_bps REAL CHECK (speed_bps IS NULL OR speed_bps >= 0),
+    stop_requested INTEGER NOT NULL DEFAULT 0 CHECK (stop_requested IN (0, 1)),
+    worker_id TEXT,
+    installation_id TEXT,
+    license_notice_hash TEXT NOT NULL CHECK (length(license_notice_hash) = 64),
+    license_accepted_at TEXT NOT NULL,
+    error_code TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    completed_at TEXT,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (installation_id)
+        REFERENCES local_tag_dictionary_installations(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_local_tag_dictionary_downloads_created
+ON local_tag_dictionary_downloads(created_at DESC);
+
+CREATE UNIQUE INDEX idx_local_tag_dictionary_downloads_active_offer
+ON local_tag_dictionary_downloads(offer_id)
+WHERE status IN ('queued', 'downloading', 'verifying', 'installing');
+"""
+
+GLOBAL_SCHEMA_VERSION = 12
 GLOBAL_MIGRATIONS = (
     Migration(1, "initial_global_schema", GLOBAL_SCHEMA),
     Migration(2, "provider_request_options", PROVIDER_REQUEST_OPTIONS_MIGRATION),
@@ -372,6 +452,11 @@ GLOBAL_MIGRATIONS = (
         11,
         "platform_path_identity",
         PLATFORM_PATH_IDENTITY_MIGRATION,
+    ),
+    Migration(
+        12,
+        "local_tag_dictionaries",
+        LOCAL_TAG_DICTIONARIES_MIGRATION,
     ),
 )
 

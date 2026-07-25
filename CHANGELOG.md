@@ -40,6 +40,9 @@ changes.
 - Added capability-driven image preprocessing backends with dynamic CUDA device
   discovery, JPEG codec acceleration, GPU Lanczos resize, per-item CPU fallback, and
   persisted planned-versus-actual execution diagnostics.
+- Added a source-root `dictionaries/` library with ffdkj, WeiLin Prompt, TagComplete CN
+  and licyk adapters, license-aware downloads, global correction entries, local
+  dictionary translation jobs, per-Tag provenance, and resolution-based stale detection.
 
 ## 0.1.0
 

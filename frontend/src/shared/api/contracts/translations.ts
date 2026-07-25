@@ -14,6 +14,14 @@ export interface TranslationAlignmentPart {
   confidence: number | null;
 }
 
+export interface TranslationDictionarySource {
+  installation_id: string;
+  name: string;
+  adapter_id: string | null;
+  source_version: string | null;
+  matched_count: number;
+}
+
 export interface TranslationDocument {
   asset_id: string;
   language: string;
@@ -36,6 +44,11 @@ export interface TranslationDocument {
   provider_profile_id: string | null;
   provider_profile_name: string | null;
   model: string | null;
+  dictionary_resolution_hash: string | null;
+  current_dictionary_resolution_hash: string | null;
+  dictionary_sources: TranslationDictionarySource[];
+  dictionary_override_count: number;
+  dictionary_unmatched_count: number;
   modified_at: string | null;
   updated_at: string | null;
   issue: string | null;

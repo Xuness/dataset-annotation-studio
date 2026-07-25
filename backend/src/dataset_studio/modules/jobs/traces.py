@@ -14,6 +14,7 @@ from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
 from dataset_studio.modules.prompts.composer import compose_user_prompt
 from dataset_studio.modules.providers.reasoning import extract_reasoning_from_raw
+from dataset_studio.modules.tag_dictionaries.models import TagDictionaryExecutionProfile
 from dataset_studio.modules.taggers.models import TaggerExecutionProfile
 from dataset_studio.modules.workspaces.paths import WorkspacePaths
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -205,7 +206,7 @@ class AnnotationTraceService:
         execution_backend = _string(row.get("execution_backend")) or "provider"
         snapshot = _json_object(
             row.get("execution_snapshot")
-            if execution_backend == "local_tagger"
+            if execution_backend in {"local_tagger", "local_dictionary"}
             else row.get("provider_snapshot")
         )
         request_payload = artifact.get("request")
@@ -362,6 +363,22 @@ def _request_parameters(
             "categories": profile.categories,
             "device": profile.device.value,
             "batch_size": profile.batch_size,
+        }
+    if execution_backend == "local_dictionary":
+        try:
+            profile = TagDictionaryExecutionProfile.model_validate(snapshot)
+            source_names = [source.name for source in profile.sources]
+            language = profile.language
+        except (TypeError, ValueError):
+            source_names = []
+            language = _string(snapshot.get("language"))
+        return {
+            "execution_backend": "local_dictionary",
+            "provider_type": "local_dictionary",
+            "provider_profile_name": "本地 Tag 词典",
+            "model": "、".join(source_names) if source_names else "本地 Tag 词典",
+            "categories": source_names or None,
+            "model_version": language,
         }
     try:
         profile = load_provider_snapshot(snapshot)

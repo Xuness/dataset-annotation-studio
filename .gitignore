@@ -39,3 +39,6 @@ src-tauri/binaries/dataset-studio-service-*
 
 # Local model library
 /models/
+
+# Local Tag dictionary library
+/dictionaries/

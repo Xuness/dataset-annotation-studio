@@ -23,6 +23,7 @@ def active_jobs(container: Container):
     export_count, _ = container.exports.active_overview()
     asset_deletion_count, _ = container.asset_deletions.active_overview()
     tagger_download_count = container.tagger_downloads.active_count()
+    tag_dictionary_download_count = container.tag_dictionary_downloads.active_count()
     active_projects = (
         container.jobs.active_project_ids()
         | container.preprocessing.active_project_ids(preprocessing_only=True)
@@ -36,6 +37,7 @@ def active_jobs(container: Container):
             + export_count
             + asset_deletion_count
             + tagger_download_count
+            + tag_dictionary_download_count
         ),
         project_count=len(active_projects),
         annotation_job_count=jobs.annotation_job_count,
@@ -44,6 +46,7 @@ def active_jobs(container: Container):
         export_count=export_count,
         asset_deletion_count=asset_deletion_count,
         tagger_download_count=tagger_download_count,
+        tag_dictionary_download_count=tag_dictionary_download_count,
     )
 
 
@@ -54,6 +57,7 @@ def stop_all_workspace_jobs(container: Container):
             container.jobs.stop_all_workspaces()
             + container.exports.stop_all_workspaces()
             + container.tagger_downloads.pause_all()
+            + container.tag_dictionary_downloads.pause_all()
         )
     }
 

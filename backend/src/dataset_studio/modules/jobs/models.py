@@ -52,6 +52,7 @@ class JobKind(StrEnum):
 class ExecutionBackend(StrEnum):
     PROVIDER = "provider"
     LOCAL_TAGGER = "local_tagger"
+    LOCAL_DICTIONARY = "local_dictionary"
 
 
 class ExistingTranslationPolicy(StrEnum):
@@ -80,8 +81,14 @@ class JobCreateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_execution_backend(self) -> JobCreateRequest:
+        if self.execution_backend == ExecutionBackend.LOCAL_DICTIONARY:
+            if self.kind != JobKind.TRANSLATION:
+                raise ValueError("本地 Tag 词典只能用于翻译任务。")
+            if self.translation_source_kind != TranslationSourceKind.TAGS:
+                raise ValueError("本地 Tag 词典只能翻译 Tags。")
+            return self
         if self.kind == JobKind.TRANSLATION and self.execution_backend != ExecutionBackend.PROVIDER:
-            raise ValueError("翻译任务只能使用 LLM 模型连接。")
+            raise ValueError("翻译任务只能使用 LLM 模型连接或本地 Tag 词典。")
         if self.execution_backend == ExecutionBackend.PROVIDER:
             if not self.provider_profile_id or not self.provider_profile_id.strip():
                 raise ValueError("请选择模型连接。")
@@ -166,3 +173,4 @@ class ActiveJobsOverview(BaseModel):
     export_count: int = 0
     asset_deletion_count: int = 0
     tagger_download_count: int = 0
+    tag_dictionary_download_count: int = 0

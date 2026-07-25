@@ -20,6 +20,8 @@ $HadUvProjectEnvironment = Test-Path Env:UV_PROJECT_ENVIRONMENT
 $PreviousUvProjectEnvironment = $env:UV_PROJECT_ENVIRONMENT
 $HadDatasetStudioRuntime = Test-Path Env:DATASET_STUDIO_RUNTIME
 $PreviousDatasetStudioRuntime = $env:DATASET_STUDIO_RUNTIME
+$HadDatasetStudioSourceRoot = Test-Path Env:DATASET_STUDIO_SOURCE_ROOT
+$PreviousDatasetStudioSourceRoot = $env:DATASET_STUDIO_SOURCE_ROOT
 $ExitCode = 0
 
 $LogDirectory = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "DatasetAnnotationStudio\logs"
@@ -218,6 +220,7 @@ try {
         $environmentPath = Join-Path $Backend ".venv-$selectedRuntime"
         $env:UV_PROJECT_ENVIRONMENT = $environmentPath
         $env:DATASET_STUDIO_RUNTIME = $selectedRuntime
+        $env:DATASET_STUDIO_SOURCE_ROOT = $Root
 
         Write-Host "[Dataset Studio] Runtime：$selectedRuntime" -ForegroundColor Cyan
         Write-Host "[Dataset Studio] Python 环境：$environmentPath" -ForegroundColor DarkCyan
@@ -288,6 +291,11 @@ try {
         $env:DATASET_STUDIO_RUNTIME = $PreviousDatasetStudioRuntime
     } else {
         Remove-Item Env:DATASET_STUDIO_RUNTIME -ErrorAction SilentlyContinue
+    }
+    if ($HadDatasetStudioSourceRoot) {
+        $env:DATASET_STUDIO_SOURCE_ROOT = $PreviousDatasetStudioSourceRoot
+    } else {
+        Remove-Item Env:DATASET_STUDIO_SOURCE_ROOT -ErrorAction SilentlyContinue
     }
 
     if ($TranscriptStarted) {

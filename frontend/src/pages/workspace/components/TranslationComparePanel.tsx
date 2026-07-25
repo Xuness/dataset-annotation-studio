@@ -195,6 +195,22 @@ export function TranslationComparePanel({
   const sourceContent = translation?.source_content ?? "";
   const translatedContent = translation?.content ?? "";
   const mismatch = translation?.status === "source_mismatch";
+  const dictionarySummary =
+    translation?.producer_kind === "local_dictionary"
+      ? [
+          ...translation.dictionary_sources.map(
+            (source) => `${source.name} ${source.matched_count} 项`,
+          ),
+          translation.dictionary_override_count
+            ? `修正 ${translation.dictionary_override_count} 项`
+            : "",
+          translation.dictionary_unmatched_count
+            ? `未命中 ${translation.dictionary_unmatched_count} 项`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : "";
 
   return (
     <div className="annotation-editor__compare translation-compare">
@@ -223,7 +239,10 @@ export function TranslationComparePanel({
       <section>
         <header>
           <strong>{translation?.language ?? ""} 译文</strong>
-          <small>{translation ? TRANSLATION_STATUS_LABELS[translation.status] : "尚无译文"}</small>
+          <small title={dictionarySummary || undefined}>
+            {translation ? TRANSLATION_STATUS_LABELS[translation.status] : "尚无译文"}
+            {dictionarySummary ? ` · ${dictionarySummary}` : ""}
+          </small>
         </header>
         <div>
           {editing ? (

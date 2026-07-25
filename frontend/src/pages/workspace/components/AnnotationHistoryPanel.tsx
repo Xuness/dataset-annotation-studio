@@ -16,6 +16,7 @@ interface AnnotationHistoryPanelProps {
   loading: boolean;
   error: unknown;
   sourceMismatch?: boolean;
+  readOnly?: boolean;
   onRestore: (content: string, tags: AnnotationTag[]) => void;
 }
 
@@ -25,6 +26,7 @@ export function AnnotationHistoryPanel({
   loading,
   error,
   sourceMismatch = false,
+  readOnly = false,
   onRestore,
 }: AnnotationHistoryPanelProps) {
   return (
@@ -54,9 +56,10 @@ export function AnnotationHistoryPanel({
             <Button
               icon={<RotateCcw size={12} />}
               onClick={() => onRestore(revision.content, revision.tags)}
-              disabled={revision.is_tombstone}
+              disabled={revision.is_tombstone || readOnly}
+              title={readOnly ? "本地词典译文只能通过修正词条后重新生成" : undefined}
             >
-              恢复到编辑器
+              {readOnly ? "只读历史" : "恢复到编辑器"}
             </Button>
           </header>
           <pre>

@@ -9,6 +9,9 @@ from dataset_studio.core.config import settings
 from dataset_studio.modules.exports.worker import ExportWorker
 from dataset_studio.modules.jobs.worker import AnnotationWorker
 from dataset_studio.modules.output_resources import configure_output_resource_owner
+from dataset_studio.modules.tag_dictionaries.downloads.worker import (
+    TagDictionaryDownloadWorker,
+)
 from dataset_studio.modules.taggers.downloads.worker import TaggerDownloadWorker
 
 
@@ -26,10 +29,12 @@ async def run_worker() -> None:
     annotation_worker = AnnotationWorker(container)
     export_worker = ExportWorker(container)
     tagger_download_worker = TaggerDownloadWorker(container)
+    tag_dictionary_download_worker = TagDictionaryDownloadWorker(container)
     worker_tasks = (
         asyncio.create_task(annotation_worker.run(stopped)),
         asyncio.create_task(export_worker.run(stopped)),
         asyncio.create_task(tagger_download_worker.run(stopped)),
+        asyncio.create_task(tag_dictionary_download_worker.run(stopped)),
     )
     try:
         await asyncio.gather(*worker_tasks)
