@@ -1,6 +1,9 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
+import { annotationHistoryKeys, annotationKeys } from "../annotations/queryKeys";
 import { annotationTraceKeys, assetKeys } from "../assets/queryKeys";
+import { statisticsKeys } from "../statistics/queryKeys";
 import { translationKeys } from "../translations/queryKeys";
 import { workspaceKeys } from "../workspaces/queryKeys";
 import {
@@ -18,13 +21,42 @@ import { jobKeys } from "./queryKeys";
 const isActive = (status: string) => ["queued", "running", "stopping"].includes(status);
 
 export function useJobs(projectId: string) {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const previousActiveIds = useRef<Set<string> | null>(null);
+  const query = useQuery({
     queryKey: jobKeys.project(projectId),
     queryFn: () => listJobs(projectId, { limit: 500, activeOnly: true }),
     enabled: Boolean(projectId),
     refetchInterval: (query) =>
       query.state.data?.some((job) => isActive(job.status)) ? 1000 : 5000,
   });
+  const activeSignature =
+    query.data
+      ?.map((job) => job.id)
+      .sort()
+      .join("|") ?? "";
+  useEffect(() => {
+    previousActiveIds.current = null;
+  }, [projectId]);
+  useEffect(() => {
+    if (!query.data) return;
+    const activeIds = new Set(query.data.map((job) => job.id));
+    const completed =
+      previousActiveIds.current !== null &&
+      [...previousActiveIds.current].some((jobId) => !activeIds.has(jobId));
+    previousActiveIds.current = activeIds;
+    if (!completed) return;
+    void queryClient.invalidateQueries({ queryKey: annotationKeys.project(projectId) });
+    void queryClient.invalidateQueries({
+      queryKey: annotationHistoryKeys.project(projectId),
+    });
+    void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
+    void queryClient.invalidateQueries({ queryKey: annotationTraceKeys.project(projectId) });
+    void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
+    void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
+    void queryClient.invalidateQueries({ queryKey: statisticsKeys.project(projectId) });
+  }, [activeSignature, projectId, query.data, queryClient]);
+  return query;
 }
 
 export function useJobHistory(projectId: string, pageSize = 100) {
@@ -60,9 +92,14 @@ export function useJobActions(projectId: string) {
       void queryClient.invalidateQueries({ queryKey: jobKeys.detailPrefix(projectId, jobId) });
     }
     void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
+    void queryClient.invalidateQueries({ queryKey: annotationKeys.project(projectId) });
+    void queryClient.invalidateQueries({
+      queryKey: annotationHistoryKeys.project(projectId),
+    });
     void queryClient.invalidateQueries({ queryKey: annotationTraceKeys.project(projectId) });
     void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
     void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
+    void queryClient.invalidateQueries({ queryKey: statisticsKeys.project(projectId) });
   };
   return {
     create: useMutation({

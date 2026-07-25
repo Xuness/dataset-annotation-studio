@@ -23,18 +23,15 @@ import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { AnnotationHistoryPanel } from "./AnnotationHistoryPanel";
+import { TagEditorPanel } from "./TagEditorPanel";
 import {
   AVAILABILITY_LABELS,
   REVIEW_LABELS,
   revisionSourceLabel,
   TRANSLATION_STATUS_LABELS,
 } from "./annotationLabels";
-import {
-  draftToTags,
-  hasExistingAnnotationDocument,
-  reconcilePersistedContent,
-  tagsToDraft,
-} from "./annotationEditorState";
+import { hasExistingAnnotationDocument, reconcilePersistedContent } from "./annotationEditorState";
+import { annotationTagsEqual, reconcilePersistedTags } from "./tagEditorState";
 
 interface AnnotationEditorProps {
   projectId: string;
@@ -60,8 +57,7 @@ function readFontSize(): number {
 }
 
 function documentDraft(document: AnnotationDocument | undefined): string {
-  if (!document) return "";
-  return document.content_kind === "tags" ? tagsToDraft(document.tags) : document.content;
+  return document?.content ?? "";
 }
 
 export function AnnotationEditor({
@@ -95,14 +91,16 @@ export function AnnotationEditor({
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
   const [savedRevisionId, setSavedRevisionId] = useState<string | null>(null);
-  const [tagDraftBasis, setTagDraftBasis] = useState<AnnotationTag[]>([]);
-  const [restoredTagMetadata, setRestoredTagMetadata] = useState(false);
+  const [tagDraft, setTagDraft] = useState<AnnotationTag[]>([]);
+  const [savedTagDraft, setSavedTagDraft] = useState<AnnotationTag[]>([]);
   const [fontSize, setFontSize] = useState(readFontSize);
   const [showHistory, setShowHistory] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const dirty =
     mode !== "compare" &&
-    (content !== savedContent || (activeChannel === "tags" && restoredTagMetadata));
+    (activeChannel === "tags"
+      ? !annotationTagsEqual(tagDraft, savedTagDraft)
+      : content !== savedContent);
   const dirtyRef = useRef(dirty);
   const loadedDocumentKey = useRef("");
   dirtyRef.current = dirty;
@@ -147,8 +145,8 @@ export function AnnotationEditor({
       setContent("");
       setSavedContent("");
       setSavedRevisionId(null);
-      setTagDraftBasis([]);
-      setRestoredTagMetadata(false);
+      setTagDraft([]);
+      setSavedTagDraft([]);
       return;
     }
     if (!document.data || mode === "compare") return;
@@ -158,8 +156,8 @@ export function AnnotationEditor({
       setContent(next);
       setSavedContent(next);
       setSavedRevisionId(document.data.head_revision_id);
-      setTagDraftBasis(document.data.tags);
-      setRestoredTagMetadata(false);
+      setTagDraft([...document.data.tags]);
+      setSavedTagDraft([...document.data.tags]);
     }
   }, [activeChannel, activeLanguage, assetId, document.data, mode]);
 
@@ -176,8 +174,8 @@ export function AnnotationEditor({
     setContent("");
     setSavedContent("");
     setSavedRevisionId(null);
-    setTagDraftBasis([]);
-    setRestoredTagMetadata(false);
+    setTagDraft([]);
+    setSavedTagDraft([]);
     setMode("description");
   }, [bundle.isLoading, hasExistingAnnotation, mode]);
 
@@ -211,10 +209,7 @@ export function AnnotationEditor({
     ],
     [],
   );
-  const editorExtensions = useMemo(
-    () => (activeChannel === "tags" ? commonExtensions : [xml(), ...commonExtensions]),
-    [activeChannel, commonExtensions],
-  );
+  const editorExtensions = useMemo(() => [xml(), ...commonExtensions], [commonExtensions]);
 
   function channelState(channel: AnnotationChannel, targetLanguage = "") {
     const item = bundle.data?.documents.find(
@@ -239,8 +234,8 @@ export function AnnotationEditor({
     setContent("");
     setSavedContent("");
     setSavedRevisionId(null);
-    setTagDraftBasis([]);
-    setRestoredTagMetadata(false);
+    setTagDraft([]);
+    setSavedTagDraft([]);
     setActionError(null);
     setShowHistory(false);
     setMode(next);
@@ -260,20 +255,21 @@ export function AnnotationEditor({
     setContent("");
     setSavedContent("");
     setSavedRevisionId(null);
-    setTagDraftBasis([]);
-    setRestoredTagMetadata(false);
+    setTagDraft([]);
+    setSavedTagDraft([]);
     setLanguage(next);
   }
 
   async function handleSaveClick() {
     if (!assetId || mode === "compare") return;
     const submittedContent = content;
+    const submittedTags = [...tagDraft];
     setActionError(null);
     try {
       const result = await save.mutateAsync(
         activeChannel === "tags"
           ? {
-              tags: draftToTags(submittedContent, tagDraftBasis),
+              tags: submittedTags,
               expectedHeadRevisionId: savedRevisionId,
             }
           : {
@@ -281,12 +277,15 @@ export function AnnotationEditor({
               expectedHeadRevisionId: savedRevisionId,
             },
       );
-      const persisted = documentDraft(result);
-      setContent((current) => reconcilePersistedContent(current, submittedContent, persisted));
-      setSavedContent(persisted);
+      if (activeChannel === "tags") {
+        setTagDraft((current) => reconcilePersistedTags(current, submittedTags, result.tags));
+        setSavedTagDraft([...result.tags]);
+      } else {
+        const persisted = documentDraft(result);
+        setContent((current) => reconcilePersistedContent(current, submittedContent, persisted));
+        setSavedContent(persisted);
+      }
       setSavedRevisionId(result.head_revision_id);
-      setTagDraftBasis(result.tags);
-      setRestoredTagMetadata(false);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : "保存标注失败。");
     }
@@ -332,6 +331,8 @@ export function AnnotationEditor({
       setContent("");
       setSavedContent("");
       setSavedRevisionId(null);
+      setTagDraft([]);
+      setSavedTagDraft([]);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : "删除标注失败。");
     }
@@ -339,9 +340,7 @@ export function AnnotationEditor({
 
   function restoreRevision(revisionContent: string, tags: AnnotationTag[]) {
     if (activeChannel === "tags") {
-      setContent(tagsToDraft(tags));
-      setTagDraftBasis(tags);
-      setRestoredTagMetadata(true);
+      setTagDraft([...tags]);
     } else {
       setContent(revisionContent);
     }
@@ -384,7 +383,7 @@ export function AnnotationEditor({
     activeChannel === "translation" && translationStatus === "stale";
   const activeAvailabilityStatus = document.data?.availability_status ?? "missing";
   const activeReviewStatus = document.data?.review_status;
-  const tagCount = draftToTags(content, tagDraftBasis).length;
+  const tagCount = tagDraft.length;
 
   return (
     <section className="annotation-editor" data-surface-region="content">
@@ -529,6 +528,16 @@ export function AnnotationEditor({
             error={history.isError ? history.error : null}
             onRestore={restoreRevision}
           />
+        ) : assetId && mode !== "compare" && activeChannel === "tags" ? (
+          <TagEditorPanel
+            projectId={projectId}
+            assetId={assetId}
+            tags={tagDraft}
+            taggerSource={document.data?.tagger_source ?? null}
+            fontSize={fontSize}
+            onChange={setTagDraft}
+            onFontSizeChange={setFontSize}
+          />
         ) : assetId && mode !== "compare" ? (
           <CodeMirror
             className="annotation-editor__codemirror"
@@ -538,17 +547,15 @@ export function AnnotationEditor({
             extensions={editorExtensions}
             onChange={setContent}
             placeholder={
-              activeChannel === "tags"
-                ? "输入逗号或换行分隔的 Tags。保存后会立即成为当前可用版本。"
-                : activeChannel === "existing_annotation"
-                  ? "这里存放迁移时确认存在的旧 TXT，也可以继续人工修订。"
-                  : activeChannel === "description"
-                    ? "LLM 返回的描述会进入这里；校验通过后可直接用于翻译和导出。"
-                    : `输入或修订 ${language} 译文。`
+              activeChannel === "existing_annotation"
+                ? "这里存放迁移时确认存在的旧 TXT，也可以继续人工修订。"
+                : activeChannel === "description"
+                  ? "LLM 返回的描述会进入这里；校验通过后可直接用于翻译和导出。"
+                  : `输入或修订 ${language} 译文。`
             }
             basicSetup={{
-              lineNumbers: activeChannel !== "tags",
-              foldGutter: activeChannel !== "tags",
+              lineNumbers: true,
+              foldGutter: true,
               highlightActiveLine: true,
               highlightActiveLineGutter: false,
             }}

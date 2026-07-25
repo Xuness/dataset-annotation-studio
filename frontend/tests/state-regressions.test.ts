@@ -11,12 +11,18 @@ import {
 } from "../src/app/desktopExit.ts";
 import { providerCredentialCacheToken } from "../src/features/presets/queryKeys.ts";
 import {
-  draftToTags,
   hasExistingAnnotationDocument,
-  parseTagDraft,
   reconcilePersistedContent,
-  tagsToDraft,
 } from "../src/pages/workspace/components/annotationEditorState.ts";
+import {
+  annotationTagsEqual,
+  appendManualTags,
+  appendVocabularyTag,
+  groupTags,
+  parseTagDraft,
+  reconcilePersistedTags,
+  removeTag,
+} from "../src/pages/workspace/components/tagEditorState.ts";
 import {
   createDesktopFullscreenToggle,
   isFullscreenShortcut,
@@ -80,37 +86,49 @@ test("existing annotation tab is exposed only when the current asset has importe
   );
 });
 
-test("tag drafts preserve delimiters, quotes, newlines, and restored metadata", () => {
+test("tag paste parser preserves delimiters, quotes, and newlines", () => {
+  assert.deepEqual(parseTagDraft('"artist, name", "quoted ""tag""", two\nlines'), [
+    "artist, name",
+    'quoted "tag"',
+    "two",
+    "lines",
+  ]);
+});
+
+test("structured tag edits preserve existing metadata and classify vocabulary additions", () => {
   const tags = [
     {
-      name: "artist, name",
-      category: "artist",
+      name: "blue_hair",
+      category: "general",
       confidence: 0.97,
       origin: "tagger",
     },
+  ];
+
+  const manual = appendManualTags(tags, "new_tag");
+  const vocabulary = appendVocabularyTag(manual.tags, {
+    name: "alice",
+    category: "character",
+  });
+
+  assert.deepEqual(vocabulary.tags, [
+    tags[0],
     {
-      name: 'quoted "tag"',
+      name: "new_tag",
       category: null,
       confidence: null,
       origin: "manual",
     },
     {
-      name: "two\nlines",
-      category: "general",
-      confidence: 0.72,
-      origin: "tagger",
+      name: "alice",
+      category: "character",
+      confidence: null,
+      origin: "manual",
     },
-  ];
-
-  const draft = tagsToDraft(tags);
-  assert.deepEqual(
-    parseTagDraft(draft),
-    tags.map((tag) => tag.name),
-  );
-  assert.deepEqual(draftToTags(draft, tags), tags);
+  ]);
 });
 
-test("tag drafts de-duplicate case-insensitively without discarding the first metadata", () => {
+test("structured tag additions de-duplicate case-insensitively", () => {
   const previous = [
     {
       name: "Blue_Hair",
@@ -120,8 +138,12 @@ test("tag drafts de-duplicate case-insensitively without discarding the first me
     },
   ];
 
-  assert.deepEqual(draftToTags("blue_hair, BLUE_HAIR, new_tag", previous), [
-    { ...previous[0], name: "blue_hair" },
+  const result = appendManualTags(previous, "blue_hair, BLUE_HAIR, new_tag");
+
+  assert.equal(result.duplicateKey, "blue_hair");
+  assert.equal(result.addedCount, 1);
+  assert.deepEqual(result.tags, [
+    previous[0],
     {
       name: "new_tag",
       category: null,
@@ -129,6 +151,67 @@ test("tag drafts de-duplicate case-insensitively without discarding the first me
       origin: "manual",
     },
   ]);
+});
+
+test("tag groups use stable semantic order without changing stored order", () => {
+  const tags = [
+    {
+      name: "solo",
+      category: null,
+      confidence: null,
+      origin: "manual",
+    },
+    {
+      name: "blue_hair",
+      category: "general",
+      confidence: 0.97,
+      origin: "tagger",
+    },
+    {
+      name: "alice",
+      category: "character",
+      confidence: 0.93,
+      origin: "tagger",
+    },
+    {
+      name: "series",
+      category: "copyright",
+      confidence: 0.88,
+      origin: "tagger",
+    },
+  ];
+
+  assert.deepEqual(
+    groupTags(tags).map((group) => group.category),
+    ["character", "copyright", "general", null],
+  );
+  assert.deepEqual(
+    tags.map((tag) => tag.name),
+    ["solo", "blue_hair", "alice", "series"],
+  );
+});
+
+test("tag save reconciliation preserves edits made while the request is pending", () => {
+  const submitted = [
+    {
+      name: "artist_name",
+      category: "artist",
+      confidence: 0.97,
+      origin: "tagger",
+    },
+  ];
+  const current = [
+    ...submitted,
+    {
+      name: "new_tag",
+      category: null,
+      confidence: null,
+      origin: "manual",
+    },
+  ];
+
+  assert.deepEqual(reconcilePersistedTags(current, submitted, submitted), current);
+  assert.equal(annotationTagsEqual(removeTag(current, "new_tag"), submitted), true);
 });
 
 test("provider credential cache tokens distinguish non-empty keys without retaining them", () => {

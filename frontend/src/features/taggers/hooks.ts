@@ -20,6 +20,7 @@ import {
   pauseTaggerDownload,
   rescanTaggers,
   resumeTaggerDownload,
+  searchTaggerVocabulary,
   testHuggingFaceConnection,
   updateHuggingFaceSettings,
   updateTaggerModelRoot,
@@ -30,6 +31,24 @@ import { taggerKeys } from "./queryKeys";
 
 export function useTaggerLibrary() {
   return useQuery({ queryKey: taggerKeys.library, queryFn: getTaggerLibrary });
+}
+
+export function useTaggerVocabularySearch(
+  installationId: string | null,
+  fingerprint: string,
+  query: string,
+  category = "",
+) {
+  return useQuery({
+    queryKey: taggerKeys.vocabulary(installationId ?? "", fingerprint, query, category),
+    queryFn: ({ signal }) =>
+      searchTaggerVocabulary(installationId!, query, {
+        category: category || undefined,
+        signal,
+      }),
+    enabled: Boolean(installationId && query.trim()),
+    staleTime: 5 * 60 * 1000,
+  });
 }
 
 const ACTIVE_DOWNLOAD_STATUSES = new Set<TaggerDownloadStatus>([

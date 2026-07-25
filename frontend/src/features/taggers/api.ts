@@ -9,6 +9,7 @@ import type {
   TaggerLibrary,
   TaggerProfile,
   TaggerProfileInput,
+  TaggerVocabularySearchResult,
 } from "../../shared/api/types";
 
 export function getTaggerLibrary(): Promise<TaggerLibrary> {
@@ -39,6 +40,22 @@ export function validateTaggerInstallation(id: string): Promise<TaggerInstallati
 
 export function deleteTaggerInstallation(id: string): Promise<TaggerLibrary> {
   return apiRequest(`/api/v1/taggers/installations/${id}`, { method: "DELETE" });
+}
+
+export function searchTaggerVocabulary(
+  installationId: string,
+  query: string,
+  options: { category?: string; limit?: number; signal?: AbortSignal } = {},
+): Promise<TaggerVocabularySearchResult> {
+  const parameters = new URLSearchParams({
+    q: query,
+    limit: String(options.limit ?? 24),
+  });
+  if (options.category) parameters.set("category", options.category);
+  return apiRequest(
+    `/api/v1/taggers/installations/${installationId}/vocabulary/search?${parameters}`,
+    { signal: options.signal },
+  );
 }
 
 export function createTaggerProfile(input: TaggerProfileInput): Promise<TaggerProfile> {
