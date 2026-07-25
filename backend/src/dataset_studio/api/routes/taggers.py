@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
@@ -20,6 +20,7 @@ from dataset_studio.modules.taggers.models import (
     TaggerProfileCreate,
     TaggerProfileUpdate,
     TaggerSettingsUpdate,
+    TaggerVocabularySearchResult,
 )
 
 router = APIRouter(prefix="/taggers", tags=["taggers"])
@@ -49,6 +50,25 @@ def rescan(container: Container):
 @router.post("/installations/{installation_id}/validate", response_model=TaggerInstallation)
 def validate_installation(installation_id: str, container: Container):
     return container.taggers.validate_installation(installation_id)
+
+
+@router.get(
+    "/installations/{installation_id}/vocabulary/search",
+    response_model=TaggerVocabularySearchResult,
+)
+def search_vocabulary(
+    installation_id: str,
+    container: Container,
+    q: str = Query(min_length=1, max_length=200),
+    category: str | None = Query(default=None, max_length=120),
+    limit: int = Query(default=24, ge=1, le=50),
+):
+    return container.taggers.search_vocabulary(
+        installation_id,
+        q,
+        category=category,
+        limit=limit,
+    )
 
 
 @router.delete("/installations/{installation_id}", response_model=TaggerLibrary)

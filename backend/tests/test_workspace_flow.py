@@ -16,10 +16,16 @@ from dataset_studio.modules.annotations.models import (
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.assets.service import AssetService
+from dataset_studio.modules.jobs.repository import JobCreationRepository
 from dataset_studio.modules.output_resources import (
     OutputResourceClaim,
     annotation_document_resource_key,
     hold_output_resources,
+)
+from dataset_studio.modules.taggers.models import (
+    TaggerDevice,
+    TaggerExecutionProfile,
+    TaggerSelectionPolicy,
 )
 from dataset_studio.modules.translations.models import TranslationStatus
 from dataset_studio.modules.translations.service import TranslationService
@@ -183,6 +189,108 @@ def test_annotation_channels_save_review_delete_and_keep_history_in_database(
     )
     assert [revision.source for revision in history] == ["manual_delete", "manual_edit"]
     assert history[0].is_tombstone
+
+
+def test_tag_document_follows_nearest_local_tagger_source_through_manual_edits(
+    tmp_path: Path,
+) -> None:
+    workspaces, assets, annotations = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.jpg")
+    summary, _ = workspaces.open(str(project))
+    paths, _ = workspaces.get(summary.project_id)
+    asset = assets.list_assets(summary.project_id).items[0]
+    profile = TaggerExecutionProfile(
+        id="profile-1",
+        name="CL default",
+        installation_id="installation-1",
+        installation_name="CL Tagger V2",
+        adapter_id="cl_tagger_v2",
+        model_version="v2.01a",
+        fingerprint="a" * 64,
+        selection=TaggerSelectionPolicy(),
+        categories=["character", "general"],
+        device=TaggerDevice.CPU,
+        concurrency=1,
+        batch_size=1,
+    )
+    JobCreationRepository(paths.database).insert_job(
+        job_id="job-1",
+        kind="annotation",
+        configuration_snapshot="{}",
+        execution_backend="local_tagger",
+        execution_profile_id=profile.id,
+        execution_snapshot=profile.model_dump_json(),
+        system_preset_id="",
+        system_prompt_snapshot="",
+        provider_profile_id="",
+        provider_snapshot="{}",
+        user_prompt_snapshot="",
+        json_fields_snapshot="[]",
+        scope="all",
+        overwrite_existing=True,
+        output_channel="tags",
+        use_tags_as_context=False,
+        retry_limit=1,
+        asset_ids=[asset.id],
+    )
+    connection = connect(paths.database)
+    try:
+        item_id = str(
+            connection.execute("SELECT id FROM job_items WHERE job_id = 'job-1'").fetchone()["id"]
+        )
+    finally:
+        connection.close()
+
+    generated = annotations.save_generated(
+        summary.project_id,
+        asset.id,
+        "alice, blue_hair",
+        channel=AnnotationChannel.TAGS,
+        tags=[
+            AnnotationTag(
+                name="alice",
+                category="character",
+                confidence=0.96,
+                origin="tagger",
+            ),
+            AnnotationTag(
+                name="blue_hair",
+                category="general",
+                confidence=0.91,
+                origin="tagger",
+            ),
+        ],
+        source_job_item_id=item_id,
+    )
+    manual = annotations.save_tags(
+        summary.project_id,
+        asset.id,
+        [
+            *generated.document.tags,
+            AnnotationTag(name="smile", category=None, origin="manual"),
+        ],
+        expected_head_revision_id=generated.revision_id,
+    )
+
+    assert generated.document.tagger_source is not None
+    assert manual.document.tagger_source is not None
+    assert manual.document.tagger_source.installation_id == "installation-1"
+    assert manual.document.tagger_source.fingerprint == "a" * 64
+
+    deleted = annotations.delete(
+        summary.project_id,
+        asset.id,
+        AnnotationChannel.TAGS,
+    )
+    recreated = annotations.save_tags(
+        summary.project_id,
+        asset.id,
+        [AnnotationTag(name="manual_only", category=None, origin="manual")],
+        expected_head_revision_id=deleted.head_revision_id,
+    )
+
+    assert recreated.document.tagger_source is None
 
 
 def test_scan_preserves_database_annotation_written_after_scan_snapshot(

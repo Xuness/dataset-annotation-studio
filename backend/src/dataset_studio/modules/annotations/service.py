@@ -20,6 +20,7 @@ from dataset_studio.modules.annotations.models import (
     AnnotationRevision,
     AnnotationStatus,
     AnnotationTag,
+    AnnotationTaggerSource,
     AnnotationWriteResult,
     ValidationIssue,
     ValidationResult,
@@ -40,6 +41,7 @@ from dataset_studio.modules.output_resources import (
     annotation_document_resource_key,
     hold_output_resources,
 )
+from dataset_studio.modules.taggers.models import TaggerExecutionProfile
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 _EXPECTED_VERSION_UNSET = EXPECTED_HEAD_UNSET
@@ -696,7 +698,32 @@ class AnnotationService:
             ),
             current_image_hash=str(row["current_image_hash"]),
             source=str(row["source"]) if row["source"] else None,
+            tagger_source=self._tagger_source(repository, channel, head_revision_id, exists),
             updated_at=str(row["updated_at"]),
+        )
+
+    @staticmethod
+    def _tagger_source(
+        repository: AnnotationRepository,
+        channel: AnnotationChannel,
+        head_revision_id: str | None,
+        exists: bool,
+    ) -> AnnotationTaggerSource | None:
+        if channel != AnnotationChannel.TAGS or not exists or not head_revision_id:
+            return None
+        snapshot = repository.nearest_local_tagger_snapshot(head_revision_id)
+        if snapshot is None:
+            return None
+        try:
+            profile = TaggerExecutionProfile.model_validate_json(snapshot)
+        except (TypeError, ValueError):
+            return None
+        return AnnotationTaggerSource(
+            installation_id=profile.installation_id,
+            installation_name=profile.installation_name,
+            adapter_id=profile.adapter_id,
+            model_version=profile.model_version,
+            fingerprint=profile.fingerprint,
         )
 
     @staticmethod

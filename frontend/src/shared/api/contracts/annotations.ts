@@ -27,6 +27,14 @@ export interface AnnotationTag {
   origin: string;
 }
 
+export interface AnnotationTaggerSource {
+  installation_id: string;
+  installation_name: string;
+  adapter_id: string;
+  model_version: string;
+  fingerprint: string;
+}
+
 export interface AnnotationDocument {
   asset_id: string;
   document_id: string | null;
@@ -49,6 +57,7 @@ export interface AnnotationDocument {
   image_content_hash: string | null;
   current_image_hash: string | null;
   source: string | null;
+  tagger_source: AnnotationTaggerSource | null;
   updated_at: string | null;
 }
 

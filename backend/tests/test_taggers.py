@@ -281,6 +281,25 @@ def test_local_import_creates_managed_installation_and_default_profile(
     assert service.registry.get("fake_tagger").download_plans() == ()
 
 
+def test_vocabulary_search_uses_installed_adapter_without_starting_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service(tmp_path, monkeypatch)
+    installation = service.import_local(
+        TaggerImportRequest(path=str(_model_source(tmp_path)), name="Search model")
+    ).installations[0]
+
+    result = service.search_vocabulary(installation.id, "hair")
+    exact = service.search_vocabulary(installation.id, "alice", category="character")
+    excluded = service.search_vocabulary(installation.id, "alice", category="general")
+
+    assert [(item.name, item.category) for item in result.items] == [("blue_hair", "general")]
+    assert [item.name for item in exact.items] == ["alice"]
+    assert excluded.items == []
+    assert result.fingerprint == installation.fingerprint
+
+
 def test_changed_model_invalidates_old_task_snapshot_until_revalidated(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

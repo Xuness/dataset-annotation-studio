@@ -97,6 +97,20 @@ export interface TaggerLibrary {
   scan_issues: string[];
 }
 
+export interface TaggerVocabularyItem {
+  name: string;
+  category: string;
+}
+
+export interface TaggerVocabularySearchResult {
+  installation_id: string;
+  installation_name: string;
+  fingerprint: string;
+  query: string;
+  category: string | null;
+  items: TaggerVocabularyItem[];
+}
+
 export type TaggerDownloadStatus =
   | "queued"
   | "resolving"

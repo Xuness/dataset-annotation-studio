@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import heapq
 import json
 import os
+import re
 import shutil
 import sqlite3
 import threading
 import uuid
+from collections import OrderedDict
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 from typing import Concatenate, ParamSpec, TypeVar
@@ -37,6 +41,8 @@ from dataset_studio.modules.taggers.models import (
     TaggerSelectionPolicy,
     TaggerSettingsUpdate,
     TaggerSourceRecord,
+    TaggerVocabularyItem,
+    TaggerVocabularySearchResult,
 )
 from dataset_studio.modules.taggers.registry import TaggerAdapterRegistry
 from dataset_studio.modules.taggers.repository import TaggerRepository
@@ -47,6 +53,20 @@ from dataset_studio.modules.taggers.sources.base import (
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
+_VOCABULARY_CACHE_LIMIT = 4
+_VOCABULARY_SEPARATORS = re.compile(r"[_\s]+")
+
+
+@dataclass(frozen=True, slots=True)
+class _VocabularySearchEntry:
+    name: str
+    category: str
+    normalized_name: str
+    tokens: tuple[str, ...]
+
+
+def _normalize_vocabulary_text(value: str) -> str:
+    return " ".join(_VOCABULARY_SEPARATORS.split(value.strip().casefold())).strip()
 
 
 def _catalog_locked(
@@ -74,6 +94,10 @@ class TaggerService:
         self._catalog_state = threading.local()
         self._has_blocking_downloads: Callable[[], bool] = lambda: False
         self._profile_capability_cache: dict[tuple[str, str, int], TaggerProfileCapabilities] = {}
+        self._vocabulary_cache: OrderedDict[
+            tuple[str, str, int], tuple[_VocabularySearchEntry, ...]
+        ] = OrderedDict()
+        self._vocabulary_cache_lock = threading.RLock()
         self._installer = TaggerInstaller(repository, self._registry, self.model_root)
         self.model_root().mkdir(parents=True, exist_ok=True)
 
@@ -156,6 +180,7 @@ class TaggerService:
             raise ValueError("选择的模型库路径不是文件夹。")
         root.mkdir(parents=True, exist_ok=True)
         self._repository.set_model_root(str(root), utc_now_iso())
+        self._clear_vocabulary_cache()
         return self.library()
 
     @_catalog_locked
@@ -166,6 +191,7 @@ class TaggerService:
         source = source.resolve()
         manifest = self._installer.import_local(source, requested_name=data.name)
         self._create_default_profile(manifest)
+        self._clear_vocabulary_cache()
         return self.library()
 
     @_catalog_locked
@@ -176,6 +202,7 @@ class TaggerService:
     ) -> TaggerInstallation:
         manifest = self._installer.install_materialized(materialized, plan)
         self._create_default_profile(manifest)
+        self._clear_vocabulary_cache()
         row = self._repository.get_installation(manifest.installation_id)
         assert row is not None
         return self._installation_from_row(row, self.model_root())
@@ -220,6 +247,7 @@ class TaggerService:
                 self._create_default_profile(manifest)
             except (OSError, sqlite3.Error, ValueError) as error:
                 issues.append(f"{relative_path}：{error}")
+        self._clear_vocabulary_cache()
         return self.library(scan_issues=issues)
 
     @_catalog_locked
@@ -259,6 +287,7 @@ class TaggerService:
         )
         refreshed = self._repository.get_installation(installation_id)
         assert refreshed is not None
+        self._clear_vocabulary_cache()
         return self._installation_from_row(refreshed, root)
 
     @_catalog_locked
@@ -286,6 +315,7 @@ class TaggerService:
             raise
         if moved:
             shutil.rmtree(trash, ignore_errors=True)
+        self._clear_vocabulary_cache()
         return self.library()
 
     def list_profiles(self) -> list[TaggerProfile]:
@@ -293,6 +323,105 @@ class TaggerService:
 
     def has_installation(self, installation_id: str) -> bool:
         return self._repository.get_installation(installation_id) is not None
+
+    @_catalog_locked
+    def search_vocabulary(
+        self,
+        installation_id: str,
+        query: str,
+        *,
+        category: str | None = None,
+        limit: int = 24,
+    ) -> TaggerVocabularySearchResult:
+        normalized_query = _normalize_vocabulary_text(query)
+        if not normalized_query:
+            raise ValueError("词表搜索内容不能为空。")
+        if not 1 <= limit <= 50:
+            raise ValueError("词表搜索数量必须位于 1 到 50 之间。")
+        normalized_category = category.strip().casefold() if category else ""
+        normalized_category = normalized_category or None
+        installation = self._ready_installation(installation_id)
+        entries = self._vocabulary_entries(installation)
+        matches = heapq.nsmallest(
+            limit,
+            (
+                (
+                    rank,
+                    len(entry.normalized_name),
+                    entry.normalized_name,
+                    entry.name.casefold(),
+                    index,
+                    entry,
+                )
+                for index, entry in enumerate(entries)
+                if (not normalized_category or entry.category.casefold() == normalized_category)
+                if (rank := self._vocabulary_match_rank(entry, normalized_query)) is not None
+            ),
+        )
+        return TaggerVocabularySearchResult(
+            installation_id=installation.id,
+            installation_name=installation.name,
+            fingerprint=installation.fingerprint,
+            query=query.strip(),
+            category=normalized_category,
+            items=[
+                TaggerVocabularyItem(name=entry.name, category=entry.category)
+                for *_, entry in matches
+            ],
+        )
+
+    def _vocabulary_entries(
+        self,
+        installation: TaggerInstallation,
+    ) -> tuple[_VocabularySearchEntry, ...]:
+        cache_key = (
+            installation.id,
+            installation.fingerprint,
+            installation.adapter_contract_version,
+        )
+        with self._vocabulary_cache_lock:
+            cached = self._vocabulary_cache.get(cache_key)
+            if cached is not None:
+                self._vocabulary_cache.move_to_end(cache_key)
+                return cached
+        adapter = self._registry.get(installation.adapter_id)
+        vocabulary = adapter.load_vocabulary(Path(installation.path))
+        entries = tuple(
+            _VocabularySearchEntry(
+                name=name,
+                category=category,
+                normalized_name=(normalized := _normalize_vocabulary_text(name)),
+                tokens=tuple(normalized.split()),
+            )
+            for name, category in zip(vocabulary.tags, vocabulary.categories, strict=True)
+        )
+        with self._vocabulary_cache_lock:
+            self._vocabulary_cache[cache_key] = entries
+            self._vocabulary_cache.move_to_end(cache_key)
+            while len(self._vocabulary_cache) > _VOCABULARY_CACHE_LIMIT:
+                self._vocabulary_cache.popitem(last=False)
+        return entries
+
+    @staticmethod
+    def _vocabulary_match_rank(
+        entry: _VocabularySearchEntry,
+        normalized_query: str,
+    ) -> int | None:
+        if entry.normalized_name == normalized_query:
+            return 0
+        if entry.normalized_name.startswith(normalized_query):
+            return 1
+        if " " not in normalized_query and any(
+            token.startswith(normalized_query) for token in entry.tokens
+        ):
+            return 2
+        if normalized_query in entry.normalized_name:
+            return 3
+        return None
+
+    def _clear_vocabulary_cache(self) -> None:
+        with self._vocabulary_cache_lock:
+            self._vocabulary_cache.clear()
 
     @_catalog_locked
     def ensure_default_profile(self, installation_id: str) -> None:

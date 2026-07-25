@@ -311,6 +311,20 @@ class TaggerLibrary(BaseModel):
     scan_issues: list[str] = Field(default_factory=list)
 
 
+class TaggerVocabularyItem(BaseModel):
+    name: str
+    category: str
+
+
+class TaggerVocabularySearchResult(BaseModel):
+    installation_id: str
+    installation_name: str
+    fingerprint: str
+    query: str
+    category: str | None = None
+    items: list[TaggerVocabularyItem] = Field(default_factory=list)
+
+
 class TaggerInferenceTag(BaseModel):
     name: str
     category: str

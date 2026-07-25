@@ -139,6 +139,43 @@ class AnnotationRepository:
             connection.close()
         return {str(row["asset_id"]): row for row in rows}
 
+    def nearest_local_tagger_snapshot(self, head_revision_id: str) -> str | None:
+        connection = connect(self._database_path)
+        try:
+            row = connection.execute(
+                """
+                WITH RECURSIVE revision_lineage(
+                    id, parent_revision_id, source_job_item_id, is_tombstone, depth
+                ) AS (
+                    SELECT id, parent_revision_id, source_job_item_id, is_tombstone, 0
+                    FROM annotation_document_revisions
+                    WHERE id = ?
+
+                    UNION ALL
+
+                    SELECT parent.id, parent.parent_revision_id,
+                           parent.source_job_item_id, parent.is_tombstone, child.depth + 1
+                    FROM annotation_document_revisions parent
+                    JOIN revision_lineage child
+                      ON parent.id = child.parent_revision_id
+                    WHERE child.depth < 1000 AND child.is_tombstone = 0
+                )
+                SELECT job.execution_snapshot
+                FROM revision_lineage lineage
+                JOIN job_items item ON item.id = lineage.source_job_item_id
+                JOIN jobs job ON job.id = item.job_id
+                WHERE job.execution_backend = 'local_tagger'
+                  AND job.execution_snapshot IS NOT NULL
+                  AND job.execution_snapshot != ''
+                ORDER BY lineage.depth
+                LIMIT 1
+                """,
+                (head_revision_id,),
+            ).fetchone()
+            return str(row["execution_snapshot"]) if row else None
+        finally:
+            connection.close()
+
     def list_document_rows_for_assets(
         self,
         asset_ids: Sequence[str],

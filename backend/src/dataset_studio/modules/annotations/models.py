@@ -92,6 +92,14 @@ class AnnotationTag(BaseModel):
         return normalized
 
 
+class AnnotationTaggerSource(BaseModel):
+    installation_id: str
+    installation_name: str
+    adapter_id: str
+    model_version: str
+    fingerprint: str
+
+
 class AnnotationDocument(BaseModel):
     """A database-backed annotation channel.
 
@@ -121,6 +129,7 @@ class AnnotationDocument(BaseModel):
     image_content_hash: str | None = None
     current_image_hash: str | None = None
     source: str | None = None
+    tagger_source: AnnotationTaggerSource | None = None
     updated_at: str | None = None
 
 
