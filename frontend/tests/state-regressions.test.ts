@@ -311,6 +311,20 @@ test("large page scenes use paint containment without changing shared animation 
   assert.match(workspaceMaterialStyles, /backdrop-filter\s+var\(--transition\)/);
 });
 
+test("tag editor follows the content region transparency setting", () => {
+  const workspaceContentMaterialStyles = readFileSync(
+    new URL("../src/pages/workspace/styles/surface-materials.css", import.meta.url),
+    "utf8",
+  );
+  const transparentContentRule = workspaceContentMaterialStyles
+    .match(/[^{}]+\{\s*background:\s*transparent;\s*\}/g)
+    ?.find((rule) => rule.includes(".annotation-editor__header"));
+
+  assert.ok(transparentContentRule);
+  assert.match(transparentContentRule, /\.tag-editor,/);
+  assert.match(transparentContentRule, /\.tag-editor__toolbar/);
+});
+
 test("fresh interface geometry uses the curated local baseline", () => {
   assert.equal(DEFAULT_INTERFACE_SCALE, 1.2);
   assert.deepEqual(DEFAULT_WORKSPACE_LAYOUT, {
