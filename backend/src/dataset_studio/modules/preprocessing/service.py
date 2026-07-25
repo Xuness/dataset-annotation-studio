@@ -193,11 +193,16 @@ class PreprocessService:
                 raise ValueError(warning)
             if not any(item.will_change for item in plan):
                 raise ValueError("当前参数不会修改任何图片，无需执行预处理。")
-            repository.start(operation_id, request, execution.execution)
+            changed_items = [item for item in plan if item.will_change]
+            repository.start(
+                operation_id,
+                request,
+                execution.execution,
+                len(changed_items),
+            )
             operation_root = paths.recovery / operation_id
             started = time.perf_counter()
             try:
-                changed_items = [item for item in plan if item.will_change]
                 with PreprocessItemPreparer(
                     root=paths.root,
                     operation_root=operation_root,
@@ -226,8 +231,8 @@ class PreprocessService:
                     runtime = preparer.runtime_summary(
                         round((time.perf_counter() - started) * 1000)
                     )
-                repository.complete(operation_id, runtime)
                 self._scanner.scan(paths, manifest)
+                repository.complete(operation_id, runtime)
             except Exception as error:
                 compensation_errors: list[str] = []
                 try:

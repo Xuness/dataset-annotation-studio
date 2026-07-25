@@ -184,6 +184,9 @@ class PreprocessOperation(BaseModel):
     id: str
     status: str
     item_count: int
+    completed_items: int = Field(default=0, ge=0)
+    eta_seconds: int | None = Field(default=None, ge=0)
+    current_relative_path: str | None = None
     options: PreprocessRequest
     execution: PreprocessExecutionOptions = Field(default_factory=PreprocessExecutionOptions)
     created_at: str

@@ -1,4 +1,5 @@
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -816,6 +817,59 @@ def test_workspace_file_operations_are_mutually_exclusive(tmp_path: Path) -> Non
             _execute(preprocessing, summary.project_id, request, preview)
 
     assert not preprocessing.is_project_active(summary.project_id)
+
+
+def test_running_preprocessing_reports_durable_progress_and_eta(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspaces, _, preprocessing = _services(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (128, 64), "white").save(project / "a.png")
+    Image.new("RGB", (128, 64), "black").save(project / "b.png")
+    summary, _ = workspaces.open(str(project))
+    request = PreprocessRequest(rename=RenameOptions(template="renamed_{name}"))
+    preview = preprocessing.preview(summary.project_id, request)
+    first_item_committed = threading.Event()
+    allow_completion = threading.Event()
+    original_set_phase = PreprocessRepository.set_item_phase
+    committed_count = 0
+
+    def pause_after_first_commit(repository, item_id: str, phase: str) -> None:
+        nonlocal committed_count
+        original_set_phase(repository, item_id, phase)
+        if phase != PreprocessItemPhase.COMMITTED.value:
+            return
+        committed_count += 1
+        if committed_count == 1:
+            first_item_committed.set()
+            assert allow_completion.wait(timeout=5)
+
+    monkeypatch.setattr(PreprocessRepository, "set_item_phase", pause_after_first_commit)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(
+            _execute,
+            preprocessing,
+            summary.project_id,
+            request,
+            preview,
+        )
+        assert first_item_committed.wait(timeout=5)
+        running = preprocessing.list_operations(summary.project_id)[0]
+        assert running.status == "running"
+        assert running.item_count == 2
+        assert running.completed_items == 1
+        assert running.current_relative_path == "renamed_a.png"
+        assert running.eta_seconds is not None
+        assert running.eta_seconds >= 1
+        allow_completion.set()
+        completed = future.result(timeout=5)
+
+    assert completed.status == "completed"
+    assert completed.item_count == 2
+    assert completed.completed_items == 2
+    assert completed.eta_seconds is None
 
 
 def test_interrupted_preprocessing_is_recovered_from_persisted_journal(

@@ -13,10 +13,17 @@ import {
 import type { PreprocessExecutionOptions, PreprocessRequest } from "../../shared/api/types";
 import { preprocessingKeys } from "./queryKeys";
 
-export function usePreprocessOperations(projectId: string) {
+const activePreprocessStatuses = new Set(["running", "recovering"]);
+
+export function usePreprocessOperations(projectId: string, forcePolling = false) {
   return useQuery({
     queryKey: preprocessingKeys.operations(projectId),
     queryFn: () => listPreprocessOperations(projectId),
+    refetchInterval: (query) =>
+      forcePolling ||
+      query.state.data?.some((operation) => activePreprocessStatuses.has(operation.status))
+        ? 1_000
+        : false,
   });
 }
 

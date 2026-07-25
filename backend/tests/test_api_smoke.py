@@ -372,6 +372,9 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
         )
         assert executed.status_code == 200
         assert executed.json()["status"] == "completed"
+        assert executed.json()["item_count"] == 1
+        assert executed.json()["completed_items"] == 1
+        assert executed.json()["eta_seconds"] is None
         assert executed.json()["options"]["resize"]["algorithm"] == "lanczos4"
         assert executed.json()["execution"]["mode"] == "cpu_only"
         assert executed.json()["runtime"]["route_counts"] == {"cpu": 1}

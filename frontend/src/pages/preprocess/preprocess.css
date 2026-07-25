@@ -4,6 +4,7 @@
 
 .preprocess-settings,
 .preprocess-preview,
+.preprocess-operation-detail,
 .preprocess-history {
   min-width: 0;
   min-height: 0;
@@ -36,6 +37,7 @@
 
 .preprocess-settings h2,
 .preprocess-preview h2,
+.preprocess-operation-detail h2,
 .preprocess-history h2 {
   margin: 4px 0 0;
   font-family: var(--font-display);
@@ -402,6 +404,208 @@
   font-size: var(--text-xs);
 }
 
+.preprocess-operation-detail {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.preprocess-operation-detail > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px;
+  border-bottom: 1px solid var(--workspace-divider);
+}
+
+.preprocess-operation-detail__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preprocess-operation-detail__header-actions .button {
+  min-height: 31px;
+  font-size: var(--text-xs);
+}
+
+.preprocess-operation-status {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  color: var(--ink-soft);
+  background: var(--surface-soft);
+  font-size: var(--text-2xs);
+}
+
+.preprocess-operation-status.is-running {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.preprocess-operation-status.is-failed {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--line));
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.preprocess-operation-detail__body {
+  min-height: 0;
+  overflow: auto;
+  padding: 18px;
+}
+
+.preprocess-operation-progress-card {
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 80%, transparent);
+}
+
+.preprocess-operation-progress-card__heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.preprocess-operation-progress-card__heading > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.preprocess-operation-progress-card__heading span {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.preprocess-operation-progress-card__heading strong {
+  font-family: Georgia, serif;
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.preprocess-operation-progress-card__heading small,
+.preprocess-operation-timing {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.preprocess-progress-track {
+  position: relative;
+  height: 6px;
+  margin: 12px 0 9px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--progress-track);
+}
+
+.preprocess-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--progress-fill);
+  transition: width 260ms ease;
+}
+
+.preprocess-progress-track.is-indeterminate > span {
+  width: 34% !important;
+  animation: preprocess-progress-indeterminate 1.25s ease-in-out infinite;
+}
+
+@keyframes preprocess-progress-indeterminate {
+  from {
+    transform: translateX(-110%);
+  }
+
+  to {
+    transform: translateX(310%);
+  }
+}
+
+.preprocess-operation-timing {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preprocess-operation-timing span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.preprocess-operation-timing strong {
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.preprocess-operation-progress-card > p {
+  margin: 10px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preprocess-operation-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.preprocess-operation-detail__grid > section {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.preprocess-operation-detail__grid > section > header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+  color: var(--accent);
+}
+
+.preprocess-operation-detail__grid h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.preprocess-operation-detail__grid p {
+  margin: 5px 0;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  text-overflow: ellipsis;
+}
+
+.preprocess-operation-detail__body > footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  margin-top: 13px;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.preprocess-operation-detail__error {
+  margin-top: 12px;
+}
+
 .preprocess-history {
   overflow: auto;
   padding: 18px 13px;
@@ -425,33 +629,73 @@
   background: var(--surface-raised);
 }
 
-.preprocess-history article > header {
+.preprocess-history article.is-active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+.preprocess-history article.is-selected {
+  box-shadow: inset 2px 0 var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 42%, var(--surface-raised));
+}
+
+.preprocess-history-selection {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.preprocess-history-selection:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 5px;
+}
+
+.preprocess-history-selection > header {
   display: flex;
   justify-content: space-between;
 }
 
-.preprocess-history article > header strong {
+.preprocess-history-selection > header strong {
   font-size: var(--text-xs);
 }
 
-.preprocess-history article > header span {
+.preprocess-history-selection > header span {
   color: var(--ink-soft);
   font-size: var(--text-2xs);
 }
 
-.preprocess-history article > small {
+.preprocess-history-selection > small {
+  display: block;
   color: var(--muted);
   font-size: var(--text-2xs);
 }
 
+.preprocess-history-selection > p,
 .preprocess-history article > p {
   margin: 8px 0;
   color: var(--ink-soft);
   font-size: var(--text-xs);
 }
 
+.preprocess-history-selection .preprocess-progress-track {
+  height: 4px;
+  margin: 9px 0 6px;
+}
+
+.preprocess-history-progress-copy {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .preprocess-history article .button {
   min-height: 30px;
+  margin-top: 8px;
   font-size: var(--text-xs);
 }
 
@@ -469,6 +713,13 @@
 .preprocess-history-runtime strong {
   color: var(--ink-soft);
   font-size: var(--text-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preprocess-progress-track.is-indeterminate > span {
+    animation: none;
+    transform: translateX(95%);
+  }
 }
 
 @media (max-width: 1220px) {

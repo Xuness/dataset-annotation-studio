@@ -110,6 +110,9 @@ export interface PreprocessOperation {
   id: string;
   status: string;
   item_count: number;
+  completed_items?: number;
+  eta_seconds?: number | null;
+  current_relative_path?: string | null;
   options: PreprocessRequest;
   execution: PreprocessExecutionOptions;
   created_at: string;

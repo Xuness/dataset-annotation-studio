@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dataset_studio.core.sqlite import connect, transaction
@@ -22,18 +24,20 @@ class PreprocessRepository:
         operation_id: str,
         request: PreprocessRequest,
         execution: PreprocessExecutionOptions,
+        item_count: int,
     ) -> None:
         with transaction(self._database_path) as connection:
             connection.execute(
                 """
                 INSERT INTO preprocess_operations (
                     id, status, options_json, execution_json, item_count, created_at
-                ) VALUES (?, 'running', ?, ?, 0, ?)
+                ) VALUES (?, 'running', ?, ?, ?, ?)
                 """,
                 (
                     operation_id,
                     request.model_dump_json(),
                     execution.model_dump_json(),
+                    item_count,
                     utc_now_iso(),
                 ),
             )
@@ -52,14 +56,6 @@ class PreprocessRepository:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
-            )
-            connection.execute(
-                """
-                UPDATE preprocess_operations
-                SET item_count = item_count + 1
-                WHERE id = ?
-                """,
-                (operation_id,),
             )
 
     def set_item_phase(self, item_id: str, phase: str) -> None:
@@ -136,7 +132,7 @@ class PreprocessRepository:
         connection = connect(self._database_path)
         try:
             rows = connection.execute(
-                "SELECT * FROM preprocess_operations ORDER BY created_at DESC"
+                f"{self._operation_select()} ORDER BY operation.created_at DESC"
             ).fetchall()
             return [self._operation(row) for row in rows]
         finally:
@@ -146,7 +142,8 @@ class PreprocessRepository:
         connection = connect(self._database_path)
         try:
             row = connection.execute(
-                "SELECT * FROM preprocess_operations WHERE id = ?", (operation_id,)
+                f"{self._operation_select()} WHERE operation.id = ?",
+                (operation_id,),
             ).fetchone()
             return self._operation(row) if row else None
         finally:
@@ -178,16 +175,68 @@ class PreprocessRepository:
             connection.close()
 
     @staticmethod
+    def _operation_select() -> str:
+        return """
+            SELECT
+                operation.*,
+                (
+                    SELECT COUNT(*)
+                    FROM preprocess_items item
+                    WHERE item.operation_id = operation.id
+                      AND item.phase = 'committed'
+                ) AS completed_items,
+                (
+                    SELECT item.after_relative_path
+                    FROM preprocess_items item
+                    WHERE item.operation_id = operation.id
+                    ORDER BY item.rowid DESC
+                    LIMIT 1
+                ) AS current_relative_path
+            FROM preprocess_operations operation
+        """
+
+    @staticmethod
+    def _eta_seconds(
+        *,
+        status: str,
+        created_at: str,
+        completed_items: int,
+        item_count: int,
+    ) -> int | None:
+        if status != "running" or completed_items <= 0 or completed_items >= item_count:
+            return None
+        started_at = datetime.fromisoformat(created_at)
+        if started_at.tzinfo is None:
+            started_at = started_at.replace(tzinfo=UTC)
+        elapsed_seconds = max(0.001, (datetime.now(UTC) - started_at).total_seconds())
+        remaining_items = item_count - completed_items
+        return max(1, math.ceil(elapsed_seconds * remaining_items / completed_items))
+
+    @staticmethod
     def _operation(row) -> PreprocessOperation:
+        status = str(row["status"])
+        item_count = int(row["item_count"])
+        completed_items = int(row["completed_items"])
+        created_at = str(row["created_at"])
         return PreprocessOperation(
             id=str(row["id"]),
-            status=str(row["status"]),
-            item_count=int(row["item_count"]),
+            status=status,
+            item_count=item_count,
+            completed_items=completed_items,
+            eta_seconds=PreprocessRepository._eta_seconds(
+                status=status,
+                created_at=created_at,
+                completed_items=completed_items,
+                item_count=item_count,
+            ),
+            current_relative_path=(
+                str(row["current_relative_path"]) if row["current_relative_path"] else None
+            ),
             options=PreprocessRequest.model_validate(json.loads(str(row["options_json"]))),
             execution=PreprocessExecutionOptions.model_validate(
                 json.loads(str(row["execution_json"]))
             ),
-            created_at=str(row["created_at"]),
+            created_at=created_at,
             completed_at=str(row["completed_at"]) if row["completed_at"] else None,
             undone_at=str(row["undone_at"]) if row["undone_at"] else None,
             error_message=str(row["error_message"]) if row["error_message"] else None,
