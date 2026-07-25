@@ -45,6 +45,9 @@ from dataset_studio.modules.workspaces.migrations.v013_output_resource_owner imp
 from dataset_studio.modules.workspaces.migrations.v014_annotation_relation_invariants import (
     MIGRATION as V014_ANNOTATION_RELATION_INVARIANTS,
 )
+from dataset_studio.modules.workspaces.migrations.v015_preprocess_execution_runtime import (
+    MIGRATION as V015_PREPROCESS_EXECUTION_RUNTIME,
+)
 
 WORKSPACE_MIGRATIONS: Final[tuple[Migration, ...]] = (
     V001_INITIAL_WORKSPACE_SCHEMA,
@@ -61,5 +64,6 @@ WORKSPACE_MIGRATIONS: Final[tuple[Migration, ...]] = (
     V012_ANNOTATION_REVIEW_DECOUPLING,
     V013_OUTPUT_RESOURCE_OWNER,
     V014_ANNOTATION_RELATION_INVARIANTS,
+    V015_PREPROCESS_EXECUTION_RUNTIME,
 )
 WORKSPACE_SCHEMA_VERSION: Final = WORKSPACE_MIGRATIONS[-1].version

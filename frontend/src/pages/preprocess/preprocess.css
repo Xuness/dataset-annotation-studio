@@ -135,6 +135,91 @@
   margin-bottom: 9px;
 }
 
+.preprocess-engine-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.preprocess-engine-selector button {
+  min-height: 31px;
+  padding: 5px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: var(--surface-soft);
+  font: inherit;
+  font-size: var(--text-2xs);
+  cursor: pointer;
+}
+
+.preprocess-engine-selector button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--ink-soft);
+}
+
+.preprocess-engine-selector button.is-active {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: var(--accent-soft);
+}
+
+.preprocess-engine-selector button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.preprocess-accelerator-field {
+  margin-bottom: 4px;
+}
+
+.preprocess-capability-summary {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+}
+
+.preprocess-engine-status {
+  display: grid;
+  gap: 3px;
+  margin: 9px 0;
+  padding: 8px 9px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: var(--text-2xs);
+  line-height: 1.45;
+}
+
+.preprocess-engine-status.is-ready {
+  border-left-color: var(--accent);
+}
+
+.preprocess-engine-status strong {
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.preprocess-advanced-execution {
+  margin: 9px 0;
+  border-top: 1px solid var(--line);
+}
+
+.preprocess-advanced-execution summary {
+  padding: 8px 0;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.preprocess-advanced-execution .preprocess-inline-fields {
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 8px;
+}
+
 .preprocess-rename-fields {
   grid-template-columns: 1fr 1fr;
   margin: 9px 0;
@@ -171,7 +256,7 @@
 
 .preprocess-preview {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .preprocess-preview > header {
@@ -206,6 +291,32 @@
   padding: 8px;
 }
 
+.preprocess-route-summary {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--workspace-divider);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-soft) 72%, transparent);
+  font-size: var(--text-xs);
+}
+
+.preprocess-route-summary > svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.preprocess-route-summary strong {
+  color: var(--ink-soft);
+}
+
+.preprocess-route-summary small {
+  margin-left: auto;
+  font-size: var(--text-2xs);
+}
+
 .preview-limit-note {
   margin: 0;
   padding: 8px 10px;
@@ -216,8 +327,10 @@
 
 .preview-table > div:not(.preview-empty) {
   display: grid;
-  min-width: 610px;
-  grid-template-columns: minmax(140px, 1fr) 78px 18px minmax(140px, 1fr) 78px;
+  min-width: 720px;
+  grid-template-columns:
+    minmax(140px, 1fr) 78px 18px minmax(140px, 1fr) 78px
+    82px;
   align-items: center;
   gap: 5px;
   min-height: 37px;
@@ -225,6 +338,35 @@
   border-bottom: 1px solid color-mix(in srgb, var(--workspace-divider) 72%, transparent);
   color: var(--muted);
   font-size: var(--text-xs);
+}
+
+.preprocess-route-chip {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  color: var(--ink-soft);
+  background: var(--surface);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+
+.preprocess-route-chip--accelerated_full {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  color: var(--accent);
+}
+
+.preprocess-route-chip--accelerated_resize {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--line));
+  color: var(--warning);
+}
+
+.preprocess-route-chip.is-muted {
+  color: var(--faint);
 }
 
 .preview-table > div.will-change {
@@ -310,6 +452,22 @@
 
 .preprocess-history article .button {
   min-height: 30px;
+  font-size: var(--text-xs);
+}
+
+.preprocess-history-runtime {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0;
+  padding: 7px 8px;
+  border-left: 2px solid var(--accent);
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: var(--text-2xs);
+}
+
+.preprocess-history-runtime strong {
+  color: var(--ink-soft);
   font-size: var(--text-xs);
 }
 

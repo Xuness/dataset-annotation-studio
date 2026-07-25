@@ -29,6 +29,8 @@ pnpm dev:cuda
 
 When switching an existing checkout between the mutually exclusive CPU and CUDA
 extras, run `uv venv --clear backend/.venv` before the selected `uv sync` command.
+The CUDA extra covers both ONNX inference and the optional CuPy + nvImageCodec image
+preprocessing backend.
 
 `pnpm dev` starts the frontend, loopback API, durable worker, and Tauri window. The
 Python services run directly from the uv environment; no sidecar is generated.
@@ -48,6 +50,14 @@ uv run --project backend --no-sync ruff check backend/src backend/tests
 uv run --project backend --no-sync pytest
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+After selecting and syncing the CUDA extra on a machine with a real NVIDIA device, the
+opt-in image backend smoke test exercises variable-shape JPEG batches and premultiplied
+alpha resize:
+
+```text
+DATASET_STUDIO_RUN_CUDA_TESTS=1 uv run --project backend --no-sync pytest backend/tests/test_cuda_image_runtime_integration.py -q
 ```
 
 The aggregate `pnpm check` runs all of the above. `cargo check` compiles Rust metadata

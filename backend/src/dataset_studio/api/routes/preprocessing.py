@@ -6,6 +6,8 @@ from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
 from dataset_studio.modules.preprocessing.models import (
     PreprocessExecuteRequest,
+    PreprocessExecutionPlan,
+    PreprocessExecutionPlanRequest,
     PreprocessOperation,
     PreprocessPreview,
     PreprocessRequest,
@@ -18,6 +20,15 @@ Container = Annotated[AppContainer, Depends(get_container)]
 @router.post("/preview", response_model=PreprocessPreview)
 def preview(project_id: str, request: PreprocessRequest, container: Container):
     return container.preprocessing.preview(project_id, request)
+
+
+@router.post("/execution-plan", response_model=PreprocessExecutionPlan)
+def execution_plan(
+    project_id: str,
+    payload: PreprocessExecutionPlanRequest,
+    container: Container,
+):
+    return container.preprocessing.execution_plan(project_id, payload)
 
 
 @router.post("/execute", response_model=PreprocessOperation)

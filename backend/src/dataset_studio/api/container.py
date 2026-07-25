@@ -101,5 +101,6 @@ class AppContainer:
         )
 
     async def aclose(self) -> None:
+        self.preprocessing.close()
         self.tagger_runtime.close()
         await self.codex.close()

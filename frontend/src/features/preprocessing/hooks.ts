@@ -4,7 +4,9 @@ import { assetKeys } from "../assets/queryKeys";
 import { workspaceKeys } from "../workspaces/queryKeys";
 import {
   executePreprocessing,
+  getImageProcessingBackends,
   listPreprocessOperations,
+  planPreprocessingExecution,
   previewPreprocessing,
   undoPreprocessOperation,
 } from "./api";
@@ -15,6 +17,29 @@ export function usePreprocessOperations(projectId: string) {
   return useQuery({
     queryKey: preprocessingKeys.operations(projectId),
     queryFn: () => listPreprocessOperations(projectId),
+  });
+}
+
+export function useImageProcessingBackends() {
+  return useQuery({
+    queryKey: preprocessingKeys.backends,
+    queryFn: getImageProcessingBackends,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export function usePreprocessExecutionPlan(
+  projectId: string,
+  request: PreprocessRequest,
+  previewToken: string | undefined,
+  execution: PreprocessExecutionOptions,
+) {
+  return useQuery({
+    queryKey: preprocessingKeys.executionPlan(projectId, previewToken ?? "", execution),
+    queryFn: () => planPreprocessingExecution(projectId, request, previewToken ?? "", execution),
+    enabled: Boolean(projectId && previewToken),
+    retry: false,
   });
 }
 

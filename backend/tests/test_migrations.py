@@ -41,6 +41,7 @@ EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS = {
     12: "313ef7efbc403b4bd46ac7cc65e77e32f2f178a053f866b1104560eab1e2c0fb",
     13: "05ae357184022303f22dcd49d4c53460844bfcc7ba9b05b37e0bbd75f00ad59c",
     14: "ec00973ffc0b07c4a531fe343cd88ab98b29b1511267bac0facca10edb4fe78e",
+    15: "75e040ea6904594889def8a785ceecd13a6b4e5cddd17b234e96ee9dd70afdd5",
 }
 
 
@@ -592,7 +593,7 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
     finally:
         connection.close()
     assert row["image_metadata_version"] == 1
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     assert "idx_job_items_asset_updated" in indexes
     assert {
         "cache_read_tokens",
@@ -619,6 +620,17 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
     }.issubset(tables)
     assert preprocess_item_columns["phase"]["notnull"] == 1
     assert preprocess_item_columns["phase"]["dflt_value"] == "'committed'"
+    assert {
+        "planned_route",
+        "actual_route",
+        "backend_id",
+        "decode_location",
+        "resize_location",
+        "encode_location",
+        "route_reason_code",
+        "fallback_code",
+        "render_duration_ms",
+    }.issubset(preprocess_item_columns)
     assert {
         "execution_backend",
         "execution_profile_id",
@@ -853,7 +865,7 @@ def test_workspace_migration_is_safe_when_api_and_worker_start_together(tmp_path
         ]
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 
 def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None:
@@ -915,7 +927,7 @@ def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None
         ).fetchone()
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     assert imported is not None
     assert imported["content"] == "<caption>legacy</caption>"
     assert imported["channel"] == "existing_annotation"
@@ -973,7 +985,7 @@ def test_recent_workspace_list_applies_missing_migrations_before_summary(
     finally:
         connection.close()
     assert [summary.project_id for summary in summaries] == [manifest.project_id]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 
 def test_annotation_relation_triggers_reject_cross_asset_revisions(tmp_path: Path) -> None:

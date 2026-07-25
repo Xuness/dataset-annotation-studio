@@ -10,6 +10,19 @@ const resizeAlgorithmLabels = {
   anime_low_halo: "二次元低光晕",
 } as const;
 
+const executionModeLabels = {
+  auto: "自动选择",
+  cpu_only: "仅 CPU",
+  prefer_accelerator: "优先硬件加速",
+} as const;
+
+function formatDuration(milliseconds: number): string {
+  if (milliseconds < 1000) return `${milliseconds} ms`;
+  const seconds = milliseconds / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)} 秒`;
+  return `${Math.floor(seconds / 60)} 分 ${Math.round(seconds % 60)} 秒`;
+}
+
 export function PreprocessHistoryPanel({
   operations,
   undoPending,
@@ -41,6 +54,13 @@ export function PreprocessHistoryPanel({
             operation.options.convert ? operation.options.convert.format.toUpperCase() : null,
             operation.options.rename ? `重命名 ${operation.options.rename.template}` : null,
           ].filter(Boolean);
+          const runtime = operation.runtime;
+          const routeReasonCount = runtime
+            ? Object.values(runtime.route_reason_counts).reduce((total, count) => total + count, 0)
+            : 0;
+          const fallbackCount = runtime
+            ? Object.values(runtime.fallback_counts).reduce((total, count) => total + count, 0)
+            : 0;
           return (
             <article key={operation.id}>
               <header>
@@ -59,6 +79,26 @@ export function PreprocessHistoryPanel({
               </header>
               <small>{new Date(operation.created_at).toLocaleString()}</small>
               <p>{details.join(" · ")}</p>
+              {runtime ? (
+                <div className="preprocess-history-runtime">
+                  <strong>
+                    {executionModeLabels[runtime.requested_mode]} → {runtime.backend_label}
+                  </strong>
+                  <span>
+                    {runtime.route_counts.accelerated_full ?? 0} 加速管线 ·{" "}
+                    {runtime.route_counts.accelerated_resize ?? 0} 加速缩放 ·{" "}
+                    {runtime.route_counts.cpu ?? 0} CPU
+                  </span>
+                  <small>
+                    {formatDuration(runtime.duration_ms)} · CPU {runtime.worker_count} 线程 · 批大小{" "}
+                    {runtime.batch_size}
+                  </small>
+                  {routeReasonCount ? (
+                    <small>能力或策略选择 CPU：{routeReasonCount} 项</small>
+                  ) : null}
+                  {fallbackCount ? <small>加速运行时回退：{fallbackCount} 项</small> : null}
+                </div>
+              ) : null}
               {operation.error_message ? (
                 <p className="form-error">{operation.error_message}</p>
               ) : null}

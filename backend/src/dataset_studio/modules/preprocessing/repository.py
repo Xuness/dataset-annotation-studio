@@ -5,22 +5,37 @@ from pathlib import Path
 
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
-from dataset_studio.modules.preprocessing.models import PreprocessOperation, PreprocessRequest
+from dataset_studio.modules.preprocessing.models import (
+    PreprocessExecutionOptions,
+    PreprocessExecutionRuntime,
+    PreprocessOperation,
+    PreprocessRequest,
+)
 
 
 class PreprocessRepository:
     def __init__(self, database_path: Path) -> None:
         self._database_path = database_path
 
-    def start(self, operation_id: str, request: PreprocessRequest) -> None:
+    def start(
+        self,
+        operation_id: str,
+        request: PreprocessRequest,
+        execution: PreprocessExecutionOptions,
+    ) -> None:
         with transaction(self._database_path) as connection:
             connection.execute(
                 """
                 INSERT INTO preprocess_operations (
-                    id, status, options_json, item_count, created_at
-                ) VALUES (?, 'running', ?, 0, ?)
+                    id, status, options_json, execution_json, item_count, created_at
+                ) VALUES (?, 'running', ?, ?, 0, ?)
                 """,
-                (operation_id, request.model_dump_json(), utc_now_iso()),
+                (
+                    operation_id,
+                    request.model_dump_json(),
+                    execution.model_dump_json(),
+                    utc_now_iso(),
+                ),
             )
 
     def add_item(self, operation_id: str, values: tuple[object, ...]) -> None:
@@ -31,8 +46,10 @@ class PreprocessRepository:
                     id, operation_id, asset_id, before_relative_path,
                     after_relative_path, before_hash, after_hash,
                     before_width, before_height, after_width, after_height,
-                    recovery_relative_path, phase
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    recovery_relative_path, phase, planned_route, actual_route,
+                    backend_id, decode_location, resize_location, encode_location,
+                    route_reason_code, fallback_code, render_duration_ms
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
             )
@@ -78,15 +95,19 @@ class PreprocessRepository:
                 )
             return operation_ids
 
-    def complete(self, operation_id: str) -> None:
+    def complete(
+        self,
+        operation_id: str,
+        runtime: PreprocessExecutionRuntime,
+    ) -> None:
         with transaction(self._database_path) as connection:
             connection.execute(
                 """
                 UPDATE preprocess_operations
-                SET status = 'completed', completed_at = ?
+                SET status = 'completed', completed_at = ?, runtime_json = ?
                 WHERE id = ?
                 """,
-                (utc_now_iso(), operation_id),
+                (utc_now_iso(), runtime.model_dump_json(), operation_id),
             )
 
     def fail(self, operation_id: str, message: str) -> None:
@@ -163,8 +184,16 @@ class PreprocessRepository:
             status=str(row["status"]),
             item_count=int(row["item_count"]),
             options=PreprocessRequest.model_validate(json.loads(str(row["options_json"]))),
+            execution=PreprocessExecutionOptions.model_validate(
+                json.loads(str(row["execution_json"]))
+            ),
             created_at=str(row["created_at"]),
             completed_at=str(row["completed_at"]) if row["completed_at"] else None,
             undone_at=str(row["undone_at"]) if row["undone_at"] else None,
             error_message=str(row["error_message"]) if row["error_message"] else None,
+            runtime=(
+                PreprocessExecutionRuntime.model_validate(json.loads(str(row["runtime_json"])))
+                if row["runtime_json"]
+                else None
+            ),
         )

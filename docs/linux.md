@@ -60,6 +60,9 @@ pnpm dev:cuda
 The CPU and CUDA ONNX Runtime packages are intentionally conflicting choices and must
 not be installed together. The CUDA extra also installs NVIDIA runtime wheels; review
 their terms before redistributing an environment or a derived binary.
+It also enables the optional CuPy + nvImageCodec preprocessing backend. JPEG codec
+stages and Lanczos 3/4 resize are routed per image; unsupported inputs and runtime
+failures retain the CPU reference path.
 
 When changing an existing checkout between CPU and CUDA, rebuild the project virtual
 environment first so files shared by the two ONNX Runtime distributions cannot remain

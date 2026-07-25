@@ -36,6 +36,9 @@ changes.
   scheduler and general annotation repository.
 - Isolated every immutable workspace schema migration in its own versioned module, with
   a small registry and checksum regression guard.
+- Added capability-driven image preprocessing backends with dynamic CUDA device
+  discovery, JPEG codec acceleration, GPU Lanczos resize, per-item CPU fallback, and
+  persisted planned-versus-actual execution diagnostics.
 
 ## 0.1.0
 

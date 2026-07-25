@@ -4,6 +4,8 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useAssets } from "../../features/assets/hooks";
 import {
+  useImageProcessingBackends,
+  usePreprocessExecutionPlan,
   usePreprocessOperations,
   usePreprocessingActions,
 } from "../../features/preprocessing/hooks";
@@ -30,8 +32,12 @@ const initialForm: PreprocessFormState = {
   format: "webp",
   quality: 90,
   effort: 4,
+  executionMode: "auto",
+  acceleratorId: "",
   concurrencyMode: "auto",
   maxWorkers: 8,
+  batchMode: "auto",
+  batchSize: 32,
   renameEnabled: false,
   renameTemplate: "image_{index}",
   renameStartIndex: 1,
@@ -45,6 +51,7 @@ export function PreprocessPage() {
   const assets = useAssets(projectId, { limit: 1 });
   const rescan = useRescanWorkspace(projectId);
   const operations = usePreprocessOperations(projectId);
+  const imageBackends = useImageProcessingBackends();
   const actions = usePreprocessingActions(projectId);
   const checkedAssetIds = useAppStore((state) => state.checkedAssetIds);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
@@ -81,17 +88,42 @@ export function PreprocessPage() {
     }),
     [checkedAssetIds, form],
   );
+  const resolvedAcceleratorId = useMemo(() => {
+    if (form.executionMode !== "prefer_accelerator") return null;
+    const usable = imageBackends.data?.backends.filter(
+      (backend) => backend.id !== "cpu" && backend.status !== "unavailable",
+    );
+    return (
+      usable?.find((backend) => backend.id === form.acceleratorId)?.id ?? usable?.[0]?.id ?? null
+    );
+  }, [form.acceleratorId, form.executionMode, imageBackends.data]);
   const execution = useMemo<PreprocessExecutionOptions>(
     () => ({
+      mode: form.executionMode,
+      accelerator_id: resolvedAcceleratorId,
       max_workers: form.concurrencyMode === "manual" ? form.maxWorkers : null,
+      batch_size: form.batchMode === "manual" ? form.batchSize : null,
     }),
-    [form.concurrencyMode, form.maxWorkers],
+    [
+      form.batchMode,
+      form.batchSize,
+      form.concurrencyMode,
+      form.executionMode,
+      form.maxWorkers,
+      resolvedAcceleratorId,
+    ],
   );
   const requestFingerprint = useMemo(
     () => JSON.stringify([projectId, request]),
     [projectId, request],
   );
   const validPreview = previewFingerprint === requestFingerprint ? actions.preview.data : undefined;
+  const executionPlan = usePreprocessExecutionPlan(
+    projectId,
+    request,
+    validPreview?.preview_token,
+    execution,
+  );
   const filesChanging = actions.execute.isPending || actions.undo.isPending;
   const workspaceBusy = filesChanging || rescan.isPending;
 
@@ -129,7 +161,13 @@ export function PreprocessPage() {
     const previewData = validPreview;
     if (!previewData || previewData.warning_count) return;
     const confirmed = await confirmDialog(
-      `对 ${previewData.changed_count} 张图片执行预处理？原文件会保存在当前项目的恢复区。${request.rename ? "原标注、所有语言译文和 .json 也会一起重命名。" : ""}`,
+      `对 ${previewData.changed_count} 张图片执行预处理？原文件会保存在当前项目的恢复区。${
+        executionPlan.data
+          ? `预计 ${executionPlan.data.route_counts.accelerated_full ?? 0} 项使用加速管线、${
+              executionPlan.data.route_counts.accelerated_resize ?? 0
+            } 项仅加速缩放、${executionPlan.data.route_counts.cpu ?? 0} 项使用 CPU。`
+          : ""
+      }${request.rename ? "原标注、所有语言译文和 .json 也会一起重命名。" : ""}`,
       { title: "执行预处理", confirmLabel: "执行" },
     );
     if (!confirmed) return;
@@ -187,10 +225,21 @@ export function PreprocessPage() {
         previewPending={actions.preview.isPending || workspaceBusy}
         executePending={workspaceBusy}
         error={error}
+        backends={imageBackends.data}
+        backendsPending={imageBackends.isPending}
+        executionPlan={executionPlan.data}
+        executionPlanPending={executionPlan.isFetching}
         onPreview={() => void preview()}
         onExecute={() => void execute()}
       />
-      <PreprocessPreviewPanel preview={validPreview} />
+      <PreprocessPreviewPanel
+        preview={validPreview}
+        executionPlan={executionPlan.data}
+        executionPlanPending={executionPlan.isFetching}
+        executionPlanError={
+          executionPlan.error instanceof Error ? executionPlan.error.message : null
+        }
+      />
       <PreprocessHistoryPanel
         operations={operations.data ?? []}
         undoPending={workspaceBusy}

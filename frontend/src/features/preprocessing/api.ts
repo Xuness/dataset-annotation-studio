@@ -1,6 +1,8 @@
 import { apiRequest } from "../../shared/api/client";
 import type {
+  ImageProcessingBackends,
   PreprocessExecutionOptions,
+  PreprocessExecutionPlan,
   PreprocessOperation,
   PreprocessPreview,
   PreprocessRequest,
@@ -15,6 +17,22 @@ export function previewPreprocessing(
   return apiRequest(`${path(projectId)}/preview`, {
     method: "POST",
     body: JSON.stringify(request),
+  });
+}
+
+export function getImageProcessingBackends(): Promise<ImageProcessingBackends> {
+  return apiRequest("/api/v1/system/image-processing/backends");
+}
+
+export function planPreprocessingExecution(
+  projectId: string,
+  request: PreprocessRequest,
+  previewToken: string,
+  execution: PreprocessExecutionOptions,
+): Promise<PreprocessExecutionPlan> {
+  return apiRequest(`${path(projectId)}/execution-plan`, {
+    method: "POST",
+    body: JSON.stringify({ request, preview_token: previewToken, execution }),
   });
 }
 

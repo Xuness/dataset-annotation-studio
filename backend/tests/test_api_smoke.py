@@ -105,6 +105,11 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
             "log_dir": str(tmp_path / "app-data" / "logs"),
         }
         assert (tmp_path / "app-data" / "logs").is_dir()
+        image_backends = client.get("/api/v1/system/image-processing/backends")
+        assert image_backends.status_code == 200
+        assert image_backends.json()["revision"]
+        assert image_backends.json()["backends"][0]["id"] == "cpu"
+        assert image_backends.json()["backends"][0]["status"] == "ready"
 
         taggers = client.get("/api/v1/taggers")
         assert taggers.status_code == 200
@@ -345,6 +350,18 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
             json=preprocess_request,
         )
         assert preprocess_preview.status_code == 200
+        execution_plan = client.post(
+            f"/api/v1/workspaces/{project_id}/preprocessing/execution-plan",
+            json={
+                "request": preprocess_request,
+                "preview_token": preprocess_preview.json()["preview_token"],
+                "execution": {"mode": "cpu_only", "max_workers": 2},
+            },
+        )
+        assert execution_plan.status_code == 200
+        assert execution_plan.json()["selected_backend_id"] == "cpu"
+        assert execution_plan.json()["route_counts"] == {"cpu": 1}
+        assert execution_plan.json()["effective_cpu_workers"] == 1
         executed = client.post(
             f"/api/v1/workspaces/{project_id}/preprocessing/execute",
             json={
@@ -356,5 +373,7 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
         assert executed.status_code == 200
         assert executed.json()["status"] == "completed"
         assert executed.json()["options"]["resize"]["algorithm"] == "lanczos4"
+        assert executed.json()["execution"]["mode"] == "cpu_only"
+        assert executed.json()["runtime"]["route_counts"] == {"cpu": 1}
         with Image.open(project / "sample.webp") as resized:
             assert resized.size == (128, 64)

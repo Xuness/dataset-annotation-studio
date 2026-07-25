@@ -15,7 +15,8 @@
 - 在项目 SQLite 中分别管理原有标注、结构化 Tags、LLM 描述和多语言译文，独立保留当前可用性、人工复核状态与完整修订历史。
 - 校验通过且匹配当前图片的 Tagger、LLM 和翻译结果可立即用于后续流程；人工复核是可选的质量标记，素材页可按 Tags、LLM 描述、原有标注或具体译文语言批量复核与删除。
 - 可在素材页提示词配置中选择把当前可用 Tags 冻结后追加到 LLM User Prompt，并预览实际拼接内容；任务创建后的 Tag 编辑不会改变既有任务。
-- 批量缩放、格式转换、重命名、恢复与撤销，文件写入带预览和冲突检查。
+- 批量缩放、格式转换、重命名、恢复与撤销，文件写入带预览和冲突检查；CUDA
+  运行时可按图片能力加速 JPEG 编解码和 Lanczos 缩放。
 - 按“通道 + 语言”独立选择当前或已复核修订，支持一次导出多种译文语言的 TXT、逐图 JSON 或两者；多个 TXT 通道生成独立训练集目录。
 
 ## 支持范围
@@ -68,8 +69,15 @@ pnpm dev:cuda
 ```
 
 `onnxruntime` 与 `onnxruntime-gpu` 不能在同一环境中并存，uv 配置会阻止同时选择两个
-extra。CUDA extra 将 cuDNN 固定在仍支持 Tesla V100/Volta 的 9.10 系列；CUDA Runtime
-还受 NVIDIA 软件条款约束，本仓库不分发其二进制文件。
+extra。CUDA extra 还安装 CuPy、nvImageCodec 和 nvJPEG，并将 cuDNN 固定在仍支持
+Tesla V100/Volta 的 9.10 系列；CUDA Runtime 受 NVIDIA 软件条款约束，本仓库不分发其
+二进制文件。
+
+预处理页会动态探测设备，并提供“自动选择 / 仅 CPU / 硬件加速”。当前 CUDA 后端对
+8 位、非渐进式 JPEG 提供 GPU/混合编解码管线，对 L、LA、RGB、RGBA 图片的
+Lanczos 3/4 缩放提供 GPU 路径。PNG、WebP 等格式仍可采用 CPU 解码 + GPU 缩放 +
+CPU 编码；多帧、特殊位深、特殊颜色模式、低光晕算法或运行时失败会逐项安全回退 CPU，
+不会把回退结果伪装为 GPU 执行。
 
 如果已有 `.venv` 曾经切换或混装过 CPU/GPU Runtime，先运行
 `uv venv --clear backend/.venv`，再执行上面选定的一条 `uv sync` 命令。它只重建项目

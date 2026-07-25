@@ -4,6 +4,7 @@ import os
 import secrets
 import shutil
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -15,10 +16,20 @@ from dataset_studio.core.languages import LANGUAGE_PATTERN
 from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.modules.assets.scanner import IMAGE_METADATA_VERSION, AssetScanner
-from dataset_studio.modules.preprocessing.executor import PreparedItem, PreprocessItemPreparer
+from dataset_studio.modules.preprocessing.executor import (
+    PreparedItem,
+    PreprocessItemPreparer,
+    requires_render,
+    resolve_resize_worker_count,
+)
 from dataset_studio.modules.preprocessing.image_pipeline import sha256
 from dataset_studio.modules.preprocessing.models import (
+    ImageProcessingBackend,
+    ImageProcessingBackends,
     PreprocessExecuteRequest,
+    PreprocessExecutionPlan,
+    PreprocessExecutionPlanItem,
+    PreprocessExecutionPlanRequest,
     PreprocessItemPhase,
     PreprocessOperation,
     PreprocessPreview,
@@ -31,6 +42,10 @@ from dataset_studio.modules.preprocessing.recovery import (
     RecoveryFileOperations,
 )
 from dataset_studio.modules.preprocessing.repository import PreprocessRepository
+from dataset_studio.modules.preprocessing.runtime.contracts import RenderIntent
+from dataset_studio.modules.preprocessing.runtime.inspection import inspect_image
+from dataset_studio.modules.preprocessing.runtime.registry import ImageBackendRegistry
+from dataset_studio.modules.preprocessing.runtime.router import build_routing_plan
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
@@ -42,12 +57,14 @@ class PreprocessService:
         has_active_jobs: Callable[[str], bool] | None = None,
         has_active_exports: Callable[[str], bool] | None = None,
         has_active_asset_deletions: Callable[[str], bool] | None = None,
+        backend_registry: ImageBackendRegistry | None = None,
     ) -> None:
         self._workspaces = workspaces
         self._has_active_jobs = has_active_jobs or (lambda _project_id: False)
         self._has_active_exports = has_active_exports or (lambda _project_id: False)
         self._has_active_asset_deletions = has_active_asset_deletions or (lambda _project_id: False)
         self._scanner = AssetScanner()
+        self._backend_registry = backend_registry or ImageBackendRegistry()
         self._recovery = PreprocessRecoveryCoordinator(
             workspaces,
             self._scanner,
@@ -80,6 +97,81 @@ class PreprocessService:
             preview_token=preview_token(request, plan),
         )
 
+    def image_processing_backends(self) -> ImageProcessingBackends:
+        descriptors = self._backend_registry.descriptors()
+        return ImageProcessingBackends(
+            revision=self._backend_registry.revision(),
+            backends=[
+                ImageProcessingBackend(
+                    id=descriptor.id,
+                    kind=descriptor.kind,
+                    label=descriptor.label,
+                    status=descriptor.status,
+                    device_name=descriptor.device_name,
+                    total_memory_bytes=descriptor.total_memory_bytes,
+                    supports_batch=descriptor.supports_batch,
+                    decode_formats=list(descriptor.decode_formats),
+                    encode_formats=list(descriptor.encode_formats),
+                    resize_algorithms=list(descriptor.resize_algorithms),
+                    issue=descriptor.issue,
+                )
+                for descriptor in descriptors
+            ],
+        )
+
+    def execution_plan(
+        self,
+        project_id: str,
+        payload: PreprocessExecutionPlanRequest,
+    ) -> PreprocessExecutionPlan:
+        paths, _ = self._workspaces.get(project_id)
+        plan = build_plan(paths.database, paths.root, payload.request)
+        current_token = preview_token(payload.request, plan)
+        if not secrets.compare_digest(current_token, payload.preview_token):
+            raise ValueError("预览已失效；参数或源文件发生了变化，请重新预览。")
+        render_items = [
+            item for item in plan if item.will_change and requires_render(item, payload.request)
+        ]
+        intents = [
+            RenderIntent(
+                plan=item,
+                descriptor=inspect_image(paths.root / item.before_relative_path),
+                resize=payload.request.resize,
+                convert=payload.request.convert,
+            )
+            for item in render_items
+        ]
+        routing = build_routing_plan(
+            intents,
+            payload.execution,
+            self._backend_registry,
+            worker_count=resolve_resize_worker_count(
+                render_items,
+                payload.request,
+                payload.execution,
+            ),
+        )
+        visible = routing.decisions[:2000]
+        return PreprocessExecutionPlan(
+            items=[
+                PreprocessExecutionPlanItem(
+                    asset_id=decision.intent.plan.asset_id,
+                    route=decision.route,
+                    backend_id=decision.backend_id,
+                    reason_code=decision.reason_code,
+                )
+                for decision in visible
+            ],
+            total_render_items=len(routing.decisions),
+            truncated=len(visible) < len(routing.decisions),
+            selected_backend_id=routing.selected_backend_id,
+            route_counts=routing.route_counts,
+            route_reasons=routing.reason_counts,
+            effective_cpu_workers=routing.worker_count,
+            effective_batch_size=routing.batch_size,
+            capability_revision=self._backend_registry.revision(),
+        )
+
     def execute(
         self,
         project_id: str,
@@ -101,8 +193,9 @@ class PreprocessService:
                 raise ValueError(warning)
             if not any(item.will_change for item in plan):
                 raise ValueError("当前参数不会修改任何图片，无需执行预处理。")
-            repository.start(operation_id, request)
+            repository.start(operation_id, request, execution.execution)
             operation_root = paths.recovery / operation_id
+            started = time.perf_counter()
             try:
                 changed_items = [item for item in plan if item.will_change]
                 with PreprocessItemPreparer(
@@ -111,15 +204,14 @@ class PreprocessService:
                     items=changed_items,
                     request=request,
                     execution=execution.execution,
+                    backend_registry=self._backend_registry,
                 ) as preparer:
                     for prepared in preparer:
                         item_id = self._record_item(
                             repository,
                             paths.root,
                             operation_id,
-                            prepared.plan,
-                            prepared.recovery_path,
-                            prepared.after_hash,
+                            prepared,
                         )
                         repository.set_item_phase(
                             item_id,
@@ -131,7 +223,10 @@ class PreprocessService:
                             item_id,
                             PreprocessItemPhase.COMMITTED.value,
                         )
-                repository.complete(operation_id)
+                    runtime = preparer.runtime_summary(
+                        round((time.perf_counter() - started) * 1000)
+                    )
+                repository.complete(operation_id, runtime)
                 self._scanner.scan(paths, manifest)
             except Exception as error:
                 compensation_errors: list[str] = []
@@ -164,6 +259,9 @@ class PreprocessService:
 
     def recover_orphaned(self) -> int:
         return self._recovery.recover_orphaned()
+
+    def close(self) -> None:
+        self._backend_registry.close()
 
     def undo(self, project_id: str, operation_id: str) -> PreprocessOperation:
         paths, manifest = self._workspaces.get(project_id)
@@ -307,7 +405,14 @@ class PreprocessService:
             raise
 
     @staticmethod
-    def _record_item(repository, root, operation_id, item, recovery, after_hash) -> str:
+    def _record_item(
+        repository,
+        root: Path,
+        operation_id: str,
+        prepared: PreparedItem,
+    ) -> str:
+        item = prepared.plan
+        observation = prepared.observation
         item_id = str(uuid.uuid4())
         repository.add_item(
             operation_id,
@@ -318,13 +423,22 @@ class PreprocessService:
                 item.before_relative_path,
                 item.after_relative_path,
                 item.before_hash,
-                after_hash,
+                prepared.after_hash,
                 item.before_width,
                 item.before_height,
                 item.after_width,
                 item.after_height,
-                recovery.relative_to(root).as_posix(),
+                prepared.recovery_path.relative_to(root).as_posix(),
                 PreprocessItemPhase.PREPARED.value,
+                observation.planned_route.value if observation else None,
+                observation.actual_route.value if observation else None,
+                observation.backend_id if observation else None,
+                observation.decode_location if observation else None,
+                observation.resize_location if observation else None,
+                observation.encode_location if observation else None,
+                observation.route_reason_code if observation else None,
+                observation.fallback_code if observation else None,
+                observation.duration_ms if observation else None,
             ),
         )
         return item_id

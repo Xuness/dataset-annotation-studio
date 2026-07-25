@@ -25,6 +25,9 @@ cpu = [
     "onnxruntime>=1.21,<1.27",
 ]
 cuda = [
+    # Keep the CUDA sidecar self-contained apart from the NVIDIA display driver.
+    "cupy-cuda12x>=14,<15",
+    "nvidia-nvimgcodec-cu12[nvjpeg]>=0.9,<1",
     "onnxruntime-gpu[cuda,cudnn]>=1.21,<1.27",
     # cuDNN 9.11+ removed Volta support; keep Tesla V100 (SM 7.0) usable.
     "nvidia-cudnn-cu12>=9.10,<9.11",

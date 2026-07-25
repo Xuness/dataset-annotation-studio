@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from dataset_studio import __version__
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
+from dataset_studio.modules.preprocessing.models import ImageProcessingBackends
 
 router = APIRouter(prefix="/system", tags=["system"])
 Container = Annotated[AppContainer, Depends(get_container)]
@@ -27,3 +28,8 @@ def get_system_diagnostics(container: Container) -> SystemDiagnostics:
         app_data_dir=str(app_data_dir),
         log_dir=str(app_data_dir / "logs"),
     )
+
+
+@router.get("/image-processing/backends", response_model=ImageProcessingBackends)
+def get_image_processing_backends(container: Container) -> ImageProcessingBackends:
+    return container.preprocessing.image_processing_backends()

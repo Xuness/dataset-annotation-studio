@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 import cv2
@@ -48,6 +49,12 @@ def render_image_to_staging(
     item: PlanItem,
     resize: ResizeOptions | None,
     convert: ConvertOptions | None,
+    *,
+    resize_handler: Callable[
+        [Image.Image, tuple[int, int], ResizeAlgorithm],
+        Image.Image,
+    ]
+    | None = None,
 ) -> None:
     staging.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
@@ -60,7 +67,8 @@ def render_image_to_staging(
             image = ImageOps.exif_transpose(opened)
             if image.size != (item.after_width, item.after_height):
                 algorithm = resize.algorithm if resize else ResizeAlgorithm.LANCZOS3
-                image = _resize_image(
+                handler = resize_handler or _resize_image
+                image = handler(
                     image,
                     (item.after_width, item.after_height),
                     algorithm,
