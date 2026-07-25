@@ -23,6 +23,13 @@ from dataset_studio.modules.annotations.projection import (
 )
 from dataset_studio.modules.annotations.review_repository import AnnotationReviewRepository
 from dataset_studio.modules.annotations.summary import sync_asset_annotation_summary
+from dataset_studio.modules.translations.identity import (
+    DEFAULT_TRANSLATION_PRODUCER_KIND,
+    DEFAULT_TRANSLATION_SOURCE_KIND,
+    TranslationProducerKind,
+    TranslationSourceKind,
+    translation_identity_values,
+)
 
 _EXPECTED_HEAD_UNSET = object()
 
@@ -37,6 +44,8 @@ class RevisionWrite:
 def channel_definition(
     channel: AnnotationChannel,
     language: str = "",
+    translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+    translation_producer_kind: TranslationProducerKind | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
 ) -> tuple[AnnotationContentKind, str]:
     if channel == AnnotationChannel.EXISTING:
         return AnnotationContentKind.TEXT, "原有标注"
@@ -44,7 +53,11 @@ def channel_definition(
         return AnnotationContentKind.TAGS, "Tags"
     if channel == AnnotationChannel.DESCRIPTION:
         return AnnotationContentKind.TEXT, "LLM 描述"
-    return AnnotationContentKind.TEXT, f"翻译 · {language}"
+    source_kind = TranslationSourceKind(translation_source_kind)
+    producer_kind = TranslationProducerKind(translation_producer_kind)
+    source_label = "LLM 描述" if source_kind == TranslationSourceKind.DESCRIPTION else "Tags"
+    producer_label = "LLM" if producer_kind == TranslationProducerKind.LLM else "本地词典"
+    return AnnotationContentKind.TEXT, f"翻译 · {source_label} / {producer_label} · {language}"
 
 
 class AnnotationRepository:
@@ -71,6 +84,8 @@ class AnnotationRepository:
                         WHEN 'description' THEN 2
                         ELSE 3
                     END,
+                    d.translation_source_kind,
+                    d.translation_producer_kind,
                     d.language
                 """,
                 (asset_id,),
@@ -83,7 +98,15 @@ class AnnotationRepository:
         asset_id: str,
         channel: AnnotationChannel,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> sqlite3.Row | None:
+        source_value, producer_value = self._identity_values(
+            channel,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         connection = connect(self._database_path)
         try:
             return connection.execute(
@@ -96,8 +119,10 @@ class AnnotationRepository:
                 JOIN assets a ON a.id = d.asset_id
                 LEFT JOIN annotation_document_revisions r ON r.id = d.head_revision_id
                 WHERE d.asset_id = ? AND d.channel = ? AND d.language = ?
+                  AND d.translation_source_kind = ?
+                  AND d.translation_producer_kind = ?
                 """,
-                (asset_id, channel.value, language),
+                (asset_id, channel.value, language, source_value, producer_value),
             ).fetchone()
         finally:
             connection.close()
@@ -107,7 +132,15 @@ class AnnotationRepository:
         asset_ids: Sequence[str],
         channel: AnnotationChannel,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> dict[str, sqlite3.Row]:
+        source_value, producer_value = self._identity_values(
+            channel,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         unique_ids = list(dict.fromkeys(asset_id for asset_id in asset_ids if asset_id))
         if not unique_ids:
             return {}
@@ -130,9 +163,11 @@ class AnnotationRepository:
                         LEFT JOIN annotation_document_revisions r
                           ON r.id = d.head_revision_id
                         WHERE d.channel = ? AND d.language = ?
+                          AND d.translation_source_kind = ?
+                          AND d.translation_producer_kind = ?
                           AND d.asset_id IN ({placeholders})
                         """,
-                        [channel.value, language, *batch],
+                        [channel.value, language, source_value, producer_value, *batch],
                     ).fetchall()
                 )
         finally:
@@ -208,7 +243,9 @@ class AnnotationRepository:
                                 WHEN 'tags' THEN 1
                                 WHEN 'description' THEN 2
                                 ELSE 3
-                            END,
+                        END,
+                            d.translation_source_kind,
+                            d.translation_producer_kind,
                             d.language,
                             d.asset_id
                         """,
@@ -257,8 +294,17 @@ class AnnotationRepository:
         language: str = "",
         *,
         require_current_image: bool = True,
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> str | None:
-        row = self.get_document_row(asset_id, channel, language)
+        row = self.get_document_row(
+            asset_id,
+            channel,
+            language,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         if row is None:
             return None
         state = resolve_document_row_state(row)
@@ -275,7 +321,15 @@ class AnnotationRepository:
         asset_id: str,
         channel: AnnotationChannel,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> str | None:
+        source_value, producer_value = self._identity_values(
+            channel,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         connection = connect(self._database_path)
         try:
             row = connection.execute(
@@ -283,8 +337,10 @@ class AnnotationRepository:
                 SELECT head_revision_id
                 FROM annotation_documents
                 WHERE asset_id = ? AND channel = ? AND language = ?
+                  AND translation_source_kind = ?
+                  AND translation_producer_kind = ?
                 """,
-                (asset_id, channel.value, language),
+                (asset_id, channel.value, language, source_value, producer_value),
             ).fetchone()
             return str(row["head_revision_id"]) if row and row["head_revision_id"] else None
         finally:
@@ -296,6 +352,9 @@ class AnnotationRepository:
         asset_id: str,
         channel: AnnotationChannel,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
         content: str,
         raw_bytes: bytes | None = None,
         source: str,
@@ -314,6 +373,8 @@ class AnnotationRepository:
                 asset_id=asset_id,
                 channel=channel,
                 language=language,
+                translation_source_kind=translation_source_kind,
+                translation_producer_kind=translation_producer_kind,
                 content=content,
                 raw_bytes=raw_bytes,
                 source=source,
@@ -362,6 +423,8 @@ class AnnotationRepository:
                 asset_id=asset_id,
                 channel=AnnotationChannel.TAGS,
                 language="",
+                translation_source_kind=DEFAULT_TRANSLATION_SOURCE_KIND,
+                translation_producer_kind=DEFAULT_TRANSLATION_PRODUCER_KIND,
                 content_kind=AnnotationContentKind.TAGS,
                 text_content=None,
                 raw_bytes=None,
@@ -386,6 +449,8 @@ class AnnotationRepository:
             connection,
             channel=AnnotationChannel.TAGS,
             language="",
+            translation_source_kind=DEFAULT_TRANSLATION_SOURCE_KIND,
+            translation_producer_kind=DEFAULT_TRANSLATION_PRODUCER_KIND,
             content_kind=AnnotationContentKind.TAGS,
             text_content=None,
             raw_bytes=None,
@@ -398,6 +463,9 @@ class AnnotationRepository:
         asset_id: str,
         channel: AnnotationChannel,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
         expected_head_revision_id: str | None | object = _EXPECTED_HEAD_UNSET,
         source: str = "manual_delete",
     ) -> RevisionWrite | None:
@@ -407,27 +475,31 @@ class AnnotationRepository:
                 asset_id=asset_id,
                 channel=channel,
                 language=language,
+                translation_source_kind=translation_source_kind,
+                translation_producer_kind=translation_producer_kind,
                 expected_head_revision_id=expected_head_revision_id,
                 source=source,
             )
 
     def delete_many(
         self,
-        targets: Sequence[tuple[str, AnnotationChannel, str]],
-    ) -> list[tuple[str, AnnotationChannel, str]]:
+        targets: Sequence[tuple[str, AnnotationChannel, str, str, str]],
+    ) -> list[tuple[str, AnnotationChannel, str, str, str]]:
         if not targets:
             return []
-        deleted: list[tuple[str, AnnotationChannel, str]] = []
+        deleted: list[tuple[str, AnnotationChannel, str, str, str]] = []
         with transaction(self._database_path) as connection:
-            for asset_id, channel, language in targets:
+            for asset_id, channel, language, source_kind, producer_kind in targets:
                 write = self._delete_in_transaction(
                     connection,
                     asset_id=asset_id,
                     channel=channel,
                     language=language,
+                    translation_source_kind=source_kind,
+                    translation_producer_kind=producer_kind,
                 )
                 if write is not None:
-                    deleted.append((asset_id, channel, language))
+                    deleted.append((asset_id, channel, language, source_kind, producer_kind))
         return deleted
 
     def _delete_in_transaction(
@@ -437,6 +509,9 @@ class AnnotationRepository:
         asset_id: str,
         channel: AnnotationChannel,
         language: str,
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
         expected_head_revision_id: str | None | object = _EXPECTED_HEAD_UNSET,
         source: str = "manual_delete",
     ) -> RevisionWrite | None:
@@ -445,6 +520,8 @@ class AnnotationRepository:
             asset_id,
             channel,
             language,
+            translation_source_kind,
+            translation_producer_kind,
             create=False,
         )
         if document is None or not document["head_revision_id"]:
@@ -464,6 +541,8 @@ class AnnotationRepository:
             asset_id=asset_id,
             channel=channel,
             language=language,
+            translation_source_kind=translation_source_kind,
+            translation_producer_kind=translation_producer_kind,
             content_kind=AnnotationContentKind(str(document["content_kind"])),
             text_content=None,
             raw_bytes=None,
@@ -486,17 +565,22 @@ class AnnotationRepository:
         channel: AnnotationChannel,
         language: str,
         expected_head_revision_id: str,
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> str:
         return AnnotationReviewRepository(self._database_path).review(
             asset_id,
             channel,
             language,
             expected_head_revision_id,
+            translation_source_kind,
+            translation_producer_kind,
         )
 
     def review_many(
         self,
-        revisions: Sequence[tuple[str, AnnotationChannel, str, str]],
+        revisions: Sequence[tuple[str, AnnotationChannel, str, str, str, str]],
     ) -> list[str]:
         return AnnotationReviewRepository(self._database_path).review_many(revisions)
 
@@ -505,17 +589,34 @@ class AnnotationRepository:
         asset_id: str,
         channel: AnnotationChannel | None = None,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> list[sqlite3.Row]:
         connection = connect(self._database_path)
         try:
             clauses = ["d.asset_id = ?"]
             parameters: list[object] = [asset_id]
             if channel is not None:
-                clauses.extend(("d.channel = ?", "d.language = ?"))
-                parameters.extend((channel.value, language))
+                source_value, producer_value = self._identity_values(
+                    channel,
+                    translation_source_kind,
+                    translation_producer_kind,
+                )
+                clauses.extend(
+                    (
+                        "d.channel = ?",
+                        "d.language = ?",
+                        "d.translation_source_kind = ?",
+                        "d.translation_producer_kind = ?",
+                    )
+                )
+                parameters.extend((channel.value, language, source_value, producer_value))
             return connection.execute(
                 f"""
-                SELECT r.*, d.channel, d.language, d.content_kind
+                SELECT r.*, d.channel, d.language,
+                       d.translation_source_kind, d.translation_producer_kind,
+                       d.content_kind
                 FROM annotation_document_revisions r
                 JOIN annotation_documents d ON d.id = r.document_id
                 WHERE {" AND ".join(clauses)}
@@ -641,6 +742,9 @@ class AnnotationRepository:
         asset_id: str,
         channel: AnnotationChannel,
         language: str,
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
         content_kind: AnnotationContentKind,
         text_content: str | None,
         raw_bytes: bytes | None,
@@ -661,6 +765,8 @@ class AnnotationRepository:
             asset_id,
             channel,
             language,
+            translation_source_kind,
+            translation_producer_kind,
             create=True,
             content_kind=content_kind,
         )
@@ -828,21 +934,35 @@ class AnnotationRepository:
         asset_id: str,
         channel: AnnotationChannel,
         language: str,
+        translation_source_kind: TranslationSourceKind | str,
+        translation_producer_kind: TranslationProducerKind | str,
         *,
         create: bool,
         content_kind: AnnotationContentKind | None = None,
     ) -> sqlite3.Row | None:
+        source_value, producer_value = AnnotationRepository._identity_values(
+            channel,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         row = connection.execute(
             """
             SELECT *
             FROM annotation_documents
             WHERE asset_id = ? AND channel = ? AND language = ?
+              AND translation_source_kind = ?
+              AND translation_producer_kind = ?
             """,
-            (asset_id, channel.value, language),
+            (asset_id, channel.value, language, source_value, producer_value),
         ).fetchone()
         if row is not None or not create:
             return row
-        expected_kind, display_name = channel_definition(channel, language)
+        expected_kind, display_name = channel_definition(
+            channel,
+            language,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         if content_kind is not None and content_kind != expected_kind:
             raise ValueError("标注通道与内容类型不匹配。")
         now = utc_now_iso()
@@ -850,15 +970,18 @@ class AnnotationRepository:
         connection.execute(
             """
             INSERT INTO annotation_documents (
-                id, asset_id, channel, language, display_name,
+                id, asset_id, channel, language,
+                translation_source_kind, translation_producer_kind, display_name,
                 content_kind, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 document_id,
                 asset_id,
                 channel.value,
                 language,
+                source_value,
+                producer_value,
                 display_name,
                 expected_kind.value,
                 now,
@@ -869,6 +992,19 @@ class AnnotationRepository:
             "SELECT * FROM annotation_documents WHERE id = ?",
             (document_id,),
         ).fetchone()
+
+    @staticmethod
+    def _identity_values(
+        channel: AnnotationChannel,
+        translation_source_kind: TranslationSourceKind | str,
+        translation_producer_kind: TranslationProducerKind | str,
+    ) -> tuple[str, str]:
+        if channel == AnnotationChannel.TRANSLATION:
+            return translation_identity_values(
+                translation_source_kind,
+                translation_producer_kind,
+            )
+        return "", ""
 
     @staticmethod
     def sync_asset_summary_in_transaction(

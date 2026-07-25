@@ -57,7 +57,10 @@ export function ExportSettingsPanel({
     ) &&
     new Set(
       form.selections.map(
-        (selection) => `${selection.channel}:${selection.language.trim().toLowerCase()}`,
+        (selection) =>
+          `${selection.channel}:${selection.translation_source_kind ?? ""}:${
+            selection.translation_producer_kind ?? ""
+          }:${selection.language.trim().toLowerCase()}`,
       ),
     ).size === form.selections.length &&
     form.formats.length &&
@@ -77,6 +80,8 @@ export function ExportSettingsPanel({
             {
               channel,
               language: channel === "translation" ? nextTranslationLanguage() : "",
+              translation_source_kind: channel === "translation" ? "description" : null,
+              translation_producer_kind: channel === "translation" ? "llm" : null,
               revision: "current",
             },
           ],
@@ -109,6 +114,8 @@ export function ExportSettingsPanel({
         {
           channel: "translation",
           language: nextTranslationLanguage(),
+          translation_source_kind: "description",
+          translation_producer_kind: "llm",
           revision: "current",
         },
       ],
@@ -178,12 +185,28 @@ export function ExportSettingsPanel({
             <div className="export-channel-config" key={`${selection.channel}:${index}`}>
               <strong>{channelLabels[selection.channel]}</strong>
               {selection.channel === "translation" ? (
-                <input
-                  aria-label={`译文语言 ${index + 1}`}
-                  value={selection.language}
-                  placeholder="BCP 47，例如 fr 或 zh-CN"
-                  onChange={(event) => updateSelection(index, { language: event.target.value })}
-                />
+                <>
+                  <select
+                    aria-label={`译文来源 ${index + 1}`}
+                    value={selection.translation_source_kind ?? "description"}
+                    onChange={(event) =>
+                      updateSelection(index, {
+                        translation_source_kind: event.target
+                          .value as ExportChannelSelection["translation_source_kind"],
+                        translation_producer_kind: "llm",
+                      })
+                    }
+                  >
+                    <option value="description">LLM 描述</option>
+                    <option value="tags">Tags</option>
+                  </select>
+                  <input
+                    aria-label={`译文语言 ${index + 1}`}
+                    value={selection.language}
+                    placeholder="BCP 47，例如 fr 或 zh-CN"
+                    onChange={(event) => updateSelection(index, { language: event.target.value })}
+                  />
+                </>
               ) : null}
               <select
                 aria-label={`${channelLabels[selection.channel]}修订策略`}
@@ -210,7 +233,7 @@ export function ExportSettingsPanel({
             </button>
           ) : null}
         </div>
-        <small>每个通道和译文语言可以独立选择修订策略；预览会冻结实际 revision ID。</small>
+        <small>每种译文来源和语言可以独立选择修订策略；预览会冻结实际 revision ID。</small>
       </section>
 
       <section className="export-option">

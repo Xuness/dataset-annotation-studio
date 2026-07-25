@@ -15,6 +15,7 @@ interface AnnotationHistoryPanelProps {
   revisions: AnnotationRevision[] | undefined;
   loading: boolean;
   error: unknown;
+  sourceMismatch?: boolean;
   onRestore: (content: string, tags: AnnotationTag[]) => void;
 }
 
@@ -23,10 +24,16 @@ export function AnnotationHistoryPanel({
   revisions,
   loading,
   error,
+  sourceMismatch = false,
   onRestore,
 }: AnnotationHistoryPanelProps) {
   return (
     <div className="annotation-editor__history">
+      {sourceMismatch ? (
+        <p className="annotation-history__mismatch">
+          当前源标注已经变化。以下旧译文仅供追溯；恢复后必须按当前源重新校对才能保存。
+        </p>
+      ) : null}
       {loading ? <Spinner label="读取历史" /> : null}
       {error ? (
         <p className="validation-warning">
@@ -41,6 +48,7 @@ export function AnnotationHistoryPanel({
               <small>
                 {new Date(revision.created_at).toLocaleString()}
                 {revision.is_candidate ? " · 候选版本" : ""}
+                {sourceMismatch ? " · 与当前源未验证匹配" : ""}
               </small>
             </div>
             <Button

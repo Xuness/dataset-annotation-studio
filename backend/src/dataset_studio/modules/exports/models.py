@@ -7,6 +7,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from dataset_studio.core.languages import normalize_language_code
 from dataset_studio.modules.annotations.models import AnnotationChannel
+from dataset_studio.modules.translations.identity import (
+    DEFAULT_TRANSLATION_PRODUCER_KIND,
+    DEFAULT_TRANSLATION_SOURCE_KIND,
+    TranslationProducerKind,
+    TranslationSourceKind,
+)
 
 
 class ExportScope(StrEnum):
@@ -39,6 +45,8 @@ class ExportChannelSelection(BaseModel):
 
     channel: AnnotationChannel
     language: str = ""
+    translation_source_kind: TranslationSourceKind | None = None
+    translation_producer_kind: TranslationProducerKind | None = None
     revision: ExportRevisionMode = ExportRevisionMode.CURRENT
 
     @field_validator("revision", mode="before")
@@ -64,13 +72,31 @@ class ExportChannelSelection(BaseModel):
     def validate_language(self) -> ExportChannelSelection:
         if self.channel == AnnotationChannel.TRANSLATION and not self.language:
             raise ValueError("导出翻译通道时必须指定语言。")
-        if self.channel != AnnotationChannel.TRANSLATION and self.language:
-            raise ValueError("只有翻译通道可以指定语言。")
+        if self.channel == AnnotationChannel.TRANSLATION:
+            self.translation_source_kind = (
+                self.translation_source_kind or DEFAULT_TRANSLATION_SOURCE_KIND
+            )
+            self.translation_producer_kind = (
+                self.translation_producer_kind or DEFAULT_TRANSLATION_PRODUCER_KIND
+            )
+        elif (
+            self.language
+            or self.translation_source_kind is not None
+            or self.translation_producer_kind is not None
+        ):
+            raise ValueError("只有翻译通道可以指定译文身份。")
         return self
 
     @property
     def key(self) -> str:
-        return f"{self.channel.value}:{self.language}" if self.language else self.channel.value
+        if self.channel != AnnotationChannel.TRANSLATION:
+            return self.channel.value
+        assert self.translation_source_kind is not None
+        assert self.translation_producer_kind is not None
+        return (
+            f"{self.channel.value}:{self.translation_source_kind.value}:"
+            f"{self.translation_producer_kind.value}:{self.language}"
+        )
 
 
 def _default_channels() -> list[ExportChannelSelection]:

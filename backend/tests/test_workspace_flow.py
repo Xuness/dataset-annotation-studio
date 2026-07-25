@@ -591,7 +591,7 @@ def test_batch_annotation_options_review_and_delete_support_explicit_channels(
         by_name["second.png"].id,
         [AnnotationTag(name="second", origin="tagger")],
     )
-    annotations.save_text(
+    description = annotations.save_text(
         workspace.project_id,
         by_name["first.png"].id,
         AnnotationChannel.DESCRIPTION,
@@ -603,6 +603,7 @@ def test_batch_annotation_options_review_and_delete_support_explicit_channels(
         AnnotationChannel.TRANSLATION,
         "<caption>译文</caption>",
         language="zh-cn",
+        input_revisions=((description.revision_id, "translation_source"),),
     )
     annotations.save_text(
         workspace.project_id,

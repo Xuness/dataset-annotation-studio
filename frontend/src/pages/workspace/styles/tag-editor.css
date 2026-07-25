@@ -188,7 +188,7 @@
 }
 
 .tag-editor__group[data-category-tone="sage"] {
-  --tag-category-tone: var(--sage);
+  --tag-category-tone: var(--tag-copyright-tone, var(--sage));
 }
 
 .tag-editor__group[data-category-tone="warning"] {

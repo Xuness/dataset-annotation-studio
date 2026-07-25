@@ -1,4 +1,8 @@
-import type { AnnotationChannel } from "./annotations";
+import type {
+  AnnotationChannel,
+  TranslationProducerKind,
+  TranslationSourceKind,
+} from "./annotations";
 
 export type ExportScope = "all" | "selected";
 export type ExportRevisionMode = "current" | "reviewed";
@@ -7,6 +11,8 @@ export type ExportFormat = "txt" | "json";
 export interface ExportChannelSelection {
   channel: AnnotationChannel;
   language: string;
+  translation_source_kind?: TranslationSourceKind | null;
+  translation_producer_kind?: TranslationProducerKind | null;
   revision: ExportRevisionMode;
 }
 

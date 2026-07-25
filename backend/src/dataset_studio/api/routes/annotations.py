@@ -20,6 +20,12 @@ from dataset_studio.modules.annotations.models import (
     AnnotationRevision,
     AnnotationUpdate,
 )
+from dataset_studio.modules.translations.identity import (
+    DEFAULT_TRANSLATION_PRODUCER_KIND,
+    DEFAULT_TRANSLATION_SOURCE_KIND,
+    TranslationProducerKind,
+    TranslationSourceKind,
+)
 
 router = APIRouter(
     prefix="/workspaces/{project_id}/assets/{asset_id}/annotation",
@@ -89,6 +95,12 @@ def delete_annotations(
             request.asset_ids,
             channel=request.channel,
             language=request.language or "",
+            translation_source_kind=(
+                request.translation_source_kind or DEFAULT_TRANSLATION_SOURCE_KIND
+            ),
+            translation_producer_kind=(
+                request.translation_producer_kind or DEFAULT_TRANSLATION_PRODUCER_KIND
+            ),
             targets=request.targets,
         )
 
@@ -145,8 +157,17 @@ def get_annotation_channel(
     channel: AnnotationChannel,
     container: Container,
     language: str = "",
+    translation_source_kind: TranslationSourceKind = DEFAULT_TRANSLATION_SOURCE_KIND,
+    translation_producer_kind: TranslationProducerKind = DEFAULT_TRANSLATION_PRODUCER_KIND,
 ):
-    return container.annotations.get_channel(project_id, asset_id, channel, language)
+    return container.annotations.get_channel(
+        project_id,
+        asset_id,
+        channel,
+        language,
+        translation_source_kind,
+        translation_producer_kind,
+    )
 
 
 @channels_router.put("/{channel}", response_model=AnnotationDocument)
@@ -157,6 +178,8 @@ def save_annotation_channel(
     update: AnnotationChannelUpdate,
     container: Container,
     language: str = "",
+    translation_source_kind: TranslationSourceKind = DEFAULT_TRANSLATION_SOURCE_KIND,
+    translation_producer_kind: TranslationProducerKind = DEFAULT_TRANSLATION_PRODUCER_KIND,
 ):
     with container.preprocessing.guard_workspace(
         project_id,
@@ -182,6 +205,8 @@ def save_annotation_channel(
                 asset_id,
                 language,
                 update.content,
+                source_kind=translation_source_kind,
+                producer_kind=translation_producer_kind,
                 expected_head_revision_id=update.expected_head_revision_id,
                 review=should_review,
             )
@@ -193,6 +218,8 @@ def save_annotation_channel(
                 channel,
                 update.content,
                 language=language,
+                translation_source_kind=translation_source_kind,
+                translation_producer_kind=translation_producer_kind,
                 expected_head_revision_id=update.expected_head_revision_id,
                 review=should_review,
             )
@@ -210,6 +237,8 @@ def review_annotation_channel(
     request: AnnotationReviewRequest,
     container: Container,
     language: str = "",
+    translation_source_kind: TranslationSourceKind = DEFAULT_TRANSLATION_SOURCE_KIND,
+    translation_producer_kind: TranslationProducerKind = DEFAULT_TRANSLATION_PRODUCER_KIND,
 ):
     with container.preprocessing.guard_workspace(
         project_id,
@@ -223,6 +252,8 @@ def review_annotation_channel(
             channel,
             request.expected_head_revision_id,
             language,
+            translation_source_kind,
+            translation_producer_kind,
         )
 
 
@@ -233,6 +264,8 @@ def delete_annotation_channel(
     channel: AnnotationChannel,
     container: Container,
     language: str = "",
+    translation_source_kind: TranslationSourceKind = DEFAULT_TRANSLATION_SOURCE_KIND,
+    translation_producer_kind: TranslationProducerKind = DEFAULT_TRANSLATION_PRODUCER_KIND,
 ):
     with container.preprocessing.guard_workspace(
         project_id,
@@ -242,7 +275,14 @@ def delete_annotation_channel(
         container.exports.ensure_inactive(project_id)
         container.jobs.ensure_inactive(project_id)
         container.asset_deletions.ensure_persisted_inactive(project_id)
-        return container.annotations.delete(project_id, asset_id, channel, language)
+        return container.annotations.delete(
+            project_id,
+            asset_id,
+            channel,
+            language,
+            translation_source_kind,
+            translation_producer_kind,
+        )
 
 
 @channels_router.get("/{channel}/history", response_model=list[AnnotationRevision])
@@ -252,5 +292,14 @@ def annotation_channel_history(
     channel: AnnotationChannel,
     container: Container,
     language: str = "",
+    translation_source_kind: TranslationSourceKind = DEFAULT_TRANSLATION_SOURCE_KIND,
+    translation_producer_kind: TranslationProducerKind = DEFAULT_TRANSLATION_PRODUCER_KIND,
 ):
-    return container.annotations.history(project_id, asset_id, channel, language)
+    return container.annotations.history(
+        project_id,
+        asset_id,
+        channel,
+        language,
+        translation_source_kind,
+        translation_producer_kind,
+    )

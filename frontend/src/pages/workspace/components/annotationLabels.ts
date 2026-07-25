@@ -31,7 +31,7 @@ export const AVAILABILITY_LABELS: Record<AnnotationAvailabilityStatus, string> =
 export const TRANSLATION_STATUS_LABELS: Record<TranslationStatus, string> = {
   missing: "尚无译文",
   current: "译文源版本一致",
-  stale: "译文源版本已变化",
+  source_mismatch: "当前不匹配",
   invalid: "译文内容无效",
   source_missing: "缺少当前可用的源标注",
   source_invalid: "当前源标注无效",

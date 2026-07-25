@@ -1,16 +1,37 @@
+import type { AnnotationTag, TranslationProducerKind, TranslationSourceKind } from "./annotations";
+
 export type TranslationStatus =
-  "missing" | "current" | "stale" | "invalid" | "source_missing" | "source_invalid";
+  "missing" | "current" | "source_mismatch" | "invalid" | "source_missing" | "source_invalid";
+
+export type TranslationAlignmentStatus = "aligned" | "unavailable" | "invalid";
+
+export interface TranslationAlignmentPart {
+  id: string;
+  kind: "segment" | "structure" | "tag";
+  source_text: string;
+  translated_text: string;
+  category: string | null;
+  confidence: number | null;
+}
 
 export interface TranslationDocument {
   asset_id: string;
   language: string;
+  source_kind: TranslationSourceKind;
+  producer_kind: TranslationProducerKind;
+  resolved_source_channel: string | null;
   path: string;
   exists: boolean;
   content: string;
+  source_content: string;
+  source_tags: AnnotationTag[];
   status: TranslationStatus;
   source_exists: boolean;
   source_hash: string | null;
   current_source_hash: string | null;
+  source_revision_id: string | null;
+  alignment_status: TranslationAlignmentStatus;
+  alignment_parts: TranslationAlignmentPart[];
   validation_status: string | null;
   provider_profile_id: string | null;
   provider_profile_name: string | null;

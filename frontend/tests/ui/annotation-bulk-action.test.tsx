@@ -43,6 +43,8 @@ const targets = [
   {
     channel: "translation",
     language: "zh-CN",
+    translation_source_kind: "description",
+    translation_producer_kind: "llm",
     display_name: "翻译 · zh-CN",
     active_count: 1,
     reviewable_count: 1,
@@ -108,7 +110,7 @@ describe("annotation bulk action dialog", () => {
 
     expect(screen.queryByText("原有标注")).toBeNull();
     await user.click(screen.getByRole("checkbox", { name: /Tags/ }));
-    await user.click(screen.getByRole("checkbox", { name: /LLM 描述/ }));
+    await user.click(screen.getByRole("checkbox", { name: /^LLM 描述1 个待复核$/ }));
     await user.click(screen.getByRole("button", { name: "标记所选类别" }));
 
     await waitFor(() =>
@@ -148,7 +150,14 @@ describe("annotation bulk action dialog", () => {
     await waitFor(() =>
       expect(annotationHooks.remove).toHaveBeenCalledWith({
         assetIds: ["asset-1", "asset-2"],
-        targets: [{ channel: "translation", language: "zh-CN" }],
+        targets: [
+          {
+            channel: "translation",
+            language: "zh-CN",
+            translation_source_kind: "description",
+            translation_producer_kind: "llm",
+          },
+        ],
       }),
     );
     expect(annotationHooks.remove).toHaveBeenCalledOnce();

@@ -2,6 +2,8 @@ export type AnnotationStatus =
   "missing" | "valid" | "invalid" | "encoding_error" | "empty" | "unchecked" | "manually_accepted";
 
 export type AnnotationChannel = "existing_annotation" | "tags" | "description" | "translation";
+export type TranslationSourceKind = "description" | "tags";
+export type TranslationProducerKind = "llm" | "local_dictionary";
 export type AnnotationContentKind = "text" | "tags";
 export type AnnotationAvailabilityStatus = "missing" | "usable" | "invalid" | "stale";
 export type AnnotationReviewStatus = "unreviewed" | "reviewed";
@@ -40,6 +42,8 @@ export interface AnnotationDocument {
   document_id: string | null;
   channel: AnnotationChannel;
   language: string | null;
+  translation_source_kind: TranslationSourceKind | null;
+  translation_producer_kind: TranslationProducerKind | null;
   display_name: string;
   content_kind: AnnotationContentKind;
   path: string;
@@ -71,6 +75,8 @@ export interface AnnotationRevision {
   document_id: string | null;
   channel: AnnotationChannel | null;
   language: string | null;
+  translation_source_kind: TranslationSourceKind | null;
+  translation_producer_kind: TranslationProducerKind | null;
   source: string;
   validation_status: AnnotationStatus;
   created_at: string;
@@ -85,11 +91,15 @@ export interface AnnotationRevision {
 export interface AnnotationChannelTarget {
   channel: AnnotationChannel;
   language: string;
+  translation_source_kind?: TranslationSourceKind | null;
+  translation_producer_kind?: TranslationProducerKind | null;
 }
 
 export interface AnnotationBatchTargetOption {
   channel: AnnotationChannel;
   language: string | null;
+  translation_source_kind: TranslationSourceKind | null;
+  translation_producer_kind: TranslationProducerKind | null;
   display_name: string;
   active_count: number;
   reviewable_count: number;

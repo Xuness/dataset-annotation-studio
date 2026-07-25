@@ -59,6 +59,48 @@ def _latest_unresolved_generation_failure_sql(column: str) -> str:
                                 ELSE ''
                             END
                         )
+                        AND COALESCE(
+                            CASE
+                                WHEN json_valid(newer_job.configuration_snapshot)
+                                THEN json_extract(
+                                    newer_job.configuration_snapshot,
+                                    '$.translation_source_kind'
+                                )
+                            END,
+                            'description'
+                        )
+                        =
+                        COALESCE(
+                            CASE
+                                WHEN json_valid(failed_job.configuration_snapshot)
+                                THEN json_extract(
+                                    failed_job.configuration_snapshot,
+                                    '$.translation_source_kind'
+                                )
+                            END,
+                            'description'
+                        )
+                        AND COALESCE(
+                            CASE
+                                WHEN json_valid(newer_job.configuration_snapshot)
+                                THEN json_extract(
+                                    newer_job.configuration_snapshot,
+                                    '$.translation_producer_kind'
+                                )
+                            END,
+                            'llm'
+                        )
+                        =
+                        COALESCE(
+                            CASE
+                                WHEN json_valid(failed_job.configuration_snapshot)
+                                THEN json_extract(
+                                    failed_job.configuration_snapshot,
+                                    '$.translation_producer_kind'
+                                )
+                            END,
+                            'llm'
+                        )
                     )
                 )
                 AND (
@@ -510,6 +552,7 @@ class AssetRepository:
             rows = connection.execute(
                 f"""
                 SELECT d.asset_id, d.channel, d.language,
+                       d.translation_source_kind, d.translation_producer_kind,
                        d.head_revision_id, d.reviewed_revision_id,
                        r.is_tombstone, r.image_content_hash,
                        r.validation_status,
@@ -525,8 +568,11 @@ class AssetRepository:
             ).fetchall()
             for row in rows:
                 key = str(row["channel"])
-                if row["language"]:
-                    key = f"{key}:{row['language']}"
+                if key == "translation":
+                    key = (
+                        f"{key}:{row['translation_source_kind']}:"
+                        f"{row['translation_producer_kind']}:{row['language']}"
+                    )
                 state = resolve_document_row_state(row)
                 if state.availability_status.value != "usable":
                     status = (

@@ -8,6 +8,7 @@ from dataset_studio.modules.annotations.models import (
     AnnotationChannel,
     AnnotationChannelTarget,
     AnnotationStatus,
+    AnnotationTag,
 )
 from dataset_studio.modules.annotations.repository import AnnotationRepository
 from dataset_studio.modules.annotations.service import AnnotationService
@@ -34,6 +35,12 @@ from dataset_studio.modules.translations.models import TranslationStatus
 from dataset_studio.modules.translations.service import (
     TranslationService,
     TranslationSourceChangedError,
+)
+from dataset_studio.modules.translations.validation import (
+    align_description_translation,
+    align_tag_translation,
+    parse_tag_translation_response,
+    render_tag_translation_source,
 )
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -73,6 +80,204 @@ def _save_usable_source(
     )
 
 
+def test_description_translation_alignment_preserves_exact_structure() -> None:
+    source = "<caption>Hello, quiet garden!\nNext scene?</caption>"
+    translated = "<caption>你好, 安静花园!\n下一幕?</caption>"
+
+    valid, issue, parts = align_description_translation(source, translated)
+
+    assert valid is True
+    assert issue == "structure_preserved"
+    assert [(part.source_text, part.translated_text) for part in parts] == [
+        ("<caption>", "<caption>"),
+        ("Hello", "你好"),
+        (",", ","),
+        (" quiet garden", " 安静花园"),
+        ("!", "!"),
+        ("\n", "\n"),
+        ("Next scene", "下一幕"),
+        ("?", "?"),
+        ("</caption>", "</caption>"),
+    ]
+
+    changed, changed_issue, changed_parts = align_description_translation(
+        source,
+        "<caption>你好，安静花园！\n下一幕？</caption>",
+    )
+    assert changed is False
+    assert "XML、换行或标点结构" in changed_issue
+    assert changed_parts == []
+
+
+def test_tag_translation_protocol_and_alignment_keep_tag_identity() -> None:
+    tags = [
+        AnnotationTag(
+            name="blue_hair",
+            category="general",
+            confidence=0.98,
+            origin="tagger",
+        ),
+        AnnotationTag(
+            name="alice",
+            category="character",
+            confidence=0.91,
+            origin="tagger",
+        ),
+    ]
+    assert render_tag_translation_source(tags) == (
+        '<tags count="2">\n  <tag index="0">blue_hair</tag>\n  <tag index="1">alice</tag>\n</tags>'
+    )
+
+    valid, issue, normalized = parse_tag_translation_response(
+        '<tags count="2"><tag index="0">蓝发</tag><tag index="1">爱丽丝</tag></tags>',
+        tags,
+    )
+    assert valid is True
+    assert issue == "structure_preserved"
+    assert normalized == "蓝发\n爱丽丝"
+
+    aligned, alignment_issue, parts = align_tag_translation(tags, normalized)
+    assert aligned is True
+    assert alignment_issue == "structure_preserved"
+    assert [(part.id, part.source_text, part.translated_text) for part in parts] == [
+        ("tag-0", "blue_hair", "蓝发"),
+        ("tag-1", "alice", "爱丽丝"),
+    ]
+    assert parts[1].category == "character"
+    assert parts[1].confidence == 0.91
+
+    malformed, malformed_issue, malformed_content = parse_tag_translation_response(
+        '<tags count="2">额外文本<tag index="0">蓝发</tag><tag index="1">爱丽丝</tag></tags>',
+        tags,
+    )
+    assert malformed is False
+    assert "XML 结构" in malformed_issue
+    assert malformed_content == ""
+
+
+def test_translation_variants_coexist_and_only_follow_their_own_source(
+    tmp_path: Path,
+) -> None:
+    _, project_id, assets, _, annotations, translations = _translation_services(tmp_path)
+    asset = assets[0]
+    description_write = _save_usable_source(
+        annotations,
+        project_id,
+        asset.id,
+        "<caption>quiet, garden!</caption>",
+    )
+    annotations.save_tags(
+        project_id,
+        asset.id,
+        [
+            AnnotationTag(
+                name="blue_hair",
+                category="general",
+                confidence=0.98,
+                origin="tagger",
+            ),
+            AnnotationTag(
+                name="alice",
+                category="character",
+                confidence=0.91,
+                origin="tagger",
+            ),
+        ],
+    )
+
+    description_source = translations.read_source_revision(
+        project_id,
+        asset.id,
+        "description",
+    )
+    tags_source = translations.read_source_revision(project_id, asset.id, "tags")
+    assert description_source is not None
+    assert tags_source is not None
+
+    translations.save_generated(
+        project_id,
+        asset.id,
+        "zh-CN",
+        "<caption>安静, 花园!</caption>",
+        expected_source_hash=description_source.content_hash,
+        source_kind="description",
+        producer_kind="llm",
+    )
+    tags_translation = translations.save_generated(
+        project_id,
+        asset.id,
+        "zh-CN",
+        '<tags count="2"><tag index="0">蓝发</tag><tag index="1">爱丽丝</tag></tags>',
+        expected_source_hash=tags_source.content_hash,
+        source_kind="tags",
+        producer_kind="llm",
+    )
+    translations.save_manual(
+        project_id,
+        asset.id,
+        "zh-CN",
+        "<caption>宁静, 花园!</caption>",
+        source_kind="description",
+        producer_kind="local_dictionary",
+        expected_head_revision_id=None,
+    )
+
+    assert tags_translation.content == "蓝发\n爱丽丝"
+    assert {
+        (document.source_kind.value, document.producer_kind.value, document.language)
+        for document in translations.list(project_id, asset.id)
+    } == {
+        ("description", "llm", "zh-CN"),
+        ("description", "local_dictionary", "zh-CN"),
+        ("tags", "llm", "zh-CN"),
+    }
+
+    annotations.save_tags(
+        project_id,
+        asset.id,
+        [AnnotationTag(name="green_hair", category="general", origin="manual")],
+    )
+    assert (
+        translations.get(
+            project_id,
+            asset.id,
+            "zh-CN",
+            source_kind="tags",
+            producer_kind="llm",
+        ).status
+        == TranslationStatus.SOURCE_MISMATCH
+    )
+    for producer_kind in ("llm", "local_dictionary"):
+        assert (
+            translations.get(
+                project_id,
+                asset.id,
+                "zh-CN",
+                source_kind="description",
+                producer_kind=producer_kind,
+            ).status
+            == TranslationStatus.CURRENT
+        )
+
+    annotations.save_text(
+        project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>changed, garden!</caption>",
+        expected_head_revision_id=description_write.revision_id,
+    )
+    for producer_kind in ("llm", "local_dictionary"):
+        mismatch = translations.get(
+            project_id,
+            asset.id,
+            "zh-CN",
+            source_kind="description",
+            producer_kind=producer_kind,
+        )
+        assert mismatch.status == TranslationStatus.SOURCE_MISMATCH
+        assert mismatch.content == ""
+
+
 def test_translation_tracks_current_usable_source_revision_without_writing_sidecars(
     tmp_path: Path,
 ) -> None:
@@ -94,7 +299,7 @@ def test_translation_tracks_current_usable_source_revision_without_writing_sidec
     missing = translations.get(project_id, asset.id, "zh-cn")
     assert missing.status == TranslationStatus.MISSING
     assert missing.language == "zh-CN"
-    assert missing.path == "数据库 · translation:zh-CN"
+    assert missing.path == "数据库 · translation:description:llm:zh-CN"
 
     saved = translations.save_generated(
         project_id,
@@ -119,7 +324,7 @@ def test_translation_tracks_current_usable_source_revision_without_writing_sidec
     assert stored.availability_status.value == "usable"
     assert stored.review_status.value == "unreviewed"
 
-    with pytest.raises(ValueError, match="标签、属性或标签顺序"):
+    with pytest.raises(ValueError, match="XML、换行或标点结构"):
         translations.save_generated(
             project_id,
             asset.id,
@@ -145,7 +350,9 @@ def test_translation_tracks_current_usable_source_revision_without_writing_sidec
         expected_head_revision_id=source_write.revision_id,
     )
     stale = translations.get(project_id, asset.id, "zh-CN")
-    assert stale.status == TranslationStatus.STALE
+    assert stale.status == TranslationStatus.SOURCE_MISMATCH
+    assert stale.content == ""
+    assert stale.issue is not None and "当前不匹配" in stale.issue
     assert stale.source_hash != stale.current_source_hash
 
 
@@ -171,7 +378,7 @@ def test_manual_translation_edit_tracks_the_current_usable_source_revision(
 
     assert saved.language == "zh-CN"
     assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.CURRENT
-    with pytest.raises(ValueError, match="标签、属性或标签顺序"):
+    with pytest.raises(ValueError, match="XML、换行或标点结构"):
         translations.save_manual(
             project_id,
             asset.id,
@@ -188,7 +395,9 @@ def test_manual_translation_edit_tracks_the_current_usable_source_revision(
         "<caption>changed</caption>",
         expected_head_revision_id=source.revision_id,
     )
-    assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.STALE
+    mismatch = translations.get(project_id, asset.id, "zh-CN")
+    assert mismatch.status == TranslationStatus.SOURCE_MISMATCH
+    assert mismatch.content == ""
     stale_assets = AssetService(workspaces).list_assets(
         project_id,
         annotation_status="stale",
@@ -196,7 +405,7 @@ def test_manual_translation_edit_tracks_the_current_usable_source_revision(
     assert [item.id for item in stale_assets.items] == [asset.id]
 
 
-def test_batch_review_refreshes_translation_dependency_and_blocks_missing_source(
+def test_batch_review_never_reattaches_a_translation_to_changed_source(
     tmp_path: Path,
 ) -> None:
     _, project_id, assets, workspaces, annotations, translations = _translation_services(tmp_path)
@@ -229,8 +438,8 @@ def test_batch_review_refreshes_translation_dependency_and_blocks_missing_source
         option for option in options.targets if option.channel == AnnotationChannel.TRANSLATION
     )
     assert translation_option.stale_count == 1
-    assert translation_option.reviewable_count == 1
-    assert translation_option.blocked_count == 0
+    assert translation_option.reviewable_count == 0
+    assert translation_option.blocked_count == 1
 
     result = annotations.review_targets_many(
         project_id,
@@ -240,8 +449,8 @@ def test_batch_review_refreshes_translation_dependency_and_blocks_missing_source
             AnnotationChannelTarget(channel=AnnotationChannel.TRANSLATION, language="zh-CN"),
         ],
     )
-    assert result.reviewed_count == 2
-    assert result.blocked_count == 0
+    assert result.reviewed_count == 1
+    assert result.blocked_count == 1
     current = annotations.get_channel(
         project_id,
         asset.id,
@@ -249,13 +458,14 @@ def test_batch_review_refreshes_translation_dependency_and_blocks_missing_source
         "zh-CN",
     )
     assert current.content == translated.content
-    assert current.review_status.value == "reviewed"
-    assert current.availability_status.value == "usable"
-    assert current.head_revision_id != translated.modified_at
+    assert current.review_status.value == "unreviewed"
+    assert current.availability_status.value == "stale"
+    assert current.head_revision_id == translated.modified_at
     paths, _ = workspaces.get(project_id)
     assert AnnotationRepository(paths.database).revision_inputs(current.head_revision_id or "") == [
-        (next_source.revision_id, "translation_source")
+        (original_source.revision_id, "translation_source")
     ]
+    assert next_source.revision_id != original_source.revision_id
 
     annotations.delete(
         project_id,

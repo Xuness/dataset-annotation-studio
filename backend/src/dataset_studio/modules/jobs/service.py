@@ -33,6 +33,10 @@ from dataset_studio.modules.presets.models import TranslationPromptPreset
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.taggers.models import TaggerExecutionProfile
 from dataset_studio.modules.taggers.service import TaggerService
+from dataset_studio.modules.translations.identity import (
+    DEFAULT_TRANSLATION_PRODUCER_KIND,
+    TranslationSourceKind,
+)
 from dataset_studio.modules.translations.prompt import (
     DEFAULT_TRANSLATION_PROMPT_PRESET_ID,
     render_translation_system_prompt,
@@ -82,6 +86,8 @@ class JobService:
         if request.execution_backend == ExecutionBackend.LOCAL_TAGGER:
             output_channel = AnnotationChannel.TAGS
             output_language = ""
+            output_translation_source_kind = ""
+            output_translation_producer_kind = ""
             assert self._taggers is not None
             assert request.tagger_profile_id is not None
             local_snapshot = self._taggers.resolve_execution_profile(request.tagger_profile_id)
@@ -130,6 +136,10 @@ class JobService:
                 output_channel = AnnotationChannel.TRANSLATION
                 language = self._translations.normalize_language(request.target_language)
                 output_language = language
+                source_kind = TranslationSourceKind(request.translation_source_kind)
+                producer_kind = DEFAULT_TRANSLATION_PRODUCER_KIND
+                output_translation_source_kind = source_kind.value
+                output_translation_producer_kind = producer_kind.value
                 translation_prompt = self._resolve_translation_prompt(
                     request.translation_prompt_preset_id
                 )
@@ -137,6 +147,7 @@ class JobService:
                 system_prompt = render_translation_system_prompt(
                     translation_prompt.system_prompt,
                     language,
+                    source_kind,
                 )
                 system_prompt_snapshot = json.dumps(
                     {
@@ -153,6 +164,8 @@ class JobService:
                     "target_language": language,
                     "translation_policy": request.translation_policy.value,
                     "translation_prompt_preset_id": translation_prompt.id,
+                    "translation_source_kind": source_kind.value,
+                    "translation_producer_kind": producer_kind.value,
                 }
                 asset_ids = self._select_translation_assets(
                     project_id,
@@ -161,6 +174,7 @@ class JobService:
                     request.asset_ids,
                     language=language,
                     policy=request.translation_policy,
+                    source_kind=source_kind,
                 )
                 if not asset_ids:
                     raise ValueError("当前范围内没有符合策略且带有源标注的素材可翻译。")
@@ -172,6 +186,8 @@ class JobService:
             else:
                 output_channel = AnnotationChannel.DESCRIPTION
                 output_language = ""
+                output_translation_source_kind = ""
+                output_translation_producer_kind = ""
                 system_preset_id = manifest.settings.system_preset_id
                 if not system_preset_id:
                     raise ValueError("请先在素材页的提示词面板选择并保存 System Prompt 预设。")
@@ -222,6 +238,8 @@ class JobService:
             output_channel=output_channel.value,
             use_tags_as_context=use_tags_as_context,
             output_language=output_language,
+            output_translation_source_kind=output_translation_source_kind,
+            output_translation_producer_kind=output_translation_producer_kind,
             retry_limit=retry_limit,
             asset_ids=asset_ids,
         )
@@ -459,6 +477,8 @@ class JobService:
                 str(configuration["target_language"]),
                 response.content,
                 expected_source_hash=response.source_hash,
+                source_kind=str(configuration.get("translation_source_kind", "description")),
+                producer_kind=str(configuration.get("translation_producer_kind", "llm")),
                 provider_profile_id=str(job["provider_profile_id"]),
                 provider_profile_name=profile.name,
                 model=profile.model_id,
@@ -564,6 +584,7 @@ class JobService:
         *,
         language: str,
         policy: ExistingTranslationPolicy,
+        source_kind: TranslationSourceKind,
     ) -> list[str]:
         unique_ids = list(dict.fromkeys(selected_ids)) if scope == JobScope.SELECTED else []
         if scope == JobScope.SELECTED and not unique_ids:
@@ -603,4 +624,6 @@ class JobService:
             [str(row["id"]) for row in rows],
             language,
             policy.value,
+            source_kind=source_kind,
+            producer_kind=DEFAULT_TRANSLATION_PRODUCER_KIND,
         )

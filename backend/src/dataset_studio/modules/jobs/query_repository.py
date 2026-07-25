@@ -289,6 +289,16 @@ class JobQueryRepository:
                 if kind == "translation" and configuration.get("target_language")
                 else None
             ),
+            translation_source_kind=(
+                str(configuration.get("translation_source_kind", "description"))
+                if kind == "translation"
+                else None
+            ),
+            translation_producer_kind=(
+                str(configuration.get("translation_producer_kind", "llm"))
+                if kind == "translation"
+                else None
+            ),
             translation_policy=(
                 str(configuration["translation_policy"])
                 if kind == "translation" and configuration.get("translation_policy")

@@ -68,7 +68,9 @@ export function JobList({
               </div>
               <strong>
                 {job.kind === "translation"
-                  ? `${job.target_language ?? "目标语言"} 译文`
+                  ? `${
+                      job.translation_source_kind === "tags" ? "Tags" : "LLM 描述"
+                    } · ${job.target_language ?? "目标语言"} 译文`
                   : job.execution_backend === "local_tagger"
                     ? "本地标签标注"
                     : job.system_preset_name}

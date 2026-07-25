@@ -5,6 +5,7 @@ import type {
   JobDetail,
   JobKind,
   JobSummary,
+  TranslationSourceKind,
 } from "../../shared/api/types";
 
 export interface CreateJobInput {
@@ -18,6 +19,7 @@ export interface CreateJobInput {
   overwrite_existing?: boolean;
   translation_prompt_preset_id?: string;
   target_language?: string;
+  translation_source_kind?: TranslationSourceKind;
   translation_policy?: ExistingTranslationPolicy;
 }
 

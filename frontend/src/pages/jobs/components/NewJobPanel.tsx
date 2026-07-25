@@ -16,6 +16,7 @@ import {
 } from "../../../features/taggers/labels";
 import type {
   ExistingTranslationPolicy,
+  TranslationSourceKind,
   ExecutionBackend,
   JobDetail,
   JobKind,
@@ -77,6 +78,8 @@ export function NewJobPanel({
   const [translationPromptPresetId, setTranslationPromptPresetId] = useState("");
   const [scope, setScope] = useState<"all" | "selected">("all");
   const [targetLanguage, setTargetLanguage] = useState("zh-CN");
+  const [translationSourceKind, setTranslationSourceKind] =
+    useState<TranslationSourceKind>("description");
   const [translationPolicy, setTranslationPolicy] = useState<ExistingTranslationPolicy>("skip");
   const [error, setError] = useState<string | null>(null);
   const executionBackend = kind === "translation" ? "provider" : annotationBackend;
@@ -151,6 +154,7 @@ export function NewJobPanel({
         translation_prompt_preset_id:
           kind === "translation" ? translationPromptPresetId : undefined,
         target_language: targetLanguage,
+        translation_source_kind: translationSourceKind,
         translation_policy: translationPolicy,
       });
       onCreated(job);
@@ -388,6 +392,18 @@ export function NewJobPanel({
       {kind === "translation" ? (
         <>
           <label className="form-field">
+            <span>翻译来源</span>
+            <select
+              value={translationSourceKind}
+              onChange={(event) =>
+                setTranslationSourceKind(event.target.value as TranslationSourceKind)
+              }
+            >
+              <option value="description">LLM 描述（无描述时回退原有标注）</option>
+              <option value="tags">Tags（逐项对齐）</option>
+            </select>
+          </label>
+          <label className="form-field">
             <span>目标语言</span>
             <select
               value={targetLanguage}
@@ -435,7 +451,9 @@ export function NewJobPanel({
           <dt>目标通道</dt>
           <dd>
             {kind === "translation"
-              ? `翻译 · ${targetLanguage}`
+              ? `翻译 · ${translationSourceKind === "tags" ? "Tags" : "LLM 描述"} · ${
+                  targetLanguage
+                }`
               : executionBackend === "local_tagger"
                 ? "Tags"
                 : "LLM 描述"}

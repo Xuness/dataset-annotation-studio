@@ -42,6 +42,7 @@ EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS = {
     13: "05ae357184022303f22dcd49d4c53460844bfcc7ba9b05b37e0bbd75f00ad59c",
     14: "ec00973ffc0b07c4a531fe343cd88ab98b29b1511267bac0facca10edb4fe78e",
     15: "75e040ea6904594889def8a785ceecd13a6b4e5cddd17b234e96ee9dd70afdd5",
+    16: "9b7e99492fe535f035db23760d3903be63c374abb5f21c3161412542b59fa12b",
 }
 
 
@@ -593,7 +594,7 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
     finally:
         connection.close()
     assert row["image_metadata_version"] == 1
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert versions == list(range(1, WORKSPACE_SCHEMA_VERSION + 1))
     assert "idx_job_items_asset_updated" in indexes
     assert {
         "cache_read_tokens",
@@ -865,7 +866,162 @@ def test_workspace_migration_is_safe_when_api_and_worker_start_together(tmp_path
         ]
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert versions == list(range(1, WORKSPACE_SCHEMA_VERSION + 1))
+
+
+def test_translation_variant_migration_preserves_history_and_allows_parallel_variants(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "workspace.sqlite3"
+    migrate_database(database, WORKSPACE_MIGRATIONS[:15])
+    now = "2026-07-25T00:00:00Z"
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            INSERT INTO assets (
+                id, relative_path, filename, stem, suffix, content_hash,
+                byte_size, modified_ns, width, height, annotation_relative_path,
+                annotation_status, image_metadata_version, created_at, updated_at
+            ) VALUES (
+                'asset', 'sample.png', 'sample.png', 'sample', '.png', 'image-hash',
+                1, 1, 32, 32, 'sample.txt', 'missing', 1, ?, ?
+            )
+            """,
+            (now, now),
+        )
+        connection.execute(
+            """
+            INSERT INTO annotation_documents (
+                id, asset_id, channel, language, display_name, content_kind,
+                created_at, updated_at
+            ) VALUES (
+                'legacy-translation', 'asset', 'translation', 'zh-CN',
+                '翻译 · zh-CN', 'text', ?, ?
+            )
+            """,
+            (now, now),
+        )
+        connection.execute(
+            """
+            INSERT INTO annotation_document_revisions (
+                id, document_id, source, image_content_hash,
+                validation_status, created_at
+            ) VALUES (
+                'legacy-revision', 'legacy-translation', 'model_response',
+                'image-hash', 'valid', ?
+            )
+            """,
+            (now,),
+        )
+        connection.execute(
+            """
+            INSERT INTO annotation_text_contents (revision_id, content)
+            VALUES ('legacy-revision', '<caption>旧译文</caption>')
+            """
+        )
+        connection.execute(
+            """
+            UPDATE annotation_documents
+            SET head_revision_id = 'legacy-revision',
+                reviewed_revision_id = 'legacy-revision'
+            WHERE id = 'legacy-translation'
+            """
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    initialize_workspace_database(database)
+
+    connection = connect(database)
+    try:
+        migrated = connection.execute(
+            """
+            SELECT id, translation_source_kind, translation_producer_kind,
+                   head_revision_id, reviewed_revision_id
+            FROM annotation_documents
+            WHERE id = 'legacy-translation'
+            """
+        ).fetchone()
+        content = connection.execute(
+            """
+            SELECT content
+            FROM annotation_text_contents
+            WHERE revision_id = 'legacy-revision'
+            """
+        ).fetchone()
+        revision_document = connection.execute(
+            """
+            SELECT document_id
+            FROM annotation_document_revisions
+            WHERE id = 'legacy-revision'
+            """
+        ).fetchone()
+        foreign_key_violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+    finally:
+        connection.close()
+
+    assert migrated is not None
+    assert migrated["translation_source_kind"] == "description"
+    assert migrated["translation_producer_kind"] == "llm"
+    assert migrated["head_revision_id"] == "legacy-revision"
+    assert migrated["reviewed_revision_id"] == "legacy-revision"
+    assert content["content"] == "<caption>旧译文</caption>"
+    assert revision_document["document_id"] == "legacy-translation"
+    assert foreign_key_violations == []
+
+    repository = AnnotationRepository(database)
+    repository.write_text(
+        asset_id="asset",
+        channel=AnnotationChannel.TRANSLATION,
+        language="zh-CN",
+        translation_source_kind="tags",
+        translation_producer_kind="llm",
+        content="蓝发",
+        source="model_response",
+        validation_status=AnnotationStatus.VALID,
+        image_content_hash="image-hash",
+    )
+    repository.write_text(
+        asset_id="asset",
+        channel=AnnotationChannel.TRANSLATION,
+        language="zh-CN",
+        translation_source_kind="description",
+        translation_producer_kind="local_dictionary",
+        content="<caption>词典译文</caption>",
+        source="local_dictionary",
+        validation_status=AnnotationStatus.VALID,
+        image_content_hash="image-hash",
+    )
+
+    connection = connect(database)
+    try:
+        variants = [
+            (
+                row["translation_source_kind"],
+                row["translation_producer_kind"],
+                row["language"],
+            )
+            for row in connection.execute(
+                """
+                SELECT translation_source_kind, translation_producer_kind, language
+                FROM annotation_documents
+                WHERE asset_id = 'asset' AND channel = 'translation'
+                ORDER BY translation_source_kind, translation_producer_kind
+                """
+            ).fetchall()
+        ]
+        foreign_key_violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+    finally:
+        connection.close()
+
+    assert variants == [
+        ("description", "llm", "zh-CN"),
+        ("description", "local_dictionary", "zh-CN"),
+        ("tags", "llm", "zh-CN"),
+    ]
+    assert foreign_key_violations == []
 
 
 def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None:
@@ -927,7 +1083,7 @@ def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None
         ).fetchone()
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert versions == list(range(1, WORKSPACE_SCHEMA_VERSION + 1))
     assert imported is not None
     assert imported["content"] == "<caption>legacy</caption>"
     assert imported["channel"] == "existing_annotation"
@@ -985,7 +1141,7 @@ def test_recent_workspace_list_applies_missing_migrations_before_summary(
     finally:
         connection.close()
     assert [summary.project_id for summary in summaries] == [manifest.project_id]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert versions == list(range(1, WORKSPACE_SCHEMA_VERSION + 1))
 
 
 def test_annotation_relation_triggers_reject_cross_asset_revisions(tmp_path: Path) -> None:

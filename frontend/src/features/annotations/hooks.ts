@@ -4,6 +4,8 @@ import type {
   AnnotationChannel,
   AnnotationChannelTarget,
   AnnotationTag,
+  TranslationProducerKind,
+  TranslationSourceKind,
 } from "../../shared/api/types";
 import { annotationTraceKeys, assetKeys, promptPreviewKeys } from "../assets/queryKeys";
 import { statisticsKeys } from "../statistics/queryKeys";
@@ -35,10 +37,27 @@ export function useAnnotationChannel(
   assetId: string | null,
   channel: AnnotationChannel,
   language = "",
+  translationSourceKind: TranslationSourceKind = "description",
+  translationProducerKind: TranslationProducerKind = "llm",
 ) {
   return useQuery({
-    queryKey: annotationKeys.channel(projectId, assetId, channel, language),
-    queryFn: () => getAnnotationChannel(projectId, assetId!, channel, language),
+    queryKey: annotationKeys.channel(
+      projectId,
+      assetId,
+      channel,
+      language,
+      translationSourceKind,
+      translationProducerKind,
+    ),
+    queryFn: () =>
+      getAnnotationChannel(
+        projectId,
+        assetId!,
+        channel,
+        language,
+        translationSourceKind,
+        translationProducerKind,
+      ),
     enabled: Boolean(projectId && assetId),
   });
 }
@@ -49,10 +68,27 @@ export function useAnnotationChannelHistory(
   channel: AnnotationChannel,
   language: string,
   enabled: boolean,
+  translationSourceKind: TranslationSourceKind = "description",
+  translationProducerKind: TranslationProducerKind = "llm",
 ) {
   return useQuery({
-    queryKey: annotationHistoryKeys.channel(projectId, assetId, channel, language),
-    queryFn: () => getAnnotationChannelHistory(projectId, assetId!, channel, language),
+    queryKey: annotationHistoryKeys.channel(
+      projectId,
+      assetId,
+      channel,
+      language,
+      translationSourceKind,
+      translationProducerKind,
+    ),
+    queryFn: () =>
+      getAnnotationChannelHistory(
+        projectId,
+        assetId!,
+        channel,
+        language,
+        translationSourceKind,
+        translationProducerKind,
+      ),
     enabled: Boolean(projectId && assetId && enabled),
   });
 }
@@ -89,6 +125,8 @@ export function useSaveAnnotationChannel(
   assetId: string,
   channel: AnnotationChannel,
   language = "",
+  translationSourceKind: TranslationSourceKind = "description",
+  translationProducerKind: TranslationProducerKind = "llm",
 ) {
   const invalidate = useInvalidateAnnotation(projectId);
   return useMutation({
@@ -109,6 +147,8 @@ export function useSaveAnnotationChannel(
         expectedHeadRevisionId,
         review,
         language,
+        translationSourceKind,
+        translationProducerKind,
       }),
     onSuccess: invalidate,
   });
@@ -119,11 +159,21 @@ export function useReviewAnnotationChannel(
   assetId: string,
   channel: AnnotationChannel,
   language = "",
+  translationSourceKind: TranslationSourceKind = "description",
+  translationProducerKind: TranslationProducerKind = "llm",
 ) {
   const invalidate = useInvalidateAnnotation(projectId);
   return useMutation({
     mutationFn: (expectedHeadRevisionId: string) =>
-      reviewAnnotationChannel(projectId, assetId, channel, expectedHeadRevisionId, language),
+      reviewAnnotationChannel(
+        projectId,
+        assetId,
+        channel,
+        expectedHeadRevisionId,
+        language,
+        translationSourceKind,
+        translationProducerKind,
+      ),
     onSuccess: invalidate,
   });
 }
@@ -133,10 +183,20 @@ export function useDeleteAnnotationChannel(
   assetId: string,
   channel: AnnotationChannel,
   language = "",
+  translationSourceKind: TranslationSourceKind = "description",
+  translationProducerKind: TranslationProducerKind = "llm",
 ) {
   const invalidate = useInvalidateAnnotation(projectId);
   return useMutation({
-    mutationFn: () => deleteAnnotationChannel(projectId, assetId, channel, language),
+    mutationFn: () =>
+      deleteAnnotationChannel(
+        projectId,
+        assetId,
+        channel,
+        language,
+        translationSourceKind,
+        translationProducerKind,
+      ),
     onSuccess: invalidate,
   });
 }

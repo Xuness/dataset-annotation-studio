@@ -13,10 +13,12 @@ class Migration:
     version: int
     name: str
     sql: str
+    foreign_keys_off: bool = False
 
     @property
     def checksum(self) -> str:
-        return hashlib.sha256(self.sql.encode("utf-8")).hexdigest()
+        payload = f"foreign_keys_off\n{self.sql}" if self.foreign_keys_off else self.sql
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 MIGRATION_TABLE_SQL = """
@@ -77,7 +79,13 @@ def _validate_plan(migrations: tuple[Migration, ...]) -> None:
 
 
 def _apply_migration(connection, migration: Migration) -> None:
+    foreign_keys_disabled = False
     try:
+        if migration.foreign_keys_off:
+            if connection.in_transaction:
+                raise RuntimeError("关闭 SQLite 外键检查前不应存在活动事务。")
+            connection.execute("PRAGMA foreign_keys = OFF")
+            foreign_keys_disabled = True
         connection.execute("BEGIN IMMEDIATE")
         recorded_row = connection.execute(
             "SELECT name, checksum FROM schema_migrations WHERE version = ?",
@@ -92,6 +100,14 @@ def _apply_migration(connection, migration: Migration) -> None:
             return
 
         _execute_migration_sql(connection, migration.sql)
+        if migration.foreign_keys_off:
+            violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+            if violations:
+                first = violations[0]
+                raise RuntimeError(
+                    "数据库迁移后的外键完整性检查失败："
+                    f"{first['table']} rowid={first['rowid']} parent={first['parent']}"
+                )
         connection.execute(
             """
             INSERT INTO schema_migrations (version, name, checksum, applied_at)
@@ -104,6 +120,9 @@ def _apply_migration(connection, migration: Migration) -> None:
         if connection.in_transaction:
             connection.rollback()
         raise
+    finally:
+        if foreign_keys_disabled:
+            connection.execute("PRAGMA foreign_keys = ON")
 
 
 def _verify_recorded_migration(

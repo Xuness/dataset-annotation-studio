@@ -72,7 +72,9 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
           <span className="eyebrow">Task detail</span>
           <h2>
             {job.data.kind === "translation"
-              ? `${job.data.target_language ?? "目标语言"} 译文任务`
+              ? `${
+                  job.data.translation_source_kind === "tags" ? "Tags" : "LLM 描述"
+                } · ${job.data.target_language ?? "目标语言"} 译文任务`
               : job.data.execution_backend === "local_tagger"
                 ? "本地标签标注任务"
                 : job.data.system_preset_name}
@@ -188,7 +190,9 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
                   disabled={actions.accept.isPending}
                 >
                   {job.data.kind === "translation"
-                    ? `人工确认并写入 ${job.data.target_language} 译文通道`
+                    ? `人工确认并写入 ${
+                        job.data.translation_source_kind === "tags" ? "Tags" : "LLM 描述"
+                      } · ${job.data.target_language} 译文通道`
                     : `人工确认并写入${job.data.output_channel === "tags" ? " Tags" : " LLM 描述"}通道`}
                 </Button>
               ) : null}

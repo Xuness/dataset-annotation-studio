@@ -5,6 +5,12 @@ from enum import StrEnum
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from dataset_studio.core.languages import normalize_language_code
+from dataset_studio.modules.translations.identity import (
+    DEFAULT_TRANSLATION_PRODUCER_KIND,
+    DEFAULT_TRANSLATION_SOURCE_KIND,
+    TranslationProducerKind,
+    TranslationSourceKind,
+)
 
 
 class AnnotationStatus(StrEnum):
@@ -112,6 +118,8 @@ class AnnotationDocument(BaseModel):
     document_id: str | None = None
     channel: AnnotationChannel = AnnotationChannel.DESCRIPTION
     language: str | None = None
+    translation_source_kind: TranslationSourceKind | None = None
+    translation_producer_kind: TranslationProducerKind | None = None
     display_name: str = "LLM 描述"
     content_kind: AnnotationContentKind = AnnotationContentKind.TEXT
     path: str = ""
@@ -183,6 +191,8 @@ class AnnotationChannelTarget(BaseModel):
 
     channel: AnnotationChannel
     language: str = ""
+    translation_source_kind: TranslationSourceKind | None = None
+    translation_producer_kind: TranslationProducerKind | None = None
 
     @model_validator(mode="after")
     def validate_language(self) -> AnnotationChannelTarget:
@@ -193,13 +203,30 @@ class AnnotationChannelTarget(BaseModel):
                 self.language = normalize_language_code(self.language)
             except ValueError as error:
                 raise ValueError("翻译标注通道的语言代码无效。") from error
-        elif self.language:
-            raise ValueError("只有翻译标注通道可以指定语言。")
+            self.translation_source_kind = (
+                self.translation_source_kind or DEFAULT_TRANSLATION_SOURCE_KIND
+            )
+            self.translation_producer_kind = (
+                self.translation_producer_kind or DEFAULT_TRANSLATION_PRODUCER_KIND
+            )
+        elif (
+            self.language
+            or self.translation_source_kind is not None
+            or self.translation_producer_kind is not None
+        ):
+            raise ValueError("只有翻译标注通道可以指定译文身份。")
         return self
 
     @property
     def key(self) -> str:
-        return f"{self.channel.value}:{self.language}" if self.language else self.channel.value
+        if self.channel != AnnotationChannel.TRANSLATION:
+            return self.channel.value
+        assert self.translation_source_kind is not None
+        assert self.translation_producer_kind is not None
+        return (
+            f"{self.channel.value}:{self.translation_source_kind.value}:"
+            f"{self.translation_producer_kind.value}:{self.language}"
+        )
 
 
 def _normalize_asset_ids(value: list[str]) -> list[str]:
@@ -241,6 +268,8 @@ class AnnotationBatchDeleteRequest(BaseModel):
     asset_ids: list[str]
     channel: AnnotationChannel | None = None
     language: str | None = None
+    translation_source_kind: TranslationSourceKind | None = None
+    translation_producer_kind: TranslationProducerKind | None = None
     targets: list[AnnotationChannelTarget] | None = Field(
         default=None,
         min_length=1,
@@ -251,7 +280,12 @@ class AnnotationBatchDeleteRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_scope(self) -> AnnotationBatchDeleteRequest:
-        if self.targets is not None and (self.channel is not None or self.language):
+        if self.targets is not None and (
+            self.channel is not None
+            or self.language
+            or self.translation_source_kind is not None
+            or self.translation_producer_kind is not None
+        ):
             raise ValueError("批量删除不能同时使用单通道参数和多通道范围。")
         return self
 
@@ -263,6 +297,8 @@ class AnnotationBatchReviewRequest(AnnotationBatchOptionsRequest):
 class AnnotationBatchTargetOption(BaseModel):
     channel: AnnotationChannel
     language: str | None = None
+    translation_source_kind: TranslationSourceKind | None = None
+    translation_producer_kind: TranslationProducerKind | None = None
     display_name: str
     active_count: int
     reviewable_count: int
@@ -299,6 +335,8 @@ class AnnotationRevision(BaseModel):
     document_id: str | None = None
     channel: AnnotationChannel | None = None
     language: str | None = None
+    translation_source_kind: TranslationSourceKind | None = None
+    translation_producer_kind: TranslationProducerKind | None = None
     source: str
     validation_status: AnnotationStatus
     created_at: str

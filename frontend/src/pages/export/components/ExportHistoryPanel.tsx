@@ -50,7 +50,9 @@ export function ExportHistoryPanel({
             operation.configuration_snapshot.channels
               ?.map((selection) =>
                 selection.channel === "translation"
-                  ? `translation:${selection.language}`
+                  ? `translation:${selection.translation_source_kind ?? "description"}:${
+                      selection.translation_producer_kind ?? "llm"
+                    }:${selection.language}`
                   : selection.channel,
               )
               .join(" · ") ?? "旧版导出";

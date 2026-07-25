@@ -42,6 +42,13 @@ from dataset_studio.modules.output_resources import (
     hold_output_resources,
 )
 from dataset_studio.modules.taggers.models import TaggerExecutionProfile
+from dataset_studio.modules.translations.identity import (
+    DEFAULT_TRANSLATION_PRODUCER_KIND,
+    DEFAULT_TRANSLATION_SOURCE_KIND,
+    TranslationProducerKind,
+    TranslationSourceKind,
+    translation_identity_values,
+)
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 _EXPECTED_VERSION_UNSET = EXPECTED_HEAD_UNSET
@@ -68,21 +75,51 @@ class AnnotationService:
         asset_id: str,
         channel: AnnotationChannel,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> AnnotationDocument:
         language = self._channel_language(channel, language)
+        source_value, producer_value = self._channel_identity(
+            channel,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         paths, _ = self._workspaces.get(project_id)
         asset = self._asset(paths.database, asset_id)
         repository = AnnotationRepository(paths.database)
-        row = repository.get_document_row(asset_id, channel, language)
+        row = repository.get_document_row(
+            asset_id,
+            channel,
+            language,
+            source_value,
+            producer_value,
+        )
         if row is None:
-            kind, display_name = channel_definition(channel, language)
+            kind, display_name = channel_definition(
+                channel,
+                language,
+                source_value or DEFAULT_TRANSLATION_SOURCE_KIND,
+                producer_value or DEFAULT_TRANSLATION_PRODUCER_KIND,
+            )
             return AnnotationDocument(
                 asset_id=asset_id,
                 channel=channel,
                 language=language or None,
+                translation_source_kind=(
+                    TranslationSourceKind(source_value) if source_value else None
+                ),
+                translation_producer_kind=(
+                    TranslationProducerKind(producer_value) if producer_value else None
+                ),
                 display_name=display_name,
                 content_kind=kind,
-                path=self._database_path_label(channel, language),
+                path=self._database_path_label(
+                    channel,
+                    language,
+                    source_value,
+                    producer_value,
+                ),
                 exists=False,
                 status=AnnotationStatus.MISSING,
                 availability_status=AnnotationAvailabilityStatus.MISSING,
@@ -120,6 +157,9 @@ class AnnotationService:
         content: str,
         *,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
         source: str = "manual_edit",
         expected_head_revision_id: str | None | object = _EXPECTED_VERSION_UNSET,
         review: bool = False,
@@ -133,10 +173,21 @@ class AnnotationService:
         if channel == AnnotationChannel.TAGS:
             raise ValueError("Tags 通道必须使用结构化 Tag 保存接口。")
         language = self._channel_language(channel, language)
+        source_value, producer_value = self._channel_identity(
+            channel,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         paths, _ = self._workspaces.get(project_id)
         asset = self._asset(paths.database, asset_id)
         claim = OutputResourceClaim(
-            annotation_document_resource_key(asset_id, channel.value, language),
+            annotation_document_resource_key(
+                asset_id,
+                channel.value,
+                language,
+                source_value,
+                producer_value,
+            ),
             lease_owner_id,
         )
         validation = validate_tag_balance(content)
@@ -145,6 +196,8 @@ class AnnotationService:
                 asset_id=asset_id,
                 channel=channel,
                 language=language,
+                translation_source_kind=source_value,
+                translation_producer_kind=producer_value,
                 content=content,
                 source=source,
                 validation_status=validation_status_override or validation.status,
@@ -157,7 +210,14 @@ class AnnotationService:
                 allow_candidate_on_conflict=allow_candidate_on_conflict,
             )
         return AnnotationWriteResult(
-            document=self.get_channel(project_id, asset_id, channel, language),
+            document=self.get_channel(
+                project_id,
+                asset_id,
+                channel,
+                language,
+                source_value or DEFAULT_TRANSLATION_SOURCE_KIND,
+                producer_value or DEFAULT_TRANSLATION_PRODUCER_KIND,
+            ),
             revision_id=write.revision_id,
             became_head=write.became_head,
         )
@@ -214,6 +274,9 @@ class AnnotationService:
         channel: AnnotationChannel = AnnotationChannel.DESCRIPTION,
         tags: Sequence[AnnotationTag] | None = None,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
         manually_accepted: bool = False,
         expected_modified_at: str | None | object = _EXPECTED_VERSION_UNSET,
         lease_owner_id: str | None = None,
@@ -248,6 +311,8 @@ class AnnotationService:
                 channel,
                 content,
                 language=language,
+                translation_source_kind=translation_source_kind,
+                translation_producer_kind=translation_producer_kind,
                 source=source,
                 expected_head_revision_id=expected_modified_at,
                 review=manually_accepted,
@@ -269,12 +334,26 @@ class AnnotationService:
         channel: AnnotationChannel,
         expected_head_revision_id: str,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> AnnotationDocument:
         language = self._channel_language(channel, language)
+        source_value, producer_value = self._channel_identity(
+            channel,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         paths, _ = self._workspaces.get(project_id)
         self._asset(paths.database, asset_id)
         claim = OutputResourceClaim(
-            annotation_document_resource_key(asset_id, channel.value, language)
+            annotation_document_resource_key(
+                asset_id,
+                channel.value,
+                language,
+                source_value,
+                producer_value,
+            )
         )
         with hold_output_resources(paths.database, [claim]):
             AnnotationRepository(paths.database).review(
@@ -282,8 +361,17 @@ class AnnotationService:
                 channel,
                 language,
                 expected_head_revision_id,
+                source_value,
+                producer_value,
             )
-        return self.get_channel(project_id, asset_id, channel, language)
+        return self.get_channel(
+            project_id,
+            asset_id,
+            channel,
+            language,
+            source_value or DEFAULT_TRANSLATION_SOURCE_KIND,
+            producer_value or DEFAULT_TRANSLATION_PRODUCER_KIND,
+        )
 
     def review_tags_many(
         self,
@@ -304,15 +392,17 @@ class AnnotationService:
         paths, _ = self._workspaces.get(project_id)
         normalized_ids = self._validated_asset_ids(paths.database, asset_ids)
         rows = AnnotationRepository(paths.database).list_document_rows_for_assets(normalized_ids)
-        summaries: dict[tuple[AnnotationChannel, str], dict[str, int]] = {}
+        summaries: dict[tuple[AnnotationChannel, str, str, str], dict[str, int]] = {}
         for row in rows:
             state = resolve_document_row_state(row)
             if not state.exists:
                 continue
             channel = AnnotationChannel(str(row["channel"]))
             language = str(row["language"])
+            source_kind = str(row["translation_source_kind"])
+            producer_kind = str(row["translation_producer_kind"])
             summary = summaries.setdefault(
-                (channel, language),
+                (channel, language, source_kind, producer_kind),
                 {
                     "active_count": 0,
                     "reviewable_count": 0,
@@ -335,10 +425,21 @@ class AnnotationService:
             AnnotationBatchTargetOption(
                 channel=channel,
                 language=language or None,
-                display_name=channel_definition(channel, language)[1],
+                translation_source_kind=(
+                    TranslationSourceKind(source_kind) if source_kind else None
+                ),
+                translation_producer_kind=(
+                    TranslationProducerKind(producer_kind) if producer_kind else None
+                ),
+                display_name=channel_definition(
+                    channel,
+                    language,
+                    source_kind or DEFAULT_TRANSLATION_SOURCE_KIND,
+                    producer_kind or DEFAULT_TRANSLATION_PRODUCER_KIND,
+                )[1],
                 **counts,
             )
-            for (channel, language), counts in summaries.items()
+            for (channel, language, source_kind, producer_kind), counts in summaries.items()
         ]
         return AnnotationBatchOptions(
             requested_count=len(normalized_ids),
@@ -361,30 +462,51 @@ class AnnotationService:
                 asset_id,
                 target.channel.value,
                 target.language,
+                (
+                    target.translation_source_kind.value
+                    if target.translation_source_kind is not None
+                    else ""
+                ),
+                (
+                    target.translation_producer_kind.value
+                    if target.translation_producer_kind is not None
+                    else ""
+                ),
             )
             for asset_id in normalized_ids
             for target in selected_targets
         }
-        reviews_translation = any(
-            target.channel == AnnotationChannel.TRANSLATION for target in selected_targets
-        )
         for asset_id in normalized_ids:
-            if reviews_translation:
-                claim_keys.update(
-                    {
+            for target in selected_targets:
+                if (
+                    target.channel == AnnotationChannel.TRANSLATION
+                    and target.translation_source_kind == TranslationSourceKind.DESCRIPTION
+                ):
+                    claim_keys.update(
+                        {
+                            annotation_document_resource_key(
+                                asset_id,
+                                AnnotationChannel.DESCRIPTION.value,
+                            ),
+                            annotation_document_resource_key(
+                                asset_id,
+                                AnnotationChannel.EXISTING.value,
+                            ),
+                        }
+                    )
+                elif (
+                    target.channel == AnnotationChannel.TRANSLATION
+                    and target.translation_source_kind == TranslationSourceKind.TAGS
+                ):
+                    claim_keys.add(
                         annotation_document_resource_key(
                             asset_id,
-                            AnnotationChannel.DESCRIPTION.value,
-                        ),
-                        annotation_document_resource_key(
-                            asset_id,
-                            AnnotationChannel.EXISTING.value,
-                        ),
-                    }
-                )
+                            AnnotationChannel.TAGS.value,
+                        )
+                    )
         claims = [OutputResourceClaim(key) for key in sorted(claim_keys)]
         with hold_output_resources(paths.database, claims):
-            revisions: list[tuple[str, AnnotationChannel, str, str]] = []
+            revisions: list[tuple[str, AnnotationChannel, str, str, str, str]] = []
             already_reviewed = 0
             missing = 0
             blocked = 0
@@ -393,6 +515,8 @@ class AnnotationService:
                     normalized_ids,
                     target.channel,
                     target.language,
+                    target.translation_source_kind or DEFAULT_TRANSLATION_SOURCE_KIND,
+                    target.translation_producer_kind or DEFAULT_TRANSLATION_PRODUCER_KIND,
                 )
                 for asset_id in normalized_ids:
                     row = rows.get(asset_id)
@@ -414,6 +538,16 @@ class AnnotationService:
                                 asset_id,
                                 target.channel,
                                 target.language,
+                                (
+                                    target.translation_source_kind.value
+                                    if target.translation_source_kind is not None
+                                    else ""
+                                ),
+                                (
+                                    target.translation_producer_kind.value
+                                    if target.translation_producer_kind is not None
+                                    else ""
+                                ),
                                 str(row["head_revision_id"]),
                             )
                         )
@@ -434,6 +568,9 @@ class AnnotationService:
         asset_id: str,
         channel: AnnotationChannel | None = None,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> AnnotationDocument:
         selected_channel = channel or AnnotationChannel.DESCRIPTION
         self.delete_many(
@@ -441,8 +578,17 @@ class AnnotationService:
             [asset_id],
             channel=selected_channel,
             language=language,
+            translation_source_kind=translation_source_kind,
+            translation_producer_kind=translation_producer_kind,
         )
-        return self.get_channel(project_id, asset_id, selected_channel, language)
+        return self.get_channel(
+            project_id,
+            asset_id,
+            selected_channel,
+            language,
+            translation_source_kind,
+            translation_producer_kind,
+        )
 
     def delete_many(
         self,
@@ -451,6 +597,9 @@ class AnnotationService:
         *,
         channel: AnnotationChannel | None = None,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
         targets: Sequence[AnnotationChannelTarget] | None = None,
     ) -> AnnotationBatchDeleteResult:
         if targets is not None and channel is not None:
@@ -463,7 +612,22 @@ class AnnotationService:
             selected_targets = None
         else:
             language = self._channel_language(channel, language)
-            selected_targets = [AnnotationChannelTarget(channel=channel, language=language)]
+            selected_targets = [
+                AnnotationChannelTarget(
+                    channel=channel,
+                    language=language,
+                    translation_source_kind=(
+                        translation_source_kind
+                        if channel == AnnotationChannel.TRANSLATION
+                        else None
+                    ),
+                    translation_producer_kind=(
+                        translation_producer_kind
+                        if channel == AnnotationChannel.TRANSLATION
+                        else None
+                    ),
+                )
+            ]
         paths, _ = self._workspaces.get(project_id)
         normalized_ids = self._validated_asset_ids(paths.database, asset_ids)
 
@@ -474,6 +638,8 @@ class AnnotationService:
                     str(row["asset_id"]),
                     AnnotationChannel(str(row["channel"])),
                     str(row["language"]),
+                    str(row["translation_source_kind"]),
+                    str(row["translation_producer_kind"]),
                 )
                 for row in repository.list_document_rows_for_assets(normalized_ids)
                 if row["head_revision_id"]
@@ -482,7 +648,21 @@ class AnnotationService:
             ]
         else:
             operations = [
-                (asset_id, target.channel, target.language)
+                (
+                    asset_id,
+                    target.channel,
+                    target.language,
+                    (
+                        target.translation_source_kind.value
+                        if target.translation_source_kind is not None
+                        else ""
+                    ),
+                    (
+                        target.translation_producer_kind.value
+                        if target.translation_producer_kind is not None
+                        else ""
+                    ),
+                )
                 for asset_id in normalized_ids
                 for target in selected_targets
             ]
@@ -492,13 +672,21 @@ class AnnotationService:
                     asset_id,
                     target_channel.value,
                     target_language,
+                    target_source_kind,
+                    target_producer_kind,
                 )
             )
-            for asset_id, target_channel, target_language in operations
+            for (
+                asset_id,
+                target_channel,
+                target_language,
+                target_source_kind,
+                target_producer_kind,
+            ) in operations
         ]
         with hold_output_resources(paths.database, claims):
             deleted_targets = repository.delete_many(operations)
-        deleted_asset_ids = {asset_id for asset_id, _, _ in deleted_targets}
+        deleted_asset_ids = {asset_id for asset_id, _, _, _, _ in deleted_targets}
         return AnnotationBatchDeleteResult(
             requested_count=len(normalized_ids),
             target_count=len(selected_targets) if selected_targets is not None else 0,
@@ -513,6 +701,9 @@ class AnnotationService:
         asset_id: str,
         channel: AnnotationChannel | None = None,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> list[AnnotationRevision]:
         if channel is None:
             if language:
@@ -523,7 +714,13 @@ class AnnotationService:
         self._asset(paths.database, asset_id)
         repository = AnnotationRepository(paths.database)
         revisions: list[AnnotationRevision] = []
-        for row in repository.history_rows(asset_id, channel, language):
+        for row in repository.history_rows(
+            asset_id,
+            channel,
+            language,
+            translation_source_kind,
+            translation_producer_kind,
+        ):
             revision_id = str(row["id"])
             content_kind = AnnotationContentKind(str(row["content_kind"]))
             revisions.append(
@@ -532,6 +729,16 @@ class AnnotationService:
                     document_id=str(row["document_id"]),
                     channel=AnnotationChannel(str(row["channel"])),
                     language=str(row["language"]) or None,
+                    translation_source_kind=(
+                        TranslationSourceKind(str(row["translation_source_kind"]))
+                        if row["translation_source_kind"]
+                        else None
+                    ),
+                    translation_producer_kind=(
+                        TranslationProducerKind(str(row["translation_producer_kind"]))
+                        if row["translation_producer_kind"]
+                        else None
+                    ),
                     source=str(row["source"]),
                     validation_status=AnnotationStatus(str(row["validation_status"])),
                     created_at=str(row["created_at"]),
@@ -582,11 +789,25 @@ class AnnotationService:
         asset_id: str,
         channel: AnnotationChannel,
         language: str = "",
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> str | None:
         language = self._channel_language(channel, language)
+        source_value, producer_value = self._channel_identity(
+            channel,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         paths, _ = self._workspaces.get(project_id)
         self._asset(paths.database, asset_id)
-        return AnnotationRepository(paths.database).head_revision_id(asset_id, channel, language)
+        return AnnotationRepository(paths.database).head_revision_id(
+            asset_id,
+            channel,
+            language,
+            source_value,
+            producer_value,
+        )
 
     @staticmethod
     def tags_from_content(content: str, *, origin: str) -> list[AnnotationTag]:
@@ -679,9 +900,24 @@ class AnnotationService:
             document_id=str(row["id"]),
             channel=channel,
             language=str(row["language"]) or None,
+            translation_source_kind=(
+                TranslationSourceKind(str(row["translation_source_kind"]))
+                if row["translation_source_kind"]
+                else None
+            ),
+            translation_producer_kind=(
+                TranslationProducerKind(str(row["translation_producer_kind"]))
+                if row["translation_producer_kind"]
+                else None
+            ),
             display_name=str(row["display_name"]),
             content_kind=kind,
-            path=self._database_path_label(channel, str(row["language"])),
+            path=self._database_path_label(
+                channel,
+                str(row["language"]),
+                str(row["translation_source_kind"]),
+                str(row["translation_producer_kind"]),
+            ),
             exists=exists,
             content=content,
             tags=tags,
@@ -727,9 +963,18 @@ class AnnotationService:
         )
 
     @staticmethod
-    def _database_path_label(channel: AnnotationChannel, language: str) -> str:
-        suffix = f":{language}" if language else ""
-        return f"数据库 · {channel.value}{suffix}"
+    def _database_path_label(
+        channel: AnnotationChannel,
+        language: str,
+        translation_source_kind: str = "",
+        translation_producer_kind: str = "",
+    ) -> str:
+        if channel == AnnotationChannel.TRANSLATION:
+            return (
+                f"数据库 · {channel.value}:{translation_source_kind}:"
+                f"{translation_producer_kind}:{language}"
+            )
+        return f"数据库 · {channel.value}"
 
     @staticmethod
     def _channel_language(channel: AnnotationChannel, language: str) -> str:
@@ -743,6 +988,19 @@ class AnnotationService:
         if language:
             raise ValueError("只有翻译标注通道可以指定语言。")
         return ""
+
+    @staticmethod
+    def _channel_identity(
+        channel: AnnotationChannel,
+        translation_source_kind: TranslationSourceKind | str,
+        translation_producer_kind: TranslationProducerKind | str,
+    ) -> tuple[str, str]:
+        if channel == AnnotationChannel.TRANSLATION:
+            return translation_identity_values(
+                translation_source_kind,
+                translation_producer_kind,
+            )
+        return "", ""
 
     @staticmethod
     def _asset(database_path: Path, asset_id: str):

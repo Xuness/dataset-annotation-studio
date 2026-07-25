@@ -96,10 +96,25 @@ function channelBadge(channel: string): { shortLabel: string; label: string; pri
   if (channel === "description") {
     return { shortLabel: "L", label: "LLM 描述", priority: 2 };
   }
-  const language = channel.startsWith("translation:") ? channel.slice("translation:".length) : "";
+  const translationParts = channel.startsWith("translation:") ? channel.split(":") : [];
+  const canonicalTranslation = translationParts.length >= 4;
+  const sourceKind = canonicalTranslation ? translationParts[1] : "description";
+  const language = canonicalTranslation
+    ? translationParts.slice(3).join(":")
+    : channel.startsWith("translation:")
+      ? channel.slice("translation:".length)
+      : "";
+  if (!canonicalTranslation) {
+    return {
+      shortLabel: language || "译",
+      label: language ? `${language} 译文` : "翻译",
+      priority: 3,
+    };
+  }
+  const sourceLabel = sourceKind === "tags" ? "Tags" : "LLM 描述";
   return {
-    shortLabel: language || "译",
-    label: language ? `${language} 译文` : "翻译",
+    shortLabel: language ? `${sourceKind === "tags" ? "T" : "L"}·${language}` : "译",
+    label: language ? `${sourceLabel} · ${language} 译文` : "翻译",
     priority: 3,
   };
 }

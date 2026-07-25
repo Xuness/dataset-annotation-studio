@@ -323,6 +323,30 @@ test("tag editor follows the content region transparency setting", () => {
   assert.ok(transparentContentRule);
   assert.match(transparentContentRule, /\.tag-editor,/);
   assert.match(transparentContentRule, /\.tag-editor__toolbar/);
+  assert.match(transparentContentRule, /\.translation-compare__aligned/);
+  assert.match(transparentContentRule, /\.translation-compare__plain/);
+  assert.match(transparentContentRule, /\.translation-compare__unaligned/);
+  assert.match(transparentContentRule, /\.translation-compare__mismatch/);
+});
+
+test("rainveil immersive wallpaper uses only a higher-contrast copyright label color", () => {
+  const themeStyles = readFileSync(
+    new URL("../src/styles/themes/sea-fog.css", import.meta.url),
+    "utf8",
+  );
+  const tagEditorStyles = readFileSync(
+    new URL("../src/pages/workspace/styles/tag-editor.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    themeStyles,
+    /data-theme="sea-fog".*data-immersive-mode="true".*data-background-source="theme"/,
+  );
+  assert.match(themeStyles, /--tag-copyright-tone:\s*#30483f/);
+  assert.match(tagEditorStyles, /var\(--tag-copyright-tone,\s*var\(--sage\)\)/);
+  assert.doesNotMatch(themeStyles, /--tag-copyright-label-background/);
+  assert.doesNotMatch(tagEditorStyles, /tag-copyright-label-background/);
 });
 
 test("fresh interface geometry uses the curated local baseline", () => {

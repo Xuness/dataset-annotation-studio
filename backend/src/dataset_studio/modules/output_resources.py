@@ -54,6 +54,8 @@ def annotation_document_resource_key(
     asset_id: str,
     channel: str,
     language: str = "",
+    translation_source_kind: str = "",
+    translation_producer_kind: str = "",
 ) -> str:
     if not asset_id or not channel:
         raise ValueError("标注资源缺少素材或通道标识。")
@@ -63,6 +65,19 @@ def annotation_document_resource_key(
         raise ValueError("标注通道包含无效字符。")
     if any(character in language for character in ("\x00", "\n", "\r", ":")):
         raise ValueError("标注语言包含无效字符。")
+    if channel == "translation":
+        source_kind = translation_source_kind or "description"
+        producer_kind = translation_producer_kind or "llm"
+        if source_kind not in {"description", "tags"}:
+            raise ValueError("翻译来源标识无效。")
+        if producer_kind not in {"llm", "local_dictionary"}:
+            raise ValueError("翻译生产器标识无效。")
+        return (
+            f"{_ANNOTATION_DOCUMENT_PREFIX}{asset_id}:{channel}:{language}:"
+            f"{source_kind}:{producer_kind}"
+        )
+    if translation_source_kind or translation_producer_kind:
+        raise ValueError("只有翻译通道可以指定译文身份。")
     return f"{_ANNOTATION_DOCUMENT_PREFIX}{asset_id}:{channel}:{language}"
 
 

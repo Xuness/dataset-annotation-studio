@@ -43,12 +43,24 @@ const CHANNEL_ICONS: Record<AnnotationChannel, LucideIcon> = {
   translation: Languages,
 };
 
-function targetKey(target: Pick<AnnotationChannelTarget, "channel" | "language">): string {
-  return `${target.channel}:${target.language}`;
+function targetKey(
+  target: Pick<
+    AnnotationChannelTarget,
+    "channel" | "language" | "translation_source_kind" | "translation_producer_kind"
+  >,
+): string {
+  return `${target.channel}:${target.translation_source_kind ?? ""}:${
+    target.translation_producer_kind ?? ""
+  }:${target.language}`;
 }
 
 function optionKey(option: AnnotationBatchTargetOption): string {
-  return targetKey({ channel: option.channel, language: option.language ?? "" });
+  return targetKey({
+    channel: option.channel,
+    language: option.language ?? "",
+    translation_source_kind: option.translation_source_kind,
+    translation_producer_kind: option.translation_producer_kind,
+  });
 }
 
 export function AnnotationBulkActionDialog({
@@ -113,10 +125,19 @@ export function AnnotationBulkActionDialog({
 
   async function executeAction() {
     if (!selectedOptions.length) return;
-    const targets = selectedOptions.map<AnnotationChannelTarget>((option) => ({
-      channel: option.channel,
-      language: option.language ?? "",
-    }));
+    const targets = selectedOptions.map<AnnotationChannelTarget>((option) =>
+      option.channel === "translation"
+        ? {
+            channel: option.channel,
+            language: option.language ?? "",
+            translation_source_kind: option.translation_source_kind,
+            translation_producer_kind: option.translation_producer_kind,
+          }
+        : {
+            channel: option.channel,
+            language: option.language ?? "",
+          },
+    );
     setActionError(null);
     setNotice(null);
     try {
@@ -182,7 +203,7 @@ export function AnnotationBulkActionDialog({
             ? " 勾选要标记为人工复核的当前版本；不会修改标注内容。"
             : " 勾选要删除的当前标注类别；删除修订会写入数据库，历史版本仍会保留。"}
         </p>
-        <small>仅列出所选图片中实际存在的类别；翻译按语言独立选择。</small>
+        <small>仅列出所选图片中实际存在的类别；翻译按来源和语言独立选择。</small>
       </div>
 
       <div className="annotation-bulk-dialog__toolbar">
@@ -236,7 +257,9 @@ export function AnnotationBulkActionDialog({
                   </span>
                   <span className="annotation-bulk-option__content">
                     <strong>
-                      {option.channel === "translation" ? "翻译" : option.display_name}
+                      {option.channel === "translation"
+                        ? `${option.translation_source_kind === "tags" ? "Tags" : "LLM 描述"}翻译`
+                        : option.display_name}
                     </strong>
                     <small>
                       {action === "review" ? (

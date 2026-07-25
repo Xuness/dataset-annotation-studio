@@ -83,3 +83,7 @@
   --workspace-meta-ink: #556168;
   --workspace-muted-text-shadow: 0 1px 1px rgb(233 237 240 / 46%), 0 0 4px rgb(233 237 240 / 28%);
 }
+
+:root[data-theme="sea-fog"][data-immersive-mode="true"][data-background-source="theme"] {
+  --tag-copyright-tone: #30483f;
+}

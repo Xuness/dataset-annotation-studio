@@ -260,6 +260,7 @@ def _load_annotations(
                        {
                     current_usable_source_revision_sql(
                         asset_alias="a",
+                        source_kind_sql="d.translation_source_kind",
                     )
                 } AS current_source_revision_id
                 FROM annotation_documents d
@@ -269,14 +270,34 @@ def _load_annotations(
                 batch,
             ).fetchall()
             documents = {
-                (str(row["asset_id"]), str(row["channel"]), str(row["language"])): row
+                (
+                    str(row["asset_id"]),
+                    str(row["channel"]),
+                    str(row["language"]),
+                    str(row["translation_source_kind"]),
+                    str(row["translation_producer_kind"]),
+                ): row
                 for row in document_rows
             }
             for asset_id in batch:
                 for selection in selections:
                     key = selection.key
                     document = documents.get(
-                        (asset_id, selection.channel.value, selection.language)
+                        (
+                            asset_id,
+                            selection.channel.value,
+                            selection.language,
+                            (
+                                selection.translation_source_kind.value
+                                if selection.translation_source_kind is not None
+                                else ""
+                            ),
+                            (
+                                selection.translation_producer_kind.value
+                                if selection.translation_producer_kind is not None
+                                else ""
+                            ),
+                        )
                     )
                     result[asset_id][key] = _selected_annotation(
                         connection,
@@ -593,7 +614,12 @@ def _channel_directory(selection: ExportChannelSelection) -> str:
         return "description"
     if selection.channel == AnnotationChannel.TAGS:
         return "tags"
-    return f"translation-{selection.language}"
+    assert selection.translation_source_kind is not None
+    assert selection.translation_producer_kind is not None
+    return (
+        f"translation-{selection.translation_source_kind.value}-"
+        f"{selection.translation_producer_kind.value}-{selection.language}"
+    )
 
 
 def _join_target(directory: str, name: str) -> str:

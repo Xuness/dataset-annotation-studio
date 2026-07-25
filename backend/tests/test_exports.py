@@ -202,7 +202,7 @@ def test_export_warns_when_translation_depends_on_an_old_source_revision(
     assert preview.stale_count == 1
     assert preview.warning_count == 1
     assert preview.items[0].annotation_status == "stale"
-    assert preview.items[0].channel_statuses == {"translation:zh-CN": "stale"}
+    assert preview.items[0].channel_statuses == {"translation:description:llm:zh-CN": "stale"}
     assert "源标注变化" in (preview.items[0].warning_message or "")
 
 

@@ -31,6 +31,8 @@ export interface JobSummary {
   output_channel: "tags" | "description" | "translation";
   use_tags_as_context: boolean;
   target_language: string | null;
+  translation_source_kind: TranslationSourceKind | null;
+  translation_producer_kind: TranslationProducerKind | null;
   translation_policy: ExistingTranslationPolicy | null;
   retry_limit: number;
   total: number;
@@ -78,3 +80,4 @@ export interface JobItemDetail {
 export interface JobDetail extends JobSummary {
   items: JobItemDetail[];
 }
+import type { TranslationProducerKind, TranslationSourceKind } from "./annotations";

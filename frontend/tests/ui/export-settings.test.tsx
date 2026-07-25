@@ -67,11 +67,15 @@ describe("export channel settings", () => {
       {
         channel: "translation",
         language: "zh-CN",
+        translation_source_kind: "description",
+        translation_producer_kind: "llm",
         revision: "reviewed",
       },
       {
         channel: "translation",
         language: "fr",
+        translation_source_kind: "description",
+        translation_producer_kind: "llm",
         revision: "current",
       },
     ]);

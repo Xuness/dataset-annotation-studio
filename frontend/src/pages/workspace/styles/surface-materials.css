@@ -10,6 +10,10 @@
 :root[data-transparent-regions~="content"] .workspace-page .annotation-editor__body .cm-gutters,
 :root[data-transparent-regions~="content"] .workspace-page .annotation-editor__compare,
 :root[data-transparent-regions~="content"] .workspace-page .annotation-editor__compare > section,
+:root[data-transparent-regions~="content"] .workspace-page .translation-compare__aligned,
+:root[data-transparent-regions~="content"] .workspace-page .translation-compare__plain,
+:root[data-transparent-regions~="content"] .workspace-page .translation-compare__unaligned,
+:root[data-transparent-regions~="content"] .workspace-page .translation-compare__mismatch,
 :root[data-transparent-regions~="content"] .workspace-page .tag-editor,
 :root[data-transparent-regions~="content"] .workspace-page .tag-editor__toolbar {
   background: transparent;

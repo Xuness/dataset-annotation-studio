@@ -9,7 +9,7 @@ from typing import Protocol
 
 from dataset_studio.core.errors import ResourceConflictError
 from dataset_studio.core.files import atomic_write_text
-from dataset_studio.modules.annotations.models import AnnotationChannel
+from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationTag
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
 from dataset_studio.modules.assets.service import AssetService
@@ -33,12 +33,19 @@ from dataset_studio.modules.providers.models import (
     ProviderRequestError,
     ProviderResponse,
 )
+from dataset_studio.modules.translations.identity import (
+    TranslationProducerKind,
+    TranslationSourceKind,
+)
 from dataset_studio.modules.translations.prompt import translation_user_prompt
 from dataset_studio.modules.translations.service import (
     TranslationService,
     TranslationSourceChangedError,
 )
-from dataset_studio.modules.translations.validation import validate_translation_structure
+from dataset_studio.modules.translations.validation import (
+    parse_tag_translation_response,
+    validate_translation_structure,
+)
 
 
 class ProviderExecutorContainer(Protocol):
@@ -64,6 +71,9 @@ class ProviderItemContext:
     translation_configuration: dict[str, object]
     source_content: str | None
     source_hash: str | None
+    source_tags: list[AnnotationTag]
+    translation_source_kind: TranslationSourceKind | None
+    translation_producer_kind: TranslationProducerKind | None
     tag_revision_id: str | None
 
 
@@ -298,13 +308,26 @@ class ProviderJobExecutor:
         system_snapshot = json.loads(str(job["system_prompt_snapshot"]))
         source_content: str | None = None
         source_hash: str | None = None
+        source_tags: list[AnnotationTag] = []
+        translation_source_kind: TranslationSourceKind | None = None
+        translation_producer_kind: TranslationProducerKind | None = None
         tag_revision_id: str | None = None
         translation_configuration: dict[str, object] = {}
         if kind == JobKind.TRANSLATION:
             translation_configuration = json.loads(str(job["configuration_snapshot"]))
             language = str(translation_configuration["target_language"])
             policy = str(translation_configuration["translation_policy"])
-            source = self._container.translations.read_source(project_id, asset_id)
+            translation_source_kind = TranslationSourceKind(
+                str(translation_configuration.get("translation_source_kind", "description"))
+            )
+            translation_producer_kind = TranslationProducerKind(
+                str(translation_configuration.get("translation_producer_kind", "llm"))
+            )
+            source = self._container.translations.read_source_revision(
+                project_id,
+                asset_id,
+                translation_source_kind,
+            )
             if source is None:
                 repository.finish_item(
                     item_id,
@@ -318,12 +341,21 @@ class ProviderJobExecutor:
                 asset_id,
                 language,
                 policy,
+                source_kind=translation_source_kind,
+                producer_kind=translation_producer_kind,
             ):
                 repository.finish_item(item_id, JobItemStatus.SKIPPED)
                 return None
-            source_content, source_hash = source
+            source_content = source.content
+            source_hash = source.content_hash
+            source_tags = source.tags
             image_path = None
-            user_prompt = translation_user_prompt(language, source_content)
+            user_prompt = translation_user_prompt(
+                language,
+                source_content,
+                source_kind=translation_source_kind,
+                tags=source_tags,
+            )
         else:
             image_path = self._container.assets.image_path(project_id, asset_id)
             metadata = self._container.assets.metadata(project_id, asset_id)
@@ -373,6 +405,9 @@ class ProviderJobExecutor:
             translation_configuration=translation_configuration,
             source_content=source_content,
             source_hash=source_hash,
+            source_tags=source_tags,
+            translation_source_kind=translation_source_kind,
+            translation_producer_kind=translation_producer_kind,
             tag_revision_id=tag_revision_id,
         )
 
@@ -383,6 +418,12 @@ class ProviderJobExecutor:
     ) -> tuple[bool, str, str | None]:
         if context.kind == JobKind.TRANSLATION:
             assert context.source_content is not None
+            if context.translation_source_kind == TranslationSourceKind.TAGS:
+                valid, status, _ = parse_tag_translation_response(
+                    content,
+                    context.source_tags,
+                )
+                return valid, status, None if valid else status
             valid, status = validate_translation_structure(context.source_content, content)
             return valid, status, None if valid else status
         validation = validate_tag_balance(content)
@@ -401,11 +442,15 @@ class ProviderJobExecutor:
         if context.kind == JobKind.TRANSLATION:
             language = str(context.translation_configuration["target_language"])
             policy = str(context.translation_configuration["translation_policy"])
+            assert context.translation_source_kind is not None
+            assert context.translation_producer_kind is not None
             if not self._container.translations.should_translate(
                 context.project_id,
                 context.asset_id,
                 language,
                 policy,
+                source_kind=context.translation_source_kind,
+                producer_kind=context.translation_producer_kind,
             ):
                 return False
             assert context.source_hash is not None
@@ -415,6 +460,8 @@ class ProviderJobExecutor:
                 language,
                 content,
                 expected_source_hash=context.source_hash,
+                source_kind=context.translation_source_kind,
+                producer_kind=context.translation_producer_kind,
                 provider_profile_id=context.profile.id,
                 provider_profile_name=context.profile.name,
                 model=context.profile.model_id,

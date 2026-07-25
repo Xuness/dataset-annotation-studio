@@ -41,7 +41,7 @@ class ResolvedAnnotationState:
     def reviewable(self) -> bool:
         if not self.exists or self.validation_status in INVALID_VALIDATION_STATUSES:
             return False
-        return not (self.dependency_stale and self.current_source_revision_id is None)
+        return not self.dependency_stale
 
 
 def resolve_annotation_state(
@@ -123,7 +123,7 @@ def resolve_document_row_state(row: Mapping[str, Any]) -> ResolvedAnnotationStat
     )
 
 
-def current_usable_source_revision_sql(*, asset_alias: str) -> str:
+def current_usable_description_source_revision_sql(*, asset_alias: str) -> str:
     invalid_values = ", ".join(f"'{value}'" for value in INVALID_VALIDATION_VALUES)
     return f"""
     COALESCE(
@@ -157,6 +157,41 @@ def current_usable_source_revision_sql(*, asset_alias: str) -> str:
     """
 
 
+def current_usable_tags_source_revision_sql(*, asset_alias: str) -> str:
+    invalid_values = ", ".join(f"'{value}'" for value in INVALID_VALIDATION_VALUES)
+    return f"""
+    (
+        SELECT tags.head_revision_id
+        FROM annotation_documents tags
+        JOIN annotation_document_revisions source_revision
+          ON source_revision.id = tags.head_revision_id
+        WHERE tags.asset_id = {asset_alias}.id
+          AND tags.channel = 'tags'
+          AND tags.language = ''
+          AND source_revision.is_tombstone = 0
+          AND source_revision.image_content_hash = {asset_alias}.content_hash
+          AND source_revision.validation_status NOT IN ({invalid_values})
+        LIMIT 1
+    )
+    """
+
+
+def current_usable_source_revision_sql(
+    *,
+    asset_alias: str,
+    source_kind_sql: str = "'description'",
+) -> str:
+    return f"""
+    (
+        CASE
+            WHEN {source_kind_sql} = 'tags'
+            THEN ({current_usable_tags_source_revision_sql(asset_alias=asset_alias)})
+            ELSE ({current_usable_description_source_revision_sql(asset_alias=asset_alias)})
+        END
+    )
+    """
+
+
 def translation_dependency_revision_sql(*, revision_alias: str) -> str:
     return f"""
     (
@@ -174,6 +209,7 @@ def document_state_projection_sql(
     *,
     revision_alias: str = "r",
     asset_alias: str = "a",
+    document_alias: str = "d",
 ) -> str:
     return f"""
     {translation_dependency_revision_sql(revision_alias=revision_alias)}
@@ -181,6 +217,7 @@ def document_state_projection_sql(
     {
         current_usable_source_revision_sql(
             asset_alias=asset_alias,
+            source_kind_sql=f"{document_alias}.translation_source_kind",
         )
     }
         AS current_source_revision_id
@@ -196,6 +233,7 @@ def translation_dependency_stale_sql(
     dependency = translation_dependency_revision_sql(revision_alias=revision_alias)
     current_source = current_usable_source_revision_sql(
         asset_alias=asset_alias,
+        source_kind_sql=f"{document_alias}.translation_source_kind",
     )
     return f"""
     (

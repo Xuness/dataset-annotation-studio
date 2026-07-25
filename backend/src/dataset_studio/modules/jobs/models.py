@@ -6,6 +6,11 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from dataset_studio.modules.annotations.models import AnnotationChannel
+from dataset_studio.modules.translations.identity import (
+    DEFAULT_TRANSLATION_SOURCE_KIND,
+    TranslationProducerKind,
+    TranslationSourceKind,
+)
 
 
 def _require_non_blank(value: str | None) -> str | None:
@@ -68,6 +73,7 @@ class JobCreateRequest(BaseModel):
     overwrite_existing: bool = False
     translation_prompt_preset_id: str | None = None
     target_language: str = "zh-CN"
+    translation_source_kind: TranslationSourceKind = DEFAULT_TRANSLATION_SOURCE_KIND
     translation_policy: ExistingTranslationPolicy = ExistingTranslationPolicy.SKIP
 
     _validate_model = field_validator("model_id")(_require_non_blank)
@@ -101,6 +107,8 @@ class JobSummary(BaseModel):
     output_channel: AnnotationChannel
     use_tags_as_context: bool = False
     target_language: str | None = None
+    translation_source_kind: TranslationSourceKind | None = None
+    translation_producer_kind: TranslationProducerKind | None = None
     translation_policy: ExistingTranslationPolicy | None = None
     retry_limit: int
     total: int = 0

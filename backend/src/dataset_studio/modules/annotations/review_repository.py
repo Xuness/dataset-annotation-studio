@@ -20,6 +20,13 @@ from dataset_studio.modules.annotations.projection import (
     translation_dependency_revision_sql,
 )
 from dataset_studio.modules.annotations.summary import sync_asset_annotation_summary
+from dataset_studio.modules.translations.identity import (
+    DEFAULT_TRANSLATION_PRODUCER_KIND,
+    DEFAULT_TRANSLATION_SOURCE_KIND,
+    TranslationProducerKind,
+    TranslationSourceKind,
+    translation_identity_values,
+)
 
 
 class AnnotationReviewRepository:
@@ -32,6 +39,9 @@ class AnnotationReviewRepository:
         channel: AnnotationChannel,
         language: str,
         expected_head_revision_id: str,
+        translation_source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        translation_producer_kind: TranslationProducerKind
+        | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> str:
         with transaction(self._database_path) as connection:
             return self._review_in_transaction(
@@ -40,11 +50,13 @@ class AnnotationReviewRepository:
                 channel,
                 language,
                 expected_head_revision_id,
+                translation_source_kind,
+                translation_producer_kind,
             )
 
     def review_many(
         self,
-        revisions: Sequence[tuple[str, AnnotationChannel, str, str]],
+        revisions: Sequence[tuple[str, AnnotationChannel, str, str, str, str]],
     ) -> list[str]:
         if not revisions:
             return []
@@ -56,8 +68,17 @@ class AnnotationReviewRepository:
                     channel,
                     language,
                     expected_head_revision_id,
+                    translation_source_kind,
+                    translation_producer_kind,
                 )
-                for asset_id, channel, language, expected_head_revision_id in revisions
+                for (
+                    asset_id,
+                    channel,
+                    language,
+                    translation_source_kind,
+                    translation_producer_kind,
+                    expected_head_revision_id,
+                ) in revisions
             ]
 
     def _review_in_transaction(
@@ -67,8 +88,17 @@ class AnnotationReviewRepository:
         channel: AnnotationChannel,
         language: str,
         expected_head_revision_id: str,
+        translation_source_kind: TranslationSourceKind | str,
+        translation_producer_kind: TranslationProducerKind | str,
     ) -> str:
-        document = self._document(connection, asset_id, channel, language)
+        document = self._document(
+            connection,
+            asset_id,
+            channel,
+            language,
+            translation_source_kind,
+            translation_producer_kind,
+        )
         if document is None or not document["head_revision_id"]:
             raise ValueError("当前标注通道还没有可复核的版本。")
         current = str(document["head_revision_id"])
@@ -96,8 +126,8 @@ class AnnotationReviewRepository:
             document,
             revision,
         )
-        if dependency_changed and current_source_revision_id is None:
-            raise ValueError("当前没有可用的源标注，无法复核这条译文。")
+        if dependency_changed:
+            raise ValueError("译文的源标注已变化，请重新翻译后再复核。")
 
         reviewed_revision_id = current
         if image_changed or dependency_changed:
@@ -144,6 +174,7 @@ class AnnotationReviewRepository:
                 {
                 current_usable_source_revision_sql(
                     asset_alias="asset",
+                    source_kind_sql="document.translation_source_kind",
                 )
             } AS current_source_revision_id
             FROM annotation_documents document
@@ -269,14 +300,25 @@ class AnnotationReviewRepository:
         asset_id: str,
         channel: AnnotationChannel,
         language: str,
+        translation_source_kind: TranslationSourceKind | str,
+        translation_producer_kind: TranslationProducerKind | str,
     ) -> sqlite3.Row | None:
+        if channel == AnnotationChannel.TRANSLATION:
+            source_value, producer_value = translation_identity_values(
+                translation_source_kind,
+                translation_producer_kind,
+            )
+        else:
+            source_value, producer_value = "", ""
         return connection.execute(
             """
             SELECT *
             FROM annotation_documents
             WHERE asset_id = ? AND channel = ? AND language = ?
+              AND translation_source_kind = ?
+              AND translation_producer_kind = ?
             """,
-            (asset_id, channel.value, language),
+            (asset_id, channel.value, language, source_value, producer_value),
         ).fetchone()
 
     @staticmethod

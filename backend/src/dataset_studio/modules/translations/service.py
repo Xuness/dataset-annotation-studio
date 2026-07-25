@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
+import json
+from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 
 from dataset_studio.core.errors import AssetNotFoundError
 from dataset_studio.core.languages import normalize_language_code
@@ -11,6 +13,7 @@ from dataset_studio.modules.annotations.models import (
     AnnotationChannel,
     AnnotationDocument,
     AnnotationStatus,
+    AnnotationTag,
 )
 from dataset_studio.modules.annotations.projection import (
     current_usable_source_revision_sql,
@@ -24,11 +27,26 @@ from dataset_studio.modules.output_resources import (
     annotation_document_resource_key,
     hold_output_resources,
 )
+from dataset_studio.modules.translations.identity import (
+    DEFAULT_TRANSLATION_PRODUCER_KIND,
+    DEFAULT_TRANSLATION_SOURCE_KIND,
+    TranslationProducerKind,
+    TranslationSourceKind,
+)
 from dataset_studio.modules.translations.models import (
+    TranslationAlignmentPart,
+    TranslationAlignmentStatus,
     TranslationDocument,
     TranslationStatus,
 )
-from dataset_studio.modules.translations.validation import validate_translation_structure
+from dataset_studio.modules.translations.validation import (
+    TranslationAlignmentPart as AlignmentPartData,
+)
+from dataset_studio.modules.translations.validation import (
+    align_description_translation,
+    align_tag_translation,
+    parse_tag_translation_response,
+)
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 _EXPECTED_VERSION_UNSET = object()
@@ -38,8 +56,26 @@ class TranslationSourceChangedError(ValueError):
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class TranslationSource:
+    revision_id: str
+    source_kind: TranslationSourceKind
+    resolved_channel: AnnotationChannel
+    content: str
+    tags: list[AnnotationTag]
+    content_hash: str
+
+    def __iter__(self) -> Iterator[str]:
+        yield self.revision_id
+        yield self.content
+        yield self.content_hash
+
+    def __getitem__(self, index: int) -> str:
+        return (self.revision_id, self.content, self.content_hash)[index]
+
+
 class TranslationService:
-    """Translation orchestration over database-backed annotation revisions."""
+    """Translation orchestration over multi-variant annotation revisions."""
 
     def __init__(
         self,
@@ -51,25 +87,63 @@ class TranslationService:
 
     def list(self, project_id: str, asset_id: str) -> list[TranslationDocument]:
         bundle = self._annotations.list(project_id, asset_id)
-        languages = sorted(
-            document.language
-            for document in bundle.documents
-            if document.channel == AnnotationChannel.TRANSLATION and document.language
+        variants = sorted(
+            {
+                (
+                    document.language,
+                    document.translation_source_kind,
+                    document.translation_producer_kind,
+                )
+                for document in bundle.documents
+                if (
+                    document.channel == AnnotationChannel.TRANSLATION
+                    and document.language
+                    and document.translation_source_kind is not None
+                    and document.translation_producer_kind is not None
+                )
+            },
+            key=lambda item: (item[1].value, item[2].value, item[0] or ""),
         )
-        return [self.get(project_id, asset_id, language) for language in languages]
+        return [
+            self.get(
+                project_id,
+                asset_id,
+                language or "",
+                source_kind=source_kind,
+                producer_kind=producer_kind,
+            )
+            for language, source_kind, producer_kind in variants
+        ]
 
-    def get(self, project_id: str, asset_id: str, language: str) -> TranslationDocument:
+    def get(
+        self,
+        project_id: str,
+        asset_id: str,
+        language: str,
+        *,
+        source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        producer_kind: TranslationProducerKind | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
+    ) -> TranslationDocument:
         language = self.normalize_language(language)
+        normalized_source_kind = TranslationSourceKind(source_kind)
+        normalized_producer_kind = TranslationProducerKind(producer_kind)
         document = self._annotations.get_channel(
             project_id,
             asset_id,
             AnnotationChannel.TRANSLATION,
             language,
+            normalized_source_kind,
+            normalized_producer_kind,
         )
-        source = self.read_source_revision(project_id, asset_id)
-        source_hash = source[2] if source else None
+        source = self.read_source_revision(
+            project_id,
+            asset_id,
+            normalized_source_kind,
+        )
         invalid_source_issue = (
-            self._invalid_source_issue(project_id, asset_id) if source is None else None
+            self._invalid_source_issue(project_id, asset_id, normalized_source_kind)
+            if source is None
+            else None
         )
         if invalid_source_issue:
             status = TranslationStatus.SOURCE_INVALID
@@ -80,21 +154,49 @@ class TranslationService:
         elif document.availability_status == AnnotationAvailabilityStatus.INVALID:
             status = TranslationStatus.INVALID
         elif document.availability_status == AnnotationAvailabilityStatus.STALE:
-            status = TranslationStatus.STALE
+            status = TranslationStatus.SOURCE_MISMATCH
         else:
             status = TranslationStatus.CURRENT
+
+        alignment_status = TranslationAlignmentStatus.UNAVAILABLE
+        alignment_parts: list[TranslationAlignmentPart] = []
+        issue = invalid_source_issue
+        visible_content = document.content
+        if status == TranslationStatus.SOURCE_MISMATCH:
+            visible_content = ""
+            issue = "当前不匹配：源标注已经变化，请重新翻译。旧译文仅保留在历史记录中。"
+        elif source is not None and document.exists:
+            valid, alignment_issue, raw_parts = self._align(
+                source,
+                document.content,
+            )
+            if valid:
+                alignment_status = TranslationAlignmentStatus.ALIGNED
+                alignment_parts = self._alignment_parts(raw_parts)
+            else:
+                alignment_status = TranslationAlignmentStatus.INVALID
+                issue = alignment_issue
+                status = TranslationStatus.INVALID
 
         metadata = self._revision_metadata(project_id, document.head_revision_id)
         return TranslationDocument(
             asset_id=asset_id,
             language=language,
-            path=f"数据库 · translation:{language}",
+            source_kind=normalized_source_kind,
+            producer_kind=normalized_producer_kind,
+            resolved_source_channel=(source.resolved_channel.value if source else None),
+            path=document.path,
             exists=document.exists,
-            content=document.content,
+            content=visible_content,
+            source_content=source.content if source else "",
+            source_tags=source.tags if source else [],
             status=status,
             source_exists=source is not None,
             source_hash=self._optional_text(metadata.get("source_content_hash")),
-            current_source_hash=source_hash,
+            current_source_hash=source.content_hash if source else None,
+            source_revision_id=source.revision_id if source else None,
+            alignment_status=alignment_status,
+            alignment_parts=alignment_parts,
             validation_status=(
                 document.validation_status.value if document.validation_status else None
             ),
@@ -103,22 +205,47 @@ class TranslationService:
             model=self._optional_text(metadata.get("model")),
             modified_at=document.head_revision_id,
             updated_at=document.updated_at,
-            issue=invalid_source_issue,
+            issue=issue,
         )
 
-    def read_source(self, project_id: str, asset_id: str) -> tuple[str, str] | None:
-        source = self.read_source_revision(project_id, asset_id)
-        return (source[1], source[2]) if source else None
+    def read_source(
+        self,
+        project_id: str,
+        asset_id: str,
+        source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+    ) -> tuple[str, str] | None:
+        source = self.read_source_revision(project_id, asset_id, source_kind)
+        return (source.content, source.content_hash) if source else None
 
     def read_source_revision(
         self,
         project_id: str,
         asset_id: str,
-    ) -> tuple[str, str, str] | None:
+        source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+    ) -> TranslationSource | None:
+        normalized_source_kind = TranslationSourceKind(source_kind)
         paths, _ = self._workspaces.get(project_id)
         if AssetRepository(paths.database).get_asset(asset_id) is None:
             raise AssetNotFoundError(f"找不到素材：{asset_id}")
         repository = AnnotationRepository(paths.database)
+        if normalized_source_kind == TranslationSourceKind.TAGS:
+            revision_id = repository.usable_revision_id(
+                asset_id,
+                AnnotationChannel.TAGS,
+                require_current_image=True,
+            )
+            if revision_id is None:
+                return None
+            tags = repository.revision_tags(revision_id)
+            content = "\n".join(tag.name for tag in tags)
+            return TranslationSource(
+                revision_id=revision_id,
+                source_kind=normalized_source_kind,
+                resolved_channel=AnnotationChannel.TAGS,
+                content=content,
+                tags=tags,
+                content_hash=self.tags_hash(tags),
+            )
         for channel in (AnnotationChannel.DESCRIPTION, AnnotationChannel.EXISTING):
             revision_id = repository.usable_revision_id(
                 asset_id,
@@ -127,7 +254,14 @@ class TranslationService:
             )
             if revision_id:
                 content = repository.revision_text(revision_id)
-                return revision_id, content, self.content_hash(content)
+                return TranslationSource(
+                    revision_id=revision_id,
+                    source_kind=normalized_source_kind,
+                    resolved_channel=channel,
+                    content=content,
+                    tags=[],
+                    content_hash=self.content_hash(content),
+                )
         return None
 
     def save_generated(
@@ -138,6 +272,8 @@ class TranslationService:
         content: str,
         *,
         expected_source_hash: str,
+        source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        producer_kind: TranslationProducerKind | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
         provider_profile_id: str | None = None,
         provider_profile_name: str | None = None,
         model: str | None = None,
@@ -148,18 +284,31 @@ class TranslationService:
         allow_candidate_on_conflict: bool = True,
     ) -> TranslationDocument:
         language = self.normalize_language(language)
+        normalized_source_kind = TranslationSourceKind(source_kind)
+        normalized_producer_kind = TranslationProducerKind(producer_kind)
         paths, _ = self._workspaces.get(project_id)
-        with hold_output_resources(paths.database, self._source_claims(asset_id)):
-            source = self.read_source_revision(project_id, asset_id)
+        with hold_output_resources(
+            paths.database,
+            self._source_claims(asset_id, normalized_source_kind),
+        ):
+            source = self.read_source_revision(
+                project_id,
+                asset_id,
+                normalized_source_kind,
+            )
             if source is None:
                 raise TranslationSourceChangedError("源标注已不存在，未写入译文。")
-            source_revision_id, source_content, source_hash = source
-            if source_hash != expected_source_hash:
+            if source.content_hash != expected_source_hash:
                 raise TranslationSourceChangedError("源标注在翻译期间发生变化，未写入旧译文。")
 
-            valid, validation_status = validate_translation_structure(source_content, content)
+            valid, validation_status, stored_content = self._normalize_generated_content(
+                source,
+                content,
+            )
             if not valid and not manually_accepted:
                 raise ValueError(validation_status)
+            if not valid:
+                stored_content = content
             expected = (
                 expected_modified_at
                 if expected_modified_at is not _EXPECTED_VERSION_UNSET
@@ -168,31 +317,48 @@ class TranslationService:
                     asset_id,
                     AnnotationChannel.TRANSLATION,
                     language,
+                    normalized_source_kind,
+                    normalized_producer_kind,
                 )
             )
             self._annotations.save_generated(
                 project_id,
                 asset_id,
-                content,
+                stored_content,
                 channel=AnnotationChannel.TRANSLATION,
                 language=language,
+                translation_source_kind=normalized_source_kind,
+                translation_producer_kind=normalized_producer_kind,
                 manually_accepted=manually_accepted,
                 expected_modified_at=expected,
                 lease_owner_id=lease_owner_id,
                 source_job_item_id=source_job_item_id,
-                input_revisions=((source_revision_id, "translation_source"),),
+                input_revisions=((source.revision_id, "translation_source"),),
                 metadata={
-                    "source_content_hash": source_hash,
+                    "source_content_hash": source.content_hash,
+                    "translation_source_kind": normalized_source_kind.value,
+                    "translation_producer_kind": normalized_producer_kind.value,
+                    "alignment_validation": validation_status,
                     "provider_profile_id": provider_profile_id,
                     "provider_profile_name": provider_profile_name,
                     "model": model,
                 },
                 allow_candidate_on_conflict=allow_candidate_on_conflict,
             )
-            current = self.read_source_revision(project_id, asset_id)
-            if current is None or current[0] != source_revision_id:
+            current = self.read_source_revision(
+                project_id,
+                asset_id,
+                normalized_source_kind,
+            )
+            if current is None or current.revision_id != source.revision_id:
                 raise TranslationSourceChangedError("源标注在译文提交期间发生变化，请重新翻译。")
-        return self.get(project_id, asset_id, language)
+        return self.get(
+            project_id,
+            asset_id,
+            language,
+            source_kind=normalized_source_kind,
+            producer_kind=normalized_producer_kind,
+        )
 
     def save_manual(
         self,
@@ -201,20 +367,27 @@ class TranslationService:
         language: str,
         content: str,
         *,
+        source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        producer_kind: TranslationProducerKind | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
         expected_head_revision_id: str | None,
         review: bool = False,
     ) -> AnnotationDocument:
         language = self.normalize_language(language)
+        normalized_source_kind = TranslationSourceKind(source_kind)
+        normalized_producer_kind = TranslationProducerKind(producer_kind)
         paths, _ = self._workspaces.get(project_id)
-        with hold_output_resources(paths.database, self._source_claims(asset_id)):
-            source = self.read_source_revision(project_id, asset_id)
+        with hold_output_resources(
+            paths.database,
+            self._source_claims(asset_id, normalized_source_kind),
+        ):
+            source = self.read_source_revision(
+                project_id,
+                asset_id,
+                normalized_source_kind,
+            )
             if source is None:
                 raise ValueError("当前没有可用的源标注，无法保存译文。")
-            source_revision_id, source_content, source_hash = source
-            valid, validation_issue = validate_translation_structure(
-                source_content,
-                content,
-            )
+            valid, validation_issue, _ = self._align(source, content)
             if not valid:
                 raise ValueError(validation_issue)
             return self._annotations.save_text(
@@ -223,11 +396,17 @@ class TranslationService:
                 AnnotationChannel.TRANSLATION,
                 content,
                 language=language,
+                translation_source_kind=normalized_source_kind,
+                translation_producer_kind=normalized_producer_kind,
                 source="manual_edit",
                 expected_head_revision_id=expected_head_revision_id,
                 review=review,
-                input_revisions=((source_revision_id, "translation_source"),),
-                metadata={"source_content_hash": source_hash},
+                input_revisions=((source.revision_id, "translation_source"),),
+                metadata={
+                    "source_content_hash": source.content_hash,
+                    "translation_source_kind": normalized_source_kind.value,
+                    "translation_producer_kind": normalized_producer_kind.value,
+                },
             ).document
 
     def should_translate(
@@ -236,15 +415,24 @@ class TranslationService:
         asset_id: str,
         language: str,
         policy: str,
+        *,
+        source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        producer_kind: TranslationProducerKind | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> bool:
-        document = self.get(project_id, asset_id, language)
+        document = self.get(
+            project_id,
+            asset_id,
+            language,
+            source_kind=source_kind,
+            producer_kind=producer_kind,
+        )
         if policy == "overwrite":
             return document.source_exists
         if policy == "skip":
             return document.source_exists and not document.exists
         return document.source_exists and document.status in {
             TranslationStatus.MISSING,
-            TranslationStatus.STALE,
+            TranslationStatus.SOURCE_MISMATCH,
             TranslationStatus.INVALID,
         }
 
@@ -254,8 +442,13 @@ class TranslationService:
         asset_ids: Sequence[str],
         language: str,
         policy: str,
+        *,
+        source_kind: TranslationSourceKind | str = DEFAULT_TRANSLATION_SOURCE_KIND,
+        producer_kind: TranslationProducerKind | str = DEFAULT_TRANSLATION_PRODUCER_KIND,
     ) -> list[str]:
         language = self.normalize_language(language)
+        normalized_source_kind = TranslationSourceKind(source_kind)
+        normalized_producer_kind = TranslationProducerKind(producer_kind)
         if policy not in {"skip", "stale", "overwrite"}:
             raise ValueError(f"不支持的现有译文策略：{policy}")
         ordered_ids = list(dict.fromkeys(asset_id for asset_id in asset_ids if asset_id))
@@ -275,8 +468,12 @@ class TranslationService:
                            translated_revision.is_tombstone,
                            translated_revision.image_content_hash,
                            translated_revision.validation_status,
-                           {current_usable_source_revision_sql(asset_alias="a")}
-                               AS current_source_revision_id,
+                           {
+                        current_usable_source_revision_sql(
+                            asset_alias="a",
+                            source_kind_sql=f"'{normalized_source_kind.value}'",
+                        )
+                    } AS current_source_revision_id,
                            {
                         translation_dependency_revision_sql(
                             revision_alias="translated_revision",
@@ -287,12 +484,19 @@ class TranslationService:
                       ON translated.asset_id = a.id
                      AND translated.channel = 'translation'
                      AND translated.language = ?
+                     AND translated.translation_source_kind = ?
+                     AND translated.translation_producer_kind = ?
                     LEFT JOIN annotation_document_revisions translated_revision
                       ON translated_revision.id = translated.head_revision_id
                     WHERE a.is_present = 1
                       AND a.id IN ({placeholders})
                     """,
-                    [language, *batch],
+                    [
+                        language,
+                        normalized_source_kind.value,
+                        normalized_producer_kind.value,
+                        *batch,
+                    ],
                 ).fetchall()
                 for row in rows:
                     source_revision_id = (
@@ -341,13 +545,23 @@ class TranslationService:
         paths, _ = self._workspaces.get(project_id)
         return AnnotationRepository(paths.database).revision_metadata(revision_id)
 
-    def _invalid_source_issue(self, project_id: str, asset_id: str) -> str | None:
+    def _invalid_source_issue(
+        self,
+        project_id: str,
+        asset_id: str,
+        source_kind: TranslationSourceKind,
+    ) -> str | None:
         paths, _ = self._workspaces.get(project_id)
         repository = AnnotationRepository(paths.database)
-        for channel in (AnnotationChannel.DESCRIPTION, AnnotationChannel.EXISTING):
+        channels = (
+            (AnnotationChannel.TAGS,)
+            if source_kind == TranslationSourceKind.TAGS
+            else (AnnotationChannel.DESCRIPTION, AnnotationChannel.EXISTING)
+        )
+        for channel in channels:
             revision_id = repository.head_revision_id(asset_id, channel)
             if revision_id and not repository.revision_matches_current_image(revision_id):
-                return "当前源标注对应旧图片版本，请重新生成或复核到当前图片后再翻译。"
+                return "当前源标注对应旧图片版本，请重新生成或复核后再翻译。"
             validation_status = (
                 repository.revision_validation_status(revision_id) if revision_id else None
             )
@@ -362,8 +576,60 @@ class TranslationService:
         return None
 
     @staticmethod
+    def _normalize_generated_content(
+        source: TranslationSource,
+        content: str,
+    ) -> tuple[bool, str, str]:
+        if source.source_kind == TranslationSourceKind.TAGS:
+            return parse_tag_translation_response(content, source.tags)
+        valid, issue, _ = align_description_translation(source.content, content)
+        return valid, issue, content
+
+    @staticmethod
+    def _align(
+        source: TranslationSource,
+        content: str,
+    ) -> tuple[bool, str, list[AlignmentPartData]]:
+        if source.source_kind == TranslationSourceKind.TAGS:
+            return align_tag_translation(source.tags, content)
+        return align_description_translation(source.content, content)
+
+    @staticmethod
+    def _alignment_parts(parts: list[AlignmentPartData]) -> list[TranslationAlignmentPart]:
+        return [
+            TranslationAlignmentPart(
+                id=part.id,
+                kind=part.kind,
+                source_text=part.source_text,
+                translated_text=part.translated_text,
+                category=part.category,
+                confidence=part.confidence,
+            )
+            for part in parts
+        ]
+
+    @staticmethod
     def content_hash(content: str) -> str:
         return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def tags_hash(tags: list[AnnotationTag]) -> str:
+        payload = [
+            {
+                "name": tag.name,
+                "category": tag.category,
+                "confidence": tag.confidence,
+                "origin": tag.origin,
+            }
+            for tag in tags
+        ]
+        serialized = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     @staticmethod
     def normalize_language(language: str) -> str:
@@ -377,11 +643,16 @@ class TranslationService:
         return str(value) if value is not None and str(value) else None
 
     @staticmethod
-    def _source_claims(asset_id: str) -> list[OutputResourceClaim]:
+    def _source_claims(
+        asset_id: str,
+        source_kind: TranslationSourceKind,
+    ) -> list[OutputResourceClaim]:
+        channels = (
+            (AnnotationChannel.TAGS,)
+            if source_kind == TranslationSourceKind.TAGS
+            else (AnnotationChannel.DESCRIPTION, AnnotationChannel.EXISTING)
+        )
         return [
             OutputResourceClaim(annotation_document_resource_key(asset_id, channel.value))
-            for channel in (
-                AnnotationChannel.DESCRIPTION,
-                AnnotationChannel.EXISTING,
-            )
+            for channel in channels
         ]

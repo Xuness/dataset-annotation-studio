@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from pathlib import Path
 
@@ -34,9 +35,24 @@ class JobCreationRepository:
         output_channel: str,
         use_tags_as_context: bool,
         output_language: str = "",
+        output_translation_source_kind: str = "",
+        output_translation_producer_kind: str = "",
         retry_limit: int,
         asset_ids: list[str],
     ) -> None:
+        if output_channel == "translation" and (
+            not output_translation_source_kind or not output_translation_producer_kind
+        ):
+            try:
+                translation_configuration = json.loads(configuration_snapshot)
+            except json.JSONDecodeError:
+                translation_configuration = {}
+            output_translation_source_kind = output_translation_source_kind or str(
+                translation_configuration.get("translation_source_kind", "description")
+            )
+            output_translation_producer_kind = output_translation_producer_kind or str(
+                translation_configuration.get("translation_producer_kind", "llm")
+            )
         now = utc_now_iso()
         with transaction(self._database_path) as connection:
             connection.execute(
@@ -80,8 +96,16 @@ class JobCreationRepository:
                     SELECT head_revision_id
                     FROM annotation_documents
                     WHERE asset_id = ? AND channel = ? AND language = ?
+                      AND translation_source_kind = ?
+                      AND translation_producer_kind = ?
                     """,
-                    (asset_id, output_channel, output_language),
+                    (
+                        asset_id,
+                        output_channel,
+                        output_language,
+                        output_translation_source_kind,
+                        output_translation_producer_kind,
+                    ),
                 ).fetchone()
                 output_base_revision_id = (
                     str(output_base["head_revision_id"])
