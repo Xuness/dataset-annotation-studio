@@ -73,6 +73,7 @@ class TaggerService:
         self._catalog_lock = threading.RLock()
         self._catalog_state = threading.local()
         self._has_blocking_downloads: Callable[[], bool] = lambda: False
+        self._profile_capability_cache: dict[tuple[str, str, int], TaggerProfileCapabilities] = {}
         self._installer = TaggerInstaller(repository, self._registry, self.model_root)
         self.model_root().mkdir(parents=True, exist_ok=True)
 
@@ -484,8 +485,6 @@ class TaggerService:
                         issues.append(f"模型文件已发生变化：{file.relative_path}")
             except (OSError, UnicodeError, ValueError) as error:
                 issues.append(f"安装清单无效：{error}")
-        if status != TaggerInstallationStatus.MISSING and issues:
-            status = TaggerInstallationStatus.INVALID
         fallback = self._manifest_from_row(row, strict=False)
         manifest = manifest or fallback
         categories = manifest.categories if manifest else {}
@@ -498,6 +497,18 @@ class TaggerService:
                 categories,
             )
         )
+        if manifest is not None and not issues:
+            try:
+                profile_capabilities = self._current_profile_capabilities(
+                    manifest.adapter_id,
+                    directory,
+                    manifest.fingerprint,
+                    categories,
+                )
+            except (OSError, ValueError) as error:
+                issues.append(f"适配器能力无效：{error}")
+        if status != TaggerInstallationStatus.MISSING and issues:
+            status = TaggerInstallationStatus.INVALID
         return TaggerInstallation(
             id=str(row["id"]),
             name=str(row["name"]),
@@ -727,3 +738,30 @@ class TaggerService:
             default_selection=TaggerSelectionPolicy(),
             default_categories=defaults,
         )
+
+    def _current_profile_capabilities(
+        self,
+        adapter_id: str,
+        directory: Path,
+        fingerprint: str,
+        categories: dict[str, int],
+    ) -> TaggerProfileCapabilities:
+        adapter = self._registry.get(adapter_id)
+        cache_key = (adapter_id, fingerprint, adapter.contract_version)
+        cached = self._profile_capability_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        # Selection modes are executable adapter behavior. Refresh them once per
+        # process so an existing installation is not pinned to a stale manifest
+        # after a backward-compatible adapter capability is added.
+        capabilities = adapter.profile_capabilities(directory)
+        unknown_defaults = sorted(set(capabilities.default_categories) - set(categories))
+        if unknown_defaults:
+            raise ValueError("默认配置包含未知类别：" + "、".join(unknown_defaults))
+        unknown_thresholds = sorted(
+            set(capabilities.default_selection.category_thresholds) - set(categories)
+        )
+        if unknown_thresholds:
+            raise ValueError("默认阈值包含未知类别：" + "、".join(unknown_thresholds))
+        self._profile_capability_cache[cache_key] = capabilities
+        return capabilities

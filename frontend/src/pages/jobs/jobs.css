@@ -106,6 +106,34 @@
   line-height: 1.5;
 }
 
+.tagger-job-snapshot {
+  display: grid;
+  gap: 5px;
+  margin: 2px 0 0;
+}
+
+.tagger-job-snapshot > div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.tagger-job-snapshot dt {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.tagger-job-snapshot dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 .job-prompt-source.has-error {
   border-color: color-mix(in srgb, var(--warning) 38%, var(--line));
   background: var(--warning-soft);

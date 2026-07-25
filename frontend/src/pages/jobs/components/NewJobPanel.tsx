@@ -9,12 +9,17 @@ import {
   useTranslationPromptPresets,
 } from "../../../features/presets/hooks";
 import { useTaggerLibrary } from "../../../features/taggers/hooks";
-import { taggerSelectionModeLabel } from "../../../features/taggers/labels";
+import {
+  TAGGER_DEVICE_LABELS,
+  taggerCategoryLabel,
+  taggerSelectionModeLabel,
+} from "../../../features/taggers/labels";
 import type {
   ExistingTranslationPolicy,
   ExecutionBackend,
   JobDetail,
   JobKind,
+  TaggerProfile,
   WorkspaceSummary,
 } from "../../../shared/api/types";
 import { useSettingsCenter } from "../../../shared/settings/settingsCenterStore";
@@ -26,6 +31,29 @@ interface NewJobPanelProps {
   workspace: WorkspaceSummary;
   checkedAssetIds: string[];
   onCreated: (job: JobDetail) => void;
+}
+
+function taggerThresholdSummary(profile: TaggerProfile): {
+  label: string;
+  value: string;
+} {
+  const { selection } = profile;
+  if (selection.mode === "global") {
+    return {
+      label: "统一阈值",
+      value: `${selection.global_threshold.toFixed(2)}（全部输出类别）`,
+    };
+  }
+
+  return {
+    label: selection.mode === "category" ? "有效分类阈值" : "分类回退阈值",
+    value: profile.categories
+      .map((category) => {
+        const threshold = selection.category_thresholds[category] ?? selection.global_threshold;
+        return `${taggerCategoryLabel(category)} ${threshold.toFixed(2)}`;
+      })
+      .join(" · "),
+  };
 }
 
 export function NewJobPanel({
@@ -62,6 +90,9 @@ export function NewJobPanel({
   const selectedTaggerProfile = readyTaggerProfiles.find(
     (profile) => profile.id === taggerProfileId,
   );
+  const selectedTaggerThresholds = selectedTaggerProfile
+    ? taggerThresholdSummary(selectedTaggerProfile)
+    : null;
 
   useEffect(() => {
     const available = providerProfiles.data;
@@ -263,15 +294,38 @@ export function NewJobPanel({
               ? "正在读取本地打标配置…"
               : (selectedTaggerProfile?.name ?? "尚无可用的本地打标配置")}
           </strong>
-          <small>
-            {selectedTaggerProfile
-              ? `${taggerSelectionModeLabel(selectedTaggerProfile.selection.mode)} · 回退阈值 ${selectedTaggerProfile.selection.global_threshold.toFixed(2)} · ${selectedTaggerProfile.categories.length} 个类别 · ${selectedTaggerProfile.device} · ${
-                  selectedTaggerProfile.batch_size === null
-                    ? "自动批次"
-                    : `批次 ${selectedTaggerProfile.batch_size}`
-                }`
-              : (taggerLibrary.data?.runtime.error ?? "请先在设置中导入并配置本地模型。")}
-          </small>
+          {selectedTaggerProfile && selectedTaggerThresholds ? (
+            <>
+              <dl className="tagger-job-snapshot">
+                <div>
+                  <dt>选择策略</dt>
+                  <dd>{taggerSelectionModeLabel(selectedTaggerProfile.selection.mode)}</dd>
+                </div>
+                <div>
+                  <dt>{selectedTaggerThresholds.label}</dt>
+                  <dd>{selectedTaggerThresholds.value}</dd>
+                </div>
+                <div>
+                  <dt>输出类别</dt>
+                  <dd>{selectedTaggerProfile.categories.map(taggerCategoryLabel).join("、")}</dd>
+                </div>
+                <div>
+                  <dt>执行设置</dt>
+                  <dd>
+                    {TAGGER_DEVICE_LABELS[selectedTaggerProfile.device]} ·{" "}
+                    {selectedTaggerProfile.batch_size === null
+                      ? "自动批次"
+                      : `批次 ${selectedTaggerProfile.batch_size}`}
+                  </dd>
+                </div>
+              </dl>
+              {selectedTaggerProfile.selection.mode === "model_recommended" ? (
+                <small>逐标签优先采用模型推荐值；上方分类值仅在推荐值缺失时回退。</small>
+              ) : null}
+            </>
+          ) : (
+            <small>{taggerLibrary.data?.runtime.error ?? "请先在设置中导入并配置本地模型。"}</small>
+          )}
           {!selectedTaggerProfile ? (
             <button onClick={() => openSettings("taggers")}>打开本地打标器设置</button>
           ) : null}

@@ -26,6 +26,7 @@ from dataset_studio.modules.taggers.models import (
     TaggerInferenceTag,
     TaggerInstallationStatus,
     TaggerProfileCapabilities,
+    TaggerProfileUpdate,
     TaggerRuntimeInfo,
     TaggerSelectionMode,
     TaggerSelectionPolicy,
@@ -881,6 +882,10 @@ def test_cl_tagger_v2_adapter_and_onnxruntime_execute_external_data_model(
     validated = CLTaggerV2Adapter().validate(source)
     assert validated.model_version == "v2.00"
     assert validated.categories == {"character": 1, "general": 1}
+    assert validated.profile_capabilities.supported_selection_modes == [
+        TaggerSelectionMode.GLOBAL,
+        TaggerSelectionMode.CATEGORY,
+    ]
 
     library = service.import_local(TaggerImportRequest(path=str(source), name="Tiny CL Tagger"))
     profile = service.resolve_execution_profile(library.profiles[0].id)
@@ -905,6 +910,67 @@ def test_cl_tagger_v2_adapter_and_onnxruntime_execute_external_data_model(
         assert outcome.result.provider == "CPUExecutionProvider"
         assert outcome.result.batch_size == 2
         assert outcome.result.tags[0].confidence > outcome.result.tags[1].confidence > 0.55
+
+
+def test_cl_tagger_v2_category_thresholds_refresh_stale_manifest_and_filter_independently(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+    settings.ensure_directories()
+    database = settings.app_data_dir / "global.sqlite3"
+    initialize_global_database(database)
+    service = TaggerService(
+        settings,
+        TaggerRepository(database),
+        TaggerAdapterRegistry((CLTaggerV2Adapter(),)),
+    )
+    library = service.import_local(
+        TaggerImportRequest(path=str(_real_onnx_model_source(tmp_path)), name="Tiny CL Tagger")
+    )
+    manifest_path = Path(library.installations[0].path) / "installation.json"
+    stale_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    stale_manifest["profile_capabilities"]["supported_selection_modes"] = ["global"]
+    manifest_path.write_text(json.dumps(stale_manifest), encoding="utf-8")
+
+    service = TaggerService(
+        settings,
+        TaggerRepository(database),
+        TaggerAdapterRegistry((CLTaggerV2Adapter(),)),
+    )
+    library = service.library()
+    assert library.installations[0].profile_capabilities.supported_selection_modes == [
+        TaggerSelectionMode.GLOBAL,
+        TaggerSelectionMode.CATEGORY,
+    ]
+
+    profile_id = library.profiles[0].id
+    service.update_profile(
+        profile_id,
+        TaggerProfileUpdate(
+            selection=TaggerSelectionPolicy(
+                mode=TaggerSelectionMode.CATEGORY,
+                global_threshold=0.55,
+                category_thresholds={
+                    "character": 0.9,
+                    "general": 0.6,
+                },
+            )
+        ),
+    )
+    profile = service.resolve_execution_profile(profile_id).model_copy(
+        update={"device": TaggerDevice.CPU}
+    )
+    image_path = tmp_path / "white.png"
+    Image.new("RGB", (16, 24), "white").save(image_path)
+
+    report = TaggerBatchPipeline(TaggerRuntime(service)).run(
+        profile,
+        [TaggerPipelineInput(key="image", image_path=image_path)],
+    )
+
+    result = report.outcomes[0].result
+    assert result is not None
+    assert [tag.name for tag in result.tags] == ["blue_hair"]
 
 
 def test_cl_tagger_vocabulary_handles_unrecognized_structured_category(tmp_path: Path) -> None:

@@ -102,12 +102,15 @@ class FakeDownloadAdapter:
             model_version="v1",
             tag_count=2,
             categories={"general": 2},
-            profile_capabilities=TaggerProfileCapabilities(
-                supported_selection_modes=[TaggerSelectionMode.GLOBAL],
-                default_selection=TaggerSelectionPolicy(global_threshold=0.5),
-                default_categories=["general"],
-            ),
+            profile_capabilities=self.profile_capabilities(directory),
             managed_files=("model.onnx",),
+        )
+
+    def profile_capabilities(self, _directory: Path) -> TaggerProfileCapabilities:
+        return TaggerProfileCapabilities(
+            supported_selection_modes=[TaggerSelectionMode.GLOBAL],
+            default_selection=TaggerSelectionPolicy(global_threshold=0.5),
+            default_categories=["general"],
         )
 
     def download_plans(self) -> tuple[TaggerDownloadPlan, ...]:

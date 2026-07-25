@@ -192,7 +192,10 @@ class CLTaggerV2Adapter:
     def profile_capabilities(self, directory: Path) -> TaggerProfileCapabilities:
         categories = sorted(set(self.load_vocabulary(directory).categories))
         return TaggerProfileCapabilities(
-            supported_selection_modes=[TaggerSelectionMode.GLOBAL],
+            supported_selection_modes=[
+                TaggerSelectionMode.GLOBAL,
+                TaggerSelectionMode.CATEGORY,
+            ],
             default_selection=TaggerSelectionPolicy(
                 mode=TaggerSelectionMode.GLOBAL,
                 global_threshold=0.55,
