@@ -9,6 +9,7 @@ class TranslationStatus(StrEnum):
     MISSING = "missing"
     CURRENT = "current"
     STALE = "stale"
+    INVALID = "invalid"
     SOURCE_MISSING = "source_missing"
     SOURCE_INVALID = "source_invalid"
 

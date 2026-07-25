@@ -26,6 +26,7 @@ from dataset_studio.modules.exports.models import (
 from dataset_studio.modules.exports.repository import ExportRepository
 from dataset_studio.modules.exports.service import ExportService
 from dataset_studio.modules.exports.worker import ExportWorker
+from dataset_studio.modules.translations.service import TranslationService
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
 from dataset_studio.platform.global_store import initialize_global_database
@@ -149,6 +150,60 @@ def test_export_materializes_multiple_database_channels_as_variants_and_json(
         "first",
     ]
     assert metadata["annotations"]["description"]["content"] == "<caption>first.png</caption>"
+
+
+def test_export_warns_when_translation_depends_on_an_old_source_revision(
+    tmp_path: Path,
+) -> None:
+    workspaces, assets, annotations, exports = _services(tmp_path)
+    translations = TranslationService(workspaces, annotations)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    workspace, _ = workspaces.open(str(project))
+    asset = assets.list_assets(workspace.project_id).items[0]
+    source = annotations.save_text(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>source one</caption>",
+    )
+    source_revision = translations.read_source_revision(workspace.project_id, asset.id)
+    assert source_revision is not None
+    translations.save_generated(
+        workspace.project_id,
+        asset.id,
+        "zh-CN",
+        "<caption>译文一</caption>",
+        expected_source_hash=source_revision[2],
+    )
+    annotations.save_text(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>source two</caption>",
+        expected_head_revision_id=source.revision_id,
+    )
+    destination = tmp_path / "export"
+    destination.mkdir()
+
+    preview = exports.preview(
+        workspace.project_id,
+        ExportRequest(
+            destination_path=str(destination),
+            channels=[
+                ExportChannelSelection(
+                    channel=AnnotationChannel.TRANSLATION,
+                    language="zh-CN",
+                )
+            ],
+        ),
+    )
+
+    assert preview.stale_count == 1
+    assert preview.warning_count == 1
+    assert preview.items[0].annotation_status == "stale"
+    assert preview.items[0].channel_statuses == {"translation:zh-CN": "stale"}
+    assert "源标注变化" in (preview.items[0].warning_message or "")
 
 
 def test_force_export_preserves_invalid_legacy_bytes_from_frozen_revision(

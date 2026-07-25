@@ -598,13 +598,9 @@ class JobService:
         finally:
             connection.close()
         rows.sort(key=lambda row: str(row["relative_path"]).casefold())
-        return [
-            str(row["id"])
-            for row in rows
-            if self._translations.should_translate(
-                project_id,
-                str(row["id"]),
-                language,
-                policy.value,
-            )
-        ]
+        return self._translations.filter_asset_ids(
+            project_id,
+            [str(row["id"]) for row in rows],
+            language,
+            policy.value,
+        )

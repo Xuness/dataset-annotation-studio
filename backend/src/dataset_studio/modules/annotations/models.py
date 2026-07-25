@@ -259,6 +259,7 @@ class AnnotationBatchTargetOption(BaseModel):
     reviewable_count: int
     reviewed_count: int
     stale_count: int
+    blocked_count: int
 
 
 class AnnotationBatchOptions(BaseModel):
@@ -272,6 +273,7 @@ class AnnotationBatchReviewResult(BaseModel):
     reviewed_count: int
     already_reviewed_count: int
     missing_count: int
+    blocked_count: int
     asset_ids: list[str]
 
 

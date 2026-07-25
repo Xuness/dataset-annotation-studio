@@ -1,5 +1,5 @@
 export type TranslationStatus =
-  "missing" | "current" | "stale" | "source_missing" | "source_invalid";
+  "missing" | "current" | "stale" | "invalid" | "source_missing" | "source_invalid";
 
 export interface TranslationDocument {
   asset_id: string;

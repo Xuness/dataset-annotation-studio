@@ -40,6 +40,7 @@ export interface JobSummary {
   failed: number;
   skipped: number;
   manually_accepted: number;
+  candidate_results: number;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -70,6 +71,7 @@ export interface JobItemDetail {
   last_error: string | null;
   validation_status: string | null;
   manually_accepted: boolean;
+  result_disposition: "none" | "applied" | "candidate";
   attempts: JobAttempt[];
 }
 

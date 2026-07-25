@@ -11,8 +11,11 @@ import {
 } from "../src/app/desktopExit.ts";
 import { providerCredentialCacheToken } from "../src/features/presets/queryKeys.ts";
 import {
+  draftToTags,
   hasExistingAnnotationDocument,
+  parseTagDraft,
   reconcilePersistedContent,
+  tagsToDraft,
 } from "../src/pages/workspace/components/annotationEditorState.ts";
 import {
   createDesktopFullscreenToggle,
@@ -75,6 +78,57 @@ test("existing annotation tab is exposed only when the current asset has importe
     ]),
     true,
   );
+});
+
+test("tag drafts preserve delimiters, quotes, newlines, and restored metadata", () => {
+  const tags = [
+    {
+      name: "artist, name",
+      category: "artist",
+      confidence: 0.97,
+      origin: "tagger",
+    },
+    {
+      name: 'quoted "tag"',
+      category: null,
+      confidence: null,
+      origin: "manual",
+    },
+    {
+      name: "two\nlines",
+      category: "general",
+      confidence: 0.72,
+      origin: "tagger",
+    },
+  ];
+
+  const draft = tagsToDraft(tags);
+  assert.deepEqual(
+    parseTagDraft(draft),
+    tags.map((tag) => tag.name),
+  );
+  assert.deepEqual(draftToTags(draft, tags), tags);
+});
+
+test("tag drafts de-duplicate case-insensitively without discarding the first metadata", () => {
+  const previous = [
+    {
+      name: "Blue_Hair",
+      category: "general",
+      confidence: 0.91,
+      origin: "tagger",
+    },
+  ];
+
+  assert.deepEqual(draftToTags("blue_hair, BLUE_HAIR, new_tag", previous), [
+    { ...previous[0], name: "blue_hair" },
+    {
+      name: "new_tag",
+      category: null,
+      confidence: null,
+      origin: "manual",
+    },
+  ]);
 });
 
 test("provider credential cache tokens distinguish non-empty keys without retaining them", () => {

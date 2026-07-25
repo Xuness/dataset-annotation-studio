@@ -42,6 +42,7 @@ dataset-studio-service = "dataset_studio.entrypoints.service:main"
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.7,<3",
     "pyinstaller>=6.15,<7",
     "pytest>=8.4,<9",
     "pytest-asyncio>=1.1,<2",

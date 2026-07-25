@@ -8,10 +8,12 @@ from dataset_studio.api.container import AppContainer
 from dataset_studio.core.config import settings
 from dataset_studio.modules.exports.worker import ExportWorker
 from dataset_studio.modules.jobs.worker import AnnotationWorker
+from dataset_studio.modules.output_resources import configure_output_resource_owner
 from dataset_studio.modules.taggers.downloads.worker import TaggerDownloadWorker
 
 
 async def run_worker() -> None:
+    configure_output_resource_owner("worker")
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
 

@@ -16,6 +16,13 @@ from dataset_studio.modules.annotations.models import (
     AnnotationStatus,
     AnnotationTag,
 )
+from dataset_studio.modules.annotations.projection import (
+    INVALID_VALIDATION_STATUSES,
+    document_state_projection_sql,
+    resolve_document_row_state,
+)
+from dataset_studio.modules.annotations.review_repository import AnnotationReviewRepository
+from dataset_studio.modules.annotations.summary import sync_asset_annotation_summary
 
 _EXPECTED_HEAD_UNSET = object()
 
@@ -48,10 +55,11 @@ class AnnotationRepository:
         connection = connect(self._database_path)
         try:
             return connection.execute(
-                """
+                f"""
                 SELECT d.*, r.source, r.image_content_hash, r.validation_status,
                        r.is_tombstone, r.is_candidate, r.created_at AS revision_created_at,
-                       r.metadata_json, a.content_hash AS current_image_hash
+                       r.metadata_json, a.content_hash AS current_image_hash,
+                       {document_state_projection_sql()}
                 FROM annotation_documents d
                 JOIN assets a ON a.id = d.asset_id
                 LEFT JOIN annotation_document_revisions r ON r.id = d.head_revision_id
@@ -79,10 +87,11 @@ class AnnotationRepository:
         connection = connect(self._database_path)
         try:
             return connection.execute(
-                """
+                f"""
                 SELECT d.*, r.source, r.image_content_hash, r.validation_status,
                        r.is_tombstone, r.is_candidate, r.created_at AS revision_created_at,
-                       r.metadata_json, a.content_hash AS current_image_hash
+                       r.metadata_json, a.content_hash AS current_image_hash,
+                       {document_state_projection_sql()}
                 FROM annotation_documents d
                 JOIN assets a ON a.id = d.asset_id
                 LEFT JOIN annotation_document_revisions r ON r.id = d.head_revision_id
@@ -114,7 +123,8 @@ class AnnotationRepository:
                         SELECT d.*, r.source, r.image_content_hash, r.validation_status,
                                r.is_tombstone, r.is_candidate,
                                r.created_at AS revision_created_at,
-                               r.metadata_json, a.content_hash AS current_image_hash
+                               r.metadata_json, a.content_hash AS current_image_hash,
+                               {document_state_projection_sql()}
                         FROM annotation_documents d
                         JOIN assets a ON a.id = d.asset_id
                         LEFT JOIN annotation_document_revisions r
@@ -148,7 +158,8 @@ class AnnotationRepository:
                         SELECT d.*, r.source, r.image_content_hash, r.validation_status,
                                r.is_tombstone, r.is_candidate,
                                r.created_at AS revision_created_at,
-                               r.metadata_json, a.content_hash AS current_image_hash
+                               r.metadata_json, a.content_hash AS current_image_hash,
+                               {document_state_projection_sql()}
                         FROM annotation_documents d
                         JOIN assets a ON a.id = d.asset_id
                         LEFT JOIN annotation_document_revisions r
@@ -202,39 +213,6 @@ class AnnotationRepository:
         finally:
             connection.close()
 
-    def reviewed_revision_id(
-        self,
-        asset_id: str,
-        channel: AnnotationChannel,
-        language: str = "",
-        *,
-        require_current_image: bool = False,
-    ) -> str | None:
-        connection = connect(self._database_path)
-        try:
-            row = connection.execute(
-                """
-                SELECT d.reviewed_revision_id,
-                       r.image_content_hash,
-                       a.content_hash AS current_image_hash
-                FROM annotation_documents d
-                JOIN assets a ON a.id = d.asset_id
-                LEFT JOIN annotation_document_revisions r
-                  ON r.id = d.reviewed_revision_id
-                WHERE d.asset_id = ? AND d.channel = ? AND d.language = ?
-                """,
-                (asset_id, channel.value, language),
-            ).fetchone()
-            if not row or not row["reviewed_revision_id"]:
-                return None
-            if require_current_image and str(row["image_content_hash"]) != str(
-                row["current_image_hash"]
-            ):
-                return None
-            return str(row["reviewed_revision_id"])
-        finally:
-            connection.close()
-
     def usable_revision_id(
         self,
         asset_id: str,
@@ -243,37 +221,17 @@ class AnnotationRepository:
         *,
         require_current_image: bool = True,
     ) -> str | None:
-        connection = connect(self._database_path)
-        try:
-            row = connection.execute(
-                """
-                SELECT d.head_revision_id, r.image_content_hash,
-                       r.validation_status, r.is_tombstone,
-                       a.content_hash AS current_image_hash
-                FROM annotation_documents d
-                JOIN assets a ON a.id = d.asset_id
-                LEFT JOIN annotation_document_revisions r
-                  ON r.id = d.head_revision_id
-                WHERE d.asset_id = ? AND d.channel = ? AND d.language = ?
-                """,
-                (asset_id, channel.value, language),
-            ).fetchone()
-            if not row or not row["head_revision_id"] or bool(row["is_tombstone"]):
-                return None
-            if str(row["validation_status"]) in {
-                AnnotationStatus.INVALID.value,
-                AnnotationStatus.ENCODING_ERROR.value,
-                AnnotationStatus.EMPTY.value,
-                AnnotationStatus.UNCHECKED.value,
-            }:
-                return None
-            if require_current_image and str(row["image_content_hash"]) != str(
-                row["current_image_hash"]
-            ):
-                return None
-            return str(row["head_revision_id"])
-        finally:
-            connection.close()
+        row = self.get_document_row(asset_id, channel, language)
+        if row is None:
+            return None
+        state = resolve_document_row_state(row)
+        if not state.exists or state.validation_status in INVALID_VALIDATION_STATUSES:
+            return None
+        if require_current_image and state.image_stale:
+            return None
+        if channel == AnnotationChannel.TRANSLATION and state.dependency_stale:
+            return None
+        return str(row["head_revision_id"])
 
     def head_revision_id(
         self,
@@ -492,139 +450,18 @@ class AnnotationRepository:
         language: str,
         expected_head_revision_id: str,
     ) -> str:
-        with transaction(self._database_path) as connection:
-            return self._review_in_transaction(
-                connection,
-                asset_id,
-                channel,
-                language,
-                expected_head_revision_id,
-            )
+        return AnnotationReviewRepository(self._database_path).review(
+            asset_id,
+            channel,
+            language,
+            expected_head_revision_id,
+        )
 
     def review_many(
         self,
         revisions: Sequence[tuple[str, AnnotationChannel, str, str]],
     ) -> list[str]:
-        if not revisions:
-            return []
-        with transaction(self._database_path) as connection:
-            return [
-                self._review_in_transaction(
-                    connection,
-                    asset_id,
-                    channel,
-                    language,
-                    expected_head_revision_id,
-                )
-                for asset_id, channel, language, expected_head_revision_id in revisions
-            ]
-
-    def _review_in_transaction(
-        self,
-        connection: sqlite3.Connection,
-        asset_id: str,
-        channel: AnnotationChannel,
-        language: str,
-        expected_head_revision_id: str,
-    ) -> str:
-        document = self._document(connection, asset_id, channel, language, create=False)
-        if document is None or not document["head_revision_id"]:
-            raise ValueError("当前标注通道还没有可复核的版本。")
-        current = str(document["head_revision_id"])
-        if current != expected_head_revision_id:
-            raise ResourceConflictError("标注版本已经变化，请刷新后再复核。")
-        revision = connection.execute(
-            """
-            SELECT *
-            FROM annotation_document_revisions
-            WHERE id = ?
-            """,
-            (current,),
-        ).fetchone()
-        if revision is None or bool(revision["is_tombstone"]):
-            raise ValueError("已删除的标注不能被复核。")
-        now = utc_now_iso()
-        current_image_hash = self._asset_hash(connection, asset_id)
-        reviewed_revision_id = current
-        validation_status = AnnotationStatus(str(revision["validation_status"]))
-        image_changed = str(revision["image_content_hash"]) != current_image_hash
-        if image_changed:
-            reviewed_revision_id = str(uuid.uuid4())
-            metadata = self._metadata(str(revision["metadata_json"]))
-            metadata["reviewed_for_current_image_from_revision_id"] = current
-            connection.execute(
-                """
-                INSERT INTO annotation_document_revisions (
-                    id, document_id, parent_revision_id, base_revision_id,
-                    source, source_job_item_id, image_content_hash,
-                    validation_status, is_tombstone, is_candidate,
-                    metadata_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 0, 0, ?, ?)
-                """,
-                (
-                    reviewed_revision_id,
-                    str(document["id"]),
-                    current,
-                    current,
-                    "manual_review_current_image",
-                    current_image_hash,
-                    validation_status.value,
-                    json.dumps(metadata, ensure_ascii=False, separators=(",", ":")),
-                    now,
-                ),
-            )
-            if str(document["content_kind"]) == AnnotationContentKind.TEXT.value:
-                connection.execute(
-                    """
-                    INSERT INTO annotation_text_contents (
-                        revision_id, content, format, raw_bytes
-                    )
-                    SELECT ?, content, format, raw_bytes
-                    FROM annotation_text_contents
-                    WHERE revision_id = ?
-                    """,
-                    (reviewed_revision_id, current),
-                )
-            else:
-                connection.execute(
-                    """
-                    INSERT INTO annotation_tag_items (
-                        revision_id, position, name, normalized_name,
-                        category, confidence, origin
-                    )
-                    SELECT ?, position, name, normalized_name,
-                           category, confidence, origin
-                    FROM annotation_tag_items
-                    WHERE revision_id = ?
-                    """,
-                    (reviewed_revision_id, current),
-                )
-            connection.execute(
-                """
-                INSERT INTO annotation_revision_inputs (
-                    output_revision_id, input_revision_id, role
-                )
-                SELECT ?, input_revision_id, role
-                FROM annotation_revision_inputs
-                WHERE output_revision_id = ?
-                """,
-                (reviewed_revision_id, current),
-            )
-        connection.execute(
-            """
-            UPDATE annotation_documents
-            SET head_revision_id = ?, reviewed_revision_id = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                reviewed_revision_id,
-                reviewed_revision_id,
-                now,
-                str(document["id"]),
-            ),
-        )
-        self._sync_asset_summary(connection, asset_id)
-        return reviewed_revision_id
+        return AnnotationReviewRepository(self._database_path).review_many(revisions)
 
     def history_rows(
         self,
@@ -760,14 +597,6 @@ class AnnotationRepository:
         finally:
             connection.close()
 
-    @staticmethod
-    def _metadata(value: str) -> dict[str, object]:
-        try:
-            metadata = json.loads(value)
-        except json.JSONDecodeError:
-            return {}
-        return metadata if isinstance(metadata, dict) else {}
-
     def _write_revision(
         self,
         connection: sqlite3.Connection,
@@ -814,7 +643,11 @@ class AnnotationRepository:
             if expected_head_revision_id is not _EXPECTED_HEAD_UNSET
             else current_head
         )
-        if base_revision_id is not None and not self._revision_exists(connection, base_revision_id):
+        if base_revision_id is not None and not self._revision_belongs_to_document(
+            connection,
+            base_revision_id,
+            str(document["id"]),
+        ):
             base_revision_id = None
         parent_revision_id = base_revision_id if conflicted else current_head
         connection.execute(
@@ -917,7 +750,7 @@ class AnnotationRepository:
                     """,
                     (revision_id, now, str(document["id"])),
                 )
-            self._sync_asset_summary(connection, asset_id)
+            sync_asset_annotation_summary(connection, asset_id)
         return RevisionWrite(
             revision_id=revision_id,
             document_id=str(document["id"]),
@@ -925,11 +758,19 @@ class AnnotationRepository:
         )
 
     @staticmethod
-    def _revision_exists(connection: sqlite3.Connection, revision_id: str) -> bool:
+    def _revision_belongs_to_document(
+        connection: sqlite3.Connection,
+        revision_id: str,
+        document_id: str,
+    ) -> bool:
         return (
             connection.execute(
-                "SELECT 1 FROM annotation_document_revisions WHERE id = ?",
-                (revision_id,),
+                """
+                SELECT 1
+                FROM annotation_document_revisions
+                WHERE id = ? AND document_id = ?
+                """,
+                (revision_id, document_id),
             ).fetchone()
             is not None
         )
@@ -993,52 +834,11 @@ class AnnotationRepository:
         ).fetchone()
 
     @staticmethod
-    def _sync_asset_summary(connection: sqlite3.Connection, asset_id: str) -> None:
-        row = connection.execute(
-            """
-            SELECT d.head_revision_id, r.validation_status, r.is_tombstone
-                FROM annotation_documents d
-                JOIN annotation_document_revisions r ON r.id = d.head_revision_id
-                WHERE d.asset_id = ?
-                  AND d.channel != 'translation'
-                ORDER BY
-                CASE d.channel
-                    WHEN 'description' THEN 0
-                    WHEN 'existing_annotation' THEN 1
-                    WHEN 'tags' THEN 2
-                    ELSE 3
-                END,
-                d.language
-            """,
-            (asset_id,),
-        ).fetchall()
-        active = next((candidate for candidate in row if not bool(candidate["is_tombstone"])), None)
-        if active is None:
-            status = AnnotationStatus.MISSING.value
-        elif str(active["validation_status"]) in {
-            AnnotationStatus.INVALID.value,
-            AnnotationStatus.ENCODING_ERROR.value,
-            AnnotationStatus.EMPTY.value,
-        }:
-            status = str(active["validation_status"])
-        else:
-            status = str(active["validation_status"])
-        connection.execute(
-            """
-            UPDATE assets
-            SET annotation_status = ?, annotation_modified_ns = NULL, updated_at = ?
-            WHERE id = ?
-            """,
-            (status, utc_now_iso(), asset_id),
-        )
-
-    @classmethod
     def sync_asset_summary_in_transaction(
-        cls,
         connection: sqlite3.Connection,
         asset_id: str,
     ) -> None:
-        cls._sync_asset_summary(connection, asset_id)
+        sync_asset_annotation_summary(connection, asset_id)
 
 
 EXPECTED_HEAD_UNSET = _EXPECTED_HEAD_UNSET

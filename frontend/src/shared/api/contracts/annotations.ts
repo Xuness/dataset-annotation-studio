@@ -86,6 +86,7 @@ export interface AnnotationBatchTargetOption {
   reviewable_count: number;
   reviewed_count: number;
   stale_count: number;
+  blocked_count: number;
 }
 
 export interface AnnotationBatchOptions {
@@ -107,5 +108,6 @@ export interface AnnotationBatchReviewResult {
   reviewed_count: number;
   already_reviewed_count: number;
   missing_count: number;
+  blocked_count: number;
   asset_ids: string[];
 }

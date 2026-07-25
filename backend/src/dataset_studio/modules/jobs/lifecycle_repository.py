@@ -109,11 +109,22 @@ class JobLifecycleRepository:
     def recover_orphaned(self) -> int:
         now = utc_now_iso()
         with transaction(self._database_path) as connection:
-            connection.execute("DELETE FROM output_resource_leases")
             running_jobs = connection.execute(
                 "SELECT id FROM jobs WHERE status IN ('running', 'stopping')"
             ).fetchall()
             for job in running_jobs:
+                connection.execute(
+                    """
+                    DELETE FROM output_resource_leases
+                    WHERE job_item_id IN (
+                        SELECT id
+                        FROM job_items
+                        WHERE job_id = ?
+                          AND status = 'running'
+                    )
+                    """,
+                    (job["id"],),
+                )
                 connection.execute(
                     """
                     UPDATE job_attempts

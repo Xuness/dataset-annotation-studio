@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -109,6 +110,7 @@ class JobSummary(BaseModel):
     failed: int = 0
     skipped: int = 0
     manually_accepted: int = 0
+    candidate_results: int = 0
     created_at: str
     updated_at: str
     completed_at: str | None = None
@@ -139,6 +141,7 @@ class JobItemDetail(BaseModel):
     last_error: str | None = None
     validation_status: str | None = None
     manually_accepted: bool = False
+    result_disposition: Literal["none", "applied", "candidate"] = "none"
     attempts: list[JobAttempt] = Field(default_factory=list)
 
 

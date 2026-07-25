@@ -92,7 +92,7 @@ def get_job(
     project_id: str,
     job_id: str,
     container: Container,
-    items: Literal["all", "failed", "none"] = "all",
+    items: Literal["all", "exceptions", "failed", "none"] = "all",
     item_offset: int = Query(default=0, ge=0),
     item_limit: int = Query(default=200, ge=1, le=1_000_000),
 ):
@@ -100,7 +100,7 @@ def get_job(
         project_id,
         job_id,
         include_items=items != "none",
-        failed_items_only=items == "failed",
+        failed_items_only=items in {"exceptions", "failed"},
         item_offset=item_offset,
         item_limit=item_limit,
     )

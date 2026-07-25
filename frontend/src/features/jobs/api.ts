@@ -40,7 +40,7 @@ export function listJobs(
 }
 
 export function getJob(projectId: string, jobId: string, itemLimit = 200): Promise<JobDetail> {
-  const query = new URLSearchParams({ items: "failed", item_limit: String(itemLimit) });
+  const query = new URLSearchParams({ items: "exceptions", item_limit: String(itemLimit) });
   return apiRequest(`${jobsPath(projectId)}/${jobId}?${query}`);
 }
 

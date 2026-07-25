@@ -43,6 +43,43 @@ def test_unavailable_credential_store_returns_service_unavailable(
     assert response.json() == {"detail": "Secret Service unavailable"}
 
 
+def test_legacy_singular_annotation_api_has_fixed_description_semantics(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (32, 32), "white").save(project / "sample.png")
+    (project / "sample.txt").write_text("<caption>imported</caption>", encoding="utf-8")
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+
+    with TestClient(create_app(settings)) as client:
+        opened = client.post("/api/v1/workspaces/open", json={"path": str(project)})
+        project_id = opened.json()["workspace"]["project_id"]
+        asset_id = client.get(f"/api/v1/workspaces/{project_id}/assets").json()["items"][0]["id"]
+        singular_path = f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation"
+
+        before = client.get(singular_path)
+        assert before.status_code == 200
+        assert before.json()["channel"] == "description"
+        assert before.json()["exists"] is False
+        saved = client.put(
+            singular_path,
+            json={
+                "content": "<caption>description</caption>",
+                "expected_modified_at": None,
+            },
+        )
+        assert saved.status_code == 200
+        assert saved.json()["channel"] == "description"
+        channels = client.get(
+            f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotations"
+        ).json()["documents"]
+        assert {document["channel"] for document in channels} == {
+            "existing_annotation",
+            "description",
+        }
+
+
 def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> None:
     project = tmp_path / "dataset"
     project.mkdir()

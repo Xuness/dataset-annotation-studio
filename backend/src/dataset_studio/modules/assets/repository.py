@@ -4,6 +4,12 @@ import sqlite3
 from pathlib import Path
 
 from dataset_studio.core.sqlite import connect, transaction
+from dataset_studio.modules.annotations.projection import (
+    INVALID_VALIDATION_VALUES,
+    document_state_projection_sql,
+    resolve_document_row_state,
+    translation_dependency_stale_sql,
+)
 from dataset_studio.modules.assets.models import AssetRecord, AssetSummary
 
 
@@ -74,9 +80,16 @@ UNRESOLVED_GENERATION_FAILURE_SQL = (
     f"({_latest_unresolved_generation_failure_sql('id')} IS NOT NULL)"
 )
 
-REVIEW_VALIDATION_STATUSES = ("invalid", "encoding_error", "empty", "unchecked")
+REVIEW_VALIDATION_STATUSES = INVALID_VALIDATION_VALUES
+REVIEW_VALIDATION_SQL = ", ".join(f"'{status}'" for status in REVIEW_VALIDATION_STATUSES)
 
-ACTIVE_UNREVIEWED_DOCUMENT_SQL = """
+TRANSLATION_DEPENDENCY_STALE_SQL = translation_dependency_stale_sql(
+    document_alias="d",
+    revision_alias="r",
+    asset_alias="assets",
+)
+
+ACTIVE_UNREVIEWED_DOCUMENT_SQL = f"""
 EXISTS (
     SELECT 1
     FROM annotation_documents d
@@ -84,6 +97,8 @@ EXISTS (
     WHERE d.asset_id = assets.id
       AND r.is_tombstone = 0
       AND r.image_content_hash = assets.content_hash
+      AND NOT ({TRANSLATION_DEPENDENCY_STALE_SQL})
+      AND r.validation_status NOT IN ({REVIEW_VALIDATION_SQL})
       AND (
           d.reviewed_revision_id IS NULL
           OR d.reviewed_revision_id != d.head_revision_id
@@ -91,61 +106,17 @@ EXISTS (
 )
 """
 
-STALE_DOCUMENT_SQL = """
-(
-    EXISTS (
-        SELECT 1
-        FROM annotation_documents d
-        JOIN annotation_document_revisions r ON r.id = d.head_revision_id
-        WHERE d.asset_id = assets.id
-          AND r.is_tombstone = 0
-          AND r.image_content_hash != assets.content_hash
-    )
-    OR EXISTS (
-        SELECT 1
-        FROM annotation_documents translated
-        JOIN annotation_document_revisions translated_revision
-          ON translated_revision.id = translated.head_revision_id
-        WHERE translated.asset_id = assets.id
-          AND translated.channel = 'translation'
-          AND translated_revision.is_tombstone = 0
-          AND NOT EXISTS (
-              SELECT 1
-              FROM annotation_revision_inputs dependency
-              WHERE dependency.output_revision_id = translated_revision.id
-                AND dependency.role = 'translation_source'
-                AND dependency.input_revision_id = COALESCE(
-                    (
-                        SELECT description.head_revision_id
-                        FROM annotation_documents description
-                        JOIN annotation_document_revisions source_revision
-                          ON source_revision.id = description.head_revision_id
-                        WHERE description.asset_id = assets.id
-                          AND description.channel = 'description'
-                          AND description.language = ''
-                          AND source_revision.is_tombstone = 0
-                          AND source_revision.image_content_hash = assets.content_hash
-                          AND source_revision.validation_status NOT IN (
-                              'invalid', 'encoding_error', 'empty', 'unchecked'
-                          )
-                    ),
-                    (
-                        SELECT existing.head_revision_id
-                        FROM annotation_documents existing
-                        JOIN annotation_document_revisions source_revision
-                          ON source_revision.id = existing.head_revision_id
-                        WHERE existing.asset_id = assets.id
-                          AND existing.channel = 'existing_annotation'
-                          AND existing.language = ''
-                          AND source_revision.is_tombstone = 0
-                          AND source_revision.image_content_hash = assets.content_hash
-                          AND source_revision.validation_status NOT IN (
-                              'invalid', 'encoding_error', 'empty', 'unchecked'
-                          )
-                    )
-                )
-          )
-    )
+STALE_DOCUMENT_SQL = f"""
+EXISTS (
+    SELECT 1
+    FROM annotation_documents d
+    JOIN annotation_document_revisions r ON r.id = d.head_revision_id
+    WHERE d.asset_id = assets.id
+      AND r.is_tombstone = 0
+      AND (
+          r.image_content_hash != assets.content_hash
+          OR {TRANSLATION_DEPENDENCY_STALE_SQL}
+      )
 )
 """
 
@@ -541,7 +512,9 @@ class AssetRepository:
                 SELECT d.asset_id, d.channel, d.language,
                        d.head_revision_id, d.reviewed_revision_id,
                        r.is_tombstone, r.image_content_hash,
-                       a.content_hash AS current_image_hash
+                       r.validation_status,
+                       a.content_hash AS current_image_hash,
+                       {document_state_projection_sql()}
                 FROM annotation_documents d
                 JOIN assets a ON a.id = d.asset_id
                 LEFT JOIN annotation_document_revisions r
@@ -554,13 +527,17 @@ class AssetRepository:
                 key = str(row["channel"])
                 if row["language"]:
                     key = f"{key}:{row['language']}"
-                if not row["head_revision_id"] or bool(row["is_tombstone"]):
-                    status = "missing"
-                elif str(row["image_content_hash"]) != str(row["current_image_hash"]):
-                    status = "stale"
-                elif row["reviewed_revision_id"] == row["head_revision_id"]:
-                    status = "reviewed"
+                state = resolve_document_row_state(row)
+                if state.availability_status.value != "usable":
+                    status = (
+                        state.validation_status.value
+                        if state.availability_status.value == "invalid"
+                        and state.validation_status is not None
+                        else state.availability_status.value
+                    )
+                elif state.review_status is not None:
+                    status = state.review_status.value
                 else:
-                    status = "unreviewed"
+                    status = "missing"
                 statuses[str(row["asset_id"])][key] = status
         return statuses

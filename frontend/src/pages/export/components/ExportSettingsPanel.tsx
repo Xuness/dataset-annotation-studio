@@ -1,6 +1,11 @@
 import { Eye, FolderOpen, PackageOpen } from "lucide-react";
 
-import type { AnnotationChannel, ExportFormat, ExportPreview } from "../../../shared/api/types";
+import type {
+  AnnotationChannel,
+  ExportChannelSelection,
+  ExportFormat,
+  ExportPreview,
+} from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 import type { ExportFormState } from "../types";
@@ -20,6 +25,14 @@ interface Props {
   onExport: () => void;
 }
 
+const channelLabels: Record<AnnotationChannel, string> = {
+  existing_annotation: "原有标注",
+  tags: "Tags",
+  description: "LLM 描述",
+  translation: "翻译",
+};
+const defaultTranslationLanguages = ["zh-CN", "zh-TW", "en", "ja", "ko"];
+
 export function ExportSettingsPanel({
   form,
   assetCount,
@@ -38,7 +51,15 @@ export function ExportSettingsPanel({
   const readyToPreview = Boolean(
     form.destinationPath &&
     validScope &&
-    form.channels.length &&
+    form.selections.length &&
+    form.selections.every(
+      (selection) => selection.channel !== "translation" || selection.language.trim(),
+    ) &&
+    new Set(
+      form.selections.map(
+        (selection) => `${selection.channel}:${selection.language.trim().toLowerCase()}`,
+      ),
+    ).size === form.selections.length &&
     form.formats.length &&
     !activeExport,
   );
@@ -47,10 +68,56 @@ export function ExportSettingsPanel({
   );
 
   function toggleChannel(channel: AnnotationChannel) {
+    const selected = form.selections.some((selection) => selection.channel === channel);
     onChange({
-      channels: form.channels.includes(channel)
-        ? form.channels.filter((value) => value !== channel)
-        : [...form.channels, channel],
+      selections: selected
+        ? form.selections.filter((selection) => selection.channel !== channel)
+        : [
+            ...form.selections,
+            {
+              channel,
+              language: channel === "translation" ? nextTranslationLanguage() : "",
+              revision: "current",
+            },
+          ],
+    });
+  }
+
+  function nextTranslationLanguage() {
+    const selected = new Set(
+      form.selections
+        .filter((selection) => selection.channel === "translation")
+        .map((selection) => selection.language.toLowerCase()),
+    );
+    return (
+      defaultTranslationLanguages.find((language) => !selected.has(language.toLowerCase())) ?? ""
+    );
+  }
+
+  function updateSelection(index: number, update: Partial<ExportChannelSelection>) {
+    onChange({
+      selections: form.selections.map((selection, current) =>
+        current === index ? { ...selection, ...update } : selection,
+      ),
+    });
+  }
+
+  function addTranslation() {
+    onChange({
+      selections: [
+        ...form.selections,
+        {
+          channel: "translation",
+          language: nextTranslationLanguage(),
+          revision: "current",
+        },
+      ],
+    });
+  }
+
+  function removeSelection(index: number) {
+    onChange({
+      selections: form.selections.filter((_, current) => current !== index),
     });
   }
 
@@ -93,52 +160,57 @@ export function ExportSettingsPanel({
       <section className="export-option">
         <span className="export-option__title">标注通道</span>
         <div className="export-check-grid">
-          {[
-            ["existing_annotation", "原有标注"],
-            ["tags", "Tags"],
-            ["description", "LLM 描述"],
-            ["translation", "翻译"],
-          ].map(([channel, label]) => (
-            <label key={channel}>
-              <input
-                type="checkbox"
-                checked={form.channels.includes(channel as AnnotationChannel)}
-                onChange={() => toggleChannel(channel as AnnotationChannel)}
-              />
-              <span>{label}</span>
-            </label>
-          ))}
+          {(Object.entries(channelLabels) as Array<[AnnotationChannel, string]>).map(
+            ([channel, label]) => (
+              <label key={channel}>
+                <input
+                  type="checkbox"
+                  checked={form.selections.some((selection) => selection.channel === channel)}
+                  onChange={() => toggleChannel(channel)}
+                />
+                <span>{label}</span>
+              </label>
+            ),
+          )}
         </div>
-        {form.channels.includes("translation") ? (
-          <label className="export-inline-field">
-            <span>译文语言</span>
-            <select
-              value={form.translationLanguage}
-              onChange={(event) => onChange({ translationLanguage: event.target.value })}
-            >
-              <option value="zh-CN">简体中文 · zh-CN</option>
-              <option value="zh-TW">繁體中文 · zh-TW</option>
-              <option value="en">English · en</option>
-              <option value="ja">日本語 · ja</option>
-              <option value="ko">한국어 · ko</option>
-            </select>
-          </label>
-        ) : null}
-        <label className="export-inline-field">
-          <span>修订策略</span>
-          <select
-            value={form.revision}
-            onChange={(event) =>
-              onChange({ revision: event.target.value as ExportFormState["revision"] })
-            }
-          >
-            <option value="current">导出当前版本（默认）</option>
-            <option value="reviewed">仅导出已人工复核版本</option>
-          </select>
-        </label>
-        <small>
-          当前版本无需人工复核即可导出；所选通道会冻结实际 revision ID，执行时不会漂移。
-        </small>
+        <div className="export-channel-config-list">
+          {form.selections.map((selection, index) => (
+            <div className="export-channel-config" key={`${selection.channel}:${index}`}>
+              <strong>{channelLabels[selection.channel]}</strong>
+              {selection.channel === "translation" ? (
+                <input
+                  aria-label={`译文语言 ${index + 1}`}
+                  value={selection.language}
+                  placeholder="BCP 47，例如 fr 或 zh-CN"
+                  onChange={(event) => updateSelection(index, { language: event.target.value })}
+                />
+              ) : null}
+              <select
+                aria-label={`${channelLabels[selection.channel]}修订策略`}
+                value={selection.revision}
+                onChange={(event) =>
+                  updateSelection(index, {
+                    revision: event.target.value as ExportChannelSelection["revision"],
+                  })
+                }
+              >
+                <option value="current">当前版本</option>
+                <option value="reviewed">已人工复核版本</option>
+              </select>
+              {selection.channel === "translation" ? (
+                <button type="button" onClick={() => removeSelection(index)}>
+                  移除
+                </button>
+              ) : null}
+            </div>
+          ))}
+          {form.selections.some((selection) => selection.channel === "translation") ? (
+            <button type="button" className="export-add-translation" onClick={addTranslation}>
+              添加另一种译文语言
+            </button>
+          ) : null}
+        </div>
+        <small>每个通道和译文语言可以独立选择修订策略；预览会冻结实际 revision ID。</small>
       </section>
 
       <section className="export-option">
@@ -196,7 +268,7 @@ export function ExportSettingsPanel({
           <div>
             <dt>目录结构</dt>
             <dd>
-              {form.channels.length > 1 && form.formats.includes("txt")
+              {form.selections.length > 1 && form.formats.includes("txt")
                 ? "按通道分目录"
                 : "单通道扁平"}
             </dd>

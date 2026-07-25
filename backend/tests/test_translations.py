@@ -4,7 +4,12 @@ import pytest
 from PIL import Image
 
 from dataset_studio.core.config import Settings
-from dataset_studio.modules.annotations.models import AnnotationChannel
+from dataset_studio.modules.annotations.models import (
+    AnnotationChannel,
+    AnnotationChannelTarget,
+    AnnotationStatus,
+)
+from dataset_studio.modules.annotations.repository import AnnotationRepository
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
@@ -166,6 +171,15 @@ def test_manual_translation_edit_tracks_the_current_usable_source_revision(
 
     assert saved.language == "zh-CN"
     assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.CURRENT
+    with pytest.raises(ValueError, match="标签、属性或标签顺序"):
+        translations.save_manual(
+            project_id,
+            asset.id,
+            "zh-CN",
+            "<description>结构被改坏</description>",
+            expected_head_revision_id=saved.modified_at,
+        )
+    assert translations.get(project_id, asset.id, "zh-CN").content == "<caption>人工译文</caption>"
 
     annotations.save_text(
         project_id,
@@ -180,6 +194,89 @@ def test_manual_translation_edit_tracks_the_current_usable_source_revision(
         annotation_status="stale",
     )
     assert [item.id for item in stale_assets.items] == [asset.id]
+
+
+def test_batch_review_refreshes_translation_dependency_and_blocks_missing_source(
+    tmp_path: Path,
+) -> None:
+    _, project_id, assets, workspaces, annotations, translations = _translation_services(tmp_path)
+    asset = assets[0]
+    original_source = _save_usable_source(
+        annotations,
+        project_id,
+        asset.id,
+        "<caption>source one</caption>",
+    )
+    source = translations.read_source_revision(project_id, asset.id)
+    assert source is not None
+    translated = translations.save_generated(
+        project_id,
+        asset.id,
+        "zh-CN",
+        "<caption>译文一</caption>",
+        expected_source_hash=source[2],
+    )
+    next_source = annotations.save_text(
+        project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>source two</caption>",
+        expected_head_revision_id=original_source.revision_id,
+    )
+
+    options = annotations.batch_options(project_id, [asset.id])
+    translation_option = next(
+        option for option in options.targets if option.channel == AnnotationChannel.TRANSLATION
+    )
+    assert translation_option.stale_count == 1
+    assert translation_option.reviewable_count == 1
+    assert translation_option.blocked_count == 0
+
+    result = annotations.review_targets_many(
+        project_id,
+        [asset.id],
+        [
+            AnnotationChannelTarget(channel=AnnotationChannel.DESCRIPTION),
+            AnnotationChannelTarget(channel=AnnotationChannel.TRANSLATION, language="zh-CN"),
+        ],
+    )
+    assert result.reviewed_count == 2
+    assert result.blocked_count == 0
+    current = annotations.get_channel(
+        project_id,
+        asset.id,
+        AnnotationChannel.TRANSLATION,
+        "zh-CN",
+    )
+    assert current.content == translated.content
+    assert current.review_status.value == "reviewed"
+    assert current.availability_status.value == "usable"
+    assert current.head_revision_id != translated.modified_at
+    paths, _ = workspaces.get(project_id)
+    assert AnnotationRepository(paths.database).revision_inputs(current.head_revision_id or "") == [
+        (next_source.revision_id, "translation_source")
+    ]
+
+    annotations.delete(
+        project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+    )
+    blocked_options = annotations.batch_options(project_id, [asset.id])
+    blocked_translation = next(
+        option
+        for option in blocked_options.targets
+        if option.channel == AnnotationChannel.TRANSLATION
+    )
+    assert blocked_translation.reviewable_count == 0
+    assert blocked_translation.blocked_count == 1
+    blocked_result = annotations.review_targets_many(
+        project_id,
+        [asset.id],
+        [AnnotationChannelTarget(channel=AnnotationChannel.TRANSLATION, language="zh-CN")],
+    )
+    assert blocked_result.reviewed_count == 0
+    assert blocked_result.blocked_count == 1
 
 
 def test_translation_requires_a_valid_current_source(tmp_path: Path) -> None:
@@ -204,9 +301,48 @@ def test_translation_requires_a_valid_current_source(tmp_path: Path) -> None:
             "<caption>译文</caption>",
             expected_source_hash="0" * 64,
         )
+    with pytest.raises(ValueError, match="没有可用的源标注"):
+        translations.save_manual(
+            project_id,
+            asset.id,
+            "zh-CN",
+            "<caption>译文</caption>",
+            expected_head_revision_id=None,
+        )
 
 
-def test_translation_job_uses_current_usable_sources_and_existing_policy(tmp_path: Path) -> None:
+def test_invalid_translation_is_reported_and_selected_for_retranslation(
+    tmp_path: Path,
+) -> None:
+    _, project_id, assets, _, annotations, translations = _translation_services(tmp_path)
+    asset = assets[0]
+    _save_usable_source(
+        annotations,
+        project_id,
+        asset.id,
+        "<caption>source</caption>",
+    )
+    source = translations.read_source_revision(project_id, asset.id)
+    assert source is not None
+    annotations.save_text(
+        project_id,
+        asset.id,
+        AnnotationChannel.TRANSLATION,
+        "<caption>invalid translation</caption>",
+        language="zh-CN",
+        validation_status_override=AnnotationStatus.INVALID,
+        input_revisions=((source[0], "translation_source"),),
+    )
+
+    assert translations.get(project_id, asset.id, "zh-CN").status == TranslationStatus.INVALID
+    assert translations.filter_asset_ids(project_id, [asset.id], "zh-CN", "skip") == []
+    assert translations.filter_asset_ids(project_id, [asset.id], "zh-CN", "stale") == [asset.id]
+
+
+def test_translation_job_uses_batched_current_source_and_existing_policy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     (
         _,
         project_id,
@@ -252,6 +388,11 @@ def test_translation_job_uses_current_usable_sources_and_existing_policy(tmp_pat
         )
     )
     jobs = JobService(workspaces, presets, annotations, translations)
+
+    def reject_per_asset_lookup(*_args, **_kwargs):
+        raise AssertionError("translation job filtering must not perform per-asset lookups")
+
+    monkeypatch.setattr(translations, "should_translate", reject_per_asset_lookup)
     missing_job = jobs.create(
         project_id,
         JobCreateRequest(

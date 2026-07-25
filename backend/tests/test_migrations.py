@@ -1,4 +1,6 @@
+import importlib
 import json
+import pkgutil
 import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -7,19 +9,68 @@ from pathlib import Path
 import pytest
 
 from dataset_studio.core.config import Settings
-from dataset_studio.core.migrations import migrate_database
+from dataset_studio.core.migrations import Migration, migrate_database
 from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.core.sqlite import connect
 from dataset_studio.core.time import utc_now_iso
+from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationStatus
+from dataset_studio.modules.annotations.repository import AnnotationRepository
 from dataset_studio.modules.workspaces.models import WorkspaceManifest
 from dataset_studio.modules.workspaces.paths import WorkspacePaths
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.schema import (
     WORKSPACE_MIGRATIONS,
+    WORKSPACE_SCHEMA_VERSION,
     initialize_workspace_database,
 )
 from dataset_studio.modules.workspaces.service import WorkspaceService
 from dataset_studio.platform.global_store import GLOBAL_MIGRATIONS, initialize_global_database
+
+EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS = {
+    1: "a7b50fece8e0aafa67b4c59636d4a616653ffb268a7e106b3ef3f39317609f60",
+    2: "f9851a12e095767fa170c29f645f501051eb2c92cc065b916c1690ff3792ed6f",
+    3: "050898ead57c796933f3663c7e4553fc03adcd8c05e74d4cb824a0a0aa0dad10",
+    4: "fbd250cb4b4670a84fb9d71df3e876fa885402fcbd17a547d46079f373d393fa",
+    5: "509fec77efed4abd2f929d27bd1ab3672e274da3263d558fe9471c9a30d7f5b1",
+    6: "cef4042886ce8ecfb473b2c585139b957ffb830ea10e084a16873a6a89006b8c",
+    7: "39800739573fe7cb2932f0ed85e6bb282f472ca5e481b5e8e1cc2d36a2239e53",
+    8: "25e84380d067373e6fa1139613f0698b6985e24ccb09a98b0c4a1a10a3b650e9",
+    9: "a3b1a418ea8ac88e5e5b4180e5da4bf4c4bdabbd28babb90d38cfbade1533210",
+    10: "4e6862b1690e872d82f085ee4c58f7db337fbdd25abaf8034e70e234471fb1d0",
+    11: "cc0040fe94536e7453ce876af0cf75d53441829154fcf5f5fd5e7315b5b37685",
+    12: "313ef7efbc403b4bd46ac7cc65e77e32f2f178a053f866b1104560eab1e2c0fb",
+    13: "05ae357184022303f22dcd49d4c53460844bfcc7ba9b05b37e0bbd75f00ad59c",
+    14: "ec00973ffc0b07c4a531fe343cd88ab98b29b1511267bac0facca10edb4fe78e",
+}
+
+
+def test_workspace_migrations_are_isolated_and_immutable() -> None:
+    from dataset_studio.modules.workspaces import migrations as migration_package
+
+    expected_versions = list(range(1, WORKSPACE_SCHEMA_VERSION + 1))
+    assert [migration.version for migration in WORKSPACE_MIGRATIONS] == expected_versions
+    assert len(WORKSPACE_MIGRATIONS) == WORKSPACE_SCHEMA_VERSION
+    assert {
+        migration.version: migration.checksum for migration in WORKSPACE_MIGRATIONS
+    } == EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS
+
+    expected_modules = {
+        f"v{migration.version:03d}_{migration.name}" for migration in WORKSPACE_MIGRATIONS
+    }
+    discovered_modules = {
+        module.name
+        for module in pkgutil.iter_modules(migration_package.__path__)
+        if module.name.startswith("v")
+    }
+    assert discovered_modules == expected_modules
+
+    for migration in WORKSPACE_MIGRATIONS:
+        module_name = f"v{migration.version:03d}_{migration.name}"
+        module = importlib.import_module(f"{migration_package.__name__}.{module_name}")
+        migration_instances = [
+            value for value in vars(module).values() if isinstance(value, Migration)
+        ]
+        assert migration_instances == [migration]
 
 
 @pytest.mark.parametrize(
@@ -541,7 +592,7 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
     finally:
         connection.close()
     assert row["image_metadata_version"] == 1
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
     assert "idx_job_items_asset_updated" in indexes
     assert {
         "cache_read_tokens",
@@ -802,7 +853,7 @@ def test_workspace_migration_is_safe_when_api_and_worker_start_together(tmp_path
         ]
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 
 
 def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None:
@@ -864,7 +915,7 @@ def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None
         ).fetchone()
     finally:
         connection.close()
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
     assert imported is not None
     assert imported["content"] == "<caption>legacy</caption>"
     assert imported["channel"] == "existing_annotation"
@@ -922,4 +973,69 @@ def test_recent_workspace_list_applies_missing_migrations_before_summary(
     finally:
         connection.close()
     assert [summary.project_id for summary in summaries] == [manifest.project_id]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+
+
+def test_annotation_relation_triggers_reject_cross_asset_revisions(tmp_path: Path) -> None:
+    database = tmp_path / "workspace.sqlite3"
+    initialize_workspace_database(database)
+    now = utc_now_iso()
+    connection = connect(database)
+    try:
+        connection.executemany(
+            """
+            INSERT INTO assets (
+                id, relative_path, filename, stem, suffix, content_hash,
+                byte_size, modified_ns, width, height, annotation_relative_path,
+                annotation_status, image_metadata_version, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, '.png', ?, 1, 1, 32, 32, ?, 'missing', 1, ?, ?)
+            """,
+            [
+                ("asset-a", "a.png", "a.png", "a", "hash-a", "a.txt", now, now),
+                ("asset-b", "b.png", "b.png", "b", "hash-b", "b.txt", now, now),
+            ],
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    repository = AnnotationRepository(database)
+    first = repository.write_text(
+        asset_id="asset-a",
+        channel=AnnotationChannel.DESCRIPTION,
+        content="<caption>a</caption>",
+        source="manual_edit",
+        validation_status=AnnotationStatus.VALID,
+        image_content_hash="hash-a",
+    )
+    second = repository.write_text(
+        asset_id="asset-b",
+        channel=AnnotationChannel.DESCRIPTION,
+        content="<caption>b</caption>",
+        source="manual_edit",
+        validation_status=AnnotationStatus.VALID,
+        image_content_hash="hash-b",
+    )
+
+    connection = connect(database)
+    try:
+        with pytest.raises(sqlite3.IntegrityError, match="revision scope mismatch"):
+            connection.execute(
+                """
+                UPDATE annotation_documents
+                SET head_revision_id = ?
+                WHERE id = ?
+                """,
+                (second.revision_id, first.document_id),
+            )
+        with pytest.raises(sqlite3.IntegrityError, match="input asset mismatch"):
+            connection.execute(
+                """
+                INSERT INTO annotation_revision_inputs (
+                    output_revision_id, input_revision_id, role
+                ) VALUES (?, ?, 'invalid-cross-asset')
+                """,
+                (first.revision_id, second.revision_id),
+            )
+    finally:
+        connection.close()

@@ -2,15 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { xml } from "@codemirror/lang-xml";
-import {
-  BadgeCheck,
-  FileText,
-  History,
-  RotateCcw,
-  Save,
-  Trash2,
-  TriangleAlert,
-} from "lucide-react";
+import { BadgeCheck, FileText, History, Save, Trash2, TriangleAlert } from "lucide-react";
 
 import {
   useAnnotationBundle,
@@ -23,16 +15,26 @@ import {
 import { useTranslation, useTranslations } from "../../../features/translations/hooks";
 import type {
   AnnotationChannel,
-  AnnotationAvailabilityStatus,
   AnnotationDocument,
-  AnnotationReviewStatus,
   AnnotationTag,
 } from "../../../shared/api/types";
 import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
-import { hasExistingAnnotationDocument, reconcilePersistedContent } from "./annotationEditorState";
+import { AnnotationHistoryPanel } from "./AnnotationHistoryPanel";
+import {
+  AVAILABILITY_LABELS,
+  REVIEW_LABELS,
+  revisionSourceLabel,
+  TRANSLATION_STATUS_LABELS,
+} from "./annotationLabels";
+import {
+  draftToTags,
+  hasExistingAnnotationDocument,
+  reconcilePersistedContent,
+  tagsToDraft,
+} from "./annotationEditorState";
 
 interface AnnotationEditorProps {
   projectId: string;
@@ -52,77 +54,14 @@ const DEFAULT_CHANNEL_TABS: Array<{ value: EditorMode; label: string }> = [
   { value: "translation", label: "翻译" },
   { value: "compare", label: "对照" },
 ];
-const REVISION_SOURCE_LABELS: Record<string, string> = {
-  manual_edit: "手动保存",
-  model_response: "LLM 生成",
-  local_tagger: "Tagger 生成",
-  manual_accept: "人工采用",
-  manual_reconfirm: "图片变化后复核",
-  manual_review_current_image: "复核并关联当前图片",
-  manual_delete: "删除",
-  legacy_txt_import: "旧 TXT 导入",
-};
-const REVIEW_LABELS: Record<AnnotationReviewStatus, string> = {
-  unreviewed: "尚未复核",
-  reviewed: "已复核",
-};
-const AVAILABILITY_LABELS: Record<AnnotationAvailabilityStatus, string> = {
-  missing: "缺失",
-  usable: "当前可用",
-  invalid: "内容无效",
-  stale: "图片已变化",
-};
-const TRANSLATION_STATUS_LABELS = {
-  missing: "尚无译文",
-  current: "译文源版本一致",
-  stale: "译文源版本已变化",
-  source_missing: "缺少当前可用的源标注",
-  source_invalid: "当前源标注无效",
-} as const;
-
 function readFontSize(): number {
   const stored = Number.parseInt(window.localStorage.getItem(FONT_SIZE_STORAGE_KEY) ?? "12", 10);
   return Number.isFinite(stored) ? Math.min(22, Math.max(10, stored)) : 12;
 }
 
-function tagsToDraft(tags: AnnotationTag[]): string {
-  return tags.map((tag) => tag.name).join(", ");
-}
-
-function draftToTags(draft: string, previous: AnnotationTag[]): AnnotationTag[] {
-  const existing = new Map(previous.map((tag) => [tag.name.toLowerCase(), tag]));
-  const seen = new Set<string>();
-  const result: AnnotationTag[] = [];
-  for (const part of draft.replaceAll("\n", ",").split(",")) {
-    const name = part.trim();
-    const key = name.toLowerCase();
-    if (!name || seen.has(key)) continue;
-    seen.add(key);
-    result.push(
-      existing.has(key)
-        ? { ...existing.get(key)!, name }
-        : {
-            name,
-            category: null,
-            confidence: null,
-            origin: "manual",
-          },
-    );
-  }
-  return result;
-}
-
 function documentDraft(document: AnnotationDocument | undefined): string {
   if (!document) return "";
   return document.content_kind === "tags" ? tagsToDraft(document.tags) : document.content;
-}
-
-function revisionSourceLabel(source: string): string {
-  if (source.startsWith("legacy_history:")) {
-    const original = source.slice("legacy_history:".length);
-    return `旧数据库历史 · ${REVISION_SOURCE_LABELS[original] ?? original}`;
-  }
-  return REVISION_SOURCE_LABELS[source] ?? source;
 }
 
 export function AnnotationEditor({
@@ -156,10 +95,14 @@ export function AnnotationEditor({
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
   const [savedRevisionId, setSavedRevisionId] = useState<string | null>(null);
+  const [tagDraftBasis, setTagDraftBasis] = useState<AnnotationTag[]>([]);
+  const [restoredTagMetadata, setRestoredTagMetadata] = useState(false);
   const [fontSize, setFontSize] = useState(readFontSize);
   const [showHistory, setShowHistory] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const dirty = mode !== "compare" && content !== savedContent;
+  const dirty =
+    mode !== "compare" &&
+    (content !== savedContent || (activeChannel === "tags" && restoredTagMetadata));
   const dirtyRef = useRef(dirty);
   const loadedDocumentKey = useRef("");
   dirtyRef.current = dirty;
@@ -204,6 +147,8 @@ export function AnnotationEditor({
       setContent("");
       setSavedContent("");
       setSavedRevisionId(null);
+      setTagDraftBasis([]);
+      setRestoredTagMetadata(false);
       return;
     }
     if (!document.data || mode === "compare") return;
@@ -213,6 +158,8 @@ export function AnnotationEditor({
       setContent(next);
       setSavedContent(next);
       setSavedRevisionId(document.data.head_revision_id);
+      setTagDraftBasis(document.data.tags);
+      setRestoredTagMetadata(false);
     }
   }, [activeChannel, activeLanguage, assetId, document.data, mode]);
 
@@ -229,6 +176,8 @@ export function AnnotationEditor({
     setContent("");
     setSavedContent("");
     setSavedRevisionId(null);
+    setTagDraftBasis([]);
+    setRestoredTagMetadata(false);
     setMode("description");
   }, [bundle.isLoading, hasExistingAnnotation, mode]);
 
@@ -290,6 +239,8 @@ export function AnnotationEditor({
     setContent("");
     setSavedContent("");
     setSavedRevisionId(null);
+    setTagDraftBasis([]);
+    setRestoredTagMetadata(false);
     setActionError(null);
     setShowHistory(false);
     setMode(next);
@@ -309,6 +260,8 @@ export function AnnotationEditor({
     setContent("");
     setSavedContent("");
     setSavedRevisionId(null);
+    setTagDraftBasis([]);
+    setRestoredTagMetadata(false);
     setLanguage(next);
   }
 
@@ -320,7 +273,7 @@ export function AnnotationEditor({
       const result = await save.mutateAsync(
         activeChannel === "tags"
           ? {
-              tags: draftToTags(submittedContent, document.data?.tags ?? []),
+              tags: draftToTags(submittedContent, tagDraftBasis),
               expectedHeadRevisionId: savedRevisionId,
             }
           : {
@@ -332,6 +285,8 @@ export function AnnotationEditor({
       setContent((current) => reconcilePersistedContent(current, submittedContent, persisted));
       setSavedContent(persisted);
       setSavedRevisionId(result.head_revision_id);
+      setTagDraftBasis(result.tags);
+      setRestoredTagMetadata(false);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : "保存标注失败。");
     }
@@ -383,7 +338,13 @@ export function AnnotationEditor({
   }
 
   function restoreRevision(revisionContent: string, tags: AnnotationTag[]) {
-    setContent(activeChannel === "tags" ? tagsToDraft(tags) : revisionContent);
+    if (activeChannel === "tags") {
+      setContent(tagsToDraft(tags));
+      setTagDraftBasis(tags);
+      setRestoredTagMetadata(true);
+    } else {
+      setContent(revisionContent);
+    }
     setShowHistory(false);
   }
 
@@ -423,7 +384,7 @@ export function AnnotationEditor({
     activeChannel === "translation" && translationStatus === "stale";
   const activeAvailabilityStatus = document.data?.availability_status ?? "missing";
   const activeReviewStatus = document.data?.review_status;
-  const tagCount = draftToTags(content, document.data?.tags ?? []).length;
+  const tagCount = draftToTags(content, tagDraftBasis).length;
 
   return (
     <section className="annotation-editor" data-surface-region="content">
@@ -561,42 +522,13 @@ export function AnnotationEditor({
             {document.error instanceof Error ? document.error.message : "未知错误"}
           </div>
         ) : assetId && showHistory && mode !== "compare" ? (
-          <div className="annotation-editor__history">
-            {history.isLoading ? <Spinner label="读取历史" /> : null}
-            {history.isError ? (
-              <p className="validation-warning">
-                {history.error instanceof Error ? history.error.message : "读取历史失败。"}
-              </p>
-            ) : null}
-            {history.data?.map((revision) => (
-              <article key={revision.id} className={revision.is_candidate ? "is-candidate" : ""}>
-                <header>
-                  <div>
-                    <strong>{revisionSourceLabel(revision.source)}</strong>
-                    <small>
-                      {new Date(revision.created_at).toLocaleString()}
-                      {revision.is_candidate ? " · 候选版本" : ""}
-                    </small>
-                  </div>
-                  <Button
-                    icon={<RotateCcw size={12} />}
-                    onClick={() => restoreRevision(revision.content, revision.tags)}
-                    disabled={revision.is_tombstone}
-                  >
-                    恢复到编辑器
-                  </Button>
-                </header>
-                <pre>
-                  {revision.is_tombstone
-                    ? "已删除"
-                    : activeChannel === "tags"
-                      ? tagsToDraft(revision.tags)
-                      : revision.content}
-                </pre>
-              </article>
-            ))}
-            {!history.isLoading && !history.data?.length ? <p>当前通道还没有历史版本。</p> : null}
-          </div>
+          <AnnotationHistoryPanel
+            activeChannel={activeChannel}
+            revisions={history.data}
+            loading={history.isLoading}
+            error={history.isError ? history.error : null}
+            onRestore={restoreRevision}
+          />
         ) : assetId && mode !== "compare" ? (
           <CodeMirror
             className="annotation-editor__codemirror"

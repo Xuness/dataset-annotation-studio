@@ -14,6 +14,7 @@ from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.annotations.legacy_import import ensure_database_annotation_store
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.assets.scanner import AssetScanner
+from dataset_studio.modules.output_resources import recover_stale_operation_leases
 from dataset_studio.modules.workspaces.models import (
     ScanResult,
     WorkspaceManifest,
@@ -201,6 +202,7 @@ class WorkspaceService:
             if resolved in self._initialized_databases:
                 return
             initialize_workspace_database(resolved)
+            recover_stale_operation_leases(resolved)
             self._initialized_databases.add(resolved)
 
     @staticmethod

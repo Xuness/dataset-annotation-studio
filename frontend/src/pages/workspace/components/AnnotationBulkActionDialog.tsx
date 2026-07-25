@@ -123,7 +123,7 @@ export function AnnotationBulkActionDialog({
       if (action === "review") {
         const result = await review.mutateAsync({ assetIds, targets });
         setNotice(
-          `已复核 ${result.reviewed_count} 个标注文档；${result.already_reviewed_count} 个原本已复核，${result.missing_count} 个目标位置没有活动标注。`,
+          `已复核 ${result.reviewed_count} 个标注文档；${result.already_reviewed_count} 个原本已复核，${result.blocked_count} 个内容尚不可复核，${result.missing_count} 个目标位置没有活动标注。`,
         );
       } else {
         const result = await remove.mutateAsync({ assetIds, targets });
@@ -243,9 +243,14 @@ export function AnnotationBulkActionDialog({
                         <>
                           {option.reviewable_count
                             ? `${option.reviewable_count} 个待复核`
-                            : "当前版本均已复核"}
+                            : option.blocked_count
+                              ? "当前没有可复核内容"
+                              : "当前版本均已复核"}
                           {option.reviewed_count ? ` · ${option.reviewed_count} 个已复核` : ""}
                           {option.stale_count ? ` · ${option.stale_count} 张图片已变化` : ""}
+                          {option.blocked_count
+                            ? ` · ${option.blocked_count} 个需先修复内容或源标注`
+                            : ""}
                         </>
                       ) : (
                         `${option.active_count} 张图片存在`

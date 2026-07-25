@@ -76,6 +76,34 @@ const reviewFilters: Array<{ value: StatusFilter; label: string; icon: typeof Ch
   { value: "unchecked", label: "未校验", icon: FileQuestion },
 ];
 
+const channelStatusLabels: Record<string, string> = {
+  reviewed: "已复核",
+  unreviewed: "尚未复核",
+  stale: "已过期",
+  invalid: "结构异常",
+  encoding_error: "编码异常",
+  empty: "空内容",
+  unchecked: "未校验",
+};
+
+function channelBadge(channel: string): { shortLabel: string; label: string; priority: number } {
+  if (channel === "existing_annotation") {
+    return { shortLabel: "原", label: "原有标注", priority: 0 };
+  }
+  if (channel === "tags") {
+    return { shortLabel: "T", label: "Tags", priority: 1 };
+  }
+  if (channel === "description") {
+    return { shortLabel: "L", label: "LLM 描述", priority: 2 };
+  }
+  const language = channel.startsWith("translation:") ? channel.slice("translation:".length) : "";
+  return {
+    shortLabel: language || "译",
+    label: language ? `${language} 译文` : "翻译",
+    priority: 3,
+  };
+}
+
 export function AssetBrowser({
   mode = "assets",
   projectId,
@@ -396,22 +424,29 @@ export function AssetBrowser({
                       <small>
                         {asset.width} × {asset.height} · {formatBytes(asset.byte_size, "KB")}
                         <span className="asset-row__channels" aria-label="标注通道状态">
-                          {[
-                            ["existing_annotation", "原", "原有标注"],
-                            ["tags", "T", "Tags"],
-                            ["description", "L", "LLM 描述"],
-                          ].map(([channel, shortLabel, label]) => {
-                            const status = asset.annotation_channels?.[channel];
-                            return status && status !== "missing" ? (
-                              <i
-                                key={channel}
-                                className={`is-${status}`}
-                                title={`${label}：${status}`}
-                              >
-                                {shortLabel}
-                              </i>
-                            ) : null;
-                          })}
+                          {Object.entries(asset.annotation_channels ?? {})
+                            .filter(([, status]) => status !== "missing")
+                            .map(([channel, status]) => ({
+                              channel,
+                              status,
+                              ...channelBadge(channel),
+                            }))
+                            .sort(
+                              (left, right) =>
+                                left.priority - right.priority ||
+                                left.channel.localeCompare(right.channel),
+                            )
+                            .map(({ channel, status, shortLabel, label }) => {
+                              return (
+                                <i
+                                  key={channel}
+                                  className={`is-${status}`}
+                                  title={`${label}：${channelStatusLabels[status] ?? status}`}
+                                >
+                                  {shortLabel}
+                                </i>
+                              );
+                            })}
                         </span>
                       </small>
                       <span title={asset.relative_path}>{asset.relative_path}</span>

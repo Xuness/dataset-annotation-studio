@@ -476,8 +476,9 @@
 
 .asset-row__channels i {
   display: inline-grid;
-  width: 14px;
+  min-width: 14px;
   height: 14px;
+  padding: 0 3px;
   place-items: center;
   border-radius: 3px;
   color: var(--muted);
@@ -500,6 +501,14 @@
 .asset-row__channels i.is-stale {
   color: var(--warning);
   background: var(--warning-soft);
+}
+
+.asset-row__channels i.is-invalid,
+.asset-row__channels i.is-encoding_error,
+.asset-row__channels i.is-empty,
+.asset-row__channels i.is-unchecked {
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .asset-row__copy strong {

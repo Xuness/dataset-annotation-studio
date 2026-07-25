@@ -24,6 +24,10 @@ from dataset_studio.modules.annotations.models import (
     ValidationIssue,
     ValidationResult,
 )
+from dataset_studio.modules.annotations.projection import (
+    INVALID_VALIDATION_STATUSES,
+    resolve_document_row_state,
+)
 from dataset_studio.modules.annotations.repository import (
     EXPECTED_HEAD_UNSET,
     AnnotationRepository,
@@ -85,20 +89,8 @@ class AnnotationService:
         return self._document(repository, row)
 
     def get(self, project_id: str, asset_id: str) -> AnnotationDocument:
-        """Return the primary editable text channel for compatibility clients."""
+        """Return the legacy API's fixed description channel."""
 
-        bundle = self.list(project_id, asset_id)
-        active = {
-            (document.channel, document.language or ""): document
-            for document in bundle.documents
-            if document.exists
-        }
-        for key in (
-            (AnnotationChannel.DESCRIPTION, ""),
-            (AnnotationChannel.EXISTING, ""),
-        ):
-            if key in active:
-                return active[key]
         return self.get_channel(project_id, asset_id, AnnotationChannel.DESCRIPTION)
 
     def save(
@@ -312,8 +304,8 @@ class AnnotationService:
         rows = AnnotationRepository(paths.database).list_document_rows_for_assets(normalized_ids)
         summaries: dict[tuple[AnnotationChannel, str], dict[str, int]] = {}
         for row in rows:
-            head_revision_id = str(row["head_revision_id"]) if row["head_revision_id"] else None
-            if not head_revision_id or bool(row["is_tombstone"]):
+            state = resolve_document_row_state(row)
+            if not state.exists:
                 continue
             channel = AnnotationChannel(str(row["channel"]))
             language = str(row["language"])
@@ -324,13 +316,15 @@ class AnnotationService:
                     "reviewable_count": 0,
                     "reviewed_count": 0,
                     "stale_count": 0,
+                    "blocked_count": 0,
                 },
             )
             summary["active_count"] += 1
-            stale = str(row["image_content_hash"]) != str(row["current_image_hash"])
-            if stale:
+            if state.stale:
                 summary["stale_count"] += 1
-            if row["reviewed_revision_id"] == row["head_revision_id"] and not stale:
+            if not state.reviewable:
+                summary["blocked_count"] += 1
+            elif state.review_status == AnnotationReviewStatus.REVIEWED and not state.stale:
                 summary["reviewed_count"] += 1
             else:
                 summary["reviewable_count"] += 1
@@ -360,21 +354,38 @@ class AnnotationService:
         normalized_ids = self._validated_asset_ids(paths.database, asset_ids)
 
         repository = AnnotationRepository(paths.database)
-        claims = [
-            OutputResourceClaim(
-                annotation_document_resource_key(
-                    asset_id,
-                    target.channel.value,
-                    target.language,
-                )
+        claim_keys = {
+            annotation_document_resource_key(
+                asset_id,
+                target.channel.value,
+                target.language,
             )
             for asset_id in normalized_ids
             for target in selected_targets
-        ]
+        }
+        reviews_translation = any(
+            target.channel == AnnotationChannel.TRANSLATION for target in selected_targets
+        )
+        for asset_id in normalized_ids:
+            if reviews_translation:
+                claim_keys.update(
+                    {
+                        annotation_document_resource_key(
+                            asset_id,
+                            AnnotationChannel.DESCRIPTION.value,
+                        ),
+                        annotation_document_resource_key(
+                            asset_id,
+                            AnnotationChannel.EXISTING.value,
+                        ),
+                    }
+                )
+        claims = [OutputResourceClaim(key) for key in sorted(claim_keys)]
         with hold_output_resources(paths.database, claims):
             revisions: list[tuple[str, AnnotationChannel, str, str]] = []
             already_reviewed = 0
             missing = 0
+            blocked = 0
             for target in selected_targets:
                 rows = repository.get_document_rows(
                     normalized_ids,
@@ -383,11 +394,17 @@ class AnnotationService:
                 )
                 for asset_id in normalized_ids:
                     row = rows.get(asset_id)
-                    if row is None or not row["head_revision_id"] or bool(row["is_tombstone"]):
+                    if row is None:
                         missing += 1
                         continue
-                    stale = str(row["image_content_hash"]) != str(row["current_image_hash"])
-                    if row["reviewed_revision_id"] == row["head_revision_id"] and not stale:
+                    state = resolve_document_row_state(row)
+                    if not state.exists:
+                        missing += 1
+                        continue
+                    if not state.reviewable:
+                        blocked += 1
+                        continue
+                    if state.review_status == AnnotationReviewStatus.REVIEWED and not state.stale:
                         already_reviewed += 1
                     else:
                         revisions.append(
@@ -405,6 +422,7 @@ class AnnotationService:
             reviewed_count=len(revisions),
             already_reviewed_count=already_reviewed,
             missing_count=missing,
+            blocked_count=blocked,
             asset_ids=normalized_ids,
         )
 
@@ -415,7 +433,7 @@ class AnnotationService:
         channel: AnnotationChannel | None = None,
         language: str = "",
     ) -> AnnotationDocument:
-        selected_channel = channel or self.get(project_id, asset_id).channel
+        selected_channel = channel or AnnotationChannel.DESCRIPTION
         self.delete_many(
             project_id,
             [asset_id],
@@ -617,37 +635,14 @@ class AnnotationService:
             if row["validation_status"] is not None
             else None
         )
-        stale = bool(
-            exists
-            and row["image_content_hash"]
-            and str(row["image_content_hash"]) != str(row["current_image_hash"])
-        )
-        invalid_statuses = {
-            AnnotationStatus.INVALID,
-            AnnotationStatus.ENCODING_ERROR,
-            AnnotationStatus.EMPTY,
-            AnnotationStatus.UNCHECKED,
-        }
-        if not exists:
-            availability_status = AnnotationAvailabilityStatus.MISSING
-            review_status = None
-        else:
-            review_status = (
-                AnnotationReviewStatus.REVIEWED
-                if reviewed_revision_id == head_revision_id
-                else AnnotationReviewStatus.UNREVIEWED
-            )
-            if stale:
-                availability_status = AnnotationAvailabilityStatus.STALE
-            elif validation_status in invalid_statuses:
-                availability_status = AnnotationAvailabilityStatus.INVALID
-            else:
-                availability_status = AnnotationAvailabilityStatus.USABLE
+        state = resolve_document_row_state(row)
+        availability_status = state.availability_status
+        review_status = state.review_status
         compatibility_status = (
             AnnotationStatus.MISSING
             if not exists
             else validation_status
-            if validation_status in invalid_statuses
+            if validation_status in INVALID_VALIDATION_STATUSES
             else validation_status or AnnotationStatus.UNCHECKED
         )
         validation: ValidationResult | None = None

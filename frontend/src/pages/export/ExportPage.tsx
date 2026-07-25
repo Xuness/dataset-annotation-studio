@@ -22,9 +22,13 @@ import type { ExportFormState } from "./types";
 const initialForm: ExportFormState = {
   scope: "all",
   destinationPath: "",
-  channels: ["existing_annotation"],
-  translationLanguage: "zh-CN",
-  revision: "current",
+  selections: [
+    {
+      channel: "existing_annotation",
+      language: "",
+      revision: "current",
+    },
+  ],
   formats: ["txt"],
 };
 
@@ -56,11 +60,7 @@ export function ExportPage() {
       scope: form.scope,
       asset_ids: form.scope === "selected" ? checkedAssetIds : [],
       destination_path: form.destinationPath,
-      channels: form.channels.map((channel) => ({
-        channel,
-        language: channel === "translation" ? form.translationLanguage : "",
-        revision: form.revision,
-      })),
+      channels: form.selections,
       formats: form.formats,
     }),
     [checkedAssetIds, form],

@@ -36,12 +36,12 @@ channels_router = APIRouter(
 Container = Annotated[AppContainer, Depends(get_container)]
 
 
-@router.get("", response_model=AnnotationDocument)
+@router.get("", response_model=AnnotationDocument, deprecated=True)
 def get_annotation(project_id: str, asset_id: str, container: Container):
     return container.annotations.get(project_id, asset_id)
 
 
-@router.put("", response_model=AnnotationDocument)
+@router.put("", response_model=AnnotationDocument, deprecated=True)
 def save_annotation(project_id: str, asset_id: str, update: AnnotationUpdate, container: Container):
     with container.preprocessing.guard_workspace(project_id, f"save-annotation:{asset_id}"):
         container.asset_deletions.ensure_persisted_inactive(project_id)
@@ -54,7 +54,7 @@ def save_annotation(project_id: str, asset_id: str, update: AnnotationUpdate, co
         )
 
 
-@router.delete("", response_model=AnnotationDocument)
+@router.delete("", response_model=AnnotationDocument, deprecated=True)
 def delete_annotation(project_id: str, asset_id: str, container: Container):
     with container.preprocessing.guard_workspace(project_id, f"delete-annotation:{asset_id}"):
         container.preprocessing.ensure_persisted_inactive(project_id)
@@ -64,9 +64,13 @@ def delete_annotation(project_id: str, asset_id: str, container: Container):
         return container.annotations.delete(project_id, asset_id)
 
 
-@router.get("/history", response_model=list[AnnotationRevision])
+@router.get("/history", response_model=list[AnnotationRevision], deprecated=True)
 def annotation_history(project_id: str, asset_id: str, container: Container):
-    return container.annotations.history(project_id, asset_id)
+    return container.annotations.history(
+        project_id,
+        asset_id,
+        AnnotationChannel.DESCRIPTION,
+    )
 
 
 @batch_router.post("/delete", response_model=AnnotationBatchDeleteResult)

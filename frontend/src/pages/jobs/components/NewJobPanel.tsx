@@ -355,7 +355,7 @@ export function NewJobPanel({
               }
             >
               <option value="skip">跳过已有译文</option>
-              <option value="stale">补齐缺失并重译过期项</option>
+              <option value="stale">补齐缺失并重译无效或过期项</option>
               <option value="overwrite">覆盖范围内全部译文</option>
             </select>
           </label>

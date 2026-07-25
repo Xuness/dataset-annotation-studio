@@ -8,7 +8,12 @@ from pathlib import Path, PurePosixPath
 
 from dataset_studio.core.files import file_sha256
 from dataset_studio.core.sqlite import connect
-from dataset_studio.modules.annotations.models import AnnotationChannel
+from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationStatus
+from dataset_studio.modules.annotations.projection import (
+    current_usable_source_revision_sql,
+    resolve_annotation_state,
+    translation_dependency_revision_sql,
+)
 from dataset_studio.modules.exports.models import (
     ExportChannelSelection,
     ExportFormat,
@@ -251,7 +256,12 @@ def _load_annotations(
             placeholders = ",".join("?" for _ in batch)
             document_rows = connection.execute(
                 f"""
-                SELECT d.*, a.content_hash AS current_image_hash
+                SELECT d.*, a.content_hash AS current_image_hash,
+                       {
+                    current_usable_source_revision_sql(
+                        asset_alias="a",
+                    )
+                } AS current_source_revision_id
                 FROM annotation_documents d
                 JOIN assets a ON a.id = d.asset_id
                 WHERE d.asset_id IN ({placeholders})
@@ -293,25 +303,39 @@ def _selected_annotation(
     if not pointer:
         return _missing_selection(selection)
     revision = connection.execute(
-        """
-        SELECT *
-        FROM annotation_document_revisions
-        WHERE id = ?
+        f"""
+        SELECT r.*,
+               {translation_dependency_revision_sql(revision_alias="r")}
+                   AS dependency_revision_id
+        FROM annotation_document_revisions r
+        WHERE r.id = ?
         """,
         (str(pointer),),
     ).fetchone()
     if revision is None or bool(revision["is_tombstone"]):
         return _missing_selection(selection)
     validation_status = str(revision["validation_status"])
-    if str(revision["image_content_hash"]) != str(document["current_image_hash"]):
-        availability_status = "stale"
-    elif validation_status in {"invalid", "encoding_error", "empty", "unchecked"}:
-        availability_status = "invalid"
-    else:
-        availability_status = "usable"
-    review_status = (
-        "reviewed" if str(document["reviewed_revision_id"] or "") == str(pointer) else "unreviewed"
+    state = resolve_annotation_state(
+        channel=selection.channel,
+        revision_id=str(pointer),
+        reviewed_revision_id=(
+            str(document["reviewed_revision_id"]) if document["reviewed_revision_id"] else None
+        ),
+        is_tombstone=bool(revision["is_tombstone"]),
+        image_content_hash=str(revision["image_content_hash"]),
+        current_image_hash=str(document["current_image_hash"]),
+        validation_status=AnnotationStatus(validation_status),
+        dependency_revision_id=(
+            str(revision["dependency_revision_id"]) if revision["dependency_revision_id"] else None
+        ),
+        current_source_revision_id=(
+            str(document["current_source_revision_id"])
+            if document["current_source_revision_id"]
+            else None
+        ),
     )
+    availability_status = state.availability_status.value
+    review_status = state.review_status.value if state.review_status else None
 
     if selection.channel == AnnotationChannel.TAGS:
         tags = [
@@ -450,7 +474,7 @@ def _plan_item(
     if any(status == "missing" for status in statuses.values()):
         warnings.append("部分所选标注通道缺少可导出的版本。")
     if any(status == "stale" for status in statuses.values()):
-        warnings.append("导出范围包含图片变化后的过期标注。")
+        warnings.append("导出范围包含图片或源标注变化后的过期标注。")
     invalid_statuses = {
         selected.validation_status
         for selected in annotations.values()

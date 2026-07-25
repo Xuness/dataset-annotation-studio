@@ -13,12 +13,41 @@ from dataset_studio.core.time import utc_now_iso
 
 _ANNOTATION_DOCUMENT_PREFIX = "annotation-document:"
 LOGGER = logging.getLogger("dataset_studio.output_resources")
+_OWNER_INSTANCE_ID = str(uuid.uuid4())
+_OWNER_ROLE = "embedded"
 
 
 @dataclass(frozen=True, slots=True)
 class OutputResourceClaim:
     resource_key: str
     job_item_id: str | None = None
+
+
+def configure_output_resource_owner(role: str) -> None:
+    normalized = role.strip().lower()
+    if not normalized or any(character in normalized for character in ("\x00", "\n", "\r")):
+        raise ValueError("输出资源所有者角色无效。")
+    global _OWNER_ROLE
+    _OWNER_ROLE = normalized
+
+
+def recover_stale_operation_leases(database_path: Path) -> int:
+    with transaction(database_path) as connection:
+        return connection.execute(
+            """
+            DELETE FROM output_resource_leases
+            WHERE operation_id IS NOT NULL
+              AND (
+                  owner_role IS NULL
+                  OR owner_role = 'legacy'
+                  OR (
+                      owner_role = ?
+                      AND owner_instance_id != ?
+                  )
+              )
+            """,
+            (_OWNER_ROLE, _OWNER_INSTANCE_ID),
+        ).rowcount
 
 
 def annotation_document_resource_key(
@@ -70,10 +99,17 @@ def hold_output_resources(
             acquired = connection.execute(
                 """
                 INSERT OR IGNORE INTO output_resource_leases (
-                    resource_key, operation_id, acquired_at
-                ) VALUES (?, ?, ?)
+                    resource_key, operation_id, acquired_at,
+                    owner_role, owner_instance_id
+                ) VALUES (?, ?, ?, ?, ?)
                 """,
-                (claim.resource_key, operation_id, utc_now_iso()),
+                (
+                    claim.resource_key,
+                    operation_id,
+                    utc_now_iso(),
+                    _OWNER_ROLE,
+                    _OWNER_INSTANCE_ID,
+                ),
             ).rowcount
             if not acquired:
                 raise ResourceConflictError(

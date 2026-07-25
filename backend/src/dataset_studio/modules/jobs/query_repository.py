@@ -140,14 +140,43 @@ class JobQueryRepository:
         offset: int = 0,
         limit: int | None = None,
     ) -> list[JobItemDetail]:
-        status_clause = "AND ji.status = 'failed'" if failed_only else ""
+        status_clause = (
+            """
+            AND (
+                ji.status = 'failed'
+                OR EXISTS (
+                    SELECT 1
+                    FROM annotation_document_revisions candidate_filter
+                    WHERE candidate_filter.source_job_item_id = ji.id
+                      AND candidate_filter.is_candidate = 1
+                )
+            )
+            """
+            if failed_only
+            else ""
+        )
         limit_clause = "LIMIT ? OFFSET ?" if limit is not None else ""
         parameters: list[object] = [job_id]
         if limit is not None:
             parameters.extend((limit, offset))
         item_rows = connection.execute(
             f"""
-            SELECT ji.*, a.relative_path
+            SELECT ji.*, a.relative_path,
+                   CASE
+                       WHEN EXISTS (
+                           SELECT 1
+                           FROM annotation_document_revisions candidate
+                           WHERE candidate.source_job_item_id = ji.id
+                             AND candidate.is_candidate = 1
+                       ) THEN 'candidate'
+                       WHEN EXISTS (
+                           SELECT 1
+                           FROM annotation_document_revisions applied
+                           WHERE applied.source_job_item_id = ji.id
+                             AND applied.is_candidate = 0
+                       ) THEN 'applied'
+                       ELSE 'none'
+                   END AS result_disposition
             FROM job_items ji
             JOIN assets a ON a.id = ji.asset_id
             WHERE ji.job_id = ?
@@ -197,15 +226,22 @@ class JobQueryRepository:
     def _summary(connection, row, *, counts: dict[str, int] | None = None) -> JobSummary:
         if counts is None:
             counts = {
-                str(count_row["status"]): int(count_row["count"])
+                str(count_row["key"]): int(count_row["count"])
                 for count_row in connection.execute(
                     """
-                    SELECT status, COUNT(*) AS count
+                    SELECT status AS key, COUNT(*) AS count
                     FROM job_items
                     WHERE job_id = ?
                     GROUP BY status
+                    UNION ALL
+                    SELECT '__candidate__' AS key, COUNT(DISTINCT ji.id) AS count
+                    FROM job_items ji
+                    JOIN annotation_document_revisions revision
+                      ON revision.source_job_item_id = ji.id
+                     AND revision.is_candidate = 1
+                    WHERE ji.job_id = ?
                     """,
-                    (row["id"],),
+                    (row["id"], row["id"]),
                 )
             }
         backend = ExecutionBackend(str(row["execution_backend"] or "provider"))
@@ -259,7 +295,7 @@ class JobQueryRepository:
                 else None
             ),
             retry_limit=int(row["retry_limit"]),
-            total=sum(counts.values()),
+            total=sum(count for key, count in counts.items() if not key.startswith("__")),
             pending=counts.get(JobItemStatus.PENDING.value, 0)
             + counts.get(JobItemStatus.INTERRUPTED.value, 0),
             running=counts.get(JobItemStatus.RUNNING.value, 0),
@@ -267,6 +303,7 @@ class JobQueryRepository:
             failed=counts.get(JobItemStatus.FAILED.value, 0),
             skipped=counts.get(JobItemStatus.SKIPPED.value, 0),
             manually_accepted=counts.get(JobItemStatus.MANUALLY_ACCEPTED.value, 0),
+            candidate_results=counts.get("__candidate__", 0),
             created_at=str(row["created_at"]),
             updated_at=str(row["updated_at"]),
             completed_at=str(row["completed_at"]) if row["completed_at"] else None,
@@ -279,14 +316,23 @@ class JobQueryRepository:
         placeholders = ",".join("?" for _ in job_ids)
         rows = connection.execute(
             f"""
-            SELECT job_id, status, COUNT(*) AS count
+            SELECT job_id, status AS key, COUNT(*) AS count
             FROM job_items
             WHERE job_id IN ({placeholders})
             GROUP BY job_id, status
+            UNION ALL
+            SELECT ji.job_id, '__candidate__' AS key,
+                   COUNT(DISTINCT ji.id) AS count
+            FROM job_items ji
+            JOIN annotation_document_revisions revision
+              ON revision.source_job_item_id = ji.id
+             AND revision.is_candidate = 1
+            WHERE ji.job_id IN ({placeholders})
+            GROUP BY ji.job_id
             """,
-            job_ids,
+            [*job_ids, *job_ids],
         ).fetchall()
         counts: dict[str, dict[str, int]] = {job_id: {} for job_id in job_ids}
         for row in rows:
-            counts[str(row["job_id"])][str(row["status"])] = int(row["count"])
+            counts[str(row["job_id"])][str(row["key"])] = int(row["count"])
         return counts

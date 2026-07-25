@@ -165,6 +165,60 @@
   font-size: var(--text-xs);
 }
 
+.export-channel-config-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.export-channel-config {
+  display: grid;
+  grid-template-columns: minmax(70px, 0.7fr) minmax(0, 1.3fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.export-channel-config strong {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-channel-config input,
+.export-channel-config select,
+.export-channel-config button,
+.export-add-translation {
+  min-width: 0;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--text-2xs);
+}
+
+.export-channel-config button,
+.export-add-translation {
+  cursor: pointer;
+}
+
+.export-channel-config:has(input) {
+  grid-template-columns: minmax(58px, 0.55fr) minmax(0, 1.2fr) minmax(88px, 0.85fr) auto;
+}
+
+.export-add-translation {
+  justify-self: stretch;
+  color: var(--accent);
+}
+
 .export-rules dl {
   display: grid;
   grid-template-columns: 1fr 1fr;

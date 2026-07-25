@@ -21,7 +21,12 @@ from dataset_studio.modules.jobs.models import (
 )
 from dataset_studio.modules.jobs.output_resources import job_output_resource_key
 from dataset_studio.modules.jobs.service import JobService
-from dataset_studio.modules.output_resources import annotation_document_resource_key
+from dataset_studio.modules.output_resources import (
+    OutputResourceClaim,
+    annotation_document_resource_key,
+    hold_output_resources,
+    recover_stale_operation_leases,
+)
 from dataset_studio.modules.presets.models import (
     ProviderProfileCreate,
     SystemPresetCreate,
@@ -170,6 +175,35 @@ def test_orphan_recovery_finishes_running_attempt(tmp_path: Path) -> None:
     assert attempt["status"] == "interrupted"
     assert "应用在请求完成前退出" in attempt["error_message"]
     assert attempt["finished_at"] is not None
+
+
+def test_job_recovery_does_not_delete_a_live_foreground_output_lease(
+    tmp_path: Path,
+) -> None:
+    _, _, _, database, _ = _single_item_job(tmp_path)
+    resource_key = annotation_document_resource_key(
+        "foreground-asset",
+        AnnotationChannel.DESCRIPTION.value,
+    )
+    with hold_output_resources(database, [OutputResourceClaim(resource_key)]):
+        assert JobLifecycleRepository(database).recover_orphaned() == 0
+        assert recover_stale_operation_leases(database) == 0
+        connection = connect(database)
+        try:
+            lease = connection.execute(
+                """
+                SELECT operation_id, owner_role, owner_instance_id
+                FROM output_resource_leases
+                WHERE resource_key = ?
+                """,
+                (resource_key,),
+            ).fetchone()
+        finally:
+            connection.close()
+        assert lease is not None
+        assert lease["operation_id"]
+        assert lease["owner_role"]
+        assert lease["owner_instance_id"]
 
 
 def test_output_lease_serializes_jobs_targeting_the_same_file(tmp_path: Path) -> None:

@@ -29,7 +29,10 @@ const asset: AssetSummary = {
   metadata_relative_path: null,
   generation_status: null,
   generation_error: null,
-  annotation_channels: {},
+  annotation_channels: {
+    description: "reviewed",
+    "translation:zh-CN": "stale",
+  },
 };
 
 afterEach(cleanup);
@@ -95,6 +98,8 @@ describe("asset browser rows", () => {
     const checkbox = screen.getByRole("checkbox", { name: "选择 sample.png" });
     const openButton = screen.getByRole("button", { name: /sample\.png/ });
     expect(openButton.contains(checkbox)).toBe(false);
+    expect(screen.getByTitle("LLM 描述：已复核").textContent).toBe("L");
+    expect(screen.getByTitle("zh-CN 译文：已过期").textContent).toBe("zh-CN");
 
     await user.click(checkbox);
     expect(onSetChecked).toHaveBeenCalledWith(["asset-1"], false);

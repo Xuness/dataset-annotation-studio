@@ -28,6 +28,7 @@ const targets = [
     reviewable_count: 1,
     reviewed_count: 1,
     stale_count: 0,
+    blocked_count: 0,
   },
   {
     channel: "description",
@@ -37,6 +38,7 @@ const targets = [
     reviewable_count: 1,
     reviewed_count: 0,
     stale_count: 0,
+    blocked_count: 0,
   },
   {
     channel: "translation",
@@ -46,6 +48,7 @@ const targets = [
     reviewable_count: 1,
     reviewed_count: 0,
     stale_count: 0,
+    blocked_count: 0,
   },
 ] as const;
 
@@ -59,6 +62,7 @@ beforeEach(() => {
     reviewed_count: 2,
     already_reviewed_count: 1,
     missing_count: 1,
+    blocked_count: 0,
     asset_ids: ["asset-1", "asset-2"],
   });
   annotationHooks.remove.mockResolvedValue({

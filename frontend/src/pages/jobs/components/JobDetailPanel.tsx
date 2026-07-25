@@ -57,7 +57,10 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
   const active = ["queued", "running", "stopping"].includes(job.data.status);
   const stopping = job.data.status === "stopping";
   const resumable = ["stopped", "interrupted"].includes(job.data.status);
-  const failedItems = job.data.items.filter((item) => item.status === "failed");
+  const exceptionItems = job.data.items.filter(
+    (item) => item.status === "failed" || item.result_disposition === "candidate",
+  );
+  const exceptionCount = job.data.failed + job.data.candidate_results;
 
   return (
     <section
@@ -133,16 +136,27 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
           <strong>{job.data.failed}</strong>
           <span>失败</span>
         </div>
+        {job.data.candidate_results ? (
+          <div className="is-alert">
+            <strong>{job.data.candidate_results}</strong>
+            <span>候选修订</span>
+          </div>
+        ) : null}
       </div>
+      {job.data.candidate_results ? (
+        <p className="form-help">
+          这些结果生成期间目标通道已被人工修改，因此只保存在标注历史中，没有覆盖当前内容。
+        </p>
+      ) : null}
 
       <div className="failed-items-header">
         <span>失败与异常项</span>
         <small>
-          已显示 {failedItems.length} / {job.data.failed} 项
+          已显示 {exceptionItems.length} / {exceptionCount} 项
         </small>
       </div>
       <div className="failed-items-list">
-        {failedItems.map((item) => {
+        {exceptionItems.map((item) => {
           const attempts = [...item.attempts].reverse();
           const adoptableResponse = attempts.find(
             (attempt) => attempt.status === "validation_failed" && attempt.response_content,
@@ -155,7 +169,11 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
                 <strong title={item.relative_path}>{item.relative_path}</strong>
                 <span>{item.attempt_count} 次尝试</span>
               </header>
-              <p>{item.last_error ?? "未知错误"}</p>
+              <p>
+                {item.result_disposition === "candidate"
+                  ? "目标通道在任务期间发生了修改；结果已保存在标注历史中，当前内容未被覆盖。"
+                  : (item.last_error ?? "未知错误")}
+              </p>
               {diagnosticResponse?.response_content ? (
                 <pre>{diagnosticResponse.response_content}</pre>
               ) : null}
@@ -177,16 +195,16 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
             </article>
           );
         })}
-        {!failedItems.length ? (
+        {!exceptionItems.length ? (
           <div className="no-failed-items">
             <Check size={20} />
             <p>当前没有失败项。</p>
           </div>
         ) : null}
-        {failedItems.length < job.data.failed ? (
+        {exceptionItems.length < exceptionCount ? (
           <Button
             icon={<RefreshCw size={13} />}
-            onClick={() => setItemLimit((current) => Math.min(current + 200, job.data.failed))}
+            onClick={() => setItemLimit((current) => Math.min(current + 200, exceptionCount))}
             disabled={job.isFetching}
           >
             载入更多失败项

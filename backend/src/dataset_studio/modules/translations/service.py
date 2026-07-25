@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 
 from dataset_studio.core.errors import AssetNotFoundError
 from dataset_studio.core.languages import normalize_language_code
+from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.annotations.models import (
+    AnnotationAvailabilityStatus,
     AnnotationChannel,
     AnnotationDocument,
     AnnotationStatus,
+)
+from dataset_studio.modules.annotations.projection import (
+    current_usable_source_revision_sql,
+    translation_dependency_revision_sql,
 )
 from dataset_studio.modules.annotations.repository import AnnotationRepository
 from dataset_studio.modules.annotations.service import AnnotationService
@@ -60,23 +67,19 @@ class TranslationService:
             language,
         )
         source = self.read_source_revision(project_id, asset_id)
-        source_revision_id = source[0] if source else None
         source_hash = source[2] if source else None
         invalid_source_issue = (
             self._invalid_source_issue(project_id, asset_id) if source is None else None
         )
-        dependency_revision_id = self._translation_source_revision(
-            project_id,
-            document.head_revision_id,
-        )
-
         if invalid_source_issue:
             status = TranslationStatus.SOURCE_INVALID
         elif source is None:
             status = TranslationStatus.SOURCE_MISSING
         elif not document.exists:
             status = TranslationStatus.MISSING
-        elif dependency_revision_id != source_revision_id:
+        elif document.availability_status == AnnotationAvailabilityStatus.INVALID:
+            status = TranslationStatus.INVALID
+        elif document.availability_status == AnnotationAvailabilityStatus.STALE:
             status = TranslationStatus.STALE
         else:
             status = TranslationStatus.CURRENT
@@ -122,15 +125,7 @@ class TranslationService:
                 channel,
                 require_current_image=True,
             )
-            validation_status = (
-                repository.revision_validation_status(revision_id) if revision_id else None
-            )
-            if revision_id and validation_status not in {
-                None,
-                AnnotationStatus.EMPTY,
-                AnnotationStatus.INVALID,
-                AnnotationStatus.ENCODING_ERROR,
-            }:
+            if revision_id:
                 content = repository.revision_text(revision_id)
                 return revision_id, content, self.content_hash(content)
         return None
@@ -213,12 +208,15 @@ class TranslationService:
         paths, _ = self._workspaces.get(project_id)
         with hold_output_resources(paths.database, self._source_claims(asset_id)):
             source = self.read_source_revision(project_id, asset_id)
-            input_revisions: tuple[tuple[str, str], ...] = ()
-            metadata: dict[str, object] = {}
-            if source is not None:
-                source_revision_id, _, source_hash = source
-                input_revisions = ((source_revision_id, "translation_source"),)
-                metadata["source_content_hash"] = source_hash
+            if source is None:
+                raise ValueError("当前没有可用的源标注，无法保存译文。")
+            source_revision_id, source_content, source_hash = source
+            valid, validation_issue = validate_translation_structure(
+                source_content,
+                content,
+            )
+            if not valid:
+                raise ValueError(validation_issue)
             return self._annotations.save_text(
                 project_id,
                 asset_id,
@@ -228,8 +226,8 @@ class TranslationService:
                 source="manual_edit",
                 expected_head_revision_id=expected_head_revision_id,
                 review=review,
-                input_revisions=input_revisions,
-                metadata=metadata,
+                input_revisions=((source_revision_id, "translation_source"),),
+                metadata={"source_content_hash": source_hash},
             ).document
 
     def should_translate(
@@ -247,22 +245,91 @@ class TranslationService:
         return document.source_exists and document.status in {
             TranslationStatus.MISSING,
             TranslationStatus.STALE,
+            TranslationStatus.INVALID,
         }
 
-    def _translation_source_revision(
+    def filter_asset_ids(
         self,
         project_id: str,
-        revision_id: str | None,
-    ) -> str | None:
-        if not revision_id:
-            return None
+        asset_ids: Sequence[str],
+        language: str,
+        policy: str,
+    ) -> list[str]:
+        language = self.normalize_language(language)
+        if policy not in {"skip", "stale", "overwrite"}:
+            raise ValueError(f"不支持的现有译文策略：{policy}")
+        ordered_ids = list(dict.fromkeys(asset_id for asset_id in asset_ids if asset_id))
+        if not ordered_ids:
+            return []
         paths, _ = self._workspaces.get(project_id)
-        for input_revision_id, role in AnnotationRepository(paths.database).revision_inputs(
-            revision_id
-        ):
-            if role == "translation_source":
-                return input_revision_id
-        return None
+        selected: set[str] = set()
+        connection = connect(paths.database)
+        try:
+            for start in range(0, len(ordered_ids), 500):
+                batch = ordered_ids[start : start + 500]
+                placeholders = ",".join("?" for _ in batch)
+                rows = connection.execute(
+                    f"""
+                    SELECT a.id, a.content_hash AS current_image_hash,
+                           translated.head_revision_id,
+                           translated_revision.is_tombstone,
+                           translated_revision.image_content_hash,
+                           translated_revision.validation_status,
+                           {current_usable_source_revision_sql(asset_alias="a")}
+                               AS current_source_revision_id,
+                           {
+                        translation_dependency_revision_sql(
+                            revision_alias="translated_revision",
+                        )
+                    } AS dependency_revision_id
+                    FROM assets a
+                    LEFT JOIN annotation_documents translated
+                      ON translated.asset_id = a.id
+                     AND translated.channel = 'translation'
+                     AND translated.language = ?
+                    LEFT JOIN annotation_document_revisions translated_revision
+                      ON translated_revision.id = translated.head_revision_id
+                    WHERE a.is_present = 1
+                      AND a.id IN ({placeholders})
+                    """,
+                    [language, *batch],
+                ).fetchall()
+                for row in rows:
+                    source_revision_id = (
+                        str(row["current_source_revision_id"])
+                        if row["current_source_revision_id"]
+                        else None
+                    )
+                    if source_revision_id is None:
+                        continue
+                    exists = bool(row["head_revision_id"] and not bool(row["is_tombstone"]))
+                    stale = bool(
+                        exists
+                        and (
+                            str(row["image_content_hash"]) != str(row["current_image_hash"])
+                            or not row["dependency_revision_id"]
+                            or str(row["dependency_revision_id"]) != source_revision_id
+                        )
+                    )
+                    invalid = bool(
+                        exists
+                        and str(row["validation_status"])
+                        in {
+                            AnnotationStatus.INVALID.value,
+                            AnnotationStatus.ENCODING_ERROR.value,
+                            AnnotationStatus.EMPTY.value,
+                            AnnotationStatus.UNCHECKED.value,
+                        }
+                    )
+                    if (
+                        policy == "overwrite"
+                        or (policy == "skip" and not exists)
+                        or (policy == "stale" and (not exists or stale or invalid))
+                    ):
+                        selected.add(str(row["id"]))
+        finally:
+            connection.close()
+        return [asset_id for asset_id in ordered_ids if asset_id in selected]
 
     def _revision_metadata(
         self,

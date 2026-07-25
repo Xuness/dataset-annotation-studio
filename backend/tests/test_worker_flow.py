@@ -683,3 +683,111 @@ async def test_worker_translates_annotation_without_sending_image(tmp_path: Path
     translation = container.translations.get(workspace.project_id, asset.id, "zh-CN")
     assert translation.status.value == "current"
     assert translation.provider_profile_name == "Fake translator"
+
+
+@pytest.mark.asyncio
+async def test_queued_translation_keeps_later_manual_edit_and_records_candidate(
+    tmp_path: Path,
+) -> None:
+    container, workspaces, presets, jobs = _runtime(tmp_path)
+    project = tmp_path / "dataset"
+    project.mkdir()
+    Image.new("RGB", (48, 48), "white").save(project / "sample.png")
+    workspace, _ = workspaces.open(str(project))
+    asset = container.assets.list_assets(workspace.project_id).items[0]
+    container.annotations.save_text(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>quiet garden</caption>",
+    )
+    initial = container.translations.save_manual(
+        workspace.project_id,
+        asset.id,
+        "zh-CN",
+        "<caption>初始译文</caption>",
+        expected_head_revision_id=None,
+    )
+    profile = presets.create_provider(
+        ProviderProfileCreate(
+            name="Fake translator",
+            provider_type=ProviderType.OPENAI_COMPATIBLE,
+            base_url="https://example.invalid/v1",
+            default_model_id="fake-translation-model",
+            models=[
+                ProviderModelConfig(
+                    model_id="fake-translation-model",
+                    protocol_options=OpenAICompatibleModelOptions(),
+                )
+            ],
+            api_key="local-test-key",
+            concurrency=1,
+        )
+    )
+    prompt_preset = presets.create_translation_prompt(
+        TranslationPromptPresetCreate(
+            name="Snapshot translation",
+            system_prompt="Translate into {target_language}; locale={language_code}.",
+        )
+    )
+    created = jobs.create(
+        workspace.project_id,
+        JobCreateRequest(
+            provider_profile_id=profile.id,
+            kind=JobKind.TRANSLATION,
+            scope=JobScope.SELECTED,
+            asset_ids=[asset.id],
+            translation_prompt_preset_id=prompt_preset.id,
+            target_language="zh-CN",
+            translation_policy=ExistingTranslationPolicy.OVERWRITE,
+        ),
+    )
+    manual = container.translations.save_manual(
+        workspace.project_id,
+        asset.id,
+        "zh-CN",
+        "<caption>排队后人工修改</caption>",
+        expected_head_revision_id=initial.modified_at,
+    )
+
+    provider = TranslationProvider()
+    worker = AnnotationWorker(container, provider_factory=lambda _kind: provider)
+    stopped = asyncio.Event()
+    worker_task = asyncio.create_task(worker.run(stopped))
+    try:
+        for _ in range(80):
+            current_job = jobs.get(workspace.project_id, created.id)
+            if current_job.status in {JobStatus.COMPLETED, JobStatus.COMPLETED_WITH_ERRORS}:
+                break
+            await asyncio.sleep(0.05)
+        else:
+            pytest.fail("worker did not complete the translation job")
+    finally:
+        stopped.set()
+        await asyncio.wait_for(worker_task, timeout=2)
+
+    current = container.translations.get(workspace.project_id, asset.id, "zh-CN")
+    assert current.content == manual.content
+    assert current.modified_at == manual.modified_at
+    detail = jobs.get(workspace.project_id, created.id)
+    assert detail.status == JobStatus.COMPLETED
+    assert detail.candidate_results == 1
+    assert detail.items[0].result_disposition == "candidate"
+    exceptions = jobs.get(
+        workspace.project_id,
+        created.id,
+        failed_items_only=True,
+    )
+    assert [item.result_disposition for item in exceptions.items] == ["candidate"]
+    candidate = next(
+        revision
+        for revision in container.annotations.history(
+            workspace.project_id,
+            asset.id,
+            AnnotationChannel.TRANSLATION,
+            "zh-CN",
+        )
+        if revision.is_candidate
+    )
+    assert candidate.source_job_item_id == created.items[0].id
+    assert candidate.content == "<caption>安静的花园</caption>"
