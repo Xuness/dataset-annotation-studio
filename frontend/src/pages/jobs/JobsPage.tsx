@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -11,6 +11,7 @@ import { Button } from "../../shared/ui/Button";
 import { JobDetailPanel } from "./components/JobDetailPanel";
 import { JobList } from "./components/JobList";
 import { NewJobPanel } from "./components/NewJobPanel";
+import { jobsViewState, reconcileSelectedJobId } from "./jobsViewState";
 import "./jobs.css";
 import "./job-detail.css";
 
@@ -23,15 +24,24 @@ export function JobsPage() {
   const rescan = useRescanWorkspace(projectId);
   const checkedAssetIds = useAppStore((state) => state.checkedAssetIds);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const { selectedJobId } = jobsViewState.useValue(projectId);
+  const setSelectedJobId = (jobId: string | null) =>
+    jobsViewState.patch(projectId, { selectedJobId: jobId });
   const jobItems = useMemo(() => jobs.data?.pages.flat() ?? [], [jobs.data?.pages]);
 
   useEffect(() => setActiveProject(projectId), [projectId, setActiveProject]);
   useEffect(() => {
-    setSelectedJobId((current) =>
-      current && jobItems.some((job) => job.id === current) ? current : (jobItems[0]?.id ?? null),
-    );
-  }, [jobItems, projectId]);
+    if (!jobs.data) return;
+    const loadedJobIds = jobItems.map((job) => job.id);
+    jobsViewState.patch(projectId, (current) => {
+      const selectedJobId = reconcileSelectedJobId(
+        current.selectedJobId,
+        loadedJobIds,
+        Boolean(jobs.hasNextPage),
+      );
+      return selectedJobId === current.selectedJobId ? {} : { selectedJobId };
+    });
+  }, [jobItems, jobs.data, jobs.hasNextPage, projectId]);
 
   if (workspace.isError)
     return (

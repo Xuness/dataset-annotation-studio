@@ -1,15 +1,14 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { Braces, ChartNoAxesColumn, MessageSquareText } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import type { AssetSummary, WorkspaceSummary } from "../../../shared/api/types";
 import { useAppStore } from "../../../shared/store/appStore";
 import { confirmDialog } from "../../../shared/ui/dialogs";
+import { inspectorViewState, type InspectorTab } from "../workspaceViewState";
 import { MetadataSettingsPanel } from "./MetadataSettingsPanel";
 import { OverviewPanel } from "./OverviewPanel";
 import { PromptSettingsPanel } from "./PromptSettingsPanel";
-
-type InspectorTab = "overview" | "prompt" | "metadata";
 
 interface InspectorPanelProps {
   projectId: string;
@@ -31,9 +30,13 @@ export function InspectorPanel({
   onDeleteAsset,
 }: InspectorPanelProps) {
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<InspectorTab>(() =>
-    searchParams.get("panel") === "prompt" ? "prompt" : "overview",
-  );
+  const { activeTab } = inspectorViewState.useValue(projectId);
+  const setActiveTab = (tab: InspectorTab) =>
+    inspectorViewState.patch(projectId, { activeTab: tab });
+  const promptPanelRequested = searchParams.get("panel") === "prompt";
+  useEffect(() => {
+    if (promptPanelRequested) inspectorViewState.patch(projectId, { activeTab: "prompt" });
+  }, [projectId, promptPanelRequested]);
   const promptScope = `workspace-prompt:${projectId}`;
   const promptDirty = useAppStore((state) => Boolean(state.dirtyScopes[promptScope]));
   const setDirtyScope = useAppStore((state) => state.setDirtyScope);

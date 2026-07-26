@@ -20,6 +20,7 @@ import {
 import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
 import type { AnnotationChannelTarget, AssetFilterStatus } from "../../shared/api/types";
 import { useAppStore } from "../../shared/store/appStore";
+import { assetBrowserViewState, browserScopeKey } from "./workspaceViewState";
 import { Button } from "../../shared/ui/Button";
 import { alertDialog, confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
@@ -58,6 +59,11 @@ interface AnnotationBulkDialogState {
   assetIds: string[];
 }
 
+const DEFAULT_EDITOR_TARGET: AnnotationChannelTarget = {
+  channel: "description",
+  language: "",
+};
+
 const CLOSED_ANNOTATION_DIALOG: AnnotationBulkDialogState = {
   open: false,
   action: "review",
@@ -70,22 +76,33 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const workspace = useWorkspace(projectId);
   const rescan = useRescanWorkspace(projectId);
   const updateWorkspace = useUpdateWorkspace(projectId);
-  const selectedAssetId = useAppStore((state) => state.selectedAssetId);
-  const selectAsset = useAppStore((state) => state.selectAsset);
   const checkedAssetIds = useAppStore((state) => state.checkedAssetIds);
   const setAssetsChecked = useAppStore((state) => state.setAssetsChecked);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<AssetFilterStatus | null>(
-    mode === "review" ? "needs_review" : null,
+  const browserScope = browserScopeKey(projectId, mode);
+  const { search, statusFilter, folderPath, selectedAssetId } =
+    assetBrowserViewState.useValue(browserScope);
+  const selectAsset = useCallback(
+    (assetId: string | null) =>
+      assetBrowserViewState.patch(browserScope, { selectedAssetId: assetId }),
+    [browserScope],
   );
-  const [folderPath, setFolderPath] = useState("");
+  const setSearch = useCallback(
+    (value: string) => assetBrowserViewState.patch(browserScope, { search: value }),
+    [browserScope],
+  );
+  const setStatusFilter = useCallback(
+    (value: AssetFilterStatus | null) =>
+      assetBrowserViewState.patch(browserScope, { statusFilter: value }),
+    [browserScope],
+  );
+  const setFolderPath = useCallback(
+    (value: string) => assetBrowserViewState.patch(browserScope, { folderPath: value }),
+    [browserScope],
+  );
   const [editorDirty, setEditorDirty] = useState(false);
   const [editorDirtyKind, setEditorDirtyKind] = useState<"tags" | "annotation" | null>(null);
-  const [editorTarget, setEditorTarget] = useState<AnnotationChannelTarget>({
-    channel: "description",
-    language: "",
-  });
+  const [editorTarget, setEditorTarget] = useState<AnnotationChannelTarget>(DEFAULT_EDITOR_TARGET);
   const [editorRevision, setEditorRevision] = useState(0);
   const [annotationDialog, setAnnotationDialog] =
     useState<AnnotationBulkDialogState>(CLOSED_ANNOTATION_DIALOG);
@@ -114,6 +131,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     selectedAssetId,
     editorDirty,
     discardEditorDraft,
+    selectAsset,
   });
   const assetItems = useMemo(
     () => assets.data?.pages.flatMap((page) => page.items) ?? [],
@@ -142,11 +160,9 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
 
   useEffect(() => {
     setActiveProject(projectId);
-    setSearch("");
-    setStatusFilter(mode === "review" ? "needs_review" : null);
-    setFolderPath("");
     setEditorDirty(false);
     setEditorDirtyKind(null);
+    setEditorTarget(DEFAULT_EDITOR_TARGET);
     setEditorRevision(0);
     setAnnotationDialog(CLOSED_ANNOTATION_DIALOG);
   }, [mode, projectId, setActiveProject]);
@@ -160,7 +176,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
       return;
     }
     setFolderPath("");
-  }, [editorDirty, folderPath, folders.data]);
+  }, [editorDirty, folderPath, folders.data, setFolderPath]);
 
   useEffect(() => {
     const body = workspaceBodyRef.current;
@@ -177,7 +193,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
 
   useEffect(() => {
     const items = assetItems;
-    if (editorDirty) return;
+    if (editorDirty || assets.isLoading) return;
     if (!items?.length) {
       if (selectedAssetId) selectAsset(null);
       return;
@@ -185,7 +201,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     if (!selectedAssetId || !items.some((asset) => asset.id === selectedAssetId)) {
       selectAsset(items[0].id);
     }
-  }, [assetItems, editorDirty, selectAsset, selectedAssetId]);
+  }, [assetItems, assets.isLoading, editorDirty, selectAsset, selectedAssetId]);
 
   const selectedAsset = assetItems.find((asset) => asset.id === selectedAssetId) ?? null;
 
@@ -232,7 +248,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
       setFolderPath(nextFolderPath);
       return true;
     },
-    [discardEditorDraft, editorDirty, editorDirtyKind, folderPath],
+    [discardEditorDraft, editorDirty, editorDirtyKind, folderPath, setFolderPath],
   );
 
   const toggleAllMatchingAssets = useCallback(async () => {
@@ -425,7 +441,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
           }
         >
           <AnnotationEditor
-            key={`${selectedAssetId ?? "no-asset"}:${editorRevision}`}
+            key={`${projectId}:${mode}:${selectedAssetId ?? "no-asset"}:${editorRevision}`}
             projectId={projectId}
             assetId={selectedAssetId}
             onDirtyChange={updateEditorDirty}

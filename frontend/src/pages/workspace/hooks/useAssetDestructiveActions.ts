@@ -8,6 +8,7 @@ interface UseAssetDestructiveActionsOptions {
   selectedAssetId: string | null;
   editorDirty: boolean;
   discardEditorDraft: () => void;
+  selectAsset: (assetId: string | null) => void;
 }
 
 interface AssetDeletionDialogState {
@@ -27,8 +28,8 @@ export function useAssetDestructiveActions({
   selectedAssetId,
   editorDirty,
   discardEditorDraft,
+  selectAsset,
 }: UseAssetDestructiveActionsOptions) {
-  const selectAsset = useAppStore((state) => state.selectAsset);
   const setAssetsChecked = useAppStore((state) => state.setAssetsChecked);
   const [deletionDialog, setDeletionDialog] = useState<AssetDeletionDialogState>(CLOSED_DIALOG);
 

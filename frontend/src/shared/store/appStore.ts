@@ -2,11 +2,9 @@ import { create } from "zustand";
 
 interface AppState {
   activeProjectId: string | null;
-  selectedAssetId: string | null;
   checkedAssetIds: string[];
   dirtyScopes: Record<string, true>;
   setActiveProject: (projectId: string | null) => void;
-  selectAsset: (assetId: string | null) => void;
   toggleCheckedAsset: (assetId: string) => void;
   setAssetsChecked: (assetIds: string[], checked: boolean) => void;
   clearCheckedAssets: () => void;
@@ -16,16 +14,12 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   activeProjectId: null,
-  selectedAssetId: null,
   checkedAssetIds: [],
   dirtyScopes: {},
   setActiveProject: (activeProjectId) =>
     set((state) =>
-      state.activeProjectId === activeProjectId
-        ? state
-        : { activeProjectId, selectedAssetId: null, checkedAssetIds: [] },
+      state.activeProjectId === activeProjectId ? state : { activeProjectId, checkedAssetIds: [] },
     ),
-  selectAsset: (selectedAssetId) => set({ selectedAssetId }),
   toggleCheckedAsset: (assetId) =>
     set((state) => ({
       checkedAssetIds: state.checkedAssetIds.includes(assetId)

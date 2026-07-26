@@ -21,30 +21,9 @@ import { PreprocessOperationDetailPanel } from "./components/PreprocessOperation
 import { PreprocessPreviewPanel } from "./components/PreprocessPreviewPanel";
 import { PreprocessSettingsPanel } from "./components/PreprocessSettingsPanel";
 import { activePreprocessStatuses } from "./operationProgress";
+import { preprocessViewState } from "./preprocessViewState";
 import "./preprocess.css";
 import type { PreprocessFormState } from "./types";
-
-const initialForm: PreprocessFormState = {
-  scope: "all",
-  resizeEnabled: true,
-  maxEdge: 2048,
-  allowUpscale: false,
-  resizeAlgorithm: "lanczos3",
-  convertEnabled: false,
-  format: "webp",
-  quality: 90,
-  effort: 4,
-  executionMode: "auto",
-  acceleratorId: "",
-  concurrencyMode: "auto",
-  maxWorkers: 8,
-  batchMode: "auto",
-  batchSize: 32,
-  renameEnabled: false,
-  renameTemplate: "image_{index}",
-  renameStartIndex: 1,
-  renamePadding: 6,
-};
 
 export function PreprocessPage() {
   const { projectId = "" } = useParams();
@@ -60,30 +39,36 @@ export function PreprocessPage() {
   );
   const checkedAssetIds = useAppStore((state) => state.checkedAssetIds);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
-  const [form, setForm] = useState(initialForm);
+  const { form, selectedOperationId } = preprocessViewState.useValue(projectId);
+  const patchForm = (update: Partial<PreprocessFormState>) =>
+    preprocessViewState.patch(projectId, (current) => ({ form: { ...current.form, ...update } }));
+  const setSelectedOperationId = (operationId: string | null) =>
+    preprocessViewState.patch(projectId, { selectedOperationId: operationId });
   const [error, setError] = useState<string | null>(null);
   const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
-  const [selectedOperationId, setSelectedOperationId] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveProject(projectId);
-    setForm({ ...initialForm });
     setError(null);
     setPreviewFingerprint(null);
-    setSelectedOperationId(null);
   }, [projectId, setActiveProject]);
   useEffect(() => {
-    if (!operations.data) return;
-    setSelectedOperationId((current) => {
-      if (current && operations.data.some((operation) => operation.id === current)) {
-        return current;
+    const operationItems = operations.data;
+    if (!operationItems) return;
+    preprocessViewState.patch(projectId, (current) => {
+      if (
+        current.selectedOperationId &&
+        operationItems.some((operation) => operation.id === current.selectedOperationId)
+      ) {
+        return {};
       }
-      return (
-        operations.data.find((operation) => activePreprocessStatuses.has(operation.status))?.id ??
-        null
-      );
+      return {
+        selectedOperationId:
+          operationItems.find((operation) => activePreprocessStatuses.has(operation.status))?.id ??
+          null,
+      };
     });
-  }, [operations.data]);
+  }, [operations.data, projectId]);
   const request = useMemo<PreprocessRequest>(
     () => ({
       asset_ids: form.scope === "selected" ? checkedAssetIds : [],
@@ -245,7 +230,7 @@ export function PreprocessPage() {
     >
       <PreprocessSettingsPanel
         form={form}
-        onChange={(update) => setForm((current) => ({ ...current, ...update }))}
+        onChange={patchForm}
         assetCount={assets.data?.total ?? 0}
         checkedCount={checkedAssetIds.length}
         preview={validPreview}

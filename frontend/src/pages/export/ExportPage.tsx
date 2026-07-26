@@ -16,21 +16,9 @@ import { Spinner } from "../../shared/ui/Spinner";
 import { ExportHistoryPanel } from "./components/ExportHistoryPanel";
 import { ExportPreviewPanel } from "./components/ExportPreviewPanel";
 import { ExportSettingsPanel } from "./components/ExportSettingsPanel";
+import { exportViewState } from "./exportViewState";
 import "./export.css";
 import type { ExportFormState } from "./types";
-
-const initialForm: ExportFormState = {
-  scope: "all",
-  destinationPath: "",
-  selections: [
-    {
-      channel: "existing_annotation",
-      language: "",
-      revision: "current",
-    },
-  ],
-  formats: ["txt"],
-};
 
 const activeStatuses = new Set(["queued", "running", "stopping"]);
 
@@ -44,13 +32,14 @@ export function ExportPage() {
   const actions = useExportActions(projectId);
   const checkedAssetIds = useAppStore((state) => state.checkedAssetIds);
   const setActiveProject = useAppStore((state) => state.setActiveProject);
-  const [form, setForm] = useState(initialForm);
+  const { form } = exportViewState.useValue(projectId);
+  const patchForm = (update: Partial<ExportFormState>) =>
+    exportViewState.patch(projectId, (current) => ({ form: { ...current.form, ...update } }));
   const [error, setError] = useState<string | null>(null);
   const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveProject(projectId);
-    setForm(initialForm);
     setError(null);
     setPreviewFingerprint(null);
   }, [projectId, setActiveProject]);
@@ -98,7 +87,7 @@ export function ExportPage() {
     setError(null);
     try {
       const selected = await pickExportFolder();
-      if (selected) setForm((current) => ({ ...current, destinationPath: selected }));
+      if (selected) patchForm({ destinationPath: selected });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法选择导出目录。");
     }
@@ -225,7 +214,7 @@ export function ExportPage() {
         exportPending={actionPending}
         activeExport={activeExport}
         error={error}
-        onChange={(update) => setForm((current) => ({ ...current, ...update }))}
+        onChange={patchForm}
         onChooseFolder={() => void chooseFolder()}
         onPreview={() => void preview()}
         onExport={() => void startExport()}

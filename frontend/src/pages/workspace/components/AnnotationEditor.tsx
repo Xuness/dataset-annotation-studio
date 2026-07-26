@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { xml } from "@codemirror/lang-xml";
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
@@ -40,6 +40,7 @@ import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
 import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
+import { annotationEditorViewState } from "../workspaceViewState";
 import { AnnotationHistoryPanel } from "./AnnotationHistoryPanel";
 import {
   AVAILABILITY_LABELS,
@@ -88,12 +89,28 @@ export function AnnotationEditor({
   onDirtyChange,
   onActiveTargetChange,
 }: AnnotationEditorProps) {
-  const [mode, setMode] = useState<EditorMode>("description");
-  const [language, setLanguage] = useState("zh-CN");
-  const [translationSourceKind, setTranslationSourceKind] =
-    useState<TranslationSourceKind>("description");
-  const [translationProducerKind, setTranslationProducerKind] =
-    useState<TranslationProducerKind>("llm");
+  // View selections live in a session-scoped store so they survive the
+  // per-asset remount of this component and route changes within a project.
+  const { mode, language, translationSourceKind, translationProducerKind } =
+    annotationEditorViewState.useValue(projectId);
+  const setMode = useCallback(
+    (next: EditorMode) => annotationEditorViewState.patch(projectId, { mode: next }),
+    [projectId],
+  );
+  const setLanguage = useCallback(
+    (next: string) => annotationEditorViewState.patch(projectId, { language: next }),
+    [projectId],
+  );
+  const setTranslationSourceKind = useCallback(
+    (next: TranslationSourceKind) =>
+      annotationEditorViewState.patch(projectId, { translationSourceKind: next }),
+    [projectId],
+  );
+  const setTranslationProducerKind = useCallback(
+    (next: TranslationProducerKind) =>
+      annotationEditorViewState.patch(projectId, { translationProducerKind: next }),
+    [projectId],
+  );
   const [translationEditing, setTranslationEditing] = useState(false);
   const activeLanguage = mode === "translation" ? language : "";
   const bundle = useAnnotationBundle(projectId, assetId);
@@ -178,9 +195,13 @@ export function AnnotationEditor({
   const languageOptions = useMemo(
     () =>
       Array.from(
-        new Set([...DEFAULT_LANGUAGES, ...(translations.data?.map((item) => item.language) ?? [])]),
+        new Set([
+          ...DEFAULT_LANGUAGES,
+          language,
+          ...(translations.data?.map((item) => item.language) ?? []),
+        ]),
       ),
-    [translations.data],
+    [language, translations.data],
   );
   const hasExistingAnnotation = hasExistingAnnotationDocument(bundle.data?.documents);
   const dictionaryPreview = useTagDictionaryResolution(
@@ -300,7 +321,7 @@ export function AnnotationEditor({
     }
     resetDraft();
     setMode("description");
-  }, [bundle.isLoading, hasExistingAnnotation, mode]);
+  }, [bundle.isLoading, hasExistingAnnotation, mode, setMode]);
 
   useEffect(() => {
     function handleSave(event: KeyboardEvent) {

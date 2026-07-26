@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { ChevronRight, Folder, FolderOpen, HardDrive } from "lucide-react";
 
 import type { AssetFolderSummary } from "../../../shared/api/types";
 import { Spinner } from "../../../shared/ui/Spinner";
+import { folderTreeViewState } from "../workspaceViewState";
 
 interface AssetFolderTreeProps {
   projectId: string;
@@ -19,7 +20,11 @@ export function AssetFolderTree({
   loading,
   onSelect,
 }: AssetFolderTreeProps) {
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set([""]));
+  const { expandedPaths } = folderTreeViewState.useValue(projectId);
+  const setExpandedPaths = (update: (current: ReadonlySet<string>) => ReadonlySet<string>) =>
+    folderTreeViewState.patch(projectId, (current) => ({
+      expandedPaths: update(current.expandedPaths),
+    }));
   const childrenByParent = useMemo(() => {
     const children = new Map<string, AssetFolderSummary[]>();
     for (const folder of folders) {
@@ -32,20 +37,16 @@ export function AssetFolderTree({
   }, [folders]);
 
   useEffect(() => {
-    setExpandedPaths(new Set([""]));
-  }, [projectId]);
-
-  useEffect(() => {
     if (!selectedPath) return;
-    setExpandedPaths((current) => {
-      const next = new Set(current);
+    folderTreeViewState.patch(projectId, (current) => {
+      const next = new Set(current.expandedPaths);
       const parts = selectedPath.split("/");
       for (let index = 1; index <= parts.length; index += 1) {
         next.add(parts.slice(0, index).join("/"));
       }
-      return next;
+      return next.size === current.expandedPaths.size ? {} : { expandedPaths: next };
     });
-  }, [selectedPath]);
+  }, [projectId, selectedPath]);
 
   const visibleFolders = useMemo(() => {
     const root = folders.find((folder) => folder.path === "");
