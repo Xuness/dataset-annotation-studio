@@ -1,4 +1,4 @@
-import type { AnnotationTag, TaggerVocabularyItem } from "../../../shared/api/types";
+import type { AnnotationTag } from "../../../shared/api/types";
 
 export const TAG_CATEGORY_ORDER = [
   "character",
@@ -125,7 +125,7 @@ export function appendManualTags(
 
 export function appendVocabularyTag(
   current: ReadonlyArray<AnnotationTag>,
-  item: TaggerVocabularyItem,
+  item: Pick<AnnotationTag, "name" | "category">,
 ): AppendTagsResult {
   return appendTags(current, [
     {

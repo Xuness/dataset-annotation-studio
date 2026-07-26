@@ -9,12 +9,15 @@ import {
 } from "react";
 import { Plus, Search, X } from "lucide-react";
 
+import {
+  useTagDictionaryResolution,
+  useTagDictionarySearch,
+} from "../../../features/tagDictionaries/hooks";
 import { useTaggerLibrary, useTaggerVocabularySearch } from "../../../features/taggers/hooks";
 import type {
   AnnotationTag,
   AnnotationTaggerSource,
   TaggerInstallation,
-  TaggerVocabularyItem,
 } from "../../../shared/api/types";
 import {
   appendManualTags,
@@ -41,8 +44,15 @@ interface TagEditorPanelProps {
   compact?: boolean;
 }
 
+interface TagSuggestion {
+  name: string;
+  category: string | null;
+  translation: string | null;
+}
+
 const AUTO_VOCABULARY = "auto";
 const VOCABULARY_STORAGE_PREFIX = "dataset-studio.tag-vocabulary-source";
+const HAN_CHARACTER = /\p{Script=Han}/u;
 
 function vocabularyStorageKey(projectId: string): string {
   return `${VOCABULARY_STORAGE_PREFIX}.${projectId}`;
@@ -50,6 +60,10 @@ function vocabularyStorageKey(projectId: string): string {
 
 function readVocabularyMode(projectId: string): string {
   return window.localStorage.getItem(vocabularyStorageKey(projectId)) || AUTO_VOCABULARY;
+}
+
+function isChineseTagQuery(value: string): boolean {
+  return HAN_CHARACTER.test(value);
 }
 
 function collectSelectedTagKeys(container: HTMLElement, selection: Selection | null): string[] {
@@ -162,23 +176,65 @@ export function TagEditorPanel({
     [],
   );
 
+  const normalizedQuery = query.trim();
+  const searchSettled = normalizedQuery === debouncedQuery;
+  const chineseQuery = isChineseTagQuery(normalizedQuery);
+  const debouncedChineseQuery = isChineseTagQuery(debouncedQuery);
   const vocabulary = useTaggerVocabularySearch(
-    selectedInstallation?.id ?? null,
+    debouncedChineseQuery ? null : (selectedInstallation?.id ?? null),
     selectedInstallation?.fingerprint ?? "",
-    debouncedQuery,
+    debouncedChineseQuery ? "" : debouncedQuery,
   );
-  const suggestions = useMemo(() => {
+  const dictionarySearch = useTagDictionarySearch(
+    debouncedChineseQuery ? debouncedQuery : "",
+    "zh-CN",
+  );
+  const suggestions = useMemo<TagSuggestion[]>(() => {
+    if (!searchSettled) return [];
+    if (debouncedChineseQuery) {
+      return (
+        dictionarySearch.data?.items.map((item) => ({
+          name: item.tag,
+          category: item.category,
+          translation: item.effective_translation?.trim() || null,
+        })) ?? []
+      );
+    }
     const result = vocabulary.data;
-    return query.trim() === debouncedQuery &&
-      result &&
-      result.fingerprint === selectedInstallation?.fingerprint
-      ? result.items
+    return result && result.fingerprint === selectedInstallation?.fingerprint
+      ? result.items.map((item) => ({
+          ...item,
+          translation: null,
+        }))
       : [];
-  }, [debouncedQuery, query, selectedInstallation?.fingerprint, vocabulary.data]);
+  }, [
+    debouncedChineseQuery,
+    dictionarySearch.data?.items,
+    searchSettled,
+    selectedInstallation?.fingerprint,
+    vocabulary.data,
+  ]);
+  const suggestionTags = useMemo(
+    () =>
+      debouncedChineseQuery
+        ? []
+        : suggestions.map((item) => ({ name: item.name, category: item.category })),
+    [debouncedChineseQuery, suggestions],
+  );
+  const suggestionTranslations = useTagDictionaryResolution(
+    suggestionTags,
+    "zh-CN",
+    suggestionsOpen && suggestionTags.length > 0,
+  );
   const existingKeys = useMemo(() => new Set(tags.map((tag) => normalizeTagKey(tag.name))), [tags]);
   const groups = useMemo(() => groupTags(tags), [tags]);
   const currentOption = suggestions[activeSuggestion] ?? null;
-  const showSuggestions = suggestionsOpen && Boolean(query.trim()) && Boolean(selectedInstallation);
+  const showSuggestions =
+    suggestionsOpen && Boolean(normalizedQuery) && (chineseQuery || Boolean(selectedInstallation));
+  const suggestionsFetching =
+    !searchSettled || (chineseQuery ? dictionarySearch.isFetching : vocabulary.isFetching);
+  const suggestionsError =
+    searchSettled && (chineseQuery ? dictionarySearch.isError : vocabulary.isError);
 
   useEffect(() => {
     setActiveSuggestion(0);
@@ -223,7 +279,7 @@ export function TagEditorPanel({
     applyAppend(appendManualTags(tags, value));
   }
 
-  function addSuggestion(item: TaggerVocabularyItem) {
+  function addSuggestion(item: TagSuggestion) {
     applyAppend(appendVocabularyTag(tags, item));
   }
 
@@ -337,9 +393,7 @@ export function TagEditorPanel({
                   ? `${listboxId}-option-${activeSuggestion}`
                   : undefined
               }
-              placeholder={
-                selectedInstallation ? "搜索模型词库或输入新 Tag…" : "输入新 Tag，支持批量粘贴…"
-              }
+              placeholder="搜索或输入 Tag，支持中文…"
               onFocus={() => setSuggestionsOpen(true)}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -354,7 +408,7 @@ export function TagEditorPanel({
                 applyAppend(appendManualTags(tags, pasted));
               }}
             />
-            {vocabulary.isFetching && debouncedQuery ? (
+            {showSuggestions && suggestionsFetching ? (
               <span className="tag-editor__search-state">搜索中</span>
             ) : null}
             <button
@@ -371,16 +425,31 @@ export function TagEditorPanel({
 
             {showSuggestions ? (
               <div id={listboxId} className="tag-editor__suggestions" role="listbox">
-                {vocabulary.isError ? (
-                  <p className="tag-editor__suggestion-message">无法读取模型词库。</p>
+                {suggestionsError ? (
+                  <p className="tag-editor__suggestion-message">
+                    {chineseQuery ? "无法读取中文 Tag 词典。" : "无法读取模型词库。"}
+                  </p>
                 ) : suggestions.length ? (
                   suggestions.map((item, index) => {
                     const key = normalizeTagKey(item.name);
                     const exists = existingKeys.has(key);
+                    const translationEntry = suggestionTranslations.data?.entries[index];
+                    const translation =
+                      item.translation ??
+                      (translationEntry?.requested_tag === item.name
+                        ? translationEntry.translation?.trim() || null
+                        : null);
+                    const translationLabel =
+                      translation ??
+                      (suggestionTranslations.isResolving
+                        ? "查询中文译文…"
+                        : suggestionTranslations.isError
+                          ? "中文译文不可用"
+                          : "暂无中文译文");
                     return (
                       <button
                         id={`${listboxId}-option-${index}`}
-                        key={`${item.category}:${item.name}`}
+                        key={`${item.category ?? "uncategorized"}:${item.name}`}
                         type="button"
                         role="option"
                         aria-selected={index === activeSuggestion}
@@ -389,7 +458,22 @@ export function TagEditorPanel({
                         onMouseEnter={() => setActiveSuggestion(index)}
                         onClick={() => addSuggestion(item)}
                       >
-                        <span>{item.name}</span>
+                        <span className="tag-editor__suggestion-label">
+                          <span className="tag-editor__suggestion-name" title={item.name}>
+                            {item.name}
+                          </span>
+                          <span
+                            className={[
+                              "tag-editor__suggestion-translation",
+                              translation ? "" : "is-empty",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            title={translationLabel}
+                          >
+                            {translationLabel}
+                          </span>
+                        </span>
                         <small>
                           {tagCategoryLabel(item.category)}
                           {exists ? " · 已存在" : ""}
@@ -397,11 +481,13 @@ export function TagEditorPanel({
                       </button>
                     );
                   })
-                ) : vocabulary.isFetching ? (
+                ) : suggestionsFetching ? (
                   <p className="tag-editor__suggestion-message">正在搜索词库…</p>
                 ) : (
                   <p className="tag-editor__suggestion-message">
-                    词库中没有匹配项，按 Enter 可作为手动 Tag 添加。
+                    {chineseQuery
+                      ? "中文词典中没有匹配 Tag，按 Enter 可将原文作为手动 Tag 添加。"
+                      : "词库中没有匹配项，按 Enter 可作为手动 Tag 添加。"}
                   </p>
                 )}
               </div>

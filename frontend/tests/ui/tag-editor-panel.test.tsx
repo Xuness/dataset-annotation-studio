@@ -59,7 +59,7 @@ afterEach(() => {
 });
 
 describe("structured tag editor", () => {
-  test("groups model tags and adds categorized vocabulary suggestions", async () => {
+  test("shows translations, supports Chinese lookup, and preserves categories", async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       if (url.endsWith("/api/v1/taggers")) {
@@ -117,7 +117,70 @@ describe("structured tag editor", () => {
           fingerprint: "a".repeat(64),
           query: "blue",
           category: null,
-          items: [{ name: "blue_hair", category: "general" }],
+          items: [
+            { name: "blue_hair", category: "general" },
+            { name: "blue_eyes", category: "general" },
+          ],
+        });
+      }
+      if (url.includes("/api/v1/tag-dictionaries/entries/search")) {
+        return jsonResponse({
+          query: "蓝眼睛",
+          language: "zh-CN",
+          items: [
+            {
+              tag: "blue_eyes",
+              normalized_tag: "blue_eyes",
+              effective_translation: "蓝眼睛",
+              source_kind: "dictionary",
+              source_name: "中文 Tag 词典",
+              installation_id: "dictionary-1",
+              adapter_id: "tagcomplete_cn",
+              category: "general",
+              post_count: 200,
+              override: null,
+            },
+          ],
+          total: 1,
+          offset: 0,
+          limit: 80,
+        });
+      }
+      if (url.endsWith("/api/v1/tag-dictionaries/resolve")) {
+        return jsonResponse({
+          language: "zh-CN",
+          entries: [
+            {
+              requested_tag: "blue_hair",
+              normalized_tag: "blue_hair",
+              translation: "蓝发",
+              matched: true,
+              source_kind: "dictionary",
+              installation_id: "dictionary-1",
+              installation_name: "中文 Tag 词典",
+              adapter_id: "tagcomplete_cn",
+              source_version: "test",
+              category: "general",
+              post_count: 100,
+              override_revision: null,
+            },
+            {
+              requested_tag: "blue_eyes",
+              normalized_tag: "blue_eyes",
+              translation: "蓝眼睛",
+              matched: true,
+              source_kind: "dictionary",
+              installation_id: "dictionary-1",
+              installation_name: "中文 Tag 词典",
+              adapter_id: "tagcomplete_cn",
+              source_version: "test",
+              category: "general",
+              post_count: 200,
+              override_revision: null,
+            },
+          ],
+          resolution_hash: "b".repeat(64),
+          unmatched_count: 0,
         });
       }
       throw new Error(`Unexpected request: ${url}`);
@@ -139,7 +202,21 @@ describe("structured tag editor", () => {
 
     const input = screen.getByRole("combobox", { name: "搜索或添加 Tag" });
     await user.type(input, "blue");
-    await user.click(await screen.findByRole("option", { name: /blue_hair/ }));
+    const translatedSuggestion = await screen.findByRole("option", {
+      name: /blue_hair.*蓝发/u,
+    });
+    expect(translatedSuggestion.textContent).toContain("blue_hair");
+    expect(translatedSuggestion.textContent).toContain("蓝发");
+    expect(
+      translatedSuggestion.querySelector(".tag-editor__suggestion-name")?.getAttribute("title"),
+    ).toBe("blue_hair");
+    expect(
+      translatedSuggestion
+        .querySelector(".tag-editor__suggestion-translation")
+        ?.getAttribute("title"),
+    ).toBe("蓝发");
+    expect(screen.getByRole("option", { name: /blue_eyes.*蓝眼睛/u })).toBeTruthy();
+    await user.click(translatedSuggestion);
 
     const stateAfterAdd = JSON.parse(
       screen.getByRole("status", { name: "Tag 状态" }).textContent ?? "[]",
@@ -152,6 +229,22 @@ describe("structured tag editor", () => {
     });
     expect(screen.getByText("通用")).toBeTruthy();
 
+    await user.type(input, "蓝眼睛");
+    const chineseSuggestion = await screen.findByRole("option", {
+      name: /blue_eyes.*蓝眼睛/u,
+    });
+    await user.click(chineseSuggestion);
+
+    const stateAfterChineseSearch = JSON.parse(
+      screen.getByRole("status", { name: "Tag 状态" }).textContent ?? "[]",
+    ) as AnnotationTag[];
+    expect(stateAfterChineseSearch.at(-1)).toEqual({
+      name: "blue_eyes",
+      category: "general",
+      confidence: null,
+      origin: "manual",
+    });
+
     await user.click(screen.getByRole("button", { name: "删除 Tag：alice" }));
     await waitFor(() => {
       expect(screen.queryByText("alice")).toBeNull();
@@ -160,5 +253,25 @@ describe("structured tag editor", () => {
       expect.stringContaining("/installations/installation-1/vocabulary/search?q=blue&limit=24"),
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/tag-dictionaries/resolve"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          tags: ["blue_hair", "blue_eyes"],
+          categories: ["general", "general"],
+          language: "zh-CN",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/api/v1/tag-dictionaries/entries/search?q=%E8%93%9D%E7%9C%BC%E7%9D%9B&language=zh-CN&limit=80",
+      ),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(
+      fetchMock.mock.calls.filter(([request]) => String(request).includes("/vocabulary/search")),
+    ).toHaveLength(1);
   });
 });
