@@ -542,7 +542,23 @@ export function TranslationComparePanel({
     }
   }
 
-  function handleKeyUp(side: AlignmentSide, event: KeyboardEvent<HTMLDivElement>) {
+  function handleKeyDown(side: AlignmentSide, event: KeyboardEvent<HTMLElement>) {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== "a") {
+      return;
+    }
+
+    const selection = window.getSelection();
+    if (!selection) return;
+    event.preventDefault();
+
+    const range = document.createRange();
+    range.selectNodeContents(event.currentTarget);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    captureSelection(side);
+  }
+
+  function handleKeyUp(side: AlignmentSide, event: KeyboardEvent<HTMLElement>) {
     if (event.key === "Escape") {
       setPinnedIds([]);
       return;
@@ -566,7 +582,9 @@ export function TranslationComparePanel({
       <div
         ref={side === "source" ? sourceRef : translatedRef}
         className="translation-compare__aligned translation-compare__aligned--description"
+        aria-label={side === "source" ? "原文内容" : "译文内容"}
         onMouseUp={() => captureSelection(side)}
+        onKeyDown={(event) => handleKeyDown(side, event)}
         onKeyUp={(event) => handleKeyUp(side, event)}
         onScroll={() => handleAlignedScroll(side)}
         onPointerDown={(event) => {
@@ -619,7 +637,9 @@ export function TranslationComparePanel({
       <div
         ref={ref}
         className="tag-editor__groups translation-compare__tag-groups"
+        aria-label={side === "source" ? "原文 Tags" : "译文 Tags"}
         onMouseUp={() => captureSelection(side)}
+        onKeyDown={(event) => handleKeyDown(side, event)}
         onKeyUp={(event) => handleKeyUp(side, event)}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) setPinnedIds([]);
@@ -686,6 +706,19 @@ export function TranslationComparePanel({
           </div>
         )}
       </div>
+    );
+  }
+
+  function renderPlainContent(side: AlignmentSide, content: string) {
+    return (
+      <pre
+        className="translation-compare__plain"
+        aria-label={side === "source" ? "原文内容" : "译文内容"}
+        onKeyDown={(event) => handleKeyDown(side, event)}
+        tabIndex={0}
+      >
+        {content}
+      </pre>
     );
   }
 
@@ -831,7 +864,7 @@ export function TranslationComparePanel({
           {translation?.issue ? (
             <div className="translation-compare__warning">{translation.issue}</div>
           ) : null}
-          <pre className="translation-compare__plain">{translatedContent}</pre>
+          {renderPlainContent("translated", translatedContent)}
         </div>
       );
     }
@@ -880,7 +913,7 @@ export function TranslationComparePanel({
           ) : canRenderDescription ? (
             renderDescriptionParts("source", translation!.alignment_parts)
           ) : (
-            <pre className="translation-compare__plain">{sourceContent}</pre>
+            renderPlainContent("source", sourceContent)
           )}
         </div>
       </section>

@@ -6,6 +6,14 @@ const RETRY_DELAYS_MS = [0, 25, 75] as const;
 
 let writeQueue: Promise<void> = Promise.resolve();
 
+type ClipboardOperation = "copy" | "cut";
+
+interface PendingClipboardShortcut {
+  operation: ClipboardOperation;
+  text: string;
+  timeoutId: number;
+}
+
 function selectedControlText(target: EventTarget | null): string | null {
   if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
     return null;
@@ -24,6 +32,19 @@ function selectedControlText(target: EventTarget | null): string | null {
   return target.value.slice(start, end);
 }
 
+function selectedText(target: EventTarget | null): string | null {
+  if (target instanceof HTMLInputElement && target.type === "password") {
+    return null;
+  }
+
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+    return selectedControlText(target);
+  }
+
+  const selectionText = window.getSelection()?.toString() ?? "";
+  return selectionText.length > 0 ? selectionText : null;
+}
+
 function clipboardEventText(event: ClipboardEvent): string | null {
   if (event.target instanceof HTMLInputElement && event.target.type === "password") {
     return null;
@@ -34,13 +55,18 @@ function clipboardEventText(event: ClipboardEvent): string | null {
     return explicitText;
   }
 
-  const controlText = selectedControlText(event.target);
-  if (controlText) {
-    return controlText;
+  return selectedText(event.target);
+}
+
+function clipboardShortcutOperation(event: KeyboardEvent): ClipboardOperation | null {
+  if (event.defaultPrevented || event.repeat || !event.ctrlKey || event.metaKey || event.altKey) {
+    return null;
   }
 
-  const selectionText = window.getSelection()?.toString() ?? "";
-  return selectionText.length > 0 ? selectionText : null;
+  const key = event.key.toLowerCase();
+  if (key === "c") return "copy";
+  if (key === "x") return "cut";
+  return null;
 }
 
 function wait(delayMs: number): Promise<void> {
@@ -85,17 +111,55 @@ export function useClipboardHistoryBridge(): void {
       return;
     }
 
+    let pendingShortcut: PendingClipboardShortcut | null = null;
+
+    const clearPendingShortcut = () => {
+      if (pendingShortcut) {
+        window.clearTimeout(pendingShortcut.timeoutId);
+        pendingShortcut = null;
+      }
+    };
+
+    const handleShortcutKeyDown = (event: KeyboardEvent) => {
+      const operation = clipboardShortcutOperation(event);
+      if (!operation) return;
+      const text = selectedText(event.target);
+      if (text === null) return;
+
+      clearPendingShortcut();
+      const timeoutId = window.setTimeout(() => {
+        if (!pendingShortcut || pendingShortcut.timeoutId !== timeoutId) return;
+        if (event.defaultPrevented) {
+          pendingShortcut = null;
+          return;
+        }
+        const fallbackText = pendingShortcut.text;
+        pendingShortcut = null;
+        enqueueClipboardWrite(fallbackText);
+      }, 0);
+      pendingShortcut = { operation, text, timeoutId };
+    };
+
     const handleClipboardEvent = (event: ClipboardEvent) => {
-      const text = clipboardEventText(event);
+      const operation: ClipboardOperation = event.type === "cut" ? "cut" : "copy";
+      const shortcutText = pendingShortcut?.operation === operation ? pendingShortcut.text : null;
+      clearPendingShortcut();
+      const text = clipboardEventText(event) ?? shortcutText;
       if (text !== null) {
         enqueueClipboardWrite(text);
       }
     };
 
+    // Snapshot the selection before WebView2 handles the accelerator. Normal
+    // copy/cut events cancel this fallback; if WebView2 omits one, the native
+    // history bridge still receives the exact shortcut selection.
+    document.addEventListener("keydown", handleShortcutKeyDown, true);
     document.addEventListener("copy", handleClipboardEvent);
     document.addEventListener("cut", handleClipboardEvent);
 
     return () => {
+      clearPendingShortcut();
+      document.removeEventListener("keydown", handleShortcutKeyDown, true);
       document.removeEventListener("copy", handleClipboardEvent);
       document.removeEventListener("cut", handleClipboardEvent);
     };

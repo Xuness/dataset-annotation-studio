@@ -267,6 +267,21 @@ describe("translation compare panel", () => {
     ).toBe(true);
   });
 
+  test("keeps Ctrl+A selection inside the focused description pane", () => {
+    renderPanel(translationDocument());
+
+    const source = screen.getByLabelText("原文内容");
+    const translated = screen.getByLabelText("译文内容");
+    fireEvent.keyDown(source, { key: "a", ctrlKey: true });
+
+    expect(window.getSelection()?.toString()).toBe("<caption>quiet, garden!</caption>");
+    expect(window.getSelection()?.toString()).not.toContain("安静");
+
+    fireEvent.keyDown(translated, { key: "a", ctrlKey: true });
+    expect(window.getSelection()?.toString()).toBe("<caption>安静, 花园!</caption>");
+    expect(window.getSelection()?.toString()).not.toContain("quiet");
+  });
+
   test("synchronizes both scroll directions using the matching description segment", () => {
     renderPanel(translationDocument());
 
