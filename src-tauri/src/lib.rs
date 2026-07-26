@@ -17,6 +17,7 @@ enum LinuxGraphicsMode {
     #[default]
     Default,
     NvidiaSync,
+    CpuPaint,
     DmabufOff,
     Software,
 }
@@ -26,6 +27,7 @@ impl LinuxGraphicsMode {
         match self {
             Self::Default => "default",
             Self::NvidiaSync => "nvidia-sync",
+            Self::CpuPaint => "cpu-paint",
             Self::DmabufOff => "dmabuf-off",
             Self::Software => "software",
         }
@@ -36,6 +38,7 @@ fn parse_linux_graphics_mode(value: Option<&str>) -> LinuxGraphicsMode {
     match value.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
         None | Some("") | Some("default") => LinuxGraphicsMode::Default,
         Some("nvidia-sync") => LinuxGraphicsMode::NvidiaSync,
+        Some("cpu-paint") => LinuxGraphicsMode::CpuPaint,
         Some("dmabuf-off") => LinuxGraphicsMode::DmabufOff,
         Some("software") => LinuxGraphicsMode::Software,
         Some(value) => {
@@ -58,6 +61,9 @@ fn configure_linux_graphics_environment(mode: LinuxGraphicsMode) {
         LinuxGraphicsMode::Default => {}
         LinuxGraphicsMode::NvidiaSync => {
             set_env_if_missing("__NV_DISABLE_EXPLICIT_SYNC", "1");
+        }
+        LinuxGraphicsMode::CpuPaint => {
+            set_env_if_missing("WEBKIT_SKIA_ENABLE_CPU_RENDERING", "1");
         }
         LinuxGraphicsMode::DmabufOff => {
             set_env_if_missing("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
@@ -193,6 +199,10 @@ mod tests {
             LinuxGraphicsMode::NvidiaSync
         );
         assert_eq!(
+            parse_linux_graphics_mode(Some("cpu-paint")),
+            LinuxGraphicsMode::CpuPaint
+        );
+        assert_eq!(
             parse_linux_graphics_mode(Some("DMABUF-OFF")),
             LinuxGraphicsMode::DmabufOff
         );
@@ -210,5 +220,7 @@ mod tests {
             runtime_platform_name()
         )));
         assert!(script.contains("dataset.linuxGraphicsMode=\"software\""));
+        let cpu_paint_script = runtime_initialization_script(LinuxGraphicsMode::CpuPaint);
+        assert!(cpu_paint_script.contains("dataset.linuxGraphicsMode=\"cpu-paint\""));
     }
 }

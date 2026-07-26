@@ -131,3 +131,28 @@ The combined tree passed:
 
 The Linux renderer modes still require validation on the affected niri/WebKitGTK/driver
 combination because a Windows development host cannot reproduce that graphics stack.
+
+## Follow-up: Skia GPU painting crashes (July 26, 2026)
+
+Continued use of the July 24 tree on the affected niri desktop still produced black or
+frozen windows in the default graphics mode. `coredumpctl` recorded eight
+`WebKitWebProcess` crashes over three days (seven `SIGBUS`, one `SIGABRT`); every
+`SIGBUS` terminated a `SkiaGPUWorker` thread inside `libgallium` (Mesa 26.1.5 radeonsi,
+Radeon RX 5500, WebKitGTK 2.52.5), with identical crash offsets across days. The
+failure is therefore a deterministic defect in the Skia GPU painting path, not a load
+or memory condition, and it is unrelated to the CUDA runtime: the Tesla V100 exposes no
+DRM render node, so the web process only ever touches the display GPU.
+
+`dmabuf-off` cannot address this class because `WEBKIT_DISABLE_DMABUF_RENDERER`
+disables the buffer transport between WebKit processes while Skia GPU painting keeps
+running. The new `cpu-paint` mode instead sets `WEBKIT_SKIA_ENABLE_CPU_RENDERING=1`
+before the webview is created, moving tile painting to Skia CPU workers while
+accelerated compositing, DMA-BUF presentation, and the full visual system stay
+enabled. The Linux launcher now defaults to `cpu-paint`; `--graphics native` restores
+the upstream rendering path.
+
+On the affected desktop, a launcher start with the new default selected the CUDA
+runtime with `cpu-paint`, and the web process environment contained
+`WEBKIT_SKIA_ENABLE_CPU_RENDERING=1`. The process ran eight `SkiaCPUWorker` threads,
+no `SkiaGPUWorker` thread, and the threaded compositor remained active, which removes
+the crashing code path while keeping composited visuals.

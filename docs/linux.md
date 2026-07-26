@@ -93,10 +93,25 @@ keeps the same theme materials, wallpaper, transparency controls, and immersive-
 presentation as Windows. The native title bar itself follows the desktop environment
 instead of the application's custom title-bar theme.
 
-If WebKitGTK still shows an invisible or black window, select one compatibility mode
-before starting Tauri. Start with the narrowest mode that matches the system:
+The Linux launcher defaults to the `cpu-paint` graphics mode. WebKitGTK 2.46 and newer
+paint web content with Skia on GPU worker threads; on at least one validated desktop
+(niri 26.04, Mesa 26.1.5 radeonsi on a Radeon RX 5500, WebKitGTK 2.52.5) that painting
+path intermittently kills the web process with `SIGBUS` inside Mesa on a
+`SkiaGPUWorker` thread, which appears as a black or frozen window after some time.
+Recorded coredumps across several days crash at identical driver offsets, so the
+failure is a deterministic driver-path defect rather than a load or memory problem.
+`cpu-paint` sets `WEBKIT_SKIA_ENABLE_CPU_RENDERING=1` so Skia paints tiles on CPU
+worker threads while accelerated compositing and DMA-BUF presentation stay enabled:
+themes, blur, and animations remain identical to `native`, and CUDA inference or GPU
+image preprocessing is unaffected because the webview only ever renders on the
+display GPU.
+
+If a different mode matches the system better, select it before starting Tauri:
 
 ```bash
+# Upstream WebKitGTK rendering path, including Skia GPU painting
+./启动开发版.sh --graphics native
+
 # NVIDIA explicit-sync workaround
 ./启动开发版.sh --graphics nvidia-sync
 
@@ -110,19 +125,21 @@ before starting Tauri. Start with the narrowest mode that matches the system:
 Runtime and graphics choices are independent, for example:
 
 ```bash
-./启动开发版.sh --cuda --graphics dmabuf-off
+./启动开发版.sh --cuda --graphics native
 ```
 
 The script passes only the current `DATASET_STUDIO_LINUX_GRAPHICS` mode into Tauri.
 Rust applies the corresponding WebKitGTK/NVIDIA environment settings before creating
 the webview, so the launcher does not duplicate the older black-screen workaround.
-`native` (the default) leaves `DATASET_STUDIO_LINUX_GRAPHICS` unset and changes no
-WebKitGTK graphics environment variables.
-The `nvidia-sync` and `dmabuf-off` modes retain the full application visuals and
-animations. Depending on the installed WebKitGTK version, `dmabuf-off` can move the
-webview to a non-accelerated shared-memory presentation path, so it is an opt-in
-workaround rather than the Linux default. It does not disable ONNX Runtime CUDA
-inference.
+`native` leaves `DATASET_STUDIO_LINUX_GRAPHICS` unset and changes no WebKitGTK
+graphics environment variables.
+The `cpu-paint`, `nvidia-sync`, and `dmabuf-off` modes retain the full application
+visuals and animations. `dmabuf-off` disables only the DMA-BUF buffer transport
+between WebKit processes; it does not disable Skia GPU painting, so it cannot address
+the `SkiaGPUWorker` crash class that `cpu-paint` targets — the two workarounds cover
+independent layers. Depending on the installed WebKitGTK version, `dmabuf-off` can
+move the webview to a non-accelerated shared-memory presentation path, so it is an
+opt-in workaround. It does not disable ONNX Runtime CUDA inference.
 
 `software` is the last-resort mode: it disables accelerated compositing and removes
 backdrop blur and large-surface animations, while keeping the selected palette,
@@ -135,6 +152,9 @@ be used only after the narrower modes fail.
 
 For a niri report, record the niri, WebKitGTK, Mesa/NVIDIA driver, and kernel versions,
 whether the session is native Wayland, and which compatibility mode changes the result.
+If a session still freezes while rendering stays otherwise stable, testing with
+`WEBKIT_FORCE_VBLANK_TIMER=1` (WebKitGTK 2.52+) is worth recording in the report; it
+replaces the DRM vblank wait with a timer-driven frame clock.
 
 ## Filesystem and desktop notes
 

@@ -262,6 +262,7 @@ test("runtime platform detection keeps native decorations and scene ownership on
   );
   assert.equal(normalizeLinuxGraphicsMode("software"), "software");
   assert.equal(normalizeLinuxGraphicsMode("dmabuf-off"), "dmabuf-off");
+  assert.equal(normalizeLinuxGraphicsMode("cpu-paint"), "cpu-paint");
   assert.equal(normalizeLinuxGraphicsMode("unexpected"), "default");
   assert.equal(normalizeLinuxGraphicsMode(undefined), "default");
   assert.equal(normalizeRuntimePlatform("linux", "windows"), "linux");
