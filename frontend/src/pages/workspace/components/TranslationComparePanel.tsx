@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ClipboardEvent,
   type ComponentProps,
   type KeyboardEvent,
 } from "react";
@@ -290,6 +291,15 @@ function collectSelectedAlignmentIds(
     .filter((value): value is string => Boolean(value));
 }
 
+function selectedTextInside(container: HTMLElement, selection: Selection | null): string | null {
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  if (!container.contains(range.startContainer) || !container.contains(range.endContainer)) {
+    return null;
+  }
+  return selection.toString();
+}
+
 function sourceLabel(document: TranslationDocument): string {
   if (document.source_kind === "tags") return "Tags";
   return document.resolved_source_channel === "existing_annotation" ? "原有标注" : "LLM 描述";
@@ -566,6 +576,18 @@ export function TranslationComparePanel({
     captureSelection(side);
   }
 
+  function handleCopy(event: ClipboardEvent<HTMLElement>) {
+    const text = selectedTextInside(event.currentTarget, window.getSelection());
+    if (text === null) return;
+
+    // Match CodeMirror's clipboard contract: expose plain text instead of a
+    // serialization of the highlighted span tree. Large aligned selections
+    // otherwise produce a blank preview in Windows clipboard history.
+    event.preventDefault();
+    event.clipboardData.clearData();
+    event.clipboardData.setData("text/plain", text);
+  }
+
   function setTagSelection(keys: string[]) {
     if (!aligned || !keys.length) return;
     setPinnedIds(Array.from(new Set(keys)));
@@ -583,6 +605,7 @@ export function TranslationComparePanel({
         ref={side === "source" ? sourceRef : translatedRef}
         className="translation-compare__aligned translation-compare__aligned--description"
         aria-label={side === "source" ? "原文内容" : "译文内容"}
+        onCopy={handleCopy}
         onMouseUp={() => captureSelection(side)}
         onKeyDown={(event) => handleKeyDown(side, event)}
         onKeyUp={(event) => handleKeyUp(side, event)}
@@ -638,6 +661,7 @@ export function TranslationComparePanel({
         ref={ref}
         className="tag-editor__groups translation-compare__tag-groups"
         aria-label={side === "source" ? "原文 Tags" : "译文 Tags"}
+        onCopy={handleCopy}
         onMouseUp={() => captureSelection(side)}
         onKeyDown={(event) => handleKeyDown(side, event)}
         onKeyUp={(event) => handleKeyUp(side, event)}
@@ -714,6 +738,7 @@ export function TranslationComparePanel({
       <pre
         className="translation-compare__plain"
         aria-label={side === "source" ? "原文内容" : "译文内容"}
+        onCopy={handleCopy}
         onKeyDown={(event) => handleKeyDown(side, event)}
         tabIndex={0}
       >

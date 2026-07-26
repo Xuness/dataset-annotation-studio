@@ -282,6 +282,50 @@ describe("translation compare panel", () => {
     expect(window.getSelection()?.toString()).not.toContain("quiet");
   });
 
+  test("copies an aligned description pane as plain text", () => {
+    renderPanel(translationDocument());
+
+    const source = screen.getByLabelText("原文内容");
+    fireEvent.keyDown(source, { key: "a", ctrlKey: true });
+    const clipboardData = {
+      clearData: vi.fn(),
+      setData: vi.fn(),
+    };
+
+    const copiedByDefault = fireEvent.copy(source, { clipboardData });
+
+    expect(copiedByDefault).toBe(false);
+    expect(clipboardData.clearData).toHaveBeenCalledOnce();
+    expect(clipboardData.setData).toHaveBeenCalledWith(
+      "text/plain",
+      "<caption>quiet, garden!</caption>",
+    );
+  });
+
+  test("copies a manually selected full translation as plain text", () => {
+    renderPanel(translationDocument());
+
+    const translated = screen.getByLabelText("译文内容");
+    const range = document.createRange();
+    range.selectNodeContents(translated);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    const clipboardData = {
+      clearData: vi.fn(),
+      setData: vi.fn(),
+    };
+
+    const copiedByDefault = fireEvent.copy(translated, { clipboardData });
+
+    expect(copiedByDefault).toBe(false);
+    expect(clipboardData.clearData).toHaveBeenCalledOnce();
+    expect(clipboardData.setData).toHaveBeenCalledWith(
+      "text/plain",
+      "<caption>安静, 花园!</caption>",
+    );
+  });
+
   test("synchronizes both scroll directions using the matching description segment", () => {
     renderPanel(translationDocument());
 
