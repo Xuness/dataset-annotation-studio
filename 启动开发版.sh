@@ -4,7 +4,7 @@ set -Eeuo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND="$ROOT/backend"
 RUNTIME_REQUEST="${DATASET_STUDIO_RUNTIME:-auto}"
-GRAPHICS="${DATASET_STUDIO_LINUX_GRAPHICS:-native}"
+GRAPHICS="${DATASET_STUDIO_LINUX_GRAPHICS:-cpu-paint}"
 CHECK_ONLY=0
 SKIP_SYNC=0
 
@@ -19,14 +19,14 @@ Dataset Annotation Studio Linux 开发版启动器
   --auto                 自动选择 Runtime（默认；有 NVIDIA CUDA 时优先 CUDA）
   --cuda                 强制使用 backend/.venv-cuda
   --cpu                  强制使用 backend/.venv-cpu
-  --graphics MODE        native | nvidia-sync | dmabuf-off | software
+  --graphics MODE        cpu-paint（默认）| native | nvidia-sync | dmabuf-off | software
   --check-only           只检查并同步依赖，不启动应用
   --skip-sync            跳过 pnpm install 与 uv sync
   -h, --help             显示帮助
 
 示例：
   ./启动开发版.sh
-  ./启动开发版.sh --cuda --graphics dmabuf-off
+  ./启动开发版.sh --cuda --graphics native
   ./启动开发版.sh --cpu --graphics software
 EOF
 }
@@ -68,9 +68,9 @@ case "$RUNTIME_REQUEST" in
 esac
 case "$GRAPHICS" in
   default) GRAPHICS="native" ;;
-  native | nvidia-sync | dmabuf-off | software) ;;
+  native | cpu-paint | nvidia-sync | dmabuf-off | software) ;;
   *)
-    echo "错误：图形模式只能是 native、nvidia-sync、dmabuf-off 或 software。" >&2
+    echo "错误：图形模式只能是 native、cpu-paint、nvidia-sync、dmabuf-off 或 software。" >&2
     exit 2
     ;;
 esac

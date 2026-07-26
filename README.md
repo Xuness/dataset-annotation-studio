@@ -75,8 +75,9 @@ chmod +x ./启动开发版.sh
 ./启动开发版.sh --cpu
 ```
 
-脚本还保留 `--graphics nvidia-sync|dmabuf-off|software`、`--check-only` 和
-`--skip-sync`。详细系统依赖见 [Linux 源码指南](docs/linux.md)。
+脚本还保留 `--graphics cpu-paint|native|nvidia-sync|dmabuf-off|software`（Linux 默认
+`cpu-paint`）、`--check-only` 和 `--skip-sync`。详细系统依赖见
+[Linux 源码指南](docs/linux.md)。
 
 ### CPU 与 CUDA Runtime
 
@@ -165,7 +166,9 @@ Secret Service。应用不会退回到明文凭据文件。Hugging Face 下载�
 ### Linux 或 niri 下窗口偶发黑屏
 
 Linux 使用原生窗口边框，但默认保留与 Windows 相同的主题、壁纸、透光区域和沉浸模式
-效果。若 WebKitGTK 仍出现黑屏，可按
+效果。Linux 启动器默认使用 `cpu-paint` 图形档位：它把 WebKitGTK 的 Skia 瓦片绘制
+移到 CPU 线程，规避已在 niri + Mesa radeonsi 上确认的 GPU 绘制线程崩溃（表现为运行
+一段时间后黑屏或卡死），同时保留全部加速合成视觉效果。若仍出现黑屏，可按
 [Linux 源码指南](docs/linux.md#wayland-and-webkitgtk-graphics-compatibility) 依次尝试
 `nvidia-sync`、`dmabuf-off` 或 `software` 图形兼容档位；只有最后的 `software`
 档位会关闭高成本模糊与动画。

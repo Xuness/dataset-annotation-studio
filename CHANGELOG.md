@@ -43,6 +43,10 @@ changes.
 - Added a source-root `dictionaries/` library with ffdkj, WeiLin Prompt, TagComplete CN
   and licyk adapters, license-aware downloads, global correction entries, local
   dictionary translation jobs, per-Tag provenance, and resolution-based stale detection.
+- Added a `cpu-paint` Linux graphics mode that keeps accelerated compositing while Skia
+  paints on CPU workers, and made it the Linux launcher default after deterministic
+  `SkiaGPUWorker` SIGBUS crashes inside Mesa radeonsi on the niri/WebKitGTK 2.52
+  desktop.
 
 ## 0.1.0
 

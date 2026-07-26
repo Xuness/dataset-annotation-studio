@@ -1,9 +1,10 @@
 export type RuntimePlatform = "linux" | "macos" | "windows" | "other";
-export type LinuxGraphicsMode = "default" | "nvidia-sync" | "dmabuf-off" | "software";
+export type LinuxGraphicsMode = "default" | "nvidia-sync" | "cpu-paint" | "dmabuf-off" | "software";
 
 const LINUX_GRAPHICS_MODES = new Set<LinuxGraphicsMode>([
   "default",
   "nvidia-sync",
+  "cpu-paint",
   "dmabuf-off",
   "software",
 ]);
