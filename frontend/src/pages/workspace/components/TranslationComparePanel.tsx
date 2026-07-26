@@ -1,5 +1,7 @@
 import {
+  useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -48,6 +50,220 @@ interface TranslationComparePanelProps {
 }
 
 type AlignmentSide = "source" | "translated";
+
+interface ScrollSyncPoint {
+  from: number;
+  to: number;
+}
+
+interface ScrollSyncCache {
+  layoutKey: string;
+  sourceToTranslated: ScrollSyncPoint[];
+  translatedToSource: ScrollSyncPoint[];
+}
+
+interface SuppressedScroll {
+  side: AlignmentSide;
+  top: number;
+}
+
+interface AlignmentVerticalRange {
+  top: number;
+  bottom: number;
+}
+
+interface HighlightScrollAnimation {
+  side: AlignmentSide;
+  frameId: number;
+  startTop: number;
+  targetTop: number;
+  startedAt: number | null;
+  lastAppliedTop: number;
+}
+
+// Keep corresponding clauses near the upper reading third, then interpolate
+// between them so different source/translation lengths still scroll smoothly.
+const SCROLL_READING_ANCHOR = 0.35;
+const SCROLL_POSITION_EPSILON = 1;
+const HIGHLIGHT_VISIBILITY_MARGIN = 8;
+const HIGHLIGHT_SCROLL_DURATION_MS = 160;
+const HIGHLIGHT_SCROLL_MIN_DISTANCE = 4;
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function maximumScrollTop(container: HTMLElement): number {
+  return Math.max(0, container.scrollHeight - container.clientHeight);
+}
+
+function scrollSyncLayoutKey(source: HTMLElement, translated: HTMLElement): string {
+  return [
+    source.clientWidth,
+    source.clientHeight,
+    source.scrollHeight,
+    translated.clientWidth,
+    translated.clientHeight,
+    translated.scrollHeight,
+  ].join(":");
+}
+
+function collectAlignmentCenters(container: HTMLElement): Map<string, number> {
+  const containerBounds = container.getBoundingClientRect();
+  const centers = new Map<string, number>();
+  for (const element of container.querySelectorAll<HTMLElement>("[data-alignment-id]")) {
+    const id = element.dataset.alignmentId;
+    if (!id) continue;
+    const bounds = element.getBoundingClientRect();
+    centers.set(
+      id,
+      bounds.top - containerBounds.top + container.scrollTop + Math.max(bounds.height, 0) / 2,
+    );
+  }
+  return centers;
+}
+
+function scrollPositionForCenter(container: HTMLElement, center: number): number {
+  return clamp(
+    center - container.clientHeight * SCROLL_READING_ANCHOR,
+    0,
+    maximumScrollTop(container),
+  );
+}
+
+function buildScrollSyncPoints(
+  driver: HTMLElement,
+  follower: HTMLElement,
+  driverCenters: Map<string, number>,
+  followerCenters: Map<string, number>,
+): ScrollSyncPoint[] {
+  const driverMaximum = maximumScrollTop(driver);
+  const followerMaximum = maximumScrollTop(follower);
+  const rawPoints: ScrollSyncPoint[] = [
+    { from: 0, to: 0 },
+    { from: driverMaximum, to: followerMaximum },
+  ];
+
+  for (const [id, driverCenter] of driverCenters) {
+    const followerCenter = followerCenters.get(id);
+    if (followerCenter === undefined) continue;
+    rawPoints.push({
+      from: scrollPositionForCenter(driver, driverCenter),
+      to: scrollPositionForCenter(follower, followerCenter),
+    });
+  }
+  rawPoints.sort((left, right) => left.from - right.from);
+
+  const groupedPoints: Array<{ from: number; targets: number[] }> = [];
+  for (const point of rawPoints) {
+    const previous = groupedPoints.at(-1);
+    if (previous && Math.abs(previous.from - point.from) <= SCROLL_POSITION_EPSILON) {
+      previous.targets.push(point.to);
+    } else {
+      groupedPoints.push({ from: point.from, targets: [point.to] });
+    }
+  }
+
+  let previousTarget = 0;
+  return groupedPoints.map((point) => {
+    let target = point.targets.reduce((total, value) => total + value, 0) / point.targets.length;
+    if (point.from <= SCROLL_POSITION_EPSILON) {
+      target = 0;
+    } else if (point.from >= driverMaximum - SCROLL_POSITION_EPSILON) {
+      target = followerMaximum;
+    }
+    target = clamp(Math.max(previousTarget, target), 0, followerMaximum);
+    previousTarget = target;
+    return { from: point.from, to: target };
+  });
+}
+
+function buildScrollSyncCache(source: HTMLElement, translated: HTMLElement): ScrollSyncCache {
+  const sourceCenters = collectAlignmentCenters(source);
+  const translatedCenters = collectAlignmentCenters(translated);
+  return {
+    layoutKey: scrollSyncLayoutKey(source, translated),
+    sourceToTranslated: buildScrollSyncPoints(source, translated, sourceCenters, translatedCenters),
+    translatedToSource: buildScrollSyncPoints(translated, source, translatedCenters, sourceCenters),
+  };
+}
+
+function interpolateScrollPosition(points: ScrollSyncPoint[], position: number): number {
+  if (!points.length) return 0;
+  if (position <= points[0].from) return points[0].to;
+  const finalPoint = points.at(-1);
+  if (finalPoint && position >= finalPoint.from) return finalPoint.to;
+
+  let lowerIndex = 0;
+  let upperIndex = points.length - 1;
+  while (upperIndex - lowerIndex > 1) {
+    const middleIndex = Math.floor((lowerIndex + upperIndex) / 2);
+    if (points[middleIndex].from < position) {
+      lowerIndex = middleIndex;
+    } else {
+      upperIndex = middleIndex;
+    }
+  }
+  const lower = points[lowerIndex];
+  const upper = points[upperIndex];
+  const distance = upper.from - lower.from;
+  if (distance <= SCROLL_POSITION_EPSILON) return upper.to;
+  const progress = (position - lower.from) / distance;
+  return lower.to + (upper.to - lower.to) * progress;
+}
+
+function collectAlignmentRange(
+  container: HTMLElement,
+  alignmentIds: readonly string[],
+): AlignmentVerticalRange | null {
+  const requestedIds = new Set(alignmentIds);
+  const containerBounds = container.getBoundingClientRect();
+  let top = Number.POSITIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+
+  for (const element of container.querySelectorAll<HTMLElement>("[data-alignment-id]")) {
+    if (!element.dataset.alignmentId || !requestedIds.has(element.dataset.alignmentId)) continue;
+    const bounds = element.getBoundingClientRect();
+    top = Math.min(top, bounds.top - containerBounds.top + container.scrollTop);
+    bottom = Math.max(bottom, bounds.bottom - containerBounds.top + container.scrollTop);
+  }
+  return Number.isFinite(top) && Number.isFinite(bottom) ? { top, bottom } : null;
+}
+
+function alignmentRangeIsVisible(container: HTMLElement, range: AlignmentVerticalRange): boolean {
+  const margin = Math.min(HIGHLIGHT_VISIBILITY_MARGIN, container.clientHeight / 4);
+  const viewportTop = container.scrollTop + margin;
+  const viewportBottom = container.scrollTop + container.clientHeight - margin;
+  if (range.bottom - range.top > viewportBottom - viewportTop) {
+    return range.bottom > viewportTop && range.top < viewportBottom;
+  }
+  return range.top >= viewportTop && range.bottom <= viewportBottom;
+}
+
+function scrollTopToRevealAlignment(
+  container: HTMLElement,
+  range: AlignmentVerticalRange,
+): number | null {
+  if (alignmentRangeIsVisible(container, range)) return null;
+  const margin = Math.min(HIGHLIGHT_VISIBILITY_MARGIN, container.clientHeight / 4);
+  const viewportTop = container.scrollTop + margin;
+  const viewportBottom = container.scrollTop + container.clientHeight - margin;
+  const nextTop =
+    range.top < viewportTop
+      ? range.top - margin
+      : range.bottom > viewportBottom
+        ? range.bottom - container.clientHeight + margin
+        : container.scrollTop;
+  return clamp(nextTop, 0, maximumScrollTop(container));
+}
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+function easeOutCubic(progress: number): number {
+  return 1 - (1 - progress) ** 3;
+}
 
 function collectSelectedAlignmentIds(
   container: HTMLElement,
@@ -109,6 +325,10 @@ export function TranslationComparePanel({
 }: TranslationComparePanelProps) {
   const sourceRef = useRef<HTMLDivElement>(null);
   const translatedRef = useRef<HTMLDivElement>(null);
+  const scrollSyncCacheRef = useRef<ScrollSyncCache | null>(null);
+  const suppressedScrollRef = useRef<SuppressedScroll | null>(null);
+  const highlightSideRef = useRef<AlignmentSide | null>(null);
+  const highlightScrollAnimationRef = useRef<HighlightScrollAnimation | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const isTags = translation?.source_kind === "tags";
@@ -139,9 +359,72 @@ export function TranslationComparePanel({
     [hoveredId, pinnedIds],
   );
 
+  const cancelHighlightScrollAnimation = useCallback(() => {
+    const animation = highlightScrollAnimationRef.current;
+    if (animation) window.cancelAnimationFrame(animation.frameId);
+    highlightScrollAnimationRef.current = null;
+  }, []);
+
+  const applyProgrammaticScroll = useCallback(
+    (side: AlignmentSide, container: HTMLElement, top: number) => {
+      suppressedScrollRef.current = { side, top };
+      container.scrollTop = top;
+    },
+    [],
+  );
+
+  const animateHighlightScroll = useCallback(
+    (side: AlignmentSide, container: HTMLElement, targetTop: number) => {
+      cancelHighlightScrollAnimation();
+      const startTop = container.scrollTop;
+      if (
+        prefersReducedMotion() ||
+        typeof window.requestAnimationFrame !== "function" ||
+        Math.abs(targetTop - startTop) < HIGHLIGHT_SCROLL_MIN_DISTANCE
+      ) {
+        applyProgrammaticScroll(side, container, targetTop);
+        return;
+      }
+
+      const animation: HighlightScrollAnimation = {
+        side,
+        frameId: 0,
+        startTop,
+        targetTop,
+        startedAt: null,
+        lastAppliedTop: startTop,
+      };
+      const step = (timestamp: number) => {
+        if (highlightScrollAnimationRef.current !== animation) return;
+        animation.startedAt ??= timestamp;
+        const progress = Math.min(
+          1,
+          (timestamp - animation.startedAt) / HIGHLIGHT_SCROLL_DURATION_MS,
+        );
+        const nextTop =
+          animation.startTop + (animation.targetTop - animation.startTop) * easeOutCubic(progress);
+        animation.lastAppliedTop = nextTop;
+        applyProgrammaticScroll(side, container, nextTop);
+        if (progress < 1) {
+          animation.frameId = window.requestAnimationFrame(step);
+        } else {
+          highlightScrollAnimationRef.current = null;
+        }
+      };
+
+      highlightScrollAnimationRef.current = animation;
+      animation.frameId = window.requestAnimationFrame(step);
+    },
+    [applyProgrammaticScroll, cancelHighlightScrollAnimation],
+  );
+
   useEffect(() => {
     setHoveredId(null);
     setPinnedIds([]);
+    cancelHighlightScrollAnimation();
+    scrollSyncCacheRef.current = null;
+    suppressedScrollRef.current = null;
+    highlightSideRef.current = null;
   }, [
     translation?.asset_id,
     translation?.language,
@@ -150,6 +433,93 @@ export function TranslationComparePanel({
     translation?.modified_at,
     tagSignature,
     editing,
+    cancelHighlightScrollAnimation,
+  ]);
+
+  useEffect(
+    () => () => {
+      cancelHighlightScrollAnimation();
+    },
+    [cancelHighlightScrollAnimation],
+  );
+
+  function handleAlignedScroll(side: AlignmentSide) {
+    if (!persistedAligned || isTags) return;
+    const source = sourceRef.current;
+    const translated = translatedRef.current;
+    if (!source || !translated) return;
+    const driver = side === "source" ? source : translated;
+    const follower = side === "source" ? translated : source;
+
+    const suppressed = suppressedScrollRef.current;
+    if (suppressed?.side === side) {
+      suppressedScrollRef.current = null;
+      if (Math.abs(driver.scrollTop - suppressed.top) <= SCROLL_POSITION_EPSILON) return;
+    }
+
+    const animation = highlightScrollAnimationRef.current;
+    if (
+      animation?.side === side &&
+      Math.abs(driver.scrollTop - animation.lastAppliedTop) <= SCROLL_POSITION_EPSILON
+    ) {
+      return;
+    }
+    cancelHighlightScrollAnimation();
+
+    const layoutKey = scrollSyncLayoutKey(source, translated);
+    let cache = scrollSyncCacheRef.current;
+    if (!cache || cache.layoutKey !== layoutKey) {
+      cache = buildScrollSyncCache(source, translated);
+      scrollSyncCacheRef.current = cache;
+    }
+    const points = side === "source" ? cache.sourceToTranslated : cache.translatedToSource;
+    const nextTop = clamp(
+      interpolateScrollPosition(points, driver.scrollTop),
+      0,
+      maximumScrollTop(follower),
+    );
+    if (Math.abs(follower.scrollTop - nextTop) <= SCROLL_POSITION_EPSILON) return;
+
+    suppressedScrollRef.current = {
+      side: side === "source" ? "translated" : "source",
+      top: nextTop,
+    };
+    follower.scrollTop = nextTop;
+  }
+
+  useLayoutEffect(() => {
+    cancelHighlightScrollAnimation();
+    if (!persistedAligned || isTags) return;
+    const alignmentIds = pinnedIds.length ? pinnedIds : hoveredId ? [hoveredId] : [];
+    const highlightSide = highlightSideRef.current;
+    const source = sourceRef.current;
+    const translated = translatedRef.current;
+    if (!alignmentIds.length || !highlightSide || !source || !translated) return;
+
+    const sourceRange = collectAlignmentRange(source, alignmentIds);
+    const translatedRange = collectAlignmentRange(translated, alignmentIds);
+    if (!sourceRange || !translatedRange) return;
+    const sourceVisible = alignmentRangeIsVisible(source, sourceRange);
+    const translatedVisible = alignmentRangeIsVisible(translated, translatedRange);
+    if (sourceVisible && translatedVisible) return;
+
+    const targetSide: AlignmentSide = highlightSide === "source" ? "translated" : "source";
+    const target = targetSide === "source" ? source : translated;
+    const targetRange = targetSide === "source" ? sourceRange : translatedRange;
+    if (targetSide === "source" ? sourceVisible : translatedVisible) return;
+    const nextTop = scrollTopToRevealAlignment(target, targetRange);
+    if (nextTop === null || Math.abs(target.scrollTop - nextTop) <= SCROLL_POSITION_EPSILON) {
+      return;
+    }
+
+    animateHighlightScroll(targetSide, target, nextTop);
+  }, [
+    animateHighlightScroll,
+    cancelHighlightScrollAnimation,
+    hoveredId,
+    isTags,
+    persistedAligned,
+    pinnedIds,
   ]);
 
   useEffect(() => {
@@ -166,6 +536,7 @@ export function TranslationComparePanel({
     if (!container) return;
     const ids = collectSelectedAlignmentIds(container, window.getSelection());
     if (ids.length) {
+      highlightSideRef.current = side;
       setPinnedIds(Array.from(new Set(ids)));
       setHoveredId(null);
     }
@@ -197,6 +568,7 @@ export function TranslationComparePanel({
         className="translation-compare__aligned translation-compare__aligned--description"
         onMouseUp={() => captureSelection(side)}
         onKeyUp={(event) => handleKeyUp(side, event)}
+        onScroll={() => handleAlignedScroll(side)}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) setPinnedIds([]);
         }}
@@ -217,7 +589,10 @@ export function TranslationComparePanel({
                 .join(" ")}
               data-alignment-id={alignable ? part.id : undefined}
               onPointerEnter={() => {
-                if (alignable && !pinnedIds.length) setHoveredId(part.id);
+                if (alignable && !pinnedIds.length) {
+                  highlightSideRef.current = side;
+                  setHoveredId(part.id);
+                }
               }}
               onPointerLeave={() => {
                 if (alignable && !pinnedIds.length) setHoveredId(null);

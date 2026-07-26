@@ -113,9 +113,64 @@ function renderPanel(
   );
 }
 
+function rectangle(top: number, height: number, width = 320): DOMRect {
+  return {
+    x: 0,
+    y: top,
+    width,
+    height,
+    top,
+    right: width,
+    bottom: top + height,
+    left: 0,
+    toJSON: () => ({}),
+  };
+}
+
+function mockScrollablePane(pane: HTMLElement, scrollHeight: number, segmentCenters: number[]) {
+  Object.defineProperties(pane, {
+    clientWidth: { configurable: true, value: 320 },
+    clientHeight: { configurable: true, value: 100 },
+    scrollHeight: { configurable: true, value: scrollHeight },
+  });
+  vi.spyOn(pane, "getBoundingClientRect").mockImplementation(() => rectangle(0, 100));
+  const segments = pane.querySelectorAll<HTMLElement>('[data-alignment-id^="segment-"]');
+  expect(segments.length).toBe(segmentCenters.length);
+  segments.forEach((segment, index) => {
+    vi.spyOn(segment, "getBoundingClientRect").mockImplementation(() =>
+      rectangle(segmentCenters[index] - pane.scrollTop - 10, 20),
+    );
+  });
+}
+
+function mockAnimationFrames() {
+  let nextFrameId = 1;
+  let timestamp = 0;
+  const frames = new Map<number, FrameRequestCallback>();
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    const frameId = nextFrameId;
+    nextFrameId += 1;
+    frames.set(frameId, callback);
+    return frameId;
+  });
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation((frameId) => {
+    frames.delete(frameId);
+  });
+  return {
+    runNext(elapsed: number) {
+      timestamp += elapsed;
+      const frame = frames.entries().next().value as [number, FrameRequestCallback] | undefined;
+      expect(frame).toBeDefined();
+      frames.delete(frame![0]);
+      frame![1](timestamp);
+    },
+  };
+}
+
 afterEach(() => {
   window.getSelection()?.removeAllRanges();
   cleanup();
+  vi.restoreAllMocks();
 });
 
 describe("translation compare panel", () => {
@@ -210,6 +265,77 @@ describe("translation compare panel", () => {
         (element) => !element.classList.contains("is-linked"),
       ),
     ).toBe(true);
+  });
+
+  test("synchronizes both scroll directions using the matching description segment", () => {
+    renderPanel(translationDocument());
+
+    const panes = document.querySelectorAll<HTMLElement>(
+      ".translation-compare__aligned--description",
+    );
+    expect(panes.length).toBe(2);
+    const source = panes[0];
+    const translated = panes[1];
+    mockScrollablePane(source, 500, [50, 250]);
+    mockScrollablePane(translated, 900, [80, 400]);
+
+    source.scrollTop = 215;
+    fireEvent.scroll(source);
+
+    expect(translated.scrollTop).toBeCloseTo(365);
+
+    // Consume the scroll event produced by the programmatic update, then make
+    // the translated pane the active driver.
+    fireEvent.scroll(translated);
+    source.scrollTop = 0;
+    translated.scrollTop = 365;
+    fireEvent.scroll(translated);
+
+    expect(source.scrollTop).toBeCloseTo(215);
+  });
+
+  test("reveals an off-screen counterpart once when the linked hover changes", () => {
+    renderPanel(translationDocument());
+    const animationFrames = mockAnimationFrames();
+
+    const panes = document.querySelectorAll<HTMLElement>(
+      ".translation-compare__aligned--description",
+    );
+    expect(panes.length).toBe(2);
+    const source = panes[0];
+    const translated = panes[1];
+    mockScrollablePane(source, 500, [50, 250]);
+    mockScrollablePane(translated, 900, [80, 400]);
+    const translatedSegment = translated.querySelector<HTMLElement>(
+      '[data-alignment-id="segment-1"]',
+    );
+    expect(translatedSegment).not.toBeNull();
+
+    translated.scrollTop = 365;
+    fireEvent.pointerEnter(translatedSegment!);
+
+    expect(source.scrollTop).toBe(0);
+    animationFrames.runNext(0);
+    animationFrames.runNext(80);
+    expect(source.scrollTop).toBeGreaterThan(0);
+    expect(source.scrollTop).toBeLessThan(168);
+    animationFrames.runNext(80);
+    expect(source.scrollTop).toBeCloseTo(168);
+
+    // The resulting programmatic event is ignored instead of scrolling the
+    // pane under the pointer back to another position.
+    fireEvent.scroll(source);
+    expect(translated.scrollTop).toBeCloseTo(365);
+
+    source.scrollTop = 0;
+    expect(source.scrollTop).toBe(0);
+
+    fireEvent.pointerLeave(translatedSegment!);
+    fireEvent.pointerEnter(translatedSegment!);
+    animationFrames.runNext(0);
+    animationFrames.runNext(80);
+    animationFrames.runNext(80);
+    expect(source.scrollTop).toBeCloseTo(168);
   });
 
   test("surfaces translation quality warnings without disabling linked highlighting", () => {
