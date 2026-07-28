@@ -1,0 +1,24 @@
+.update-announcement-indicator {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--surface-raised) 76%, transparent);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.settings-center__sidebar .update-announcement-indicator {
+  margin-left: auto;
+}
+
+.navigation-rail__utility .update-announcement-indicator {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+}
+
+.home-navigation .update-announcement-indicator {
+  margin-left: -3px;
+}

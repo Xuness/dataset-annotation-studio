@@ -7,6 +7,8 @@ import {
   useRecentWorkspaces,
   useRemoveRecentWorkspace,
 } from "../../features/workspaces/hooks";
+import { UpdateAnnouncementIndicator } from "../../features/updateAnnouncements/UpdateAnnouncementIndicator";
+import { useHasUnreadUpdateAnnouncement } from "../../features/updateAnnouncements/readState";
 import { pickWorkspaceFolder } from "../../shared/desktop/pickFolder";
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 import { useAppStore } from "../../shared/store/appStore";
@@ -34,6 +36,7 @@ export function HomePage() {
   const openMutation = useOpenWorkspace();
   const removeRecentMutation = useRemoveRecentWorkspace();
   const openSettings = useSettingsCenter((state) => state.open);
+  const hasUnreadUpdateAnnouncement = useHasUnreadUpdateAnnouncement();
   const setActiveProject = useAppStore((state) => state.setActiveProject);
   const themeId = useAppPreferences((state) => state.preferences.themeId);
   const homeContent = useAppPreferences((state) => state.preferences.homeContent);
@@ -106,9 +109,14 @@ export function HomePage() {
             <Cable size={14} aria-hidden="true" />
             <span>预设与连接</span>
           </button>
-          <button type="button" onClick={() => openSettings("appearance")}>
+          <button
+            type="button"
+            aria-label={hasUnreadUpdateAnnouncement ? "设置，有未读更新公告" : undefined}
+            onClick={() => openSettings("appearance")}
+          >
             <Settings size={14} aria-hidden="true" />
             <span>设置</span>
+            {hasUnreadUpdateAnnouncement ? <UpdateAnnouncementIndicator /> : null}
           </button>
         </nav>
       </header>

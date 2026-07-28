@@ -61,12 +61,13 @@ afterEach(() => {
 });
 
 describe("settings overview sections", () => {
-  test("registers appearance, presets, local models, dictionaries and diagnostics in stable order", () => {
+  test("registers all settings sections in stable order", () => {
     expect(SETTINGS_SECTION_IDS).toEqual([
       "appearance",
       "presets",
       "taggers",
       "tag-dictionaries",
+      "announcements",
       "about",
     ]);
   });

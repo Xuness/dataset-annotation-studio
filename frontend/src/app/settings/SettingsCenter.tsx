@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { Settings } from "lucide-react";
 
+import { UpdateAnnouncementIndicator } from "../../features/updateAnnouncements/UpdateAnnouncementIndicator";
+import { useHasUnreadUpdateAnnouncement } from "../../features/updateAnnouncements/readState";
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 import { ModalLayer } from "../../shared/ui/ModalLayer";
 import { Spinner } from "../../shared/ui/Spinner";
@@ -12,6 +14,7 @@ export function SettingsCenter() {
   const section = useSettingsCenter((state) => state.section);
   const close = useSettingsCenter((state) => state.close);
   const open = useSettingsCenter((state) => state.open);
+  const hasUnreadUpdateAnnouncement = useHasUnreadUpdateAnnouncement();
   const activeSection =
     SETTINGS_SECTIONS.find((candidate) => candidate.id === section) ?? SETTINGS_SECTIONS[0];
   const ActiveSection = activeSection.component;
@@ -38,16 +41,19 @@ export function SettingsCenter() {
         <nav aria-label="设置分类">
           {SETTINGS_SECTIONS.map((entry) => {
             const Icon = entry.icon;
+            const showUnreadIndicator = entry.id === "announcements" && hasUnreadUpdateAnnouncement;
             return (
               <button
                 type="button"
                 key={entry.id}
                 className={section === entry.id ? "is-active" : ""}
                 aria-current={section === entry.id ? "page" : undefined}
+                aria-label={showUnreadIndicator ? `${entry.label}，有未读更新公告` : undefined}
                 onClick={() => open(entry.id)}
               >
                 <Icon size={15} aria-hidden="true" />
                 <span>{entry.label}</span>
+                {showUnreadIndicator ? <UpdateAnnouncementIndicator /> : null}
               </button>
             );
           })}

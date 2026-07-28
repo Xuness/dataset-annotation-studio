@@ -122,9 +122,13 @@ OpenRouter 目录仍使用其扩展元数据；两个协议各自由适配器映
 - `pages` 负责页面编排，每个大页面拆分为局部组件和局部样式。
 - `features/*/api.ts` 是资源级 API，`hooks.ts` 负责 React Query 缓存与失效。
 - `shared/api` 只包含传输和共享 DTO；`shared/desktop` 隔离 Tauri 能力。
-- Zustand 只保存短生命周期的界面选择，不复制后端持久状态。
+- Zustand 只保存界面选择和本机偏好，不复制后端持久状态。
 
 图片列表使用虚拟化，面向 2,000 余项仍只渲染可见行。页面使用按路由懒加载，工作区编辑器不会拖慢项目首页启动。
+
+更新公告位于独立的 `features/updateAnnouncements` 边界，使用结构化 TypeScript 目录随源码
+发布，不解析 HTML 或 Markdown，也不访问远端版本服务。公告 ID 独立于应用版本号；最新公告
+被查看后，只把该 ID 写入浏览器 `localStorage`，不写项目 SQLite、全局数据库或配置文件。
 
 素材页保持两类选择状态分离：`selectedAssetId` 只表示编辑器当前打开的图片，
 `checkedAssetIds` 只表示跨列表页保留的批量操作范围。目录树是后端索引的只读投影，选中目录只给素材查询和

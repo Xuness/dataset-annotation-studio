@@ -6,6 +6,8 @@ changes.
 
 ## Unreleased
 
+- Added a repository-bundled update announcement page with local unread state and no
+  remote version checks, Git execution, download, telemetry, or updater service.
 - Replaced runtime annotation sidecars with revisioned SQLite channels for imported
   annotations, structured Tags, LLM descriptions, and translations.
 - Decoupled current usability from optional human review: validated Tagger, LLM, and

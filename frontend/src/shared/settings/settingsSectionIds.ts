@@ -3,6 +3,7 @@ export const SETTINGS_SECTION_IDS = [
   "presets",
   "taggers",
   "tag-dictionaries",
+  "announcements",
   "about",
 ] as const;
 

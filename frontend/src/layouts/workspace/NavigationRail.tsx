@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { UpdateAnnouncementIndicator } from "../../features/updateAnnouncements/UpdateAnnouncementIndicator";
+import { useHasUnreadUpdateAnnouncement } from "../../features/updateAnnouncements/readState";
 import { useUnsavedChangesGuard } from "../../shared/desktop/useUnsavedChanges";
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 
@@ -46,6 +48,7 @@ export function NavigationRail({
   const navigate = useNavigate();
   const { confirmDiscard } = useUnsavedChangesGuard();
   const openSettings = useSettingsCenter((state) => state.open);
+  const hasUnreadUpdateAnnouncement = useHasUnreadUpdateAnnouncement();
 
   function open(id: WorkspaceSection) {
     if (id === active) return;
@@ -73,9 +76,15 @@ export function NavigationRail({
         ))}
       </div>
       <div className="navigation-rail__utility">
-        <button type="button" title="设置" onClick={() => openSettings("appearance")}>
+        <button
+          type="button"
+          title={hasUnreadUpdateAnnouncement ? "设置 · 有未读更新公告" : "设置"}
+          aria-label={hasUnreadUpdateAnnouncement ? "设置，有未读更新公告" : undefined}
+          onClick={() => openSettings("appearance")}
+        >
           <Settings size={18} aria-hidden="true" />
           <span>设置</span>
+          {hasUnreadUpdateAnnouncement ? <UpdateAnnouncementIndicator /> : null}
         </button>
       </div>
     </nav>
