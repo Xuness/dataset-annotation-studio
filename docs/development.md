@@ -36,21 +36,28 @@ exclusive `onnxruntime` distributions therefore never overwrite one another.
 retains per-model and per-image CPU fallback. The CUDA extra also covers CuPy +
 nvImageCodec preprocessing.
 
-Normal launcher runs reserve a per-checkout session lock and verify that the Vite/API
-ports `5173` and `8765` are free before dependency synchronization. A collision is
-reported with owner details when the platform exposes them; launchers never terminate
-the occupying process. Check-only mode does not require those ports because it starts no
-services.
+Normal launcher runs reserve a per-checkout session lock and scan bounded loopback port
+ranges before dependency synchronization. Vite prefers `5173` and falls back within
+`5173-5199`; the API prefers `8765` and falls back within `8765-8799`. Remote HMR, when
+`TAURI_DEV_HOST` is set, uses `5200-5225`. The selected API and frontend ports are passed
+through Vite, FastAPI, CORS, and the Tauri `devUrl` as one startup configuration.
+Launchers never terminate an occupying process. Check-only mode does not probe ports
+because it starts no services.
+
+`DATASET_STUDIO_FRONTEND_PORT`, `DATASET_STUDIO_PORT`, and
+`DATASET_STUDIO_HMR_PORT` are strict explicit overrides: startup fails if a requested
+port cannot be bound. Set `DATASET_STUDIO_AUTO_PORTS=1` only when those overrides should
+be treated as preferences with automatic fallback.
 
 Explicit CUDA selection is strict: missing hardware or a failed CuPy/ONNX Runtime probe
 stops startup with a diagnostic. Auto mode chooses CPU only when the NVIDIA device probe
 is absent; it does not disguise a broken CUDA installation as a successful GPU launch.
 
-`pnpm dev` and `pnpm dev:cuda` are the low-level CUDA Tauri commands;
-`pnpm dev:cpu` is the CPU equivalent. The launchers choose between them after setting
-the matching environment. All variants start the frontend, loopback API, durable worker,
-and Tauri window. The Python services run directly from the selected uv environment; no
-sidecar is generated.
+`pnpm dev` and `pnpm dev:cuda` select ports and invoke the CUDA Tauri development
+configuration; `pnpm dev:cpu` is the CPU equivalent. The launchers choose between them
+after setting the matching environment. All variants start the frontend, loopback API,
+durable worker, and Tauri window. The Python services run directly from the selected uv
+environment; no sidecar is generated.
 
 ## Checks
 
@@ -69,6 +76,7 @@ pnpm check
 The individual gates remain:
 
 ```text
+node --test scripts/dev-ports.test.mjs
 pnpm --dir frontend check
 uv run --project backend --no-sync ruff check backend/src backend/tests
 uv run --project backend --no-sync pytest

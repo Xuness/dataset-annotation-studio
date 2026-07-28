@@ -51,8 +51,8 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
+            f"http://localhost:{app_settings.frontend_port}",
+            f"http://127.0.0.1:{app_settings.frontend_port}",
             "tauri://localhost",
             "http://tauri.localhost",
         ],

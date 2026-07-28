@@ -5,7 +5,7 @@
   "identifier": "studio.dataset.annotation",
   "build": {
     "beforeDevCommand": "pnpm dev:services",
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://127.0.0.1:5173",
     "beforeBuildCommand": "pnpm build:frontend",
     "frontendDist": "../frontend/dist"
   },
@@ -27,6 +27,7 @@
     ],
     "security": {
       "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:8765; img-src 'self' asset: http://asset.localhost http://127.0.0.1:8765 data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:",
+      "devCsp": "default-src 'self'; connect-src 'self' http://127.0.0.1:*; img-src 'self' asset: http://asset.localhost http://127.0.0.1:* data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:",
       "assetProtocol": {
         "enable": true,
         "scope": ["$APPLOCALDATA/backgrounds/**"]

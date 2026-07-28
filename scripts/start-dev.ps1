@@ -22,6 +22,16 @@ $HadDatasetStudioRuntime = Test-Path Env:DATASET_STUDIO_RUNTIME
 $PreviousDatasetStudioRuntime = $env:DATASET_STUDIO_RUNTIME
 $HadDatasetStudioSourceRoot = Test-Path Env:DATASET_STUDIO_SOURCE_ROOT
 $PreviousDatasetStudioSourceRoot = $env:DATASET_STUDIO_SOURCE_ROOT
+$HadDatasetStudioFrontendPort = Test-Path Env:DATASET_STUDIO_FRONTEND_PORT
+$PreviousDatasetStudioFrontendPort = $env:DATASET_STUDIO_FRONTEND_PORT
+$HadDatasetStudioPort = Test-Path Env:DATASET_STUDIO_PORT
+$PreviousDatasetStudioPort = $env:DATASET_STUDIO_PORT
+$HadDatasetStudioHmrPort = Test-Path Env:DATASET_STUDIO_HMR_PORT
+$PreviousDatasetStudioHmrPort = $env:DATASET_STUDIO_HMR_PORT
+$HadViteApiBaseUrl = Test-Path Env:VITE_API_BASE_URL
+$PreviousViteApiBaseUrl = $env:VITE_API_BASE_URL
+$HadDatasetStudioAutoPorts = Test-Path Env:DATASET_STUDIO_AUTO_PORTS
+$PreviousDatasetStudioAutoPorts = $env:DATASET_STUDIO_AUTO_PORTS
 $ExitCode = 0
 
 $LogDirectory = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "DatasetAnnotationStudio\logs"
@@ -156,24 +166,31 @@ function Enter-DevSession {
     }
 }
 
-function Assert-DevPortsAvailable {
-    $occupied = foreach ($port in 5173, 8765) {
-        Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue |
-            Select-Object -First 1 LocalPort, OwningProcess
+function Select-DevPorts {
+    $selector = Join-Path $Root "scripts\dev-ports.mjs"
+    $probeOutput = @(& node $selector "--json")
+    Assert-LastExitCode -Step "开发端口检查"
+
+    try {
+        $selection = ($probeOutput -join [Environment]::NewLine) | ConvertFrom-Json
+    } catch {
+        throw "开发端口检查返回了无效结果。"
     }
 
-    if (-not $occupied) {
-        return
+    if ($selection.frontendPort -notmatch "^\d+$" -or $selection.apiPort -notmatch "^\d+$") {
+        throw "开发端口检查返回了无效端口。"
     }
 
-    $descriptions = foreach ($connection in $occupied) {
-        $ownerProcessId = [int]$connection.OwningProcess
-        $owner = Get-Process -Id $ownerProcessId -ErrorAction SilentlyContinue
-        $ownerName = if ($owner) { $owner.ProcessName } else { "未知进程" }
-        "端口 $($connection.LocalPort)：$ownerName (PID $ownerProcessId)"
+    $env:DATASET_STUDIO_FRONTEND_PORT = [string][int]$selection.frontendPort
+    $env:DATASET_STUDIO_PORT = [string][int]$selection.apiPort
+    $env:VITE_API_BASE_URL = "http://127.0.0.1:$($selection.apiPort)"
+    $env:DATASET_STUDIO_AUTO_PORTS = "1"
+    if ($null -eq $selection.hmrPort) {
+        Remove-Item Env:DATASET_STUDIO_HMR_PORT -ErrorAction SilentlyContinue
+    } else {
+        $env:DATASET_STUDIO_HMR_PORT = [string][int]$selection.hmrPort
     }
-
-    throw "开发端口已被占用，可能是此前的会话尚未退出：$($descriptions -join '；')"
+    Write-Host "[Dataset Studio] 可用开发端口：Vite $($selection.frontendPort)，API $($selection.apiPort)" -ForegroundColor DarkCyan
 }
 
 function Write-FailureSummary {
@@ -199,6 +216,7 @@ try {
     $TranscriptStarted = $true
 
     Assert-Command -Name "pnpm" -Hint "请安装 Node.js 与 pnpm。"
+    Assert-Command -Name "node" -Hint "请安装 Node.js。"
     Assert-Command -Name "uv" -Hint "请安装 uv。"
     Assert-Command -Name "cargo" -Hint "请安装 Rust 工具链。"
     Assert-Command -Name "rustc" -Hint "请安装 Rust 工具链。"
@@ -211,7 +229,6 @@ try {
 
     if (-not $CheckOnly) {
         Enter-DevSession
-        Assert-DevPortsAvailable
     }
 
     Push-Location $Root
@@ -221,6 +238,9 @@ try {
         $env:UV_PROJECT_ENVIRONMENT = $environmentPath
         $env:DATASET_STUDIO_RUNTIME = $selectedRuntime
         $env:DATASET_STUDIO_SOURCE_ROOT = $Root
+        if (-not $CheckOnly) {
+            Select-DevPorts
+        }
 
         Write-Host "[Dataset Studio] Runtime：$selectedRuntime" -ForegroundColor Cyan
         Write-Host "[Dataset Studio] Python 环境：$environmentPath" -ForegroundColor DarkCyan
@@ -296,6 +316,31 @@ try {
         $env:DATASET_STUDIO_SOURCE_ROOT = $PreviousDatasetStudioSourceRoot
     } else {
         Remove-Item Env:DATASET_STUDIO_SOURCE_ROOT -ErrorAction SilentlyContinue
+    }
+    if ($HadDatasetStudioFrontendPort) {
+        $env:DATASET_STUDIO_FRONTEND_PORT = $PreviousDatasetStudioFrontendPort
+    } else {
+        Remove-Item Env:DATASET_STUDIO_FRONTEND_PORT -ErrorAction SilentlyContinue
+    }
+    if ($HadDatasetStudioPort) {
+        $env:DATASET_STUDIO_PORT = $PreviousDatasetStudioPort
+    } else {
+        Remove-Item Env:DATASET_STUDIO_PORT -ErrorAction SilentlyContinue
+    }
+    if ($HadDatasetStudioHmrPort) {
+        $env:DATASET_STUDIO_HMR_PORT = $PreviousDatasetStudioHmrPort
+    } else {
+        Remove-Item Env:DATASET_STUDIO_HMR_PORT -ErrorAction SilentlyContinue
+    }
+    if ($HadViteApiBaseUrl) {
+        $env:VITE_API_BASE_URL = $PreviousViteApiBaseUrl
+    } else {
+        Remove-Item Env:VITE_API_BASE_URL -ErrorAction SilentlyContinue
+    }
+    if ($HadDatasetStudioAutoPorts) {
+        $env:DATASET_STUDIO_AUTO_PORTS = $PreviousDatasetStudioAutoPorts
+    } else {
+        Remove-Item Env:DATASET_STUDIO_AUTO_PORTS -ErrorAction SilentlyContinue
     }
 
     if ($TranscriptStarted) {

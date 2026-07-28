@@ -15,9 +15,9 @@
   },
   "packageManager": "pnpm@10.30.3",
   "scripts": {
-    "dev": "tauri dev --config src-tauri/tauri.cuda.conf.json",
-    "dev:cpu": "tauri dev",
-    "dev:cuda": "tauri dev --config src-tauri/tauri.cuda.conf.json",
+    "dev": "node scripts/run-tauri-dev.mjs src-tauri/tauri.cuda.conf.json",
+    "dev:cpu": "node scripts/run-tauri-dev.mjs",
+    "dev:cuda": "node scripts/run-tauri-dev.mjs src-tauri/tauri.cuda.conf.json",
     "dev:frontend": "pnpm --dir frontend dev",
     "dev:api": "uv run --project backend --extra cpu --no-sync dataset-studio-api",
     "dev:worker": "uv run --project backend --extra cpu --no-sync dataset-studio-worker",
@@ -32,7 +32,7 @@
     "build:cuda": "pnpm build:sidecar:cuda && tauri build --config src-tauri/tauri.release.conf.json",
     "icons:generate": "tauri icon assets/app-icon.png --output src-tauri/icons --ios-color \"#050607\" && node scripts/sync-app-icon.mjs",
     "clean": "pwsh -NoProfile -File scripts/clean-generated.ps1",
-    "check": "pnpm --dir frontend check && uv run --project backend --no-sync ruff check backend/src backend/tests && uv run --project backend --no-sync pytest && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo check --manifest-path src-tauri/Cargo.toml",
+    "check": "node --test scripts/dev-ports.test.mjs && pnpm --dir frontend check && uv run --project backend --no-sync ruff check backend/src backend/tests && uv run --project backend --no-sync pytest && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo check --manifest-path src-tauri/Cargo.toml",
     "format": "pnpm --dir frontend format && uv run --project backend --no-sync ruff format backend/src backend/tests"
   },
   "devDependencies": {

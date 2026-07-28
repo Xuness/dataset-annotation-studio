@@ -51,10 +51,11 @@ CPU-only machine never removes CUDA packages from another environment. The first
 downloads dependencies and compiles the desktop shell; Vite, the FastAPI service, and
 the task worker remain attached to the terminal and stop together.
 
-Before synchronizing dependencies, a normal launch checks the Vite and API ports
-(`5173` and `8765`). If another process owns either port, the launcher reports the
-available process name and PID and stops without terminating that process. `--check-only`
-continues to validate the environment without requiring the development ports.
+Before synchronizing dependencies, a normal launch scans bounded loopback ranges. Vite
+prefers `5173` and falls back within `5173-5199`; the API prefers `8765` and falls back
+within `8765-8799`. The launcher passes the selected ports consistently to Vite,
+FastAPI/CORS, and Tauri. It never terminates an occupying process. `--check-only`
+continues to validate the environment without probing development ports.
 
 Explicit overrides and validation modes are available:
 
@@ -177,9 +178,10 @@ replaces the DRM vblank wait with a timer-driven frame clock.
 - The native-decorated Tauri window still needs real desktop testing under niri,
   GNOME/Wayland, and KDE. Until that matrix is complete, Linux remains marked
   experimental.
-- The local API and Vite development server use ports `8765` and `5173`. The launcher
-  never kills a conflicting process; stop it yourself or free the configured port before
-  starting Dataset Studio.
+- The local API and Vite development server prefer ports `8765` and `5173`, respectively,
+  and automatically fall back within their documented development ranges. Explicit
+  `DATASET_STUDIO_PORT` or `DATASET_STUDIO_FRONTEND_PORT` values remain strict. The
+  launcher never kills a conflicting process.
 
 Set `DATASET_STUDIO_APP_DATA` to an absolute directory only when a custom application
 data location is required.

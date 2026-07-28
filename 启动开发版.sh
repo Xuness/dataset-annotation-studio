@@ -7,7 +7,6 @@ RUNTIME_REQUEST="${DATASET_STUDIO_RUNTIME:-auto}"
 GRAPHICS="${DATASET_STUDIO_LINUX_GRAPHICS:-cpu-paint}"
 CHECK_ONLY=0
 SKIP_SYNC=0
-DEV_PORTS=(5173 8765)
 
 usage() {
   cat <<'EOF'
@@ -76,7 +75,7 @@ case "$GRAPHICS" in
     ;;
 esac
 
-for command in pnpm uv cargo rustc; do
+for command in node pnpm uv cargo rustc; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "错误：缺少命令 '$command'，请先安装对应开发工具。" >&2
     exit 1
@@ -109,74 +108,33 @@ resolve_runtime() {
   printf 'cpu\n'
 }
 
-find_port_listeners() {
-  local port="$1"
-  local details
+select_dev_ports() {
+  local ports_json
+  local frontend_port
+  local api_port
+  local hmr_port
 
-  if command -v ss >/dev/null 2>&1; then
-    details="$(ss -H -ltnp "sport = :$port" 2>/dev/null || true)"
-    if [[ -n "$details" ]]; then
-      printf '%s\n' "$details"
-      return
-    fi
-  fi
+  ports_json="$(node "$ROOT/scripts/dev-ports.mjs" --json)"
+  read -r frontend_port api_port hmr_port < <(
+    node -e \
+      'const selection = JSON.parse(process.argv[1]); console.log(selection.frontendPort, selection.apiPort, selection.hmrPort);' \
+      "$ports_json"
+  )
+  [[ "$frontend_port" =~ ^[0-9]+$ && "$api_port" =~ ^[0-9]+$ ]] || {
+    echo "错误：端口选择器返回了无效结果。" >&2
+    exit 1
+  }
 
-  if command -v lsof >/dev/null 2>&1; then
-    details="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
-    if [[ -n "$details" ]]; then
-      printf '%s\n' "$details"
-      return
-    fi
-  fi
-
-  # Development services bind loopback. Keep the preflight useful on minimal systems
-  # without ss or lsof, even though this fallback cannot report the owning PID.
-  for host in 127.0.0.1 localhost; do
-    if (exec 3<>"/dev/tcp/$host/$port") 2>/dev/null; then
-      printf 'listening on %s\n' "$host"
-      return
-    fi
-  done
-}
-
-describe_port_listener() {
-  local details="$1"
-  local owner
-
-  owner="$(sed -nE 's/.*users:\(\("([^"]+)",pid=([0-9]+).*/\1 (PID \2)/p' <<<"$details")"
-  owner="${owner%%$'\n'*}"
-  if [[ -z "$owner" && "$details" == COMMAND\ PID\ * ]]; then
-    owner="$(awk 'NR > 1 {print $1 " (PID " $2 ")"; exit}' <<<"$details")"
-  fi
-  if [[ -n "$owner" ]]; then
-    printf '%s' "$owner"
+  export DATASET_STUDIO_FRONTEND_PORT="$frontend_port"
+  export DATASET_STUDIO_PORT="$api_port"
+  export VITE_API_BASE_URL="http://127.0.0.1:$api_port"
+  export DATASET_STUDIO_AUTO_PORTS=1
+  if [[ "$hmr_port" == "null" ]]; then
+    unset DATASET_STUDIO_HMR_PORT
   else
-    printf '已有监听器'
+    export DATASET_STUDIO_HMR_PORT="$hmr_port"
   fi
-}
-
-assert_dev_ports_available() {
-  local port
-  local details
-  local owner
-  local -a occupied=()
-
-  for port in "${DEV_PORTS[@]}"; do
-    details="$(find_port_listeners "$port")"
-    if [[ -n "$details" ]]; then
-      owner="$(describe_port_listener "$details")"
-      occupied+=("端口 $port：$owner")
-    fi
-  done
-
-  if ((${#occupied[@]} == 0)); then
-    return
-  fi
-
-  echo "错误：开发端口已被占用，无法启动 Dataset Studio。" >&2
-  printf '  %s\n' "${occupied[@]}" >&2
-  echo "请停止占用进程后重试；启动器不会自动终止其它进程。" >&2
-  exit 1
+  echo "[Dataset Studio] 可用开发端口：Vite $frontend_port，API $api_port"
 }
 
 RUNTIME="$(resolve_runtime)"
@@ -203,7 +161,10 @@ if [[ $CHECK_ONLY -eq 0 ]]; then
       exit 1
     }
   fi
-  assert_dev_ports_available
+fi
+
+if [[ $CHECK_ONLY -eq 0 ]]; then
+  select_dev_ports
 fi
 
 if [[ $SKIP_SYNC -eq 0 ]]; then

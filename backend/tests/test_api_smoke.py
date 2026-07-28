@@ -9,6 +9,36 @@ from dataset_studio.core.errors import SecretStoreUnavailableError
 from dataset_studio.platform.secrets import KeyringSecretStore
 
 
+def test_cors_allows_only_the_selected_frontend_port(tmp_path: Path) -> None:
+    settings = Settings(
+        app_data_dir=tmp_path / "app-data",
+        host="127.0.0.1",
+        port=0,
+        frontend_port=5180,
+    )
+
+    with TestClient(create_app(settings)) as client:
+        allowed = client.options(
+            "/health",
+            headers={
+                "Origin": "http://localhost:5180",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        rejected = client.options(
+            "/health",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+    assert allowed.status_code == 200
+    assert allowed.headers["access-control-allow-origin"] == "http://localhost:5180"
+    assert rejected.status_code == 400
+    assert "access-control-allow-origin" not in rejected.headers
+
+
 def test_unavailable_credential_store_returns_service_unavailable(
     tmp_path: Path,
     monkeypatch,

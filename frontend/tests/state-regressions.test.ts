@@ -1120,16 +1120,43 @@ test("desktop lifecycle bridge names stay aligned with the Rust host", () => {
   );
 });
 
-test("Linux launcher preflights development ports before synchronizing dependencies", () => {
+test("development launchers select shared ports before synchronizing dependencies", () => {
   const launcher = readFileSync(new URL("../../启动开发版.sh", import.meta.url), "utf8");
-  const preflightCall = launcher.indexOf("\n  assert_dev_ports_available\n");
+  const portSelector = readFileSync(
+    new URL("../../scripts/dev-ports.mjs", import.meta.url),
+    "utf8",
+  );
+  const windowsLauncher = readFileSync(
+    new URL("../../scripts/start-dev.ps1", import.meta.url),
+    "utf8",
+  );
+  const packageManifest = readFileSync(new URL("../../package.json", import.meta.url), "utf8");
+  const viteConfig = readFileSync(new URL("../vite.config.ts", import.meta.url), "utf8");
+  const tauriConfig = readFileSync(
+    new URL("../../src-tauri/tauri.conf.json", import.meta.url),
+    "utf8",
+  );
+  const selectionCall = launcher.indexOf("\n  select_dev_ports\n");
   const dependencySync = launcher.indexOf("pnpm install --frozen-lockfile");
 
-  assert.match(launcher, /DEV_PORTS=\(5173 8765\)/);
-  assert.ok(preflightCall >= 0);
+  assert.match(launcher, /scripts\/dev-ports\.mjs.*--json/);
+  assert.doesNotMatch(launcher, /scripts\/dev-ports\.mjs.*--auto/);
+  assert.match(portSelector, /preferred: 5173/);
+  assert.match(portSelector, /preferred: 8765/);
+  assert.match(windowsLauncher, /scripts\\dev-ports\.mjs/);
+  assert.match(windowsLauncher, /Select-DevPorts/);
+  assert.doesNotMatch(windowsLauncher, /dev-ports\.mjs[^\r\n]*--auto/);
+  assert.match(packageManifest, /scripts\/run-tauri-dev\.mjs/);
+  assert.match(viteConfig, /DATASET_STUDIO_FRONTEND_PORT/);
+  assert.match(viteConfig, /DATASET_STUDIO_HMR_PORT/);
+  assert.match(viteConfig, /host: host \|\| "127\.0\.0\.1"/);
+  assert.match(tauriConfig, /"devUrl": "http:\/\/127\.0\.0\.1:5173"/);
+  assert.match(tauriConfig, /"devCsp": .*http:\/\/127\.0\.0\.1:\*/);
+  assert.match(launcher, /if \[\[ \$CHECK_ONLY -eq 0 \]\]; then\n {2}select_dev_ports/);
+  assert.match(windowsLauncher, /if \(-not \$CheckOnly\) \{\r?\n\s+Select-DevPorts/);
+  assert.ok(selectionCall >= 0);
   assert.ok(dependencySync >= 0);
-  assert.ok(preflightCall < dependencySync);
-  assert.match(launcher, /启动器不会自动终止其它进程/);
+  assert.ok(selectionCall < dependencySync);
 });
 
 test("large application panels do not create nested native dialogs", () => {

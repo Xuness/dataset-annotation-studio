@@ -3,7 +3,7 @@ from pathlib import Path
 import keyring
 import pytest
 
-from dataset_studio.core.config import APP_DIR_NAME, _default_app_data_dir
+from dataset_studio.core.config import APP_DIR_NAME, Settings, _default_app_data_dir
 from dataset_studio.core.errors import SecretStoreUnavailableError
 from dataset_studio.core.paths import relative_path_key
 from dataset_studio.platform.secrets import KeyringSecretStore
@@ -42,6 +42,17 @@ def test_default_app_data_directory_matches_platform_conventions() -> None:
         )
         == Path("/Users/tester/Library/Application Support") / APP_DIR_NAME
     )
+
+
+def test_settings_read_selected_development_ports(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATASET_STUDIO_APP_DATA", str(tmp_path / "app-data"))
+    monkeypatch.setenv("DATASET_STUDIO_PORT", "8772")
+    monkeypatch.setenv("DATASET_STUDIO_FRONTEND_PORT", "5184")
+
+    settings = Settings.from_environment()
+
+    assert settings.port == 8772
+    assert settings.frontend_port == 5184
 
 
 def test_relative_path_identity_follows_platform_case_policy() -> None:

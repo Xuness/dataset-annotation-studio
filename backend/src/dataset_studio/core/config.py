@@ -42,6 +42,7 @@ class Settings:
     workspace_dir_name: str = WORKSPACE_DIR_NAME
     thumbnail_size: int = 320
     source_root: Path | None = None
+    frontend_port: int = 5173
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -51,6 +52,7 @@ class Settings:
             app_data_dir=Path(configured_app_data or _default_app_data_dir()).resolve(),
             host=os.environ.get("DATASET_STUDIO_HOST", "127.0.0.1"),
             port=int(os.environ.get("DATASET_STUDIO_PORT", "8765")),
+            frontend_port=int(os.environ.get("DATASET_STUDIO_FRONTEND_PORT", "5173")),
             source_root=(
                 Path(configured_source_root).resolve() if configured_source_root else None
             ),
