@@ -7,6 +7,7 @@ RUNTIME_REQUEST="${DATASET_STUDIO_RUNTIME:-auto}"
 GRAPHICS="${DATASET_STUDIO_LINUX_GRAPHICS:-cpu-paint}"
 CHECK_ONLY=0
 SKIP_SYNC=0
+ORIGINAL_TERMINAL_STATE=""
 
 usage() {
   cat <<'EOF'
@@ -250,6 +251,30 @@ configure_cuda_library_path() {
   echo "[Dataset Studio] 已加入 ${#cuda_library_dirs[@]} 个 NVIDIA 动态库目录。"
 }
 
+restore_terminal() {
+  local exit_status=$?
+
+  if [[ -t 0 || -t 1 ]]; then
+    if [[ -n "$ORIGINAL_TERMINAL_STATE" ]]; then
+      stty "$ORIGINAL_TERMINAL_STATE" 2>/dev/null </dev/tty || true
+    else
+      stty sane 2>/dev/null </dev/tty || true
+    fi
+    printf \
+      '\033[0m\033[?25h\033[?1l\033>\033[<u\033[=0u\033[>4;0m\r\n[Dataset Studio] 开发会话已结束，终端状态已恢复。\r\n' \
+      2>/dev/null >/dev/tty || true
+  fi
+
+  return "$exit_status"
+}
+
+exit_for_signal() {
+  local exit_status="$1"
+
+  trap - HUP INT TERM
+  exit "$exit_status"
+}
+
 validate_cuda_runtime() {
   local python_bin="$ENVIRONMENT_DIR/bin/python"
 
@@ -301,10 +326,17 @@ fi
 echo "[Dataset Studio] 启动开发版"
 echo "  Runtime: $RUNTIME"
 echo "  图形模式: $GRAPHICS"
+if [[ -t 0 || -t 1 ]]; then
+  ORIGINAL_TERMINAL_STATE="$(stty -g 2>/dev/null </dev/tty || true)"
+fi
+trap restore_terminal EXIT
+trap 'exit_for_signal 129' HUP
+trap 'exit_for_signal 130' INT
+trap 'exit_for_signal 143' TERM
 if [[ "$RUNTIME" == "cuda" ]]; then
   echo "  图片预处理: CUDA 编解码/缩放可用，不支持的图片或加速失败会逐项回退 CPU"
-  exec pnpm dev
+  pnpm dev
 else
   echo "  图片预处理: CPU"
-  exec pnpm dev:cpu
+  pnpm dev:cpu
 fi

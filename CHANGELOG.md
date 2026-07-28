@@ -30,6 +30,8 @@ changes.
 - Made source launchers select available loopback development ports before dependency
   sync without terminating their current owners, and added a native exit fallback when
   the Linux frontend cannot answer a close request.
+- Restored Linux terminal and enhanced keyboard state after a development window closes,
+  allowing the same checkout to start again immediately.
 - Kept credential-free provider profiles usable when a Linux Secret Service is absent.
 - Added explicit third-party model license disclosure and acceptance.
 - Unified annotation availability across the asset list, translation workflows, batch

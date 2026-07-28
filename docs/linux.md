@@ -51,6 +51,12 @@ CPU-only machine never removes CUDA packages from another environment. The first
 downloads dependencies and compiles the desktop shell; Vite, the FastAPI service, and
 the task worker remain attached to the terminal and stop together.
 
+The launcher remains the outer process while the Tauri development session is running.
+After a normal window close or a terminal signal, it restores canonical terminal input,
+cursor-key modes, and enhanced keyboard protocol state before returning to the shell.
+`[Dataset Studio] 开发会话已结束，终端状态已恢复。` confirms that cleanup completed and
+the same checkout can be started again immediately.
+
 Before synchronizing dependencies, a normal launch scans bounded loopback ranges. Vite
 prefers `5173` and falls back within `5173-5199`; the API prefers `8765` and falls back
 within `8765-8799`. The launcher passes the selected ports consistently to Vite,

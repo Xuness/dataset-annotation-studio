@@ -1154,6 +1154,13 @@ test("development launchers select shared ports before synchronizing dependencie
   assert.match(tauriConfig, /"devCsp": .*http:\/\/127\.0\.0\.1:\*/);
   assert.match(launcher, /if \[\[ \$CHECK_ONLY -eq 0 \]\]; then\n {2}select_dev_ports/);
   assert.match(windowsLauncher, /if \(-not \$CheckOnly\) \{\r?\n\s+Select-DevPorts/);
+  assert.match(launcher, /restore_terminal\(\)/);
+  assert.match(launcher, /ORIGINAL_TERMINAL_STATE="\$\(stty -g/);
+  assert.match(launcher, /stty "\$ORIGINAL_TERMINAL_STATE"/);
+  assert.match(launcher, /stty sane/);
+  assert.match(launcher, /\\033\[<u/);
+  assert.match(launcher, /trap restore_terminal EXIT/);
+  assert.doesNotMatch(launcher, /exec pnpm dev(?::cpu)?/);
   assert.ok(selectionCall >= 0);
   assert.ok(dependencySync >= 0);
   assert.ok(selectionCall < dependencySync);
