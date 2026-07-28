@@ -58,11 +58,13 @@ describe("update announcements", () => {
   });
 
   test("shows the latest and historical notes and records the latest note as read", async () => {
+    const user = userEvent.setup();
     render(<UpdateAnnouncementsSettings onClose={() => undefined} />);
 
     expect(screen.getByRole("heading", { name: "本次更新" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "源码启动与桌面稳定性更新" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "历史版本" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "查看数据集 ZIP 导出更新" }));
     expect(screen.getByRole("heading", { name: "数据集 ZIP 导出更新" })).toBeTruthy();
     expect(
       screen.getByText(

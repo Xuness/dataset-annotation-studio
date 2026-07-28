@@ -3,11 +3,12 @@ import {
   CheckCircle2,
   CircleAlert,
   History,
+  Megaphone,
   Sparkles,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import {
   LATEST_UPDATE_ANNOUNCEMENT,
@@ -38,13 +39,15 @@ function formatPublishedAt(value: string): string {
 
 function AnnouncementSections({ announcement }: { announcement: UpdateAnnouncement }) {
   return (
-    <div className="update-announcement__groups">
+    <div className="update-announcement-detail__sections">
       {announcement.sections.map((section) => {
         const Icon = SECTION_ICONS[section.kind];
         return (
-          <section key={section.kind} data-kind={section.kind}>
-            <div className="update-announcement__group-title">
-              <Icon size={15} aria-hidden="true" />
+          <section key={section.kind}>
+            <div className="update-announcement-detail__section-heading">
+              <span aria-hidden="true">
+                <Icon size={15} />
+              </span>
               <h4>{section.title}</h4>
             </div>
             <ul>
@@ -59,15 +62,28 @@ function AnnouncementSections({ announcement }: { announcement: UpdateAnnounceme
   );
 }
 
-function AnnouncementMetadata({ announcement }: { announcement: UpdateAnnouncement }) {
+function AnnouncementListItem({
+  announcement,
+  selected,
+  onSelect,
+}: {
+  announcement: UpdateAnnouncement;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   return (
-    <div className="update-announcement__metadata">
-      <span>源码预览版 · {announcement.version}</span>
-      <time dateTime={announcement.publishedAt}>
-        <CalendarDays size={13} aria-hidden="true" />
-        {formatPublishedAt(announcement.publishedAt)}
-      </time>
-    </div>
+    <button
+      type="button"
+      className={selected ? "is-active" : ""}
+      aria-pressed={selected}
+      aria-label={`查看${announcement.title}`}
+      onClick={onSelect}
+    >
+      <strong>{announcement.title}</strong>
+      <small>
+        {announcement.version} · {formatPublishedAt(announcement.publishedAt)}
+      </small>
+    </button>
   );
 }
 
@@ -75,7 +91,14 @@ export function UpdateAnnouncementsSettings({ onClose }: { onClose: () => void }
   const markLatestAnnouncementRead = useUpdateAnnouncementReadState(
     (state) => state.markLatestAnnouncementRead,
   );
+  const [selectedAnnouncementId, setSelectedAnnouncementId] = useState(
+    LATEST_UPDATE_ANNOUNCEMENT.id,
+  );
   const historicalAnnouncements = UPDATE_ANNOUNCEMENTS.slice(1);
+  const selectedAnnouncement =
+    UPDATE_ANNOUNCEMENTS.find((announcement) => announcement.id === selectedAnnouncementId) ??
+    LATEST_UPDATE_ANNOUNCEMENT;
+  const showingLatest = selectedAnnouncement.id === LATEST_UPDATE_ANNOUNCEMENT.id;
 
   useEffect(() => {
     markLatestAnnouncementRead();
@@ -91,46 +114,92 @@ export function UpdateAnnouncementsSettings({ onClose }: { onClose: () => void }
       />
 
       <div className="update-announcements-settings">
-        <section aria-labelledby="latest-announcement-title">
-          <div className="update-announcements-heading">
+        <section className="update-announcement-list" aria-labelledby="announcement-list-title">
+          <header>
             <div>
-              <span className="eyebrow">Latest</span>
-              <h3 id="latest-announcement-title">本次更新</h3>
+              <span className="eyebrow">Release index</span>
+              <h3 id="announcement-list-title">公告版本</h3>
             </div>
-            <span className="update-announcements-heading__status">
-              <CheckCircle2 size={14} aria-hidden="true" />
-              已查看
+            <small>{UPDATE_ANNOUNCEMENTS.length} 期</small>
+          </header>
+
+          <div className="update-announcement-list__groups">
+            <section>
+              <h4>本次更新</h4>
+              <AnnouncementListItem
+                announcement={LATEST_UPDATE_ANNOUNCEMENT}
+                selected={showingLatest}
+                onSelect={() => setSelectedAnnouncementId(LATEST_UPDATE_ANNOUNCEMENT.id)}
+              />
+            </section>
+
+            <section>
+              <h4>历史版本</h4>
+              {historicalAnnouncements.map((announcement) => (
+                <AnnouncementListItem
+                  announcement={announcement}
+                  selected={selectedAnnouncement.id === announcement.id}
+                  onSelect={() => setSelectedAnnouncementId(announcement.id)}
+                  key={announcement.id}
+                />
+              ))}
+            </section>
+          </div>
+        </section>
+
+        <article className="update-announcement-detail">
+          <header>
+            <div>
+              <span className="eyebrow">{showingLatest ? "Latest release" : "Archive"}</span>
+              <h3>{selectedAnnouncement.title}</h3>
+              <p>{selectedAnnouncement.summary}</p>
+            </div>
+            <span className="update-announcement-detail__status">
+              {showingLatest ? (
+                <CheckCircle2 size={14} aria-hidden="true" />
+              ) : (
+                <History size={14} aria-hidden="true" />
+              )}
+              {showingLatest ? "已查看" : "历史公告"}
             </span>
-          </div>
+          </header>
 
-          <article className="update-announcement update-announcement--latest">
-            <AnnouncementMetadata announcement={LATEST_UPDATE_ANNOUNCEMENT} />
-            <h3>{LATEST_UPDATE_ANNOUNCEMENT.title}</h3>
-            <p className="update-announcement__summary">{LATEST_UPDATE_ANNOUNCEMENT.summary}</p>
-            <AnnouncementSections announcement={LATEST_UPDATE_ANNOUNCEMENT} />
-          </article>
-        </section>
-
-        <section aria-labelledby="announcement-history-title">
-          <div className="update-announcements-heading">
+          <dl className="update-announcement-detail__metadata">
             <div>
-              <span className="eyebrow">Archive</span>
-              <h3 id="announcement-history-title">历史版本</h3>
+              <dt>发布渠道</dt>
+              <dd>源码预览版</dd>
             </div>
-            <History size={17} aria-hidden="true" />
+            <div>
+              <dt>版本</dt>
+              <dd>{selectedAnnouncement.version}</dd>
+            </div>
+            <div>
+              <dt>发布日期</dt>
+              <dd>
+                <CalendarDays size={13} aria-hidden="true" />
+                <time dateTime={selectedAnnouncement.publishedAt}>
+                  {formatPublishedAt(selectedAnnouncement.publishedAt)}
+                </time>
+              </dd>
+            </div>
+            <div>
+              <dt>公告编号</dt>
+              <dd title={selectedAnnouncement.id}>{selectedAnnouncement.id}</dd>
+            </div>
+          </dl>
+
+          <div className="update-announcement-detail__heading">
+            <span aria-hidden="true">
+              <Megaphone size={16} />
+            </span>
+            <div>
+              <span className="eyebrow">Changes</span>
+              <h4>版本改动</h4>
+            </div>
           </div>
 
-          <div className="update-announcement-history">
-            {historicalAnnouncements.map((announcement) => (
-              <article className="update-announcement" key={announcement.id}>
-                <AnnouncementMetadata announcement={announcement} />
-                <h3>{announcement.title}</h3>
-                <p className="update-announcement__summary">{announcement.summary}</p>
-                <AnnouncementSections announcement={announcement} />
-              </article>
-            ))}
-          </div>
-        </section>
+          <AnnouncementSections announcement={selectedAnnouncement} />
+        </article>
       </div>
 
       <footer>
