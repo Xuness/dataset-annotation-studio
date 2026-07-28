@@ -13,6 +13,7 @@ function createInitialExportForm(): ExportFormState {
       },
     ],
     formats: ["txt"],
+    packaging: "directory",
   };
 }
 

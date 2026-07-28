@@ -91,7 +91,7 @@ export function ExportPreviewPanel({ preview }: { preview: ExportPreview | undef
         {!preview ? (
           <div className="export-preview-empty">
             <ScanSearch size={25} />
-            <p>选择范围和空目录后进行校验；校验不会写入任何导出文件。</p>
+            <p>选择范围和导出目录后进行校验；校验不会写入任何导出文件。</p>
           </div>
         ) : preview.blocking_issue_count === 0 && preview.warning_count === 0 ? (
           <div className="export-preview-success">

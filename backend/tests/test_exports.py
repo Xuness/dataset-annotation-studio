@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -12,6 +13,7 @@ from PIL import Image
 from dataset_studio.api.app import create_app
 from dataset_studio.api.container import AppContainer
 from dataset_studio.core.config import Settings
+from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationTag
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.service import AssetService
@@ -20,6 +22,7 @@ from dataset_studio.modules.exports.models import (
     ExportCreateRequest,
     ExportFormat,
     ExportOperationStatus,
+    ExportPackaging,
     ExportRequest,
     ExportRevisionMode,
 )
@@ -150,6 +153,327 @@ def test_export_materializes_multiple_database_channels_as_variants_and_json(
         "first",
     ]
     assert metadata["annotations"]["description"]["content"] == "<caption>first.png</caption>"
+
+
+def test_export_streams_frozen_artifacts_into_a_zip_archive(tmp_path: Path) -> None:
+    workspaces, _, _, exports = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    (project / "image.txt").write_text("ready", encoding="utf-8")
+    workspace, _ = workspaces.open(str(project))
+    destination = tmp_path / "zip-export"
+    destination.mkdir()
+    request = ExportRequest(
+        destination_path=str(destination),
+        packaging=ExportPackaging.ZIP,
+    )
+    preview = exports.preview(workspace.project_id, request)
+    operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(request=request, preview_token=preview.preview_token),
+    )
+
+    _run_export(workspaces, workspace.project_id, operation.id)
+
+    completed = exports.get(workspace.project_id, operation.id)
+    archive_path = destination / "zip-export.zip"
+    assert completed.status == ExportOperationStatus.COMPLETED
+    assert completed.configuration_snapshot["packaging"] == "zip"
+    assert list(destination.iterdir()) == [archive_path]
+    with zipfile.ZipFile(archive_path) as archive:
+        assert archive.comment == f"dataset-studio-export:{operation.id}".encode()
+        assert set(archive.namelist()) == {"image.png", "image.txt"}
+        assert archive.read("image.png") == (project / "image.png").read_bytes()
+        assert archive.read("image.txt") == b"ready"
+        assert archive.getinfo("image.png").compress_type == zipfile.ZIP_STORED
+        assert archive.getinfo("image.txt").compress_type == zipfile.ZIP_DEFLATED
+        assert archive.testzip() is None
+
+
+def test_zip_export_preserves_multi_channel_layout(tmp_path: Path) -> None:
+    workspaces, assets, annotations, exports = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    workspace, _ = workspaces.open(str(project))
+    asset = assets.list_assets(workspace.project_id).items[0]
+    annotations.save_tags(
+        workspace.project_id,
+        asset.id,
+        [AnnotationTag(name="character", origin="manual")],
+    )
+    annotations.save_text(
+        workspace.project_id,
+        asset.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>ready</caption>",
+    )
+    destination = tmp_path / "multi-channel-zip"
+    destination.mkdir()
+    existing_directory = destination / "tags"
+    existing_directory.mkdir()
+    marker = existing_directory / "keep.me"
+    marker.write_text("user-owned", encoding="utf-8")
+    request = ExportRequest(
+        destination_path=str(destination),
+        channels=[
+            ExportChannelSelection(channel=AnnotationChannel.TAGS),
+            ExportChannelSelection(channel=AnnotationChannel.DESCRIPTION),
+        ],
+        formats=[ExportFormat.TXT, ExportFormat.JSON],
+        packaging=ExportPackaging.ZIP,
+    )
+    preview = exports.preview(workspace.project_id, request)
+    operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(request=request, preview_token=preview.preview_token),
+    )
+
+    _run_export(workspaces, workspace.project_id, operation.id)
+
+    assert marker.read_text(encoding="utf-8") == "user-owned"
+    with zipfile.ZipFile(destination / "multi-channel-zip.zip") as archive:
+        assert set(archive.namelist()) == {
+            "description/image.png",
+            "description/image.txt",
+            "metadata/image.annotations.json",
+            "tags/image.png",
+            "tags/image.txt",
+        }
+        assert archive.read("tags/image.txt") == b"character"
+        assert archive.read("description/image.txt") == b"<caption>ready</caption>"
+        metadata = json.loads(archive.read("metadata/image.annotations.json"))
+        assert metadata["annotations"]["tags"]["tags"][0]["name"] == "character"
+
+
+def test_zip_export_allows_a_nonempty_destination_without_touching_existing_entries(
+    tmp_path: Path,
+) -> None:
+    workspaces, _, _, exports = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    (project / "image.txt").write_text("ready", encoding="utf-8")
+    workspace, _ = workspaces.open(str(project))
+    destination = tmp_path / "shared-export-folder"
+    destination.mkdir()
+    preserved_file = destination / "keep.me"
+    preserved_file.write_text("user-owned", encoding="utf-8")
+    preserved_directory = destination / "existing-directory"
+    preserved_directory.mkdir()
+    request = ExportRequest(
+        destination_path=str(destination),
+        packaging=ExportPackaging.ZIP,
+    )
+
+    preview = exports.preview(workspace.project_id, request)
+    assert preview.blocking_issue_count == 0
+    operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(request=request, preview_token=preview.preview_token),
+    )
+    late_file = destination / "created-after-preview.me"
+    late_file.write_text("late-user-owned", encoding="utf-8")
+    nested_prefix_match = preserved_directory / f".dataset-studio-export-{operation.id}-user-owned"
+    nested_prefix_match.write_text("nested-user-owned", encoding="utf-8")
+    _run_export(workspaces, workspace.project_id, operation.id)
+
+    archive_path = destination / "shared-export-folder.zip"
+    assert exports.get(workspace.project_id, operation.id).status == ExportOperationStatus.COMPLETED
+    assert preserved_file.read_text(encoding="utf-8") == "user-owned"
+    assert preserved_directory.is_dir()
+    assert late_file.read_text(encoding="utf-8") == "late-user-owned"
+    assert nested_prefix_match.read_text(encoding="utf-8") == "nested-user-owned"
+    assert archive_path.is_file()
+
+    conflict_preview = exports.preview(workspace.project_id, request)
+    assert conflict_preview.blocking_issues == ["目标 ZIP 压缩包已经存在，无法覆盖。"]
+
+
+def test_stopped_zip_export_discards_partial_archive_and_restarts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspaces, _, _, exports = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "first.png")
+    _write_image(project / "second.png", "black")
+    (project / "first.txt").write_text("first", encoding="utf-8")
+    (project / "second.txt").write_text("second", encoding="utf-8")
+    workspace, _ = workspaces.open(str(project))
+    destination = tmp_path / "zip-resume"
+    destination.mkdir()
+    request = ExportRequest(
+        destination_path=str(destination),
+        packaging=ExportPackaging.ZIP,
+    )
+    preview = exports.preview(workspace.project_id, request)
+    operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(request=request, preview_token=preview.preview_token),
+    )
+    paths, _ = workspaces.get(workspace.project_id)
+    repository = ExportRepository(paths.database)
+    assert repository.claim_next_operation() is not None
+    container = cast(AppContainer, SimpleNamespace(workspaces=workspaces))
+    worker = ExportWorker(container)
+    write_image = worker._write_image_to_archive
+    stop_requested = False
+
+    def write_then_stop(*args, **kwargs):
+        nonlocal stop_requested
+        result = write_image(*args, **kwargs)
+        if not stop_requested:
+            stop_requested = True
+            assert repository.request_stop(operation.id)
+        return result
+
+    monkeypatch.setattr(worker, "_write_image_to_archive", write_then_stop)
+    worker._process_operation(workspace.project_id, operation.id)
+
+    stopped = exports.get(workspace.project_id, operation.id)
+    assert stopped.status == ExportOperationStatus.STOPPED
+    assert stopped.completed_items == 0
+    assert stopped.copied_bytes == 0
+    assert list(destination.iterdir()) == []
+
+    monkeypatch.setattr(worker, "_write_image_to_archive", write_image)
+    resumed = exports.resume(workspace.project_id, operation.id)
+    assert resumed.status == ExportOperationStatus.QUEUED
+    _run_export(workspaces, workspace.project_id, operation.id)
+    assert exports.get(workspace.project_id, operation.id).status == ExportOperationStatus.COMPLETED
+    assert [entry.name for entry in destination.iterdir()] == ["zip-resume.zip"]
+
+
+def test_orphaned_zip_export_discards_owned_archive_and_resets_all_progress(
+    tmp_path: Path,
+) -> None:
+    workspaces, _, _, exports = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "first.png")
+    _write_image(project / "second.png", "black")
+    (project / "first.txt").write_text("first", encoding="utf-8")
+    (project / "second.txt").write_text("second", encoding="utf-8")
+    workspace, _ = workspaces.open(str(project))
+    destination = tmp_path / "zip-recovery"
+    destination.mkdir()
+    request = ExportRequest(
+        destination_path=str(destination),
+        packaging=ExportPackaging.ZIP,
+    )
+    preview = exports.preview(workspace.project_id, request)
+    operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(request=request, preview_token=preview.preview_token),
+    )
+    paths, _ = workspaces.get(workspace.project_id)
+    repository = ExportRepository(paths.database)
+    assert repository.claim_next_operation() is not None
+    while item := repository.claim_next_item(operation.id):
+        artifacts = json.loads(str(item["artifact_snapshot"]))
+        repository.complete_item(
+            operation.id,
+            str(item["id"]),
+            sum(int(artifact["byte_size"]) for artifact in artifacts),
+        )
+
+    partial = destination / f".dataset-studio-export-{operation.id}-partial.zip"
+    partial.write_bytes(b"partial")
+    archive_path = destination / "zip-recovery.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.comment = f"dataset-studio-export:{operation.id}".encode()
+        archive.writestr("first.txt", b"first")
+
+    container = cast(AppContainer, SimpleNamespace(workspaces=workspaces))
+    ExportWorker(container)._recover_orphaned()
+
+    interrupted = exports.get(workspace.project_id, operation.id)
+    assert interrupted.status == ExportOperationStatus.INTERRUPTED
+    assert interrupted.completed_items == 0
+    assert interrupted.copied_bytes == 0
+    assert {str(item["status"]) for item in repository.operation_items(operation.id)} == {"pending"}
+    assert list(destination.iterdir()) == []
+
+    assert exports.resume(workspace.project_id, operation.id).status == ExportOperationStatus.QUEUED
+    _run_export(workspaces, workspace.project_id, operation.id)
+    assert exports.get(workspace.project_id, operation.id).status == ExportOperationStatus.COMPLETED
+    assert [entry.name for entry in destination.iterdir()] == ["zip-recovery.zip"]
+
+
+def test_zip_export_never_removes_an_external_archive_created_after_preview(
+    tmp_path: Path,
+) -> None:
+    workspaces, _, _, exports = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    (project / "image.txt").write_text("ready", encoding="utf-8")
+    workspace, _ = workspaces.open(str(project))
+    destination = tmp_path / "external-archive"
+    destination.mkdir()
+    request = ExportRequest(
+        destination_path=str(destination),
+        packaging=ExportPackaging.ZIP,
+    )
+    preview = exports.preview(workspace.project_id, request)
+    operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(request=request, preview_token=preview.preview_token),
+    )
+    archive_path = destination / "external-archive.zip"
+    archive_path.write_bytes(b"user-owned")
+
+    _run_export(workspaces, workspace.project_id, operation.id)
+
+    failed = exports.get(workspace.project_id, operation.id)
+    assert failed.status == ExportOperationStatus.FAILED
+    assert "目标 ZIP 压缩包已经存在" in (failed.error_message or "")
+    assert archive_path.read_bytes() == b"user-owned"
+
+
+def test_zip_publication_never_replaces_an_existing_target(tmp_path: Path) -> None:
+    temporary = tmp_path / "temporary.zip"
+    target = tmp_path / "target.zip"
+    temporary.write_bytes(b"new archive")
+    target.write_bytes(b"user-owned")
+
+    with pytest.raises(ValueError, match="目标 ZIP 压缩包已经存在"):
+        ExportWorker._publish_archive(temporary, target)
+
+    assert temporary.read_bytes() == b"new archive"
+    assert target.read_bytes() == b"user-owned"
+
+
+def test_export_worker_fails_an_invalid_packaging_snapshot_without_escaping(
+    tmp_path: Path,
+) -> None:
+    workspaces, _, _, exports = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    workspace, _ = workspaces.open(str(project))
+    destination = tmp_path / "invalid-packaging"
+    destination.mkdir()
+    request = ExportRequest(destination_path=str(destination))
+    preview = exports.preview(workspace.project_id, request)
+    operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(
+            request=request,
+            preview_token=preview.preview_token,
+            allow_warnings=True,
+        ),
+    )
+    paths, _ = workspaces.get(workspace.project_id)
+    with connect(paths.database) as connection:
+        connection.execute(
+            "UPDATE export_operations SET configuration_snapshot = ? WHERE id = ?",
+            ('{"packaging":"tar"}', operation.id),
+        )
+        connection.commit()
+
+    _run_export(workspaces, workspace.project_id, operation.id)
+
+    failed = exports.get(workspace.project_id, operation.id)
+    assert failed.status == ExportOperationStatus.FAILED
+    assert failed.error_message == "导出任务的输出方式快照无效。"
+    assert list(destination.iterdir()) == []
 
 
 def test_export_warns_when_translation_depends_on_an_old_source_revision(
@@ -412,6 +736,7 @@ def test_export_api_uses_persistent_active_state_and_blocks_annotation_edits(
         )
         assert created.status_code == 201
         assert created.json()["status"] == "queued"
+        assert created.json()["configuration_snapshot"]["packaging"] == "directory"
         active = client.get("/api/v1/jobs/active")
         assert active.json()["export_count"] == 1
 

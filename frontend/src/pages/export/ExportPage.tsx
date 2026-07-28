@@ -51,6 +51,7 @@ export function ExportPage() {
       destination_path: form.destinationPath,
       channels: form.selections,
       formats: form.formats,
+      packaging: form.packaging,
     }),
     [checkedAssetIds, form],
   );
@@ -128,7 +129,9 @@ export function ExportPage() {
       allowWarnings = true;
     } else {
       const confirmed = await confirmDialog(
-        `将 ${previewData.total_items} 张图片及所选标注通道物化到导出目录？`,
+        form.packaging === "zip"
+          ? `将 ${previewData.total_items} 张图片及所选标注通道打包为 ZIP 压缩包？`
+          : `将 ${previewData.total_items} 张图片及所选标注通道物化到导出目录？`,
         {
           title: "开始导出",
           confirmLabel: "开始导出",
@@ -152,8 +155,12 @@ export function ExportPage() {
   }
 
   async function stop(operationId: string) {
+    const operation = operations.data?.find((candidate) => candidate.id === operationId);
+    const packaging = operation?.configuration_snapshot.packaging ?? "directory";
     const confirmed = await confirmDialog(
-      "停止后已完成的输出文件会保留在导出目录中，之后可以继续任务。",
+      packaging === "zip"
+        ? "停止后未完成的临时压缩包会删除；继续任务时会从头重新打包。"
+        : "停止后已完成的输出文件会保留在导出目录中，之后可以继续任务。",
       {
         title: "停止导出",
         confirmLabel: "停止",
@@ -198,7 +205,7 @@ export function ExportPage() {
       bodyClassName="export-workspace-body"
       statusbar={
         <>
-          <span>多通道导出 · 数据库修订物化为 TXT / JSON</span>
+          <span>多通道导出 · TXT / JSON · 文件夹 / ZIP</span>
           <span className="workspace-statusbar__path">
             任务状态：.annotation-workspace/state.sqlite3
           </span>

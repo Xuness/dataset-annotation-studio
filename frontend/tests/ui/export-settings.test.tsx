@@ -25,6 +25,7 @@ describe("export channel settings", () => {
           },
         ],
         formats: ["txt"],
+        packaging: "directory",
       });
       latest = form;
       return (
@@ -57,6 +58,8 @@ describe("export channel settings", () => {
       screen.getAllByRole("combobox", { name: "翻译修订策略" })[0],
       "reviewed",
     );
+    await user.click(screen.getByRole("button", { name: "ZIP 压缩包" }));
+    expect(screen.getByText(/不会覆盖同名压缩包/)).toBeTruthy();
 
     expect(latest?.selections).toEqual([
       {
@@ -79,6 +82,7 @@ describe("export channel settings", () => {
         revision: "current",
       },
     ]);
+    expect(latest?.packaging).toBe("zip");
     expect((screen.getByRole("button", { name: "校验并预览" }) as HTMLButtonElement).disabled).toBe(
       false,
     );

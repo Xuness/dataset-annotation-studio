@@ -1,4 +1,4 @@
-import { Eye, FolderOpen, PackageOpen } from "lucide-react";
+import { Eye, FileArchive, FolderOpen, FolderTree, PackageOpen } from "lucide-react";
 
 import type {
   AnnotationChannel,
@@ -282,6 +282,37 @@ export function ExportSettingsPanel({
       </section>
 
       <section className="export-option">
+        <span className="export-option__title">输出方式</span>
+        <div className="export-packaging-selector" role="group" aria-label="输出方式">
+          <button
+            type="button"
+            className={form.packaging === "directory" ? "is-active" : ""}
+            aria-pressed={form.packaging === "directory"}
+            disabled={activeExport}
+            onClick={() => onChange({ packaging: "directory" })}
+          >
+            <FolderTree size={15} />
+            <span>文件夹</span>
+          </button>
+          <button
+            type="button"
+            className={form.packaging === "zip" ? "is-active" : ""}
+            aria-pressed={form.packaging === "zip"}
+            disabled={activeExport}
+            onClick={() => onChange({ packaging: "zip" })}
+          >
+            <FileArchive size={15} />
+            <span>ZIP 压缩包</span>
+          </button>
+        </div>
+        <small>
+          {form.packaging === "zip"
+            ? "输出一个与所选目录同名的 .zip 文件。"
+            : "直接输出图片、TXT 和 JSON 文件。"}
+        </small>
+      </section>
+
+      <section className="export-option">
         <span className="export-option__title">导出目录</span>
         <button
           type="button"
@@ -291,10 +322,14 @@ export function ExportSettingsPanel({
         >
           <FolderOpen size={16} />
           <span title={form.destinationPath}>
-            {form.destinationPath || "使用系统目录选择器选择空文件夹"}
+            {form.destinationPath || "使用系统目录选择器选择导出文件夹"}
           </span>
         </button>
-        <small>选择的文件夹就是最终输出位置，且必须为空；导出不会修改项目内的旧 TXT。</small>
+        <small>
+          {form.packaging === "zip"
+            ? "压缩包会生成在该目录内；不会覆盖同名压缩包或修改目录中的其他文件。"
+            : "选择的文件夹就是最终输出位置，且必须为空；导出不会修改项目内的旧 TXT。"}
+        </small>
       </section>
 
       <section className="export-option export-rules">
@@ -320,6 +355,10 @@ export function ExportSettingsPanel({
             <dt>覆盖文件</dt>
             <dd>不允许</dd>
           </div>
+          <div>
+            <dt>封装</dt>
+            <dd>{form.packaging === "zip" ? "ZIP 压缩包" : "文件夹"}</dd>
+          </div>
         </dl>
       </section>
 
@@ -343,7 +382,15 @@ export function ExportSettingsPanel({
         </Button>
         <Button
           tone="primary"
-          icon={exportPending ? <Spinner /> : <PackageOpen size={14} />}
+          icon={
+            exportPending ? (
+              <Spinner />
+            ) : form.packaging === "zip" ? (
+              <FileArchive size={14} />
+            ) : (
+              <PackageOpen size={14} />
+            )
+          }
           disabled={!readyToExport || previewPending || exportPending}
           onClick={onExport}
         >

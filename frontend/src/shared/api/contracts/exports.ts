@@ -7,6 +7,7 @@ import type {
 export type ExportScope = "all" | "selected";
 export type ExportRevisionMode = "current" | "reviewed";
 export type ExportFormat = "txt" | "json";
+export type ExportPackaging = "directory" | "zip";
 
 export interface ExportChannelSelection {
   channel: AnnotationChannel;
@@ -22,6 +23,7 @@ export interface ExportRequest {
   destination_path: string;
   channels: ExportChannelSelection[];
   formats: ExportFormat[];
+  packaging: ExportPackaging;
 }
 
 export interface ExportPreviewItem {
@@ -76,6 +78,7 @@ export interface ExportOperation {
   configuration_snapshot: {
     channels?: ExportChannelSelection[];
     formats?: ExportFormat[];
+    packaging?: ExportPackaging;
   };
   current_relative_path: string | null;
   created_at: string;

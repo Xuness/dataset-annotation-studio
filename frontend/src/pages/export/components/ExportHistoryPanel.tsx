@@ -57,6 +57,7 @@ export function ExportHistoryPanel({
               )
               .join(" · ") ?? "旧版导出";
           const formats = operation.configuration_snapshot.formats?.join(" + ") ?? "txt";
+          const packaging = operation.configuration_snapshot.packaging === "zip" ? "ZIP" : "文件夹";
           return (
             <article key={operation.id} className={active ? "is-active" : ""}>
               <header>
@@ -73,7 +74,7 @@ export function ExportHistoryPanel({
                 {formatBytes(operation.total_bytes, "KB")}
               </small>
               <small title={channels}>
-                {formats.toUpperCase()} · {channels}
+                {packaging} · {formats.toUpperCase()} · {channels}
               </small>
               {operation.current_relative_path ? (
                 <small title={operation.current_relative_path}>

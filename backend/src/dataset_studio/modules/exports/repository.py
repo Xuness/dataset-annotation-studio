@@ -26,6 +26,7 @@ class RecoveredExport:
     operation_id: str
     destination_path: str
     target_names: tuple[str, ...]
+    packaging: str
 
 
 class ExportRepository:
@@ -47,6 +48,7 @@ class ExportRepository:
             {
                 "channels": [selection.model_dump(mode="json") for selection in request.channels],
                 "formats": [format_.value for format_ in request.formats],
+                "packaging": request.packaging.value,
             },
             ensure_ascii=False,
             separators=(",", ":"),
@@ -284,6 +286,28 @@ class ExportRepository:
                 (now, operation_id),
             )
 
+    def reset_archive_progress(self, operation_id: str) -> None:
+        now = utc_now_iso()
+        with transaction(self._database_path) as connection:
+            connection.execute(
+                """
+                UPDATE export_items
+                SET status = 'pending', copied_bytes = 0,
+                    error_message = NULL, updated_at = ?
+                WHERE operation_id = ?
+                """,
+                (now, operation_id),
+            )
+            connection.execute(
+                """
+                UPDATE export_operations
+                SET completed_items = 0, copied_bytes = 0,
+                    current_relative_path = NULL, updated_at = ?
+                WHERE id = ?
+                """,
+                (now, operation_id),
+            )
+
     def fail(
         self,
         operation_id: str,
@@ -473,6 +497,7 @@ class ExportRepository:
             rows = connection.execute(
                 """
                 SELECT o.id AS operation_id, o.destination_path,
+                       o.configuration_snapshot,
                        i.target_image_name, i.target_annotation_name,
                        i.annotation_exists, i.artifact_snapshot
                 FROM export_operations o
@@ -482,29 +507,39 @@ class ExportRepository:
                 ORDER BY o.created_at, i.position
                 """
             ).fetchall()
-            recovered: dict[str, tuple[str, list[str]]] = {}
+            recovered: dict[str, tuple[str, list[str], str]] = {}
             for row in rows:
                 operation_id = str(row["operation_id"])
-                destination_path, names = recovered.setdefault(
-                    operation_id,
-                    (str(row["destination_path"]), []),
-                )
                 try:
-                    artifacts = json.loads(str(row["artifact_snapshot"]))
-                except json.JSONDecodeError:
-                    artifacts = []
-                if artifacts:
-                    names.extend(
-                        str(artifact["target_relative_path"])
-                        for artifact in artifacts
-                        if isinstance(artifact, dict) and artifact.get("target_relative_path")
-                    )
-                else:
-                    if row["target_image_name"]:
-                        names.append(str(row["target_image_name"]))
-                    if row["target_annotation_name"] and int(row["annotation_exists"] or 0):
-                        names.append(str(row["target_annotation_name"]))
-                recovered[operation_id] = (destination_path, names)
+                    configuration = json.loads(str(row["configuration_snapshot"]))
+                except (json.JSONDecodeError, TypeError):
+                    configuration = {}
+                packaging = (
+                    str(configuration.get("packaging", "directory"))
+                    if isinstance(configuration, dict)
+                    else "directory"
+                )
+                destination_path, names, packaging = recovered.setdefault(
+                    operation_id,
+                    (str(row["destination_path"]), [], packaging),
+                )
+                if packaging != "zip":
+                    try:
+                        artifacts = json.loads(str(row["artifact_snapshot"]))
+                    except (json.JSONDecodeError, TypeError):
+                        artifacts = []
+                    if artifacts:
+                        names.extend(
+                            str(artifact["target_relative_path"])
+                            for artifact in artifacts
+                            if isinstance(artifact, dict) and artifact.get("target_relative_path")
+                        )
+                    else:
+                        if row["target_image_name"]:
+                            names.append(str(row["target_image_name"]))
+                        if row["target_annotation_name"] and int(row["annotation_exists"] or 0):
+                            names.append(str(row["target_annotation_name"]))
+                recovered[operation_id] = (destination_path, names, packaging)
             if not recovered:
                 return []
             connection.execute(
@@ -520,6 +555,26 @@ class ExportRepository:
                 """,
                 (now,),
             )
+            for operation_id, (_destination_path, _names, packaging) in recovered.items():
+                if packaging != "zip":
+                    continue
+                connection.execute(
+                    """
+                    UPDATE export_items
+                    SET status = 'pending', copied_bytes = 0,
+                        error_message = NULL, updated_at = ?
+                    WHERE operation_id = ?
+                    """,
+                    (now, operation_id),
+                )
+                connection.execute(
+                    """
+                    UPDATE export_operations
+                    SET completed_items = 0, copied_bytes = 0
+                    WHERE id = ?
+                    """,
+                    (operation_id,),
+                )
             connection.execute(
                 """
                 UPDATE export_operations
@@ -530,8 +585,8 @@ class ExportRepository:
                 (now, now),
             )
             return [
-                RecoveredExport(operation_id, destination_path, tuple(names))
-                for operation_id, (destination_path, names) in recovered.items()
+                RecoveredExport(operation_id, destination_path, tuple(names), packaging)
+                for operation_id, (destination_path, names, packaging) in recovered.items()
             ]
 
     def active_count(self) -> int:

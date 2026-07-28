@@ -10,19 +10,23 @@ import shutil
 import sqlite3
 import tempfile
 import threading
+import zipfile
 from contextlib import suppress
 from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 from dataset_studio.core.errors import WorkspaceNotFoundError
 from dataset_studio.core.files import file_sha256
-from dataset_studio.modules.exports.models import ExportOperation
+from dataset_studio.modules.exports.models import ExportOperation, ExportPackaging
+from dataset_studio.modules.exports.paths import archive_output_path
 from dataset_studio.modules.exports.repository import ExportRepository
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 LOGGER = logging.getLogger("dataset_studio.export_worker")
 COPY_CHUNK_SIZE = 1024 * 1024
 STOP_CHECK_INTERVAL_CHUNKS = 8
+STORED_IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp"})
+ARCHIVE_COMMENT_PREFIX = b"dataset-studio-export:"
 
 
 class ExportWorkerContainer(Protocol):
@@ -112,11 +116,15 @@ class ExportWorker:
                 continue
             for operation in recovered:
                 destination = Path(operation.destination_path)
-                self._cleanup_operation_temp_files(destination, operation.operation_id)
-                for target_name in operation.target_names:
-                    target = self._safe_target(destination, target_name)
-                    if target is not None and target.is_file():
-                        target.unlink(missing_ok=True)
+                if operation.packaging == ExportPackaging.ZIP.value:
+                    self._cleanup_archive_temp_files(destination, operation.operation_id)
+                    self._remove_owned_archive(destination, operation.operation_id)
+                else:
+                    self._cleanup_operation_temp_files(destination, operation.operation_id)
+                    for target_name in operation.target_names:
+                        target = self._safe_target(destination, target_name)
+                        if target is not None and target.is_file():
+                            target.unlink(missing_ok=True)
                 LOGGER.info(
                     "Marked export %s interrupted in %s.",
                     operation.operation_id,
@@ -133,42 +141,257 @@ class ExportWorker:
         operation = repository.get(operation_id)
         if operation is None:
             return
+        packaging = ExportPackaging.DIRECTORY
         current_item_id: str | None = None
         current_item = None
         try:
+            packaging = self._packaging(operation)
             items = repository.operation_items(operation_id)
             self._validate_destination(operation, items)
-            while item := repository.claim_next_item(operation_id):
-                current_item = item
-                current_item_id = str(item["id"])
-                self._check_stop(repository, operation_id)
-                copied_bytes = self._process_item(
+            if packaging == ExportPackaging.ZIP:
+                self._process_archive(
                     paths.root,
-                    Path(operation.destination_path),
-                    operation_id,
-                    item,
+                    operation,
                     repository,
                 )
-                repository.complete_item(operation_id, current_item_id, copied_bytes)
-                current_item_id = None
-                current_item = None
+            else:
+                while item := repository.claim_next_item(operation_id):
+                    current_item = item
+                    current_item_id = str(item["id"])
+                    self._check_stop(repository, operation_id)
+                    copied_bytes = self._process_item(
+                        paths.root,
+                        Path(operation.destination_path),
+                        operation_id,
+                        item,
+                        repository,
+                    )
+                    repository.complete_item(operation_id, current_item_id, copied_bytes)
+                    current_item_id = None
+                    current_item = None
 
-            self._check_stop(repository, operation_id)
-            completed_items = repository.operation_items(operation_id)
-            self._validate_destination(operation, completed_items, require_complete=True)
+                self._check_stop(repository, operation_id)
+                completed_items = repository.operation_items(operation_id)
+                self._validate_destination(operation, completed_items, require_complete=True)
             repository.complete(operation_id)
         except ExportStopped:
-            repository.reset_running_item(operation_id)
+            if packaging == ExportPackaging.ZIP:
+                repository.reset_archive_progress(operation_id)
+                self._cleanup_archive_outputs(operation)
+            else:
+                repository.reset_running_item(operation_id)
             repository.mark_stopped(operation_id)
         except ExportInterrupted:
-            repository.reset_running_item(operation_id)
+            if packaging == ExportPackaging.ZIP:
+                repository.reset_archive_progress(operation_id)
+                self._cleanup_archive_outputs(operation)
+            else:
+                repository.reset_running_item(operation_id)
             repository.mark_interrupted(operation_id)
         except Exception as error:
             message = str(error) or type(error).__name__
             LOGGER.exception("Export %s failed.", operation_id)
-            if current_item is not None:
+            if packaging == ExportPackaging.ZIP:
+                repository.reset_archive_progress(operation_id)
+                self._cleanup_archive_outputs(operation)
+                current_item_id = None
+            elif current_item is not None:
                 self._cleanup_item_targets(Path(operation.destination_path), current_item)
             repository.fail(operation_id, message, item_id=current_item_id)
+
+    def _process_archive(
+        self,
+        workspace_root: Path,
+        operation: ExportOperation,
+        repository: ExportRepository,
+    ) -> None:
+        destination = Path(operation.destination_path)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".dataset-studio-export-{operation.id}-",
+            suffix=".zip",
+            dir=destination,
+        )
+        os.close(descriptor)
+        temporary = Path(temporary_name)
+        target = archive_output_path(destination)
+        try:
+            with zipfile.ZipFile(
+                temporary,
+                mode="w",
+                compression=zipfile.ZIP_DEFLATED,
+                compresslevel=6,
+                allowZip64=True,
+                strict_timestamps=False,
+            ) as archive:
+                archive.comment = ARCHIVE_COMMENT_PREFIX + operation.id.encode("ascii")
+                while item := repository.claim_next_item(operation.id):
+                    item_id = str(item["id"])
+                    self._check_stop(repository, operation.id)
+                    copied_bytes = self._process_archive_item(
+                        workspace_root,
+                        operation.id,
+                        item,
+                        repository,
+                        archive,
+                    )
+                    repository.complete_item(operation.id, item_id, copied_bytes)
+
+            with temporary.open("rb") as handle:
+                os.fsync(handle.fileno())
+            self._check_stop(repository, operation.id)
+            completed_items = repository.operation_items(operation.id)
+            self._validate_destination(
+                operation,
+                completed_items,
+                require_complete=True,
+                allowed_temporary=temporary,
+            )
+            self._publish_archive(temporary, target)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
+
+    @staticmethod
+    def _publish_archive(temporary: Path, target: Path) -> None:
+        """Publish a complete archive without ever replacing an existing path.
+
+        A hard link is created in the same directory as the temporary file, so
+        the target becomes visible atomically and ``FileExistsError`` leaves an
+        external target untouched.  ``os.replace`` cannot provide that
+        guarantee if another process creates or swaps the target between the
+        existence check and publication.
+        """
+        try:
+            os.link(temporary, target)
+        except FileExistsError as error:
+            raise ValueError("目标 ZIP 压缩包已经存在，无法覆盖。") from error
+        except OSError as error:
+            raise ValueError(f"无法安全发布 ZIP 压缩包：{error}") from error
+        temporary.unlink(missing_ok=True)
+
+    def _process_archive_item(
+        self,
+        workspace_root: Path,
+        operation_id: str,
+        item,
+        repository: ExportRepository,
+        archive: zipfile.ZipFile,
+    ) -> int:
+        root = workspace_root.resolve()
+        copied_bytes = 0
+        for artifact in self._artifacts(item):
+            self._check_stop(repository, operation_id)
+            relative_path = str(artifact["target_relative_path"])
+            archive_name = self._required_archive_name(relative_path)
+            if str(artifact["kind"]) == "image":
+                source_relative = artifact.get("source_relative_path")
+                if not source_relative:
+                    raise ValueError("导出图片快照缺少源路径。")
+                source = (root / str(source_relative)).resolve()
+                if not source.is_relative_to(root):
+                    raise ValueError("图片路径超出当前项目范围。")
+                copied_bytes += self._write_image_to_archive(
+                    archive,
+                    archive_name,
+                    source,
+                    expected_hash=str(artifact["content_hash"]),
+                    expected_size=int(artifact["byte_size"]),
+                    expected_modified_ns=int(artifact["source_modified_ns"]),
+                    operation_id=operation_id,
+                    repository=repository,
+                )
+            else:
+                payload = self._artifact_payload(artifact)
+                copied_bytes += self._write_payload_to_archive(
+                    archive,
+                    archive_name,
+                    payload,
+                    expected_hash=str(artifact["content_hash"]),
+                    operation_id=operation_id,
+                    repository=repository,
+                )
+        return copied_bytes
+
+    def _write_image_to_archive(
+        self,
+        archive: zipfile.ZipFile,
+        archive_name: str,
+        source: Path,
+        *,
+        expected_hash: str,
+        expected_size: int,
+        expected_modified_ns: int,
+        operation_id: str,
+        repository: ExportRepository,
+    ) -> int:
+        if not source.is_file():
+            raise ValueError(f"源文件已经不存在：{source}")
+        stat_before = source.stat()
+        if stat_before.st_size != expected_size or stat_before.st_mtime_ns != expected_modified_ns:
+            raise ValueError(f"源文件在导出前发生了变化：{source.name}")
+
+        info = zipfile.ZipInfo.from_file(
+            source,
+            arcname=archive_name,
+            strict_timestamps=False,
+        )
+        info.compress_type = (
+            zipfile.ZIP_STORED
+            if source.suffix.casefold() in STORED_IMAGE_SUFFIXES
+            else zipfile.ZIP_DEFLATED
+        )
+        digest = hashlib.sha256()
+        with (
+            source.open("rb") as source_handle,
+            archive.open(
+                info,
+                mode="w",
+                force_zip64=True,
+            ) as archive_handle,
+        ):
+            chunk_number = 0
+            while chunk := source_handle.read(COPY_CHUNK_SIZE):
+                digest.update(chunk)
+                archive_handle.write(chunk)
+                chunk_number += 1
+                if chunk_number % STOP_CHECK_INTERVAL_CHUNKS == 0:
+                    self._check_stop(repository, operation_id)
+
+        stat_after = source.stat()
+        if (
+            stat_before.st_size,
+            stat_before.st_mtime_ns,
+        ) != (
+            stat_after.st_size,
+            stat_after.st_mtime_ns,
+        ):
+            raise ValueError(f"源文件在打包过程中发生了变化：{source.name}")
+        if digest.hexdigest() != expected_hash:
+            raise ValueError(f"源文件内容与项目索引不一致，请重新扫描：{source.name}")
+        self._check_stop(repository, operation_id)
+        return expected_size
+
+    def _write_payload_to_archive(
+        self,
+        archive: zipfile.ZipFile,
+        archive_name: str,
+        payload: bytes,
+        *,
+        expected_hash: str,
+        operation_id: str,
+        repository: ExportRepository,
+    ) -> int:
+        if hashlib.sha256(payload).hexdigest() != expected_hash:
+            raise ValueError("导出标注快照校验失败。")
+        self._check_stop(repository, operation_id)
+        archive.writestr(
+            archive_name,
+            payload,
+            compress_type=zipfile.ZIP_DEFLATED,
+            compresslevel=6,
+        )
+        self._check_stop(repository, operation_id)
+        return len(payload)
 
     def _process_item(
         self,
@@ -331,7 +554,17 @@ class ExportWorker:
         items,
         *,
         require_complete: bool = False,
+        allowed_temporary: Path | None = None,
     ) -> None:
+        if self._packaging(operation) == ExportPackaging.ZIP:
+            self._validate_archive_destination(
+                operation,
+                items,
+                require_complete=require_complete,
+                allowed_temporary=allowed_temporary,
+            )
+            return
+
         destination = Path(operation.destination_path)
         if not destination.is_dir():
             raise ValueError("导出目录已经不存在或不再是文件夹。")
@@ -368,6 +601,25 @@ class ExportWorker:
             examples = "、".join(sorted(unknown, key=str.casefold)[:5])
             raise ValueError(f"导出目录中出现了任务之外的文件：{examples}")
 
+    def _validate_archive_destination(
+        self,
+        operation: ExportOperation,
+        items,
+        *,
+        require_complete: bool,
+        allowed_temporary: Path | None,
+    ) -> None:
+        destination = Path(operation.destination_path)
+        if not destination.is_dir():
+            raise ValueError("导出目录已经不存在或不再是文件夹。")
+        if allowed_temporary is None:
+            self._cleanup_archive_temp_files(destination, operation.id)
+
+        if archive_output_path(destination).exists():
+            raise ValueError("目标 ZIP 压缩包已经存在，无法覆盖。")
+        if require_complete and any(str(item["status"]) != "completed" for item in items):
+            raise ValueError("导出任务仍有未完成条目。")
+
     def _check_stop(
         self,
         repository: ExportRepository,
@@ -377,6 +629,36 @@ class ExportWorker:
             raise ExportInterrupted
         if repository.is_stop_requested(operation_id):
             raise ExportStopped
+
+    @staticmethod
+    def _packaging(operation: ExportOperation) -> ExportPackaging:
+        raw = operation.configuration_snapshot.get(
+            "packaging",
+            ExportPackaging.DIRECTORY.value,
+        )
+        try:
+            return ExportPackaging(str(raw))
+        except ValueError as error:
+            raise ValueError("导出任务的输出方式快照无效。") from error
+
+    @classmethod
+    def _cleanup_archive_outputs(cls, operation: ExportOperation) -> None:
+        destination = Path(operation.destination_path)
+        cls._cleanup_archive_temp_files(destination, operation.id)
+        cls._remove_owned_archive(destination, operation.id)
+
+    @classmethod
+    def _remove_owned_archive(cls, destination: Path, operation_id: str) -> None:
+        archive_path = archive_output_path(destination)
+        if not archive_path.is_file():
+            return
+        try:
+            with zipfile.ZipFile(archive_path) as archive:
+                owned = archive.comment == ARCHIVE_COMMENT_PREFIX + operation_id.encode("ascii")
+        except (OSError, zipfile.BadZipFile):
+            return
+        if owned:
+            archive_path.unlink(missing_ok=True)
 
     @staticmethod
     def _artifacts(item) -> list[dict[str, object]]:
@@ -411,18 +693,42 @@ class ExportWorker:
         return target
 
     @staticmethod
-    def _safe_target(destination: Path, relative_path: str) -> Path | None:
+    def _safe_relative_path(relative_path: str) -> PurePosixPath | None:
         pure = PurePosixPath(relative_path)
         if (
             not relative_path
             or pure.is_absolute()
             or "\\" in relative_path
-            or any(part in {"", ".", ".."} for part in pure.parts)
+            or "\x00" in relative_path
+            or any(part in {"", ".", ".."} for part in relative_path.split("/"))
         ):
+            return None
+        return pure
+
+    @staticmethod
+    def _required_archive_name(relative_path: str) -> str:
+        pure = ExportWorker._safe_relative_path(relative_path)
+        if pure is None:
+            raise ValueError("ZIP 归档内的目标路径无效。")
+        return pure.as_posix()
+
+    @staticmethod
+    def _safe_target(destination: Path, relative_path: str) -> Path | None:
+        pure = ExportWorker._safe_relative_path(relative_path)
+        if pure is None:
             return None
         root = destination.resolve()
         target = (root / Path(*pure.parts)).resolve()
         return target if target.is_relative_to(root) else None
+
+    @staticmethod
+    def _cleanup_archive_temp_files(destination: Path, operation_id: str) -> None:
+        if not destination.is_dir():
+            return
+        prefix = f".dataset-studio-export-{operation_id}-"
+        for candidate in destination.iterdir():
+            if candidate.is_file() and candidate.name.startswith(prefix):
+                candidate.unlink(missing_ok=True)
 
     @staticmethod
     def _cleanup_operation_temp_files(destination: Path, operation_id: str) -> None:

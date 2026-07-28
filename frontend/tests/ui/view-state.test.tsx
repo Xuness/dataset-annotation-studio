@@ -132,6 +132,7 @@ describe("session-scoped workspace view state", () => {
           ...current.form,
           destinationPath: "D:\\exports\\dataset",
           formats: ["txt", "json"],
+          packaging: "zip",
         },
       }));
     });
@@ -148,6 +149,7 @@ describe("session-scoped workspace view state", () => {
     expect(exportViewState.get(PROJECT_A).form).toMatchObject({
       destinationPath: "D:\\exports\\dataset",
       formats: ["txt", "json"],
+      packaging: "zip",
     });
 
     expect(jobsViewState.get(PROJECT_B).selectedJobId).toBeNull();

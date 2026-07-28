@@ -40,6 +40,11 @@ class ExportFormat(StrEnum):
     JSON = "json"
 
 
+class ExportPackaging(StrEnum):
+    DIRECTORY = "directory"
+    ZIP = "zip"
+
+
 class ExportChannelSelection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -124,6 +129,7 @@ class ExportRequest(BaseModel):
         min_length=1,
         max_length=2,
     )
+    packaging: ExportPackaging = ExportPackaging.DIRECTORY
 
     @field_validator("asset_ids")
     @classmethod

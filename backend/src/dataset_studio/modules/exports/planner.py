@@ -17,12 +17,14 @@ from dataset_studio.modules.annotations.projection import (
 from dataset_studio.modules.exports.models import (
     ExportChannelSelection,
     ExportFormat,
+    ExportPackaging,
     ExportPreview,
     ExportPreviewItem,
     ExportRequest,
     ExportRevisionMode,
     ExportScope,
 )
+from dataset_studio.modules.exports.paths import archive_output_path
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +87,11 @@ def build_plan(
     request: ExportRequest,
 ) -> ExportPlan:
     root = workspace_root.resolve()
-    destination, global_issues = _validate_destination(root, request.destination_path)
+    destination, global_issues = _validate_destination(
+        root,
+        request.destination_path,
+        request.packaging,
+    )
     rows, selection_issues = _select_assets(database_path, request)
     global_issues.extend(selection_issues)
     annotations = _load_annotations(database_path, rows, request.channels)
@@ -185,7 +191,11 @@ def to_preview(request: ExportRequest, plan: ExportPlan) -> ExportPreview:
     )
 
 
-def _validate_destination(root: Path, raw_destination: str) -> tuple[Path, list[str]]:
+def _validate_destination(
+    root: Path,
+    raw_destination: str,
+    packaging: ExportPackaging = ExportPackaging.DIRECTORY,
+) -> tuple[Path, list[str]]:
     issues: list[str] = []
     try:
         destination = Path(raw_destination).expanduser().resolve()
@@ -195,12 +205,14 @@ def _validate_destination(root: Path, raw_destination: str) -> tuple[Path, list[
     if destination == root or destination.is_relative_to(root):
         issues.append("导出目录不能位于当前项目内部。")
     if not destination.exists():
-        issues.append("导出目录不存在，请通过目录选择器选择一个空文件夹。")
+        issues.append("导出目录不存在，请通过目录选择器选择一个文件夹。")
     elif not destination.is_dir():
         issues.append("选择的导出路径不是文件夹。")
     else:
         try:
-            if any(destination.iterdir()):
+            if packaging == ExportPackaging.ZIP and archive_output_path(destination).exists():
+                issues.append("目标 ZIP 压缩包已经存在，无法覆盖。")
+            elif packaging == ExportPackaging.DIRECTORY and any(destination.iterdir()):
                 issues.append("导出目录必须为空，以避免覆盖已有文件。")
         except OSError as error:
             issues.append(f"无法读取导出目录：{error}")
