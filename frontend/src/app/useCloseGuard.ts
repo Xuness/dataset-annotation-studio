@@ -6,9 +6,11 @@ import { confirm, message } from "@tauri-apps/plugin-dialog";
 import { getActiveJobs, stopAllWorkspaceJobs } from "../features/jobs/api";
 import { useAppStore } from "../shared/store/appStore";
 import {
+  ACKNOWLEDGE_EXIT_REQUEST_COMMAND,
   DESKTOP_EXIT_REQUESTED_EVENT,
   EXIT_APPLICATION_COMMAND,
   runDesktopExit,
+  type DesktopExitRequestPayload,
 } from "./desktopExit";
 
 function isTauriRuntime(): boolean {
@@ -39,26 +41,39 @@ export function useCloseGuard(): void {
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
-    const requestExit = () => {
-      if (exitRequestInFlightRef.current) return;
+    const requestExit = (requestId: number) => {
+      if (!Number.isSafeInteger(requestId) || requestId <= 0) return;
+      const acknowledgeRequest = () =>
+        invoke<boolean>(ACKNOWLEDGE_EXIT_REQUEST_COMMAND, { requestId });
+
+      if (exitRequestInFlightRef.current) {
+        void acknowledgeRequest().catch(() => undefined);
+        return;
+      }
       exitRequestInFlightRef.current = true;
-      void runDesktopExit(hasUnsavedChangesRef.current, {
-        confirm,
-        message,
-        getActiveJobs,
-        stopAllWorkspaceJobs,
-        delay: (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds)),
-        exitApplication: async () => {
-          await invoke(EXIT_APPLICATION_COMMAND);
-        },
-      })
+      void acknowledgeRequest()
+        .then(() =>
+          runDesktopExit(hasUnsavedChangesRef.current, {
+            confirm,
+            message,
+            getActiveJobs,
+            stopAllWorkspaceJobs,
+            delay: (milliseconds) =>
+              new Promise((resolve) => window.setTimeout(resolve, milliseconds)),
+            exitApplication: async () => {
+              await invoke(EXIT_APPLICATION_COMMAND);
+            },
+          }),
+        )
         .catch(() => undefined)
         .finally(() => {
           exitRequestInFlightRef.current = false;
         });
     };
 
-    void listen(DESKTOP_EXIT_REQUESTED_EVENT, requestExit)
+    void listen<DesktopExitRequestPayload>(DESKTOP_EXIT_REQUESTED_EVENT, (event) => {
+      requestExit(event.payload.request_id);
+    })
       .then((stopListening) => {
         if (disposed) stopListening();
         else unlisten = stopListening;

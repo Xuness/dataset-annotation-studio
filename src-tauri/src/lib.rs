@@ -130,6 +130,7 @@ pub fn run() {
     configure_linux_graphics_environment(graphics_mode);
 
     let builder = tauri::Builder::default()
+        .manage(desktop::ExitRequestFallback::default())
         .append_invoke_initialization_script(runtime_initialization_script(graphics_mode))
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             desktop::show_main_window(app);
@@ -141,7 +142,8 @@ pub fn run() {
             background::install_custom_background,
             background::clear_custom_background,
             desktop::open_directory,
-            desktop::exit_application
+            desktop::exit_application,
+            desktop::acknowledge_exit_request
         ])
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())

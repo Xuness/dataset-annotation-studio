@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+  ACKNOWLEDGE_EXIT_REQUEST_COMMAND,
   DESKTOP_EXIT_REQUESTED_EVENT,
   EXIT_APPLICATION_COMMAND,
   runDesktopExit,
@@ -1097,13 +1098,38 @@ test("desktop lifecycle bridge names stay aligned with the Rust host", () => {
     "utf8",
   );
   const tauriEntry = readFileSync(new URL("../../src-tauri/src/lib.rs", import.meta.url), "utf8");
+  const closeGuard = readFileSync(new URL("../src/app/useCloseGuard.ts", import.meta.url), "utf8");
 
   assert.match(
     desktopHost,
     new RegExp(`EXIT_REQUESTED_EVENT: &str = "${DESKTOP_EXIT_REQUESTED_EVENT}"`),
   );
+  assert.match(desktopHost, /ExitRequestPayload \{ request_id \}/);
+  assert.match(desktopHost, /Duration::from_secs\(3\)/);
   assert.match(desktopHost, new RegExp(`fn ${EXIT_APPLICATION_COMMAND}\\(`));
+  assert.match(desktopHost, new RegExp(`fn ${ACKNOWLEDGE_EXIT_REQUEST_COMMAND}\\(`));
   assert.match(tauriEntry, new RegExp(`desktop::${EXIT_APPLICATION_COMMAND}`));
+  assert.match(tauriEntry, new RegExp(`desktop::${ACKNOWLEDGE_EXIT_REQUEST_COMMAND}`));
+  const acknowledgement = closeGuard.indexOf("acknowledgeRequest()");
+  const safeExitChecks = closeGuard.indexOf("runDesktopExit(");
+  assert.ok(acknowledgement >= 0);
+  assert.ok(safeExitChecks >= 0);
+  assert.ok(
+    acknowledgement < safeExitChecks,
+    "the native fallback must be acknowledged before safe exit checks begin",
+  );
+});
+
+test("Linux launcher preflights development ports before synchronizing dependencies", () => {
+  const launcher = readFileSync(new URL("../../启动开发版.sh", import.meta.url), "utf8");
+  const preflightCall = launcher.indexOf("\n  assert_dev_ports_available\n");
+  const dependencySync = launcher.indexOf("pnpm install --frozen-lockfile");
+
+  assert.match(launcher, /DEV_PORTS=\(5173 8765\)/);
+  assert.ok(preflightCall >= 0);
+  assert.ok(dependencySync >= 0);
+  assert.ok(preflightCall < dependencySync);
+  assert.match(launcher, /启动器不会自动终止其它进程/);
 });
 
 test("large application panels do not create nested native dialogs", () => {

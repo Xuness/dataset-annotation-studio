@@ -1,5 +1,11 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Mutex,
+    thread,
+    time::Duration,
+};
 
+use serde::Serialize;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -11,6 +17,51 @@ const MAIN_WINDOW_LABEL: &str = "main";
 const SHOW_MENU_ID: &str = "show-main-window";
 const EXIT_MENU_ID: &str = "request-application-exit";
 pub(crate) const EXIT_REQUESTED_EVENT: &str = "desktop-exit-requested";
+const EXIT_REQUEST_FALLBACK_DELAY: Duration = Duration::from_secs(3);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+struct ExitRequestPayload {
+    request_id: u64,
+}
+
+#[derive(Debug, Default)]
+struct ExitRequestState {
+    next_request_id: u64,
+    pending_request_id: Option<u64>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct ExitRequestFallback(Mutex<ExitRequestState>);
+
+impl ExitRequestFallback {
+    fn begin_request(&self) -> (u64, bool) {
+        let mut state = self.0.lock().expect("exit request state poisoned");
+        if let Some(request_id) = state.pending_request_id {
+            return (request_id, false);
+        }
+
+        state.next_request_id = state
+            .next_request_id
+            .checked_add(1)
+            .expect("exit request id exhausted");
+        let request_id = state.next_request_id;
+        state.pending_request_id = Some(request_id);
+        (request_id, true)
+    }
+
+    fn acknowledge(&self, request_id: u64) -> bool {
+        let mut state = self.0.lock().expect("exit request state poisoned");
+        if state.pending_request_id != Some(request_id) {
+            return false;
+        }
+        state.pending_request_id = None;
+        true
+    }
+
+    fn take_pending(&self, request_id: u64) -> bool {
+        self.acknowledge(request_id)
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 enum TrayMenuAction {
@@ -35,12 +86,30 @@ pub(crate) fn show_main_window<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-fn request_application_exit<R: Runtime>(app: &AppHandle<R>) {
-    show_main_window(app);
-    let _ = app.emit(EXIT_REQUESTED_EVENT, ());
+fn schedule_exit_fallback<R: Runtime + 'static>(app: AppHandle<R>, request_id: u64) {
+    let result = thread::Builder::new()
+        .name("dataset-studio-exit-fallback".to_owned())
+        .spawn(move || {
+            thread::sleep(EXIT_REQUEST_FALLBACK_DELAY);
+            if app.state::<ExitRequestFallback>().take_pending(request_id) {
+                app.exit(0);
+            }
+        });
+    if let Err(error) = result {
+        eprintln!("Dataset Studio: failed to start native exit fallback: {error}");
+    }
 }
 
-pub(crate) fn setup<R: Runtime>(app: &App<R>) -> tauri::Result<()> {
+fn request_application_exit<R: Runtime + 'static>(app: &AppHandle<R>) {
+    show_main_window(app);
+    let (request_id, should_schedule_fallback) = app.state::<ExitRequestFallback>().begin_request();
+    let _ = app.emit(EXIT_REQUESTED_EVENT, ExitRequestPayload { request_id });
+    if should_schedule_fallback {
+        schedule_exit_fallback(app.clone(), request_id);
+    }
+}
+
+pub(crate) fn setup<R: Runtime + 'static>(app: &App<R>) -> tauri::Result<()> {
     #[cfg(target_os = "linux")]
     if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
         window.set_decorations(true)?;
@@ -86,7 +155,7 @@ pub(crate) fn setup<R: Runtime>(app: &App<R>) -> tauri::Result<()> {
     Ok(())
 }
 
-pub(crate) fn handle_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
+pub(crate) fn handle_window_event<R: Runtime + 'static>(window: &Window<R>, event: &WindowEvent) {
     if window.label() != MAIN_WINDOW_LABEL {
         return;
     }
@@ -124,11 +193,16 @@ pub(crate) fn exit_application(app: AppHandle) {
     app.exit(0);
 }
 
+#[tauri::command]
+pub(crate) fn acknowledge_exit_request(app: AppHandle, request_id: u64) -> bool {
+    app.state::<ExitRequestFallback>().acknowledge(request_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        existing_directory, tray_menu_action, TrayMenuAction, EXIT_MENU_ID, EXIT_REQUESTED_EVENT,
-        SHOW_MENU_ID,
+        existing_directory, tray_menu_action, ExitRequestFallback, TrayMenuAction, EXIT_MENU_ID,
+        EXIT_REQUESTED_EVENT, SHOW_MENU_ID,
     };
     use std::path::Path;
 
@@ -146,5 +220,24 @@ mod tests {
         assert_eq!(existing_directory(&current), Ok(current));
         assert!(existing_directory(Path::new(file!())).is_err());
         assert!(existing_directory(Path::new("definitely-missing-directory")).is_err());
+    }
+
+    #[test]
+    fn exit_fallback_tracks_current_request_and_rejects_stale_acknowledgements() {
+        let fallback = ExitRequestFallback::default();
+
+        let (first_request, should_schedule) = fallback.begin_request();
+        assert_eq!(first_request, 1);
+        assert!(should_schedule);
+        assert_eq!(fallback.begin_request(), (first_request, false));
+        assert!(!fallback.acknowledge(first_request + 1));
+        assert!(fallback.acknowledge(first_request));
+        assert!(!fallback.take_pending(first_request));
+
+        let (second_request, should_schedule) = fallback.begin_request();
+        assert_eq!(second_request, first_request + 1);
+        assert!(should_schedule);
+        assert!(!fallback.acknowledge(first_request));
+        assert!(fallback.take_pending(second_request));
     }
 }

@@ -7,6 +7,7 @@ RUNTIME_REQUEST="${DATASET_STUDIO_RUNTIME:-auto}"
 GRAPHICS="${DATASET_STUDIO_LINUX_GRAPHICS:-cpu-paint}"
 CHECK_ONLY=0
 SKIP_SYNC=0
+DEV_PORTS=(5173 8765)
 
 usage() {
   cat <<'EOF'
@@ -108,6 +109,76 @@ resolve_runtime() {
   printf 'cpu\n'
 }
 
+find_port_listeners() {
+  local port="$1"
+  local details
+
+  if command -v ss >/dev/null 2>&1; then
+    details="$(ss -H -ltnp "sport = :$port" 2>/dev/null || true)"
+    if [[ -n "$details" ]]; then
+      printf '%s\n' "$details"
+      return
+    fi
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    details="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+    if [[ -n "$details" ]]; then
+      printf '%s\n' "$details"
+      return
+    fi
+  fi
+
+  # Development services bind loopback. Keep the preflight useful on minimal systems
+  # without ss or lsof, even though this fallback cannot report the owning PID.
+  for host in 127.0.0.1 localhost; do
+    if (exec 3<>"/dev/tcp/$host/$port") 2>/dev/null; then
+      printf 'listening on %s\n' "$host"
+      return
+    fi
+  done
+}
+
+describe_port_listener() {
+  local details="$1"
+  local owner
+
+  owner="$(sed -nE 's/.*users:\(\("([^"]+)",pid=([0-9]+).*/\1 (PID \2)/p' <<<"$details")"
+  owner="${owner%%$'\n'*}"
+  if [[ -z "$owner" && "$details" == COMMAND\ PID\ * ]]; then
+    owner="$(awk 'NR > 1 {print $1 " (PID " $2 ")"; exit}' <<<"$details")"
+  fi
+  if [[ -n "$owner" ]]; then
+    printf '%s' "$owner"
+  else
+    printf '已有监听器'
+  fi
+}
+
+assert_dev_ports_available() {
+  local port
+  local details
+  local owner
+  local -a occupied=()
+
+  for port in "${DEV_PORTS[@]}"; do
+    details="$(find_port_listeners "$port")"
+    if [[ -n "$details" ]]; then
+      owner="$(describe_port_listener "$details")"
+      occupied+=("端口 $port：$owner")
+    fi
+  done
+
+  if ((${#occupied[@]} == 0)); then
+    return
+  fi
+
+  echo "错误：开发端口已被占用，无法启动 Dataset Studio。" >&2
+  printf '  %s\n' "${occupied[@]}" >&2
+  echo "请停止占用进程后重试；启动器不会自动终止其它进程。" >&2
+  exit 1
+}
+
 RUNTIME="$(resolve_runtime)"
 ENVIRONMENT_DIR="$BACKEND/.venv-$RUNTIME"
 export UV_PROJECT_ENVIRONMENT="$ENVIRONMENT_DIR"
@@ -120,6 +191,19 @@ echo "[Dataset Studio] Runtime：$RUNTIME"
 echo "[Dataset Studio] Python 环境：$ENVIRONMENT_DIR"
 if [[ "$RUNTIME_REQUEST" == "auto" && "$RUNTIME" == "cpu" ]]; then
   echo "[Dataset Studio] 未检测到 NVIDIA CUDA 设备，使用独立 CPU Runtime。"
+fi
+
+if [[ $CHECK_ONLY -eq 0 ]]; then
+  if command -v flock >/dev/null 2>&1; then
+    LOCK_ROOT="${XDG_RUNTIME_DIR:-/tmp}"
+    LOCK_ID="$(printf '%s' "$ROOT" | cksum | awk '{print $1}')"
+    exec 9>"$LOCK_ROOT/dataset-annotation-studio-dev-$LOCK_ID.lock"
+    flock -n 9 || {
+      echo "错误：当前源码目录已有 Dataset Studio 开发会话正在运行。" >&2
+      exit 1
+    }
+  fi
+  assert_dev_ports_available
 fi
 
 if [[ $SKIP_SYNC -eq 0 ]]; then
@@ -245,16 +329,6 @@ fi
 if [[ $CHECK_ONLY -eq 1 ]]; then
   echo "[Dataset Studio] 开发环境检查通过（runtime=$RUNTIME, graphics=$GRAPHICS）。"
   exit 0
-fi
-
-if command -v flock >/dev/null 2>&1; then
-  LOCK_ROOT="${XDG_RUNTIME_DIR:-/tmp}"
-  LOCK_ID="$(printf '%s' "$ROOT" | cksum | awk '{print $1}')"
-  exec 9>"$LOCK_ROOT/dataset-annotation-studio-dev-$LOCK_ID.lock"
-  flock -n 9 || {
-    echo "错误：当前源码目录已有 Dataset Studio 开发会话正在运行。" >&2
-    exit 1
-  }
 fi
 
 if [[ "$GRAPHICS" == "native" ]]; then

@@ -36,6 +36,12 @@ exclusive `onnxruntime` distributions therefore never overwrite one another.
 retains per-model and per-image CPU fallback. The CUDA extra also covers CuPy +
 nvImageCodec preprocessing.
 
+Normal launcher runs reserve a per-checkout session lock and verify that the Vite/API
+ports `5173` and `8765` are free before dependency synchronization. A collision is
+reported with owner details when the platform exposes them; launchers never terminate
+the occupying process. Check-only mode does not require those ports because it starts no
+services.
+
 Explicit CUDA selection is strict: missing hardware or a failed CuPy/ONNX Runtime probe
 stops startup with a diagnostic. Auto mode chooses CPU only when the NVIDIA device probe
 is absent; it does not disguise a broken CUDA installation as a successful GPU launch.

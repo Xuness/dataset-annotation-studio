@@ -25,6 +25,8 @@ changes.
   matching Windows/Linux launchers.
 - Added Linux-aware application data paths, filesystem path identity, credential-store
   diagnostics, portable clipboard fallback, and desktop lifecycle behavior.
+- Made source launchers reject occupied development ports before dependency sync and
+  added a native exit fallback when the Linux frontend cannot answer a close request.
 - Kept credential-free provider profiles usable when a Linux Secret Service is absent.
 - Added explicit third-party model license disclosure and acceptance.
 - Unified annotation availability across the asset list, translation workflows, batch
