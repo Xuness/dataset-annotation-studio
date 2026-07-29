@@ -1149,6 +1149,8 @@ test("development launchers select shared ports before synchronizing dependencie
   assert.match(packageManifest, /scripts\/run-tauri-dev\.mjs/);
   assert.match(viteConfig, /DATASET_STUDIO_FRONTEND_PORT/);
   assert.match(viteConfig, /DATASET_STUDIO_HMR_PORT/);
+  assert.match(viteConfig, /configuredPort\(process\.env\.DATASET_STUDIO_HMR_PORT, 5200\)/);
+  assert.doesNotMatch(viteConfig, /frontendPort \+ 1/);
   assert.match(viteConfig, /host: host \|\| "127\.0\.0\.1"/);
   assert.match(tauriConfig, /"devUrl": "http:\/\/127\.0\.0\.1:5173"/);
   assert.match(tauriConfig, /"devCsp": .*http:\/\/127\.0\.0\.1:\*/);

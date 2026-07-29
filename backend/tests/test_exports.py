@@ -272,6 +272,8 @@ def test_zip_export_allows_a_nonempty_destination_without_touching_existing_entr
     )
     late_file = destination / "created-after-preview.me"
     late_file.write_text("late-user-owned", encoding="utf-8")
+    top_level_prefix_match = destination / f".dataset-studio-export-{operation.id}-user-owned.txt"
+    top_level_prefix_match.write_text("top-level-user-owned", encoding="utf-8")
     nested_prefix_match = preserved_directory / f".dataset-studio-export-{operation.id}-user-owned"
     nested_prefix_match.write_text("nested-user-owned", encoding="utf-8")
     _run_export(workspaces, workspace.project_id, operation.id)
@@ -281,11 +283,42 @@ def test_zip_export_allows_a_nonempty_destination_without_touching_existing_entr
     assert preserved_file.read_text(encoding="utf-8") == "user-owned"
     assert preserved_directory.is_dir()
     assert late_file.read_text(encoding="utf-8") == "late-user-owned"
+    assert top_level_prefix_match.read_text(encoding="utf-8") == "top-level-user-owned"
     assert nested_prefix_match.read_text(encoding="utf-8") == "nested-user-owned"
     assert archive_path.is_file()
 
     conflict_preview = exports.preview(workspace.project_id, request)
     assert conflict_preview.blocking_issues == ["目标 ZIP 压缩包已经存在，无法覆盖。"]
+
+
+def test_zip_export_preserves_an_unowned_staging_directory(tmp_path: Path) -> None:
+    workspaces, _, _, exports = _services(tmp_path)
+    project = tmp_path / "dataset"
+    _write_image(project / "image.png")
+    (project / "image.txt").write_text("ready", encoding="utf-8")
+    workspace, _ = workspaces.open(str(project))
+    destination = tmp_path / "unowned-staging"
+    destination.mkdir()
+    request = ExportRequest(
+        destination_path=str(destination),
+        packaging=ExportPackaging.ZIP,
+    )
+    preview = exports.preview(workspace.project_id, request)
+    operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(request=request, preview_token=preview.preview_token),
+    )
+    staging = destination / f".dataset-studio-export-{operation.id}"
+    staging.mkdir()
+    marker = staging / "keep.me"
+    marker.write_text("user-owned", encoding="utf-8")
+
+    _run_export(workspaces, workspace.project_id, operation.id)
+
+    failed = exports.get(workspace.project_id, operation.id)
+    assert failed.status == ExportOperationStatus.FAILED
+    assert "无法验证所有权" in (failed.error_message or "")
+    assert marker.read_text(encoding="utf-8") == "user-owned"
 
 
 def test_stopped_zip_export_discards_partial_archive_and_restarts(
@@ -375,7 +408,10 @@ def test_orphaned_zip_export_discards_owned_archive_and_resets_all_progress(
             sum(int(artifact["byte_size"]) for artifact in artifacts),
         )
 
-    partial = destination / f".dataset-studio-export-{operation.id}-partial.zip"
+    staging = destination / f".dataset-studio-export-{operation.id}"
+    staging.mkdir()
+    (staging / ".owner").write_text(operation.id, encoding="ascii")
+    partial = staging / "archive.zip"
     partial.write_bytes(b"partial")
     archive_path = destination / "zip-recovery.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:

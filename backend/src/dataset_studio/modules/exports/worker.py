@@ -8,6 +8,7 @@ import logging
 import os
 import shutil
 import sqlite3
+import stat
 import tempfile
 import threading
 import zipfile
@@ -27,6 +28,8 @@ COPY_CHUNK_SIZE = 1024 * 1024
 STOP_CHECK_INTERVAL_CHUNKS = 8
 STORED_IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp"})
 ARCHIVE_COMMENT_PREFIX = b"dataset-studio-export:"
+ARCHIVE_STAGING_MARKER_NAME = ".owner"
+ARCHIVE_STAGING_FILE_NAME = "archive.zip"
 
 
 class ExportWorkerContainer(Protocol):
@@ -206,13 +209,7 @@ class ExportWorker:
         repository: ExportRepository,
     ) -> None:
         destination = Path(operation.destination_path)
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix=f".dataset-studio-export-{operation.id}-",
-            suffix=".zip",
-            dir=destination,
-        )
-        os.close(descriptor)
-        temporary = Path(temporary_name)
+        temporary = self._create_archive_temporary(destination, operation.id)
         target = archive_output_path(destination)
         try:
             with zipfile.ZipFile(
@@ -236,7 +233,9 @@ class ExportWorker:
                     )
                     repository.complete_item(operation.id, item_id, copied_bytes)
 
-            with temporary.open("rb") as handle:
+            # Windows FlushFileBuffers requires a writable handle even when the
+            # archive contents are already complete.
+            with temporary.open("r+b") as handle:
                 os.fsync(handle.fileno())
             self._check_stop(repository, operation.id)
             completed_items = repository.operation_items(operation.id)
@@ -247,19 +246,18 @@ class ExportWorker:
                 allowed_temporary=temporary,
             )
             self._publish_archive(temporary, target)
-        except BaseException:
-            temporary.unlink(missing_ok=True)
-            raise
+        finally:
+            self._cleanup_archive_temp_files(destination, operation.id)
 
     @staticmethod
     def _publish_archive(temporary: Path, target: Path) -> None:
         """Publish a complete archive without ever replacing an existing path.
 
-        A hard link is created in the same directory as the temporary file, so
-        the target becomes visible atomically and ``FileExistsError`` leaves an
-        external target untouched.  ``os.replace`` cannot provide that
-        guarantee if another process creates or swaps the target between the
-        existence check and publication.
+        A hard link is created on the same destination filesystem, so the target
+        becomes visible atomically and ``FileExistsError`` leaves an external
+        target untouched.  ``os.replace`` cannot provide that guarantee if
+        another process creates or swaps the target between the existence check
+        and publication.
         """
         try:
             os.link(temporary, target)
@@ -722,13 +720,92 @@ class ExportWorker:
         return target if target.is_relative_to(root) else None
 
     @staticmethod
-    def _cleanup_archive_temp_files(destination: Path, operation_id: str) -> None:
+    def _archive_staging_directory(destination: Path, operation_id: str) -> Path:
+        return destination / f".dataset-studio-export-{operation_id}"
+
+    @classmethod
+    def _create_archive_temporary(cls, destination: Path, operation_id: str) -> Path:
+        staging = cls._archive_staging_directory(destination, operation_id)
+        marker = staging / ARCHIVE_STAGING_MARKER_NAME
+        temporary = staging / ARCHIVE_STAGING_FILE_NAME
+        try:
+            staging.mkdir(mode=0o700)
+        except FileExistsError as error:
+            raise ValueError(
+                "检测到无法验证所有权的 ZIP 临时目录；为避免删除外部文件，任务已停止。"
+            ) from error
+
+        descriptor: int | None = None
+        try:
+            with marker.open("x", encoding="ascii", newline="\n") as handle:
+                handle.write(operation_id)
+                handle.flush()
+                os.fsync(handle.fileno())
+            descriptor = os.open(
+                temporary,
+                os.O_CREAT | os.O_EXCL | os.O_RDWR | getattr(os, "O_BINARY", 0),
+                0o600,
+            )
+            os.close(descriptor)
+            descriptor = None
+            return temporary
+        except BaseException:
+            if descriptor is not None:
+                with suppress(OSError):
+                    os.close(descriptor)
+            with suppress(OSError):
+                temporary.unlink(missing_ok=True)
+            with suppress(OSError):
+                marker.unlink(missing_ok=True)
+            with suppress(OSError):
+                staging.rmdir()
+            raise
+
+    @classmethod
+    def _cleanup_archive_temp_files(cls, destination: Path, operation_id: str) -> None:
         if not destination.is_dir():
             return
-        prefix = f".dataset-studio-export-{operation_id}-"
-        for candidate in destination.iterdir():
-            if candidate.is_file() and candidate.name.startswith(prefix):
-                candidate.unlink(missing_ok=True)
+        staging = cls._archive_staging_directory(destination, operation_id)
+        marker = staging / ARCHIVE_STAGING_MARKER_NAME
+        temporary = staging / ARCHIVE_STAGING_FILE_NAME
+        try:
+            staging_stat = staging.lstat()
+            reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+            if (
+                not stat.S_ISDIR(staging_stat.st_mode)
+                or stat.S_ISLNK(staging_stat.st_mode)
+                or bool(getattr(staging_stat, "st_file_attributes", 0) & reparse_flag)
+            ):
+                return
+
+            marker_stat = marker.lstat()
+            if (
+                not stat.S_ISREG(marker_stat.st_mode)
+                or marker_stat.st_size > 128
+                or bool(getattr(marker_stat, "st_file_attributes", 0) & reparse_flag)
+                or marker.read_text(encoding="ascii") != operation_id
+            ):
+                return
+
+            try:
+                temporary_stat = temporary.lstat()
+            except FileNotFoundError:
+                pass
+            else:
+                if not stat.S_ISREG(temporary_stat.st_mode):
+                    return
+                temporary.unlink()
+            marker.unlink()
+            with suppress(OSError):
+                staging.rmdir()
+        except FileNotFoundError:
+            return
+        except (OSError, UnicodeError) as error:
+            LOGGER.warning(
+                "Unable to clean archive staging for export %s: %s",
+                operation_id,
+                error,
+            )
 
     @staticmethod
     def _cleanup_operation_temp_files(destination: Path, operation_id: str) -> None:

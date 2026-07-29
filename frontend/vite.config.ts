@@ -15,7 +15,13 @@ const frontendPort = configuredPort(
   process.env.DATASET_STUDIO_FRONTEND_PORT || process.env.VITE_PORT,
   5173,
 );
-const hmrPort = configuredPort(process.env.DATASET_STUDIO_HMR_PORT, frontendPort + 1);
+const hmr = host
+  ? {
+      protocol: "ws" as const,
+      host,
+      port: configuredPort(process.env.DATASET_STUDIO_HMR_PORT, 5200),
+    }
+  : undefined;
 
 export default defineConfig({
   plugins: [react()],
@@ -24,13 +30,7 @@ export default defineConfig({
     port: frontendPort,
     strictPort: true,
     host: host || "127.0.0.1",
-    hmr: host
-      ? {
-          protocol: "ws",
-          host,
-          port: hmrPort,
-        }
-      : undefined,
+    hmr,
     watch: {
       ignored: ["**/src-tauri/**"],
     },
