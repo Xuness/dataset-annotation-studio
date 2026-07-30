@@ -1,13 +1,16 @@
 import { spawn } from "node:child_process";
-import path from "node:path";
+import { createRequire } from "node:module";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 
 import {
   applyDevPortEnvironment,
   formatPortSelection,
+  isMainModule,
   selectDevPortsFromEnvironment,
 } from "./dev-ports.mjs";
+
+const require = createRequire(import.meta.url);
+const tauriCliPath = require.resolve("@tauri-apps/cli/tauri.js");
 
 export function buildDynamicTauriConfig(frontendPort) {
   return {
@@ -23,8 +26,6 @@ export function buildTauriArguments(configPaths, frontendPort) {
     configPath,
   ]);
   return [
-    "exec",
-    "tauri",
     "dev",
     ...configurationArguments,
     "--config",
@@ -40,10 +41,12 @@ async function run() {
     `[Dataset Studio] 使用开发端口：${formatPortSelection(selection)}\n`,
   );
 
-  const packageManager = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
   const child = spawn(
-    packageManager,
-    buildTauriArguments(process.argv.slice(2), selection.frontendPort),
+    process.execPath,
+    [
+      tauriCliPath,
+      ...buildTauriArguments(process.argv.slice(2), selection.frontendPort),
+    ],
     {
       env: process.env,
       stdio: "inherit",
@@ -63,12 +66,7 @@ async function run() {
   });
 }
 
-const isMainModule =
-  process.argv[1] !== undefined &&
-  path.resolve(process.argv[1]) ===
-    path.resolve(fileURLToPath(import.meta.url));
-
-if (isMainModule) {
+if (isMainModule(import.meta.url)) {
   run().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`错误：${message}\n`);

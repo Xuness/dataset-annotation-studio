@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 
 import {
   DevPortSelectionError,
@@ -16,6 +22,8 @@ import {
   buildDynamicTauriConfig,
   buildTauriArguments,
 } from "./run-tauri-dev.mjs";
+
+const execFileAsync = promisify(execFile);
 
 test("candidate ranges prefer the conventional port without duplicates", () => {
   const candidates = candidatePorts(DEV_PORT_SPECS.frontend, 5180);
@@ -111,8 +119,6 @@ test("Tauri development arguments apply the dynamic URL after runtime config", (
   assert.deepEqual(
     buildTauriArguments(["src-tauri/tauri.cuda.conf.json"], 5180),
     [
-      "exec",
-      "tauri",
       "dev",
       "--config",
       "src-tauri/tauri.cuda.conf.json",
@@ -120,6 +126,53 @@ test("Tauri development arguments apply the dynamic URL after runtime config", (
       '{"build":{"devUrl":"http://127.0.0.1:5180"}}',
     ],
   );
+});
+
+test("development port CLI runs through a linked checkout path", async (context) => {
+  const temporaryRoot = await mkdtemp(
+    path.join(tmpdir(), "dataset-studio-dev-ports-"),
+  );
+  const checkoutAlias = path.join(temporaryRoot, "checkout");
+  const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+  try {
+    try {
+      await symlink(
+        repositoryRoot,
+        checkoutAlias,
+        process.platform === "win32" ? "junction" : "dir",
+      );
+    } catch (error) {
+      if (error?.code === "EPERM" || error?.code === "EACCES") {
+        context.skip("the environment does not allow directory links");
+        return;
+      }
+      throw error;
+    }
+
+    const environment = { ...process.env };
+    for (const key of [
+      "DATASET_STUDIO_FRONTEND_PORT",
+      "DATASET_STUDIO_PORT",
+      "DATASET_STUDIO_HMR_PORT",
+      "DATASET_STUDIO_AUTO_PORTS",
+      "VITE_PORT",
+      "TAURI_DEV_HOST",
+    ]) {
+      delete environment[key];
+    }
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [path.join(checkoutAlias, "scripts", "dev-ports.mjs"), "--json"],
+      { env: environment },
+    );
+    const selection = JSON.parse(stdout);
+
+    assert.equal(Number.isInteger(selection.frontendPort), true);
+    assert.equal(Number.isInteger(selection.apiPort), true);
+    assert.equal(selection.hmrPort, null);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
 });
 
 test("the TCP probe observes a loopback listener and its release", async (context) => {

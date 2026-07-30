@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 import process from "node:process";
@@ -22,6 +23,20 @@ export class DevPortSelectionError extends Error {
   constructor(message) {
     super(message);
     this.name = "DevPortSelectionError";
+  }
+}
+
+export function isMainModule(moduleUrl, entryPath = process.argv[1]) {
+  if (entryPath === undefined) return false;
+
+  try {
+    const resolvedEntry = realpathSync.native(path.resolve(entryPath));
+    const resolvedModule = realpathSync.native(fileURLToPath(moduleUrl));
+    return process.platform === "win32"
+      ? resolvedEntry.toLowerCase() === resolvedModule.toLowerCase()
+      : resolvedEntry === resolvedModule;
+  } catch {
+    return false;
   }
 }
 
@@ -223,12 +238,7 @@ async function runCli() {
   }
 }
 
-const isMainModule =
-  process.argv[1] !== undefined &&
-  path.resolve(process.argv[1]) ===
-    path.resolve(fileURLToPath(import.meta.url));
-
-if (isMainModule) {
+if (isMainModule(import.meta.url)) {
   runCli().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`错误：${message}\n`);

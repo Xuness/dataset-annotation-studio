@@ -170,27 +170,44 @@ function Select-DevPorts {
     $selector = Join-Path $Root "scripts\dev-ports.mjs"
     $probeOutput = @(& node $selector "--json")
     Assert-LastExitCode -Step "开发端口检查"
+    $probeText = $probeOutput -join [Environment]::NewLine
+
+    if ([string]::IsNullOrWhiteSpace($probeText)) {
+        throw "开发端口检查未返回结果。"
+    }
 
     try {
-        $selection = ($probeOutput -join [Environment]::NewLine) | ConvertFrom-Json
+        $selection = $probeText | ConvertFrom-Json -AsHashtable
     } catch {
         throw "开发端口检查返回了无效结果。"
     }
 
-    if ($selection.frontendPort -notmatch "^\d+$" -or $selection.apiPort -notmatch "^\d+$") {
+    if (
+        $selection -isnot [Collections.IDictionary] -or
+        -not $selection.Contains("frontendPort") -or
+        -not $selection.Contains("apiPort") -or
+        -not $selection.Contains("hmrPort")
+    ) {
+        throw "开发端口检查返回了无效结果。"
+    }
+
+    $frontendPort = [string]$selection["frontendPort"]
+    $apiPort = [string]$selection["apiPort"]
+    $hmrPort = $selection["hmrPort"]
+    if ($frontendPort -notmatch "^\d+$" -or $apiPort -notmatch "^\d+$") {
         throw "开发端口检查返回了无效端口。"
     }
 
-    $env:DATASET_STUDIO_FRONTEND_PORT = [string][int]$selection.frontendPort
-    $env:DATASET_STUDIO_PORT = [string][int]$selection.apiPort
-    $env:VITE_API_BASE_URL = "http://127.0.0.1:$($selection.apiPort)"
+    $env:DATASET_STUDIO_FRONTEND_PORT = [string][int]$frontendPort
+    $env:DATASET_STUDIO_PORT = [string][int]$apiPort
+    $env:VITE_API_BASE_URL = "http://127.0.0.1:$apiPort"
     $env:DATASET_STUDIO_AUTO_PORTS = "1"
-    if ($null -eq $selection.hmrPort) {
+    if ($null -eq $hmrPort) {
         Remove-Item Env:DATASET_STUDIO_HMR_PORT -ErrorAction SilentlyContinue
     } else {
-        $env:DATASET_STUDIO_HMR_PORT = [string][int]$selection.hmrPort
+        $env:DATASET_STUDIO_HMR_PORT = [string][int]$hmrPort
     }
-    Write-Host "[Dataset Studio] 可用开发端口：Vite $($selection.frontendPort)，API $($selection.apiPort)" -ForegroundColor DarkCyan
+    Write-Host "[Dataset Studio] 可用开发端口：Vite $frontendPort，API $apiPort" -ForegroundColor DarkCyan
 }
 
 function Write-FailureSummary {
