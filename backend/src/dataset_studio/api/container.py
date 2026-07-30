@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from dataset_studio.core.config import Settings
 from dataset_studio.modules.annotations.service import AnnotationService
@@ -27,6 +27,7 @@ from dataset_studio.modules.taggers.downloads.service import TaggerDownloadServi
 from dataset_studio.modules.taggers.repository import TaggerRepository
 from dataset_studio.modules.taggers.runtime import TaggerRuntime
 from dataset_studio.modules.taggers.service import TaggerService
+from dataset_studio.modules.tokenization.service import BuiltinTokenizerService
 from dataset_studio.modules.translations.service import TranslationService
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -54,6 +55,7 @@ class AppContainer:
     tag_dictionary_downloads: TagDictionaryDownloadService
     tagger_downloads: TaggerDownloadService
     tagger_runtime: TaggerRuntime
+    tokenization: BuiltinTokenizerService = field(default_factory=BuiltinTokenizerService)
 
     @classmethod
     def create(cls, settings: Settings) -> AppContainer:
@@ -126,6 +128,7 @@ class AppContainer:
             tag_dictionary_downloads=tag_dictionary_downloads,
             tagger_downloads=tagger_downloads,
             tagger_runtime=tagger_runtime,
+            tokenization=BuiltinTokenizerService(),
         )
 
     async def aclose(self) -> None:

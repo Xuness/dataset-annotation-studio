@@ -11,10 +11,13 @@ import {
 } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 
+import { useTokenCounts } from "../../../features/tokenization/hooks";
 import type {
   AnnotationTag,
   AnnotationTaggerSource,
   TagDictionaryResolution,
+  TokenCountRequestItem,
+  TokenizationProfileId,
   TranslationAlignmentPart,
   TranslationDocument,
 } from "../../../shared/api/types";
@@ -23,6 +26,7 @@ import { TRANSLATION_STATUS_LABELS } from "./annotationLabels";
 import { groupTags, normalizeTagKey } from "./tagEditorState";
 import { TagEditorPanel } from "./TagEditorPanel";
 import { annotationTagTitle, tagCategoryLabel, tagCategoryTone } from "./tagPresentation";
+import { TokenCountBadges } from "./TokenizationControls";
 
 interface TranslationTagEditor {
   projectId: string;
@@ -48,6 +52,7 @@ interface TranslationComparePanelProps {
   dictionaryPreview?: TagDictionaryResolution;
   dictionaryPreviewLoading?: boolean;
   dictionaryPreviewError?: unknown;
+  tokenProfileId: TokenizationProfileId;
 }
 
 type AlignmentSide = "source" | "translated";
@@ -332,6 +337,7 @@ export function TranslationComparePanel({
   dictionaryPreview,
   dictionaryPreviewLoading = false,
   dictionaryPreviewError,
+  tokenProfileId,
 }: TranslationComparePanelProps) {
   const sourceRef = useRef<HTMLDivElement>(null);
   const translatedRef = useRef<HTMLDivElement>(null);
@@ -652,6 +658,56 @@ export function TranslationComparePanel({
   const canRenderPersistedTags = Boolean(
     !tagEditor?.dirty && persistedAligned && persistedTagParts.length === tags.length,
   );
+  const hasSource = Boolean(translation?.source_exists);
+  const canRenderDescription = Boolean(
+    !isTags && persistedAligned && translation?.alignment_parts.length,
+  );
+  const sourceContent = translation?.source_content ?? "";
+  const translatedContent = translation?.content ?? "";
+  const mismatch = translation?.status === "source_mismatch";
+  const sourceTokenText = hasSource
+    ? isTags
+      ? tags.map((tag) => tag.name).join("\n")
+      : sourceContent
+    : null;
+  const persistedTranslationTokenText =
+    !mismatch && translation?.status !== "missing"
+      ? isTags && canRenderPersistedTags
+        ? persistedTagParts
+            .map((part) => part.translated_text)
+            .filter(Boolean)
+            .join("\n")
+        : translatedContent || null
+      : null;
+  let translatedTokenText: string | null = null;
+  if (translation && editing && hasSource) {
+    translatedTokenText = editContent;
+  } else if (
+    translation &&
+    !(isTags && tagEditor?.dirty && translation.producer_kind !== "local_dictionary")
+  ) {
+    if (isTags && translation.producer_kind === "local_dictionary") {
+      if (tags.length > 0 && !dictionaryPreviewLoading && !dictionaryPreviewError) {
+        translatedTokenText = previewAligned
+          ? (dictionaryPreview?.entries
+              .map((entry) => entry.translation ?? entry.requested_tag)
+              .filter(Boolean)
+              .join("\n") ?? null)
+          : persistedTranslationTokenText;
+      }
+    } else {
+      translatedTokenText = persistedTranslationTokenText;
+    }
+  }
+  const tokenCountItems = useMemo<TokenCountRequestItem[]>(() => {
+    const items: TokenCountRequestItem[] = [];
+    if (sourceTokenText !== null) items.push({ id: "source", text: sourceTokenText });
+    if (translatedTokenText !== null) {
+      items.push({ id: "translated", text: translatedTokenText });
+    }
+    return items;
+  }, [sourceTokenText, translatedTokenText]);
+  const tokenCounts = useTokenCounts(tokenProfileId, tokenCountItems, tokenCountItems.length > 0);
 
   function renderTagGroups(side: AlignmentSide) {
     const groups = groupTags(tags);
@@ -762,13 +818,6 @@ export function TranslationComparePanel({
     );
   }
 
-  const hasSource = Boolean(translation?.source_exists);
-  const canRenderDescription = Boolean(
-    !isTags && persistedAligned && translation?.alignment_parts.length,
-  );
-  const sourceContent = translation?.source_content ?? "";
-  const translatedContent = translation?.content ?? "";
-  const mismatch = translation?.status === "source_mismatch";
   const dictionarySummary =
     translation?.producer_kind === "local_dictionary"
       ? [
@@ -903,7 +952,7 @@ export function TranslationComparePanel({
   return (
     <div className="annotation-editor__compare translation-compare">
       <section>
-        <header>
+        <header className="translation-compare__pane-header">
           <strong>{translation ? sourceLabel(translation) : "源标注"}</strong>
           <small>
             {tagEditor?.dirty
@@ -912,6 +961,14 @@ export function TranslationComparePanel({
                 ? `当前源 · ${translation.source_revision_id.slice(0, 8)}`
                 : "缺失"}
           </small>
+          {sourceTokenText !== null ? (
+            <TokenCountBadges
+              profileId={tokenProfileId}
+              itemId="source"
+              query={tokenCounts}
+              className="token-count-badges--pane"
+            />
+          ) : null}
         </header>
         <div>
           {isTags && tagEditor ? (
@@ -944,12 +1001,20 @@ export function TranslationComparePanel({
       </section>
 
       <section>
-        <header>
+        <header className="translation-compare__pane-header">
           <strong>{translation?.language ?? ""} 译文</strong>
           <small title={previewSummary || dictionarySummary || undefined}>
             {translatedHeaderStatus}
             {!previewSummary && dictionarySummary ? ` · ${dictionarySummary}` : ""}
           </small>
+          {translatedTokenText !== null ? (
+            <TokenCountBadges
+              profileId={tokenProfileId}
+              itemId="translated"
+              query={tokenCounts}
+              className="token-count-badges--pane"
+            />
+          ) : null}
         </header>
         <div className={qualityIssues.length ? "translation-compare__quality-layout" : undefined}>
           {qualityIssues.length ? (

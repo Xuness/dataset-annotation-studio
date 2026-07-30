@@ -39,6 +39,7 @@ $PyInstallerArguments = @(
     "--windowed",
     "--name", $Name,
     "--paths", (Join-Path $Root "backend/src"),
+    "--collect-data", "dataset_studio",
     "--collect-all", "openai_codex",
     "--collect-all", "codex_cli_bin",
     "--hidden-import", "onnx",

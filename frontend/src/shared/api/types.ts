@@ -11,3 +11,4 @@ export * from "./contracts/exports";
 export * from "./contracts/system";
 export * from "./contracts/taggers";
 export * from "./contracts/tagDictionaries";
+export * from "./contracts/tokenization";

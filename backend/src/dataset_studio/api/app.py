@@ -21,6 +21,7 @@ from dataset_studio.api.routes import (
     system,
     tag_dictionaries,
     taggers,
+    tokenization,
     translations,
     workspaces,
 )
@@ -106,6 +107,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(system.router, prefix=api_prefix)
     app.include_router(taggers.router, prefix=api_prefix)
     app.include_router(tag_dictionaries.router, prefix=api_prefix)
+    app.include_router(tokenization.router, prefix=api_prefix)
     return app
 
 

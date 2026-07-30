@@ -1,11 +1,19 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { TranslationComparePanel } from "../../src/pages/workspace/components/TranslationComparePanel";
 import type { TagDictionaryResolution, TranslationDocument } from "../../src/shared/api/types";
 
 vi.mock("@uiw/react-codemirror", () => ({
   default: () => <textarea aria-label="译文编辑器" />,
+}));
+
+const { useTokenCountsMock } = vi.hoisted(() => ({
+  useTokenCountsMock: vi.fn(),
+}));
+
+vi.mock("../../src/features/tokenization/hooks", () => ({
+  useTokenCounts: useTokenCountsMock,
 }));
 
 function translationDocument(update: Partial<TranslationDocument> = {}): TranslationDocument {
@@ -109,6 +117,7 @@ function renderPanel(
       editorExtensions={[]}
       onEditContentChange={() => undefined}
       dictionaryPreview={dictionaryPreview}
+      tokenProfileId="krea2"
     />,
   );
 }
@@ -173,6 +182,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+beforeEach(() => {
+  useTokenCountsMock.mockReset();
+  useTokenCountsMock.mockReturnValue({
+    data: undefined,
+    isPending: true,
+    error: null,
+  });
+});
+
 describe("translation compare panel", () => {
   test("never renders an old translation when the source no longer matches", () => {
     renderPanel(
@@ -191,6 +209,9 @@ describe("translation compare panel", () => {
     expect(screen.getByText("<caption>quiet, garden!</caption>")).not.toBeNull();
     expect(screen.queryByText("不应显示的旧译文")).toBeNull();
     expect(screen.getByText(/旧译文没有在这里显示/)).not.toBeNull();
+    expect(useTokenCountsMock.mock.calls.at(-1)?.[1]).toEqual([
+      { id: "source", text: "<caption>quiet, garden!</caption>" },
+    ]);
   });
 
   test("links a Tags pair while either side is hovered", () => {
@@ -241,6 +262,10 @@ describe("translation compare panel", () => {
 
     expect(source.closest(".tag-editor__chip")?.classList.contains("is-linked")).toBe(true);
     expect(translated.closest(".tag-editor__chip")?.classList.contains("is-linked")).toBe(true);
+    expect(useTokenCountsMock.mock.calls.at(-1)?.[1]).toEqual([
+      { id: "source", text: "blue_hair\nalice" },
+      { id: "translated", text: "蓝发\n爱丽丝" },
+    ]);
 
     fireEvent.pointerLeave(translated);
     expect(source.closest(".tag-editor__chip")?.classList.contains("is-linked")).toBe(false);

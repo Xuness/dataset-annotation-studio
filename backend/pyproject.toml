@@ -17,6 +17,7 @@ dependencies = [
     "opencv-python-headless>=4.11,<5",
     "pillow>=11.3,<13",
     "pydantic>=2.11,<3",
+    "tokenizers>=0.21.4,<0.23",
     "uvicorn[standard]>=0.35,<1",
 ]
 

@@ -62,7 +62,12 @@ describe("update announcements", () => {
     render(<UpdateAnnouncementsSettings onClose={() => undefined} />);
 
     expect(screen.getByRole("heading", { name: "本次更新" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "源码启动与桌面稳定性更新" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "内置 Tokenizer 与 Token 计数更新" })).toBeTruthy();
+    expect(
+      screen.getByText(
+        "新增 Krea 2、Anima 与 T5 三套训练预设：Krea 2 使用 Qwen3-VL-4B，Anima 同时显示 Qwen3-0.6B 与 T5 v1.1 XXL。",
+      ),
+    ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "历史版本" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "查看数据集 ZIP 导出更新" }));
     expect(screen.getByRole("heading", { name: "数据集 ZIP 导出更新" })).toBeTruthy();
@@ -93,7 +98,9 @@ describe("update announcements", () => {
     });
     await user.click(announcementButton);
 
-    expect(await screen.findByRole("heading", { name: "源码启动与桌面稳定性更新" })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "内置 Tokenizer 与 Token 计数更新" }),
+    ).toBeTruthy();
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "更新公告" })).toBeTruthy();
       expect(window.localStorage.getItem(UPDATE_ANNOUNCEMENT_READ_STORAGE_KEY)).toBe(

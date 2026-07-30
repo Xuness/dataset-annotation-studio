@@ -24,6 +24,39 @@ export interface UpdateAnnouncement {
 
 export const UPDATE_ANNOUNCEMENTS = [
   {
+    id: "2026-07-30-builtin-token-counting",
+    version: "0.1.x",
+    publishedAt: "2026-07-30",
+    title: "内置 Tokenizer 与 Token 计数更新",
+    summary:
+      "LLM 描述与翻译对照区现在可以按训练目标实时计算 Token，并随源码内置 Krea 2、Anima 与 T5 所需的 Tokenizer。",
+    sections: [
+      {
+        kind: "feature",
+        title: "新增",
+        items: [
+          "LLM 描述编辑器与翻译对照区新增实时 Token 计数，源描述和当前译文会分别显示结果。",
+          "新增 Krea 2、Anima 与 T5 三套训练预设：Krea 2 使用 Qwen3-VL-4B，Anima 同时显示 Qwen3-0.6B 与 T5 v1.1 XXL。",
+        ],
+      },
+      {
+        kind: "improvement",
+        title: "改进",
+        items: [
+          "Tokenizer 资源直接随源码和桌面应用发布，无需前往设置页下载或维护额外模型。",
+          "预设选择与计数采用紧凑的行内布局，并适配编辑器底栏、翻译对照表头和窄窗口。",
+        ],
+      },
+      {
+        kind: "notice",
+        title: "注意事项",
+        items: [
+          "各预设按对应训练流程的特殊 Token 与提示词模板规则计算，因此同一段文本在不同预设下的结果可能不同。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-07-29-source-launch-stability",
     version: "0.1.x",
     publishedAt: "2026-07-29",

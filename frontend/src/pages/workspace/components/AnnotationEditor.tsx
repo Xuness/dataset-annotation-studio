@@ -28,11 +28,18 @@ import {
   useTranslation,
   useTranslations,
 } from "../../../features/translations/hooks";
+import { useTokenCounts } from "../../../features/tokenization/hooks";
+import {
+  DEFAULT_TOKENIZATION_PROFILE_ID,
+  TOKENIZATION_PROFILE_IDS,
+} from "../../../features/tokenization/profiles";
 import type {
   AnnotationChannel,
   AnnotationChannelTarget,
   AnnotationDocument,
   AnnotationTag,
+  TokenCountRequestItem,
+  TokenizationProfileId,
   TranslationProducerKind,
   TranslationSourceKind,
 } from "../../../shared/api/types";
@@ -51,6 +58,7 @@ import {
 import { hasExistingAnnotationDocument, reconcilePersistedContent } from "./annotationEditorState";
 import { annotationTagsEqual, reconcilePersistedTags } from "./tagEditorState";
 import { TagEditorPanel } from "./TagEditorPanel";
+import { TokenCountBadges, TokenProfileSelect } from "./TokenizationControls";
 import { TranslationComparePanel } from "./TranslationComparePanel";
 
 interface AnnotationEditorProps {
@@ -63,6 +71,7 @@ interface AnnotationEditorProps {
 type EditorMode = AnnotationChannel;
 
 const FONT_SIZE_STORAGE_KEY = "dataset-studio.annotation-font-size";
+const TOKEN_PROFILE_STORAGE_KEY = "dataset-studio.tokenization-profile";
 const DEFAULT_LANGUAGES = ["zh-CN", "zh-TW", "en", "ja", "ko"];
 const EXISTING_ANNOTATION_TAB = {
   value: "existing_annotation",
@@ -77,6 +86,13 @@ const DEFAULT_CHANNEL_TABS: Array<{ value: EditorMode; label: string }> = [
 function readFontSize(): number {
   const stored = Number.parseInt(window.localStorage.getItem(FONT_SIZE_STORAGE_KEY) ?? "12", 10);
   return Number.isFinite(stored) ? Math.min(22, Math.max(10, stored)) : 12;
+}
+
+function readTokenizationProfile(): TokenizationProfileId {
+  const stored = window.localStorage.getItem(TOKEN_PROFILE_STORAGE_KEY);
+  return TOKENIZATION_PROFILE_IDS.includes(stored as TokenizationProfileId)
+    ? (stored as TokenizationProfileId)
+    : DEFAULT_TOKENIZATION_PROFILE_ID;
 }
 
 function documentDraft(document: AnnotationDocument | undefined): string {
@@ -168,8 +184,18 @@ export function AnnotationEditor({
   const [savedTagDraft, setSavedTagDraft] = useState<AnnotationTag[]>([]);
   const [savedTagRevisionId, setSavedTagRevisionId] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState(readFontSize);
+  const [tokenProfileId, setTokenProfileId] = useState(readTokenizationProfile);
   const [showHistory, setShowHistory] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const descriptionTokenItems = useMemo<TokenCountRequestItem[]>(
+    () => (assetId && mode === "description" ? [{ id: "description", text: content }] : []),
+    [assetId, content, mode],
+  );
+  const descriptionTokenCounts = useTokenCounts(
+    tokenProfileId,
+    descriptionTokenItems,
+    Boolean(assetId && mode === "description"),
+  );
   const tagEditingActive =
     mode === "tags" || (mode === "translation" && translationSourceKind === "tags");
   const tagsDirty = tagEditingActive && !annotationTagsEqual(tagDraft, savedTagDraft);
@@ -254,6 +280,10 @@ export function AnnotationEditor({
   useEffect(() => {
     window.localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(fontSize));
   }, [fontSize]);
+
+  useEffect(() => {
+    window.localStorage.setItem(TOKEN_PROFILE_STORAGE_KEY, tokenProfileId);
+  }, [tokenProfileId]);
 
   useEffect(() => {
     const key = `${assetId ?? ""}:${mode}:${activeLanguage}:${translationSourceKind}:${translationProducerKind}`;
@@ -899,6 +929,7 @@ export function AnnotationEditor({
             dictionaryPreview={dictionaryPreview.data}
             dictionaryPreviewLoading={dictionaryPreview.isResolving}
             dictionaryPreviewError={dictionaryPreview.isError ? dictionaryPreview.error : undefined}
+            tokenProfileId={tokenProfileId}
           />
         ) : assetId ? (
           <CodeMirror
@@ -938,12 +969,25 @@ export function AnnotationEditor({
                 ? "支持悬停与划词联动"
                 : "当前未启用文本联动"}
             </span>
+            <span className="annotation-editor__token-tools">
+              <TokenProfileSelect value={tokenProfileId} onChange={setTokenProfileId} />
+            </span>
           </>
         ) : (
           <>
             <span>
               {mode === "tags" ? `${tagCount} 个 Tag` : `${content.length.toLocaleString()} 字符`}
             </span>
+            {mode === "description" && assetId ? (
+              <span className="annotation-editor__token-tools">
+                <TokenProfileSelect value={tokenProfileId} onChange={setTokenProfileId} />
+                <TokenCountBadges
+                  profileId={tokenProfileId}
+                  itemId="description"
+                  query={descriptionTokenCounts}
+                />
+              </span>
+            ) : null}
             <span>{AVAILABILITY_LABELS[activeAvailabilityStatus]}</span>
             {activeReviewStatus ? <span>{REVIEW_LABELS[activeReviewStatus]}</span> : null}
             {document.data?.source ? (
