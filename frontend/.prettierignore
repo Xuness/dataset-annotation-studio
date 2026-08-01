@@ -1,2 +1,4 @@
 dist/
 node_modules/
+openapi/openapi.json
+src/shared/api/generated/

@@ -1,13 +1,22 @@
+import { workspaceQueryKeys } from "../../shared/query/workspaceQueries";
+
 export const translationKeys = {
-  all: ["translations"] as const,
-  project: (projectId: string) => ["translations", projectId] as const,
+  project: (projectId: string) => workspaceQueryKeys.scope(projectId, "translations"),
   asset: (projectId: string, assetId: string | null) =>
-    ["translations", projectId, assetId] as const,
+    [...workspaceQueryKeys.scope(projectId, "translations"), "asset", assetId] as const,
   detail: (
     projectId: string,
     assetId: string | null,
     language: string,
     sourceKind: string,
     producerKind: string,
-  ) => ["translations", projectId, assetId, language, sourceKind, producerKind] as const,
+  ) =>
+    [
+      ...workspaceQueryKeys.scope(projectId, "translations"),
+      "detail",
+      assetId,
+      language,
+      sourceKind,
+      producerKind,
+    ] as const,
 };

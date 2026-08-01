@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
   BadgeCheck,
@@ -12,20 +11,14 @@ import {
 } from "lucide-react";
 
 import {
-  useAnnotationBatchOptions,
-  useDeleteAnnotations,
-  useReviewAnnotations,
-} from "../../../features/annotations/hooks";
-import type {
-  AnnotationBatchTargetOption,
-  AnnotationChannel,
-  AnnotationChannelTarget,
-} from "../../../shared/api/types";
+  annotationOptionKey,
+  type AnnotationBulkAction,
+} from "../../../application/annotations/annotationBulk";
+import { useAnnotationBulkController } from "../../../application/annotations/useAnnotationBulkController";
+import type { AnnotationChannel, AnnotationChannelTarget } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { ModalLayer } from "../../../shared/ui/ModalLayer";
 import { Spinner } from "../../../shared/ui/Spinner";
-
-export type AnnotationBulkAction = "review" | "delete";
 
 interface AnnotationBulkActionDialogProps {
   projectId: string;
@@ -43,26 +36,6 @@ const CHANNEL_ICONS: Record<AnnotationChannel, LucideIcon> = {
   translation: Languages,
 };
 
-function targetKey(
-  target: Pick<
-    AnnotationChannelTarget,
-    "channel" | "language" | "translation_source_kind" | "translation_producer_kind"
-  >,
-): string {
-  return `${target.channel}:${target.translation_source_kind ?? ""}:${
-    target.translation_producer_kind ?? ""
-  }:${target.language}`;
-}
-
-function optionKey(option: AnnotationBatchTargetOption): string {
-  return targetKey({
-    channel: option.channel,
-    language: option.language ?? "",
-    translation_source_kind: option.translation_source_kind,
-    translation_producer_kind: option.translation_producer_kind,
-  });
-}
-
 export function AnnotationBulkActionDialog({
   projectId,
   open,
@@ -71,105 +44,32 @@ export function AnnotationBulkActionDialog({
   blockedTarget,
   onClose,
 }: AnnotationBulkActionDialogProps) {
-  const assetIdsKey = assetIds.join("\u0000");
-  const options = useAnnotationBatchOptions(projectId, assetIds, open);
-  const review = useReviewAnnotations(projectId);
-  const remove = useDeleteAnnotations(projectId);
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const busy = review.isPending || remove.isPending;
-  const blockedKey = blockedTarget ? targetKey(blockedTarget) : null;
-
-  useEffect(() => {
-    if (!open) return;
-    setSelectedKeys(new Set());
-    setActionError(null);
-    setNotice(null);
-  }, [action, assetIdsKey, open]);
-
-  const selectableOptions = useMemo(
-    () =>
-      (options.data?.targets ?? []).filter(
-        (option) =>
-          optionKey(option) !== blockedKey && (action === "delete" || option.reviewable_count > 0),
-      ),
-    [action, blockedKey, options.data?.targets],
-  );
-  const allSelectableSelected =
-    selectableOptions.length > 0 &&
-    selectableOptions.every((option) => selectedKeys.has(optionKey(option)));
-  const selectedOptions = (options.data?.targets ?? []).filter((option) =>
-    selectedKeys.has(optionKey(option)),
-  );
-  const blockedOption = options.data?.targets.find((option) => optionKey(option) === blockedKey);
-
-  function toggleOption(key: string) {
-    setNotice(null);
-    setSelectedKeys((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  function toggleAll() {
-    setNotice(null);
-    setSelectedKeys(
-      allSelectableSelected
-        ? new Set()
-        : new Set(selectableOptions.map((option) => optionKey(option))),
-    );
-  }
-
-  async function executeAction() {
-    if (!selectedOptions.length) return;
-    const targets = selectedOptions.map<AnnotationChannelTarget>((option) =>
-      option.channel === "translation"
-        ? {
-            channel: option.channel,
-            language: option.language ?? "",
-            translation_source_kind: option.translation_source_kind,
-            translation_producer_kind: option.translation_producer_kind,
-          }
-        : {
-            channel: option.channel,
-            language: option.language ?? "",
-          },
-    );
-    setActionError(null);
-    setNotice(null);
-    try {
-      if (action === "review") {
-        const result = await review.mutateAsync({ assetIds, targets });
-        setNotice(
-          `已复核 ${result.reviewed_count} 个标注文档；${result.already_reviewed_count} 个原本已复核，${result.blocked_count} 个内容尚不可复核，${result.missing_count} 个目标位置没有活动标注。`,
-        );
-      } else {
-        const result = await remove.mutateAsync({ assetIds, targets });
-        setNotice(
-          `已删除 ${result.deleted_count} 个活动标注通道；${result.missing_count} 张图片没有所选类别的活动标注。`,
-        );
-      }
-      setSelectedKeys(new Set());
-    } catch (reason) {
-      setActionError(
-        reason instanceof Error
-          ? reason.message
-          : action === "review"
-            ? "批量复核标注失败。"
-            : "批量删除标注失败。",
-      );
-    }
-  }
-
-  function close() {
-    if (!busy) onClose();
-  }
-
-  const title = action === "review" ? "选择要复核的标注" : "选择要删除的标注";
-  const actionLabel = action === "review" ? "标记所选类别" : "删除所选类别";
+  const controller = useAnnotationBulkController({
+    projectId,
+    open,
+    action,
+    assetIds,
+    blockedTarget,
+    onClose,
+  });
+  const {
+    options,
+    selectedKeys,
+    selectableOptions,
+    selectedOptions,
+    blockedKey,
+    blockedOption,
+    allSelectableSelected,
+    busy,
+    error: actionError,
+    notice,
+    title,
+    actionLabel,
+    toggleOption,
+    toggleAll,
+    execute,
+    close,
+  } = controller;
 
   return (
     <ModalLayer
@@ -234,7 +134,7 @@ export function AnnotationBulkActionDialog({
         ) : options.data?.targets.length ? (
           <div className="annotation-bulk-options">
             {options.data.targets.map((option) => {
-              const key = optionKey(option);
+              const key = annotationOptionKey(option);
               const blocked = key === blockedKey;
               const alreadyReviewed = action === "review" && option.reviewable_count === 0;
               const disabled = busy || blocked || alreadyReviewed;
@@ -325,7 +225,7 @@ export function AnnotationBulkActionDialog({
             )
           }
           disabled={!selectedOptions.length || busy}
-          onClick={() => void executeAction()}
+          onClick={() => void execute()}
         >
           {actionLabel}
         </Button>

@@ -7,10 +7,7 @@ import type {
   TranslationProducerKind,
   TranslationSourceKind,
 } from "../../shared/api/types";
-import { annotationTraceKeys, assetKeys, promptPreviewKeys } from "../assets/queryKeys";
-import { statisticsKeys } from "../statistics/queryKeys";
-import { translationKeys } from "../translations/queryKeys";
-import { workspaceKeys } from "../workspaces/queryKeys";
+import { invalidateWorkspaceMutation } from "../../shared/query/workspaceQueries";
 import {
   deleteAnnotationChannel,
   deleteAnnotations,
@@ -105,18 +102,7 @@ export function useAnnotationBatchOptions(projectId: string, assetIds: string[],
 function useInvalidateAnnotation(projectId: string) {
   const queryClient = useQueryClient();
   return () => {
-    void queryClient.invalidateQueries({ queryKey: annotationKeys.project(projectId) });
-    void queryClient.invalidateQueries({
-      queryKey: annotationHistoryKeys.project(projectId),
-    });
-    void queryClient.invalidateQueries({
-      queryKey: annotationTraceKeys.project(projectId),
-    });
-    void queryClient.invalidateQueries({ queryKey: promptPreviewKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
-    void queryClient.invalidateQueries({ queryKey: statisticsKeys.project(projectId) });
+    void invalidateWorkspaceMutation(queryClient, projectId, "annotation-written");
   };
 }
 

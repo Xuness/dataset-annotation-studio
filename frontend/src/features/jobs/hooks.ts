@@ -1,11 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
-import { annotationHistoryKeys, annotationKeys } from "../annotations/queryKeys";
-import { annotationTraceKeys, assetKeys } from "../assets/queryKeys";
-import { statisticsKeys } from "../statistics/queryKeys";
-import { translationKeys } from "../translations/queryKeys";
-import { workspaceKeys } from "../workspaces/queryKeys";
+import { invalidateWorkspaceMutation } from "../../shared/query/workspaceQueries";
 import {
   acceptJobItem,
   createJob,
@@ -46,15 +42,7 @@ export function useJobs(projectId: string) {
       [...previousActiveIds.current].some((jobId) => !activeIds.has(jobId));
     previousActiveIds.current = activeIds;
     if (!completed) return;
-    void queryClient.invalidateQueries({ queryKey: annotationKeys.project(projectId) });
-    void queryClient.invalidateQueries({
-      queryKey: annotationHistoryKeys.project(projectId),
-    });
-    void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: annotationTraceKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
-    void queryClient.invalidateQueries({ queryKey: statisticsKeys.project(projectId) });
+    void invalidateWorkspaceMutation(queryClient, projectId, "job-output-changed");
   }, [activeSignature, projectId, query.data, queryClient]);
   return query;
 }
@@ -87,19 +75,10 @@ export function useJob(projectId: string, jobId: string | null, itemLimit = 200)
 export function useJobActions(projectId: string) {
   const queryClient = useQueryClient();
   const invalidate = (jobId?: string) => {
-    void queryClient.invalidateQueries({ queryKey: jobKeys.project(projectId) });
     if (jobId) {
       void queryClient.invalidateQueries({ queryKey: jobKeys.detailPrefix(projectId, jobId) });
     }
-    void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: annotationKeys.project(projectId) });
-    void queryClient.invalidateQueries({
-      queryKey: annotationHistoryKeys.project(projectId),
-    });
-    void queryClient.invalidateQueries({ queryKey: annotationTraceKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
-    void queryClient.invalidateQueries({ queryKey: statisticsKeys.project(projectId) });
+    void invalidateWorkspaceMutation(queryClient, projectId, "job-output-changed");
   };
   return {
     create: useMutation({

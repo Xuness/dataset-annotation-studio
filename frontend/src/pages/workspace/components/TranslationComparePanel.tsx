@@ -2,28 +2,25 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
-  useState,
   type ClipboardEvent,
   type ComponentProps,
   type KeyboardEvent,
 } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 
-import { useTokenCounts } from "../../../features/tokenization/hooks";
+import { useTranslationComparisonController } from "../../../application/translations/useTranslationComparisonController";
 import type {
   AnnotationTag,
   AnnotationTaggerSource,
   TagDictionaryResolution,
-  TokenCountRequestItem,
   TokenizationProfileId,
   TranslationAlignmentPart,
   TranslationDocument,
 } from "../../../shared/api/types";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { TRANSLATION_STATUS_LABELS } from "./annotationLabels";
-import { groupTags, normalizeTagKey } from "./tagEditorState";
+import { groupTags } from "../../../application/tags/tagDraft";
 import { TagEditorPanel } from "./TagEditorPanel";
 import { annotationTagTitle, tagCategoryLabel, tagCategoryTone } from "./tagPresentation";
 import { TokenCountBadges } from "./TokenizationControls";
@@ -345,35 +342,44 @@ export function TranslationComparePanel({
   const suppressedScrollRef = useRef<SuppressedScroll | null>(null);
   const highlightSideRef = useRef<AlignmentSide | null>(null);
   const highlightScrollAnimationRef = useRef<HighlightScrollAnimation | null>(null);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
-  const isTags = translation?.source_kind === "tags";
-  const fallbackTags =
-    translation?.source_tags.length || !isTags
-      ? (translation?.source_tags ?? [])
-      : (translation?.alignment_parts
-          .filter((part) => part.kind === "tag")
-          .map((part) => ({
-            name: part.source_text,
-            category: part.category,
-            confidence: part.confidence,
-            origin: "translation_source",
-          })) ?? []);
-  const tags = tagEditor?.tags ?? fallbackTags;
-  const tagSignature = tags
-    .map((tag) => `${normalizeTagKey(tag.name)}:${tag.category ?? ""}`)
-    .join("\u0000");
-  const persistedAligned =
-    !editing && translation?.status === "current" && translation.alignment_status === "aligned";
-  const previewAligned =
-    isTags &&
-    translation?.producer_kind === "local_dictionary" &&
-    dictionaryPreview?.entries.length === tags.length;
-  const aligned = Boolean(persistedAligned || previewAligned);
-  const activeIds = useMemo(
-    () => new Set(pinnedIds.length ? pinnedIds : hoveredId ? [hoveredId] : []),
-    [hoveredId, pinnedIds],
-  );
+  const comparison = useTranslationComparisonController({
+    translation,
+    editing,
+    editContent,
+    editorTags: tagEditor?.tags,
+    editorTagsDirty: Boolean(tagEditor?.dirty),
+    dictionaryPreview,
+    dictionaryPreviewLoading,
+    dictionaryPreviewError,
+    tokenProfileId,
+  });
+  const {
+    model: {
+      identityKey,
+      isTags,
+      tags,
+      persistedAligned,
+      previewAligned,
+      aligned,
+      persistedTagParts,
+      canRenderPersistedTags,
+      hasSource,
+      canRenderDescription,
+      sourceContent,
+      translatedContent,
+      mismatch,
+      tokenCountItems,
+    },
+    tokenCounts,
+    hoveredId,
+    pinnedIds,
+    activeIds,
+    clearPinned,
+    pinIds,
+    setHover,
+  } = comparison;
+  const hasSourceTokenText = tokenCountItems.some((item) => item.id === "source");
+  const hasTranslatedTokenText = tokenCountItems.some((item) => item.id === "translated");
 
   const cancelHighlightScrollAnimation = useCallback(() => {
     const animation = highlightScrollAnimationRef.current;
@@ -435,22 +441,11 @@ export function TranslationComparePanel({
   );
 
   useEffect(() => {
-    setHoveredId(null);
-    setPinnedIds([]);
     cancelHighlightScrollAnimation();
     scrollSyncCacheRef.current = null;
     suppressedScrollRef.current = null;
     highlightSideRef.current = null;
-  }, [
-    translation?.asset_id,
-    translation?.language,
-    translation?.source_kind,
-    translation?.producer_kind,
-    translation?.modified_at,
-    tagSignature,
-    editing,
-    cancelHighlightScrollAnimation,
-  ]);
+  }, [cancelHighlightScrollAnimation, identityKey]);
 
   useEffect(
     () => () => {
@@ -539,12 +534,12 @@ export function TranslationComparePanel({
   ]);
 
   useEffect(() => {
-    function clearPinned(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") setPinnedIds([]);
+    function handleEscape(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") clearPinned();
     }
-    window.addEventListener("keydown", clearPinned);
-    return () => window.removeEventListener("keydown", clearPinned);
-  }, []);
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [clearPinned]);
 
   function captureSelection(side: AlignmentSide) {
     if (!aligned) return;
@@ -553,8 +548,7 @@ export function TranslationComparePanel({
     const ids = collectSelectedAlignmentIds(container, window.getSelection());
     if (ids.length) {
       highlightSideRef.current = side;
-      setPinnedIds(Array.from(new Set(ids)));
-      setHoveredId(null);
+      pinIds(ids);
     }
   }
 
@@ -576,7 +570,7 @@ export function TranslationComparePanel({
 
   function handleKeyUp(side: AlignmentSide, event: KeyboardEvent<HTMLElement>) {
     if (event.key === "Escape") {
-      setPinnedIds([]);
+      clearPinned();
       return;
     }
     captureSelection(side);
@@ -596,13 +590,11 @@ export function TranslationComparePanel({
 
   function setTagSelection(keys: string[]) {
     if (!aligned || !keys.length) return;
-    setPinnedIds(Array.from(new Set(keys)));
-    setHoveredId(null);
+    pinIds(keys);
   }
 
   function setTagHover(key: string | null) {
-    if (!aligned || pinnedIds.length) return;
-    setHoveredId(key);
+    setHover(key);
   }
 
   function renderDescriptionParts(side: AlignmentSide, parts: TranslationAlignmentPart[]) {
@@ -617,7 +609,7 @@ export function TranslationComparePanel({
         onKeyUp={(event) => handleKeyUp(side, event)}
         onScroll={() => handleAlignedScroll(side)}
         onPointerDown={(event) => {
-          if (event.target === event.currentTarget) setPinnedIds([]);
+          if (event.target === event.currentTarget) clearPinned();
         }}
         tabIndex={0}
       >
@@ -638,11 +630,11 @@ export function TranslationComparePanel({
               onPointerEnter={() => {
                 if (alignable && !pinnedIds.length) {
                   highlightSideRef.current = side;
-                  setHoveredId(part.id);
+                  setHover(part.id);
                 }
               }}
               onPointerLeave={() => {
-                if (alignable && !pinnedIds.length) setHoveredId(null);
+                if (alignable && !pinnedIds.length) setHover(null);
               }}
             >
               {value}
@@ -652,62 +644,6 @@ export function TranslationComparePanel({
       </div>
     );
   }
-
-  const persistedTagParts =
-    translation?.alignment_parts.filter((part) => part.kind === "tag") ?? [];
-  const canRenderPersistedTags = Boolean(
-    !tagEditor?.dirty && persistedAligned && persistedTagParts.length === tags.length,
-  );
-  const hasSource = Boolean(translation?.source_exists);
-  const canRenderDescription = Boolean(
-    !isTags && persistedAligned && translation?.alignment_parts.length,
-  );
-  const sourceContent = translation?.source_content ?? "";
-  const translatedContent = translation?.content ?? "";
-  const mismatch = translation?.status === "source_mismatch";
-  const sourceTokenText = hasSource
-    ? isTags
-      ? tags.map((tag) => tag.name).join("\n")
-      : sourceContent
-    : null;
-  const persistedTranslationTokenText =
-    !mismatch && translation?.status !== "missing"
-      ? isTags && canRenderPersistedTags
-        ? persistedTagParts
-            .map((part) => part.translated_text)
-            .filter(Boolean)
-            .join("\n")
-        : translatedContent || null
-      : null;
-  let translatedTokenText: string | null = null;
-  if (translation && editing && hasSource) {
-    translatedTokenText = editContent;
-  } else if (
-    translation &&
-    !(isTags && tagEditor?.dirty && translation.producer_kind !== "local_dictionary")
-  ) {
-    if (isTags && translation.producer_kind === "local_dictionary") {
-      if (tags.length > 0 && !dictionaryPreviewLoading && !dictionaryPreviewError) {
-        translatedTokenText = previewAligned
-          ? (dictionaryPreview?.entries
-              .map((entry) => entry.translation ?? entry.requested_tag)
-              .filter(Boolean)
-              .join("\n") ?? null)
-          : persistedTranslationTokenText;
-      }
-    } else {
-      translatedTokenText = persistedTranslationTokenText;
-    }
-  }
-  const tokenCountItems = useMemo<TokenCountRequestItem[]>(() => {
-    const items: TokenCountRequestItem[] = [];
-    if (sourceTokenText !== null) items.push({ id: "source", text: sourceTokenText });
-    if (translatedTokenText !== null) {
-      items.push({ id: "translated", text: translatedTokenText });
-    }
-    return items;
-  }, [sourceTokenText, translatedTokenText]);
-  const tokenCounts = useTokenCounts(tokenProfileId, tokenCountItems, tokenCountItems.length > 0);
 
   function renderTagGroups(side: AlignmentSide) {
     const groups = groupTags(tags);
@@ -722,7 +658,7 @@ export function TranslationComparePanel({
         onKeyDown={(event) => handleKeyDown(side, event)}
         onKeyUp={(event) => handleKeyUp(side, event)}
         onPointerDown={(event) => {
-          if (event.target === event.currentTarget) setPinnedIds([]);
+          if (event.target === event.currentTarget) clearPinned();
         }}
         tabIndex={0}
       >
@@ -961,7 +897,7 @@ export function TranslationComparePanel({
                 ? `当前源 · ${translation.source_revision_id.slice(0, 8)}`
                 : "缺失"}
           </small>
-          {sourceTokenText !== null ? (
+          {hasSourceTokenText ? (
             <TokenCountBadges
               profileId={tokenProfileId}
               itemId="source"
@@ -1007,7 +943,7 @@ export function TranslationComparePanel({
             {translatedHeaderStatus}
             {!previewSummary && dictionarySummary ? ` · ${dictionarySummary}` : ""}
           </small>
-          {translatedTokenText !== null ? (
+          {hasTranslatedTokenText ? (
             <TokenCountBadges
               profileId={tokenProfileId}
               itemId="translated"

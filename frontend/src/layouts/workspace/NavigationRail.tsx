@@ -9,9 +9,9 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { UpdateAnnouncementIndicator } from "../../features/updateAnnouncements/UpdateAnnouncementIndicator";
 import { useHasUnreadUpdateAnnouncement } from "../../features/updateAnnouncements/readState";
-import { useUnsavedChangesGuard } from "../../shared/desktop/useUnsavedChanges";
+import { UpdateAnnouncementIndicator } from "../../legacy/components/UpdateAnnouncementIndicator";
+import { useLegacyUnsavedChangesGuard } from "../../legacy/hooks/useLegacyUnsavedChangesGuard";
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 
 export type WorkspaceSection = "assets" | "preprocess" | "jobs" | "review" | "export";
@@ -46,7 +46,7 @@ export function NavigationRail({
   active?: WorkspaceSection;
 }) {
   const navigate = useNavigate();
-  const { confirmDiscard } = useUnsavedChangesGuard();
+  const { confirmDiscard } = useLegacyUnsavedChangesGuard();
   const openSettings = useSettingsCenter((state) => state.open);
   const hasUnreadUpdateAnnouncement = useHasUnreadUpdateAnnouncement();
 

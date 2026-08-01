@@ -7,11 +7,11 @@ import {
   useRecentWorkspaces,
   useRemoveRecentWorkspace,
 } from "../../features/workspaces/hooks";
-import { UpdateAnnouncementIndicator } from "../../features/updateAnnouncements/UpdateAnnouncementIndicator";
 import { useHasUnreadUpdateAnnouncement } from "../../features/updateAnnouncements/readState";
+import { UpdateAnnouncementIndicator } from "../../legacy/components/UpdateAnnouncementIndicator";
 import { pickWorkspaceFolder } from "../../shared/desktop/pickFolder";
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
-import { useAppStore } from "../../shared/store/appStore";
+import { useWorkspaceSelectionStore } from "../../shared/store/workspaceSelectionStore";
 import { useAppPreferences } from "../../shared/theme/appPreferences";
 import { getThemeDefinition } from "../../shared/theme/themes";
 import { alertDialog, confirmDialog } from "../../shared/ui/dialogs";
@@ -37,7 +37,7 @@ export function HomePage() {
   const removeRecentMutation = useRemoveRecentWorkspace();
   const openSettings = useSettingsCenter((state) => state.open);
   const hasUnreadUpdateAnnouncement = useHasUnreadUpdateAnnouncement();
-  const setActiveProject = useAppStore((state) => state.setActiveProject);
+  const setActiveProject = useWorkspaceSelectionStore((state) => state.setActiveProject);
   const themeId = useAppPreferences((state) => state.preferences.themeId);
   const homeContent = useAppPreferences((state) => state.preferences.homeContent);
   const theme = getThemeDefinition(themeId);

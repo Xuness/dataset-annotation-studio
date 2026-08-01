@@ -1,4 +1,5 @@
+import { workspaceQueryKeys } from "../../shared/query/workspaceQueries";
+
 export const exportKeys = {
-  all: ["exports"] as const,
-  project: (projectId: string) => ["exports", projectId] as const,
+  project: (projectId: string) => workspaceQueryKeys.scope(projectId, "exports"),
 };

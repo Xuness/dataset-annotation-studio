@@ -1,12 +1,11 @@
-import { isTauri } from "@tauri-apps/api/core";
-
 import { usesNativeDesktopWindowDecorations } from "../../../desktop/runtimePlatform";
+import { isDesktopRuntime } from "../../../desktop/runtime";
 import { useAppPreferences } from "../../../theme/appPreferences";
 
 export function ImmersiveModeSection() {
   const immersiveMode = useAppPreferences((state) => state.preferences.appearance.immersiveMode);
   const setImmersiveMode = useAppPreferences((state) => state.setImmersiveMode);
-  const nativeWindowDecorations = usesNativeDesktopWindowDecorations(isTauri());
+  const nativeWindowDecorations = usesNativeDesktopWindowDecorations(isDesktopRuntime());
 
   return (
     <section className="appearance-section">

@@ -128,6 +128,10 @@ OpenRouter 目录仍使用其扩展元数据；两个协议各自由适配器映
 - `shared/api` 只包含传输和共享 DTO；`shared/desktop` 隔离 Tauri 能力。
 - Zustand 只保存界面选择和本机偏好，不复制后端持久状态。
 
+全新 V2 与 Legacy UI 采用独立 HTML/TypeScript/CSS 入口，二者只共享 application、feature 与明确的
+shared 能力；旧页面、布局、主题、设置和 UI 组件不属于 V2 依赖面。工作区查询键、缓存失效、
+OpenAPI 类型生成、桌面适配和状态边界详见 [前端 V2 架构边界](frontend-v2-architecture.md)。
+
 图片列表使用虚拟化，面向 2,000 余项仍只渲染可见行。页面使用按路由懒加载，工作区编辑器不会拖慢项目首页启动。
 
 更新公告位于独立的 `features/updateAnnouncements` 边界，使用结构化 TypeScript 目录随源码

@@ -3,7 +3,7 @@ import { Braces, ChartNoAxesColumn, MessageSquareText } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import type { AssetSummary, WorkspaceSummary } from "../../../shared/api/types";
-import { useAppStore } from "../../../shared/store/appStore";
+import { useUnsavedChangesStore } from "../../../shared/store/unsavedChangesStore";
 import { confirmDialog } from "../../../shared/ui/dialogs";
 import { inspectorViewState, type InspectorTab } from "../workspaceViewState";
 import { MetadataSettingsPanel } from "./MetadataSettingsPanel";
@@ -38,8 +38,8 @@ export function InspectorPanel({
     if (promptPanelRequested) inspectorViewState.patch(projectId, { activeTab: "prompt" });
   }, [projectId, promptPanelRequested]);
   const promptScope = `workspace-prompt:${projectId}`;
-  const promptDirty = useAppStore((state) => Boolean(state.dirtyScopes[promptScope]));
-  const setDirtyScope = useAppStore((state) => state.setDirtyScope);
+  const promptDirty = useUnsavedChangesStore((state) => Boolean(state.dirtyScopes[promptScope]));
+  const setDirtyScope = useUnsavedChangesStore((state) => state.setDirtyScope);
 
   function selectTab(tab: InspectorTab) {
     if (tab === activeTab) return;

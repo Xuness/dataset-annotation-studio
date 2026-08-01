@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
 import {
   ArchiveRestore,
   CircleAlert,
@@ -10,13 +9,10 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  useAssetDeletionActions,
-  useAssetDeletionOperations,
-} from "../../../features/assetDeletions/hooks";
+import { useAssetDeletionDialogController } from "../../../application/workspace/useAssetDeletionDialogController";
+import { legacyConfirm } from "../../../legacy/legacyInteractions";
 import type { AssetDeleteOperation } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
-import { confirmDialog } from "../../../shared/ui/dialogs";
 import { ModalLayer } from "../../../shared/ui/ModalLayer";
 import { Spinner } from "../../../shared/ui/Spinner";
 
@@ -49,69 +45,35 @@ export function AssetDeletionDialog({
   beforeExecute,
   onDeleted,
 }: AssetDeletionDialogProps) {
-  const [view, setView] = useState(initialView);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const operations = useAssetDeletionOperations(projectId, open);
-  const actions = useAssetDeletionActions(projectId);
-  const { mutate: previewDeletion, reset: resetPreview } = actions.preview;
-  const assetIdsKey = useMemo(() => assetIds.join("\u0000"), [assetIds]);
-  const busy = actions.execute.isPending || actions.undo.isPending;
-
-  useEffect(() => {
-    if (!open) return;
-    setView(initialView);
-    setActionError(null);
-    setNotice(null);
-    resetPreview();
-    if (initialView === "preview" && assetIds.length) previewDeletion(assetIds);
-  }, [assetIds, assetIdsKey, initialView, open, previewDeletion, resetPreview]);
+  const controller = useAssetDeletionDialogController({
+    projectId,
+    open,
+    assetIds,
+    initialView,
+    onClose,
+    beforeExecute,
+    onDeleted,
+    confirm: legacyConfirm,
+  });
+  const {
+    view,
+    setView,
+    operations,
+    preview,
+    previewPending,
+    previewError,
+    executePending,
+    undoPending,
+    busy,
+    canExecute,
+    error: actionError,
+    notice,
+    execute,
+    undo,
+    close,
+  } = controller;
 
   if (!open) return null;
-
-  const preview = actions.preview.data;
-  const canExecute =
-    Boolean(preview) && !preview?.blocking_issues.length && !actions.preview.isPending && !busy;
-
-  async function executeDeletion() {
-    if (!preview || !(await beforeExecute(assetIds))) return;
-    setActionError(null);
-    setNotice(null);
-    try {
-      await actions.execute.mutateAsync({
-        assetIds,
-        previewToken: preview.preview_token,
-      });
-      onDeleted(assetIds);
-      setNotice(`已将 ${assetIds.length} 张图片及可独占旁车移入项目恢复区。`);
-      setView("history");
-    } catch (reason) {
-      setActionError(reason instanceof Error ? reason.message : "删除素材失败。");
-    }
-  }
-
-  async function undo(operation: AssetDeleteOperation) {
-    const confirmed = await confirmDialog(
-      `恢复这次删除的 ${operation.asset_count} 张图片及其旁车文件？`,
-      {
-        title: "恢复已删除素材",
-        confirmLabel: "恢复",
-      },
-    );
-    if (!confirmed) return;
-    setActionError(null);
-    setNotice(null);
-    try {
-      await actions.undo.mutateAsync(operation.id);
-      setNotice(`已恢复 ${operation.asset_count} 张图片。`);
-    } catch (reason) {
-      setActionError(reason instanceof Error ? reason.message : "恢复素材失败。");
-    }
-  }
-
-  function close() {
-    if (!busy) onClose();
-  }
 
   return (
     <ModalLayer
@@ -159,19 +121,15 @@ export function AssetDeletionDialog({
 
       <div className="asset-deletion-dialog__body">
         {view === "preview" ? (
-          actions.preview.isPending ? (
+          previewPending ? (
             <div className="asset-deletion-dialog__empty">
               <Spinner label="核对文件范围" />
               <p>正在校验图片和旁车文件…</p>
             </div>
-          ) : actions.preview.isError ? (
+          ) : previewError ? (
             <div className="asset-deletion-dialog__empty is-error">
               <CircleAlert size={22} />
-              <p>
-                {actions.preview.error instanceof Error
-                  ? actions.preview.error.message
-                  : "无法生成删除预览。"}
-              </p>
+              <p>{previewError instanceof Error ? previewError.message : "无法生成删除预览。"}</p>
             </div>
           ) : preview ? (
             <>
@@ -244,7 +202,7 @@ export function AssetDeletionDialog({
                 ) : null}
                 {operation.status === "completed" ? (
                   <Button
-                    icon={actions.undo.isPending ? <Spinner /> : <RotateCcw size={13} />}
+                    icon={undoPending ? <Spinner /> : <RotateCcw size={13} />}
                     disabled={busy}
                     onClick={() => void undo(operation)}
                   >
@@ -277,9 +235,9 @@ export function AssetDeletionDialog({
         {view === "preview" ? (
           <Button
             tone="danger"
-            icon={actions.execute.isPending ? <Spinner /> : <Trash2 size={14} />}
+            icon={executePending ? <Spinner /> : <Trash2 size={14} />}
             disabled={!canExecute}
-            onClick={() => void executeDeletion()}
+            onClick={() => void execute()}
           >
             移入恢复区
           </Button>

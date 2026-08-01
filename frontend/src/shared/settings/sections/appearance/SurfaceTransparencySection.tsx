@@ -1,10 +1,10 @@
 import { Check } from "lucide-react";
-import { isTauri } from "@tauri-apps/api/core";
 
 import {
   filterTransparentRegionsForWindowDecorations,
   usesNativeDesktopWindowDecorations,
 } from "../../../desktop/runtimePlatform";
+import { isDesktopRuntime } from "../../../desktop/runtime";
 import { useAppPreferences } from "../../../theme/appPreferences";
 import { APP_SURFACE_REGIONS, type AppSurfaceRegion } from "../../../theme/appearance";
 import { confirmDialog } from "../../../ui/dialogs";
@@ -82,7 +82,7 @@ export function SurfaceTransparencySection() {
   const setImmersiveMode = useAppPreferences((state) => state.setImmersiveMode);
   const configurableRegions = filterTransparentRegionsForWindowDecorations(
     APP_SURFACE_REGIONS,
-    usesNativeDesktopWindowDecorations(isTauri()),
+    usesNativeDesktopWindowDecorations(isDesktopRuntime()),
   );
   const allRegionsTransparent = configurableRegions.every((region) => transparentRegions[region]);
 

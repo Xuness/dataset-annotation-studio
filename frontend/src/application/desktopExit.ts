@@ -1,12 +1,5 @@
-export const DESKTOP_EXIT_REQUESTED_EVENT = "desktop-exit-requested";
-export const EXIT_APPLICATION_COMMAND = "exit_application";
-export const ACKNOWLEDGE_EXIT_REQUEST_COMMAND = "acknowledge_exit_request";
 const EXIT_STOP_POLL_INTERVAL_MS = 250;
 const EXIT_STOP_TIMEOUT_MS = 60_000;
-
-export interface DesktopExitRequestPayload {
-  request_id: number;
-}
 
 export interface ActiveDesktopJobs {
   annotation_job_count: number;

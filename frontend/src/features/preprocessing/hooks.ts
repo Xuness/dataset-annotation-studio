@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { assetKeys } from "../assets/queryKeys";
-import { workspaceKeys } from "../workspaces/queryKeys";
+import { invalidateWorkspaceMutation } from "../../shared/query/workspaceQueries";
 import {
   executePreprocessing,
   getImageProcessingBackends,
@@ -53,9 +52,7 @@ export function usePreprocessExecutionPlan(
 export function usePreprocessingActions(projectId: string) {
   const queryClient = useQueryClient();
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: preprocessingKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
+    void invalidateWorkspaceMutation(queryClient, projectId, "preprocessing-changed");
   };
   return {
     preview: useMutation({

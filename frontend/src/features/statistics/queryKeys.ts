@@ -1,5 +1,7 @@
+import { workspaceQueryKeys } from "../../shared/query/workspaceQueries";
+
 export const statisticsKeys = {
-  all: ["statistics"] as const,
-  project: (projectId: string) => ["statistics", projectId] as const,
-  tagFrequency: (projectId: string) => ["statistics", projectId, "tag-frequency"] as const,
+  project: (projectId: string) => workspaceQueryKeys.scope(projectId, "statistics"),
+  tagFrequency: (projectId: string) =>
+    [...workspaceQueryKeys.scope(projectId, "statistics"), "tag-frequency"] as const,
 };

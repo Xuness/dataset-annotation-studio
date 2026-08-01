@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { ExportRequest } from "../../shared/api/types";
+import { invalidateWorkspaceMutation } from "../../shared/query/workspaceQueries";
 import { createExport, listExports, previewExport, resumeExport, stopExport } from "./api";
 import { exportKeys } from "./queryKeys";
 
@@ -19,7 +20,7 @@ export function useExportOperations(projectId: string) {
 export function useExportActions(projectId: string) {
   const queryClient = useQueryClient();
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: exportKeys.project(projectId) });
+    void invalidateWorkspaceMutation(queryClient, projectId, "export-changed");
   };
   return {
     preview: useMutation({

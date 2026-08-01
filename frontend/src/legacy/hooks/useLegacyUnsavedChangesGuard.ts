@@ -1,26 +1,17 @@
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 
-import { useAppStore } from "../store/appStore";
-import { confirmDialog } from "../ui/dialogs";
+import { useUnsavedChangesStore } from "../../shared/store/unsavedChangesStore";
+import { confirmDialog } from "../../shared/ui/dialogs";
 
 const DEFAULT_MESSAGE = "当前还有尚未保存的修改，离开会丢弃这些修改。";
 
-export function useUnsavedScope(scope: string, dirty: boolean): void {
-  const setDirtyScope = useAppStore((state) => state.setDirtyScope);
-
-  useEffect(() => {
-    setDirtyScope(scope, dirty);
-    return () => setDirtyScope(scope, false);
-  }, [dirty, scope, setDirtyScope]);
-}
-
-export function useUnsavedChangesGuard() {
-  const dirtyScopes = useAppStore((state) => state.dirtyScopes);
+export function useLegacyUnsavedChangesGuard() {
+  const dirtyScopes = useUnsavedChangesStore((state) => state.dirtyScopes);
   const hasUnsavedChanges = Object.keys(dirtyScopes).length > 0;
   const hasUnsavedTagChanges = Object.keys(dirtyScopes).some((scope) =>
     scope.startsWith("annotation-tags:"),
   );
-  const clearDirtyScopes = useAppStore((state) => state.clearDirtyScopes);
+  const clearDirtyScopes = useUnsavedChangesStore((state) => state.clearDirtyScopes);
 
   const confirmDiscard = useCallback(
     async (message?: string) => {

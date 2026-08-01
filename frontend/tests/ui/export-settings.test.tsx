@@ -4,7 +4,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { ExportSettingsPanel } from "../../src/pages/export/components/ExportSettingsPanel";
-import type { ExportFormState } from "../../src/pages/export/types";
+import type { ExportFormState } from "../../src/application/exports/exportState";
 
 afterEach(cleanup);
 

@@ -1,4 +1,3 @@
-import { isTauri } from "@tauri-apps/api/core";
 import {
   ArrowDown,
   ArrowUp,
@@ -22,6 +21,7 @@ import type { TagDictionaryInstallation } from "../../../shared/api/types";
 import { openExternalUrl } from "../../../shared/desktop/openExternalUrl";
 import { openLocalFolder } from "../../../shared/desktop/openLocalFolder";
 import { pickTagDictionaryFile, pickTagDictionaryFolder } from "../../../shared/desktop/pickFolder";
+import { isDesktopRuntime } from "../../../shared/desktop/runtime";
 import { formatBytes } from "../../../shared/format/bytes";
 import { SettingsSectionHeader } from "../../../shared/settings/components/SettingsSectionHeader";
 import "../../../shared/settings/styles/tag-dictionary-settings.css";
@@ -215,7 +215,7 @@ export function TagDictionarySettings({ onClose }: { onClose: () => void }) {
                 </div>
                 <Button
                   icon={<FolderOpen size={13} />}
-                  disabled={!isTauri()}
+                  disabled={!isDesktopRuntime()}
                   onClick={() =>
                     void openManagedDirectory(
                       library.data.dictionary_root,
@@ -355,7 +355,7 @@ export function TagDictionarySettings({ onClose }: { onClose: () => void }) {
                           </Button>
                           <Button
                             icon={<FolderOpen size={13} />}
-                            disabled={!isTauri()}
+                            disabled={!isDesktopRuntime()}
                             onClick={() =>
                               void openManagedDirectory(selected.path, "已打开词典安装目录。")
                             }

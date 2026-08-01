@@ -1,35 +1,17 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { lazy, Suspense, useEffect, useRef, type CSSProperties } from "react";
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useAssetFolders, useAssetIds, useInfiniteAssets } from "../../features/assets/hooks";
-import {
-  useRescanWorkspace,
-  useUpdateWorkspace,
-  useWorkspace,
-} from "../../features/workspaces/hooks";
+import { useWorkspaceAssetsController } from "../../application/workspace/useWorkspaceAssetsController";
+import type { WorkspaceBrowserMode } from "../../application/workspace/assetBrowserState";
+import { useLegacyRescanWorkspace } from "../../legacy/hooks/useLegacyRescanWorkspace";
+import { legacyAlert, legacyConfirm } from "../../legacy/legacyInteractions";
 import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
-import type { AnnotationChannelTarget, AssetFilterStatus } from "../../shared/api/types";
-import { useAppStore } from "../../shared/store/appStore";
-import { assetBrowserViewState, browserScopeKey } from "./workspaceViewState";
 import { Button } from "../../shared/ui/Button";
-import { alertDialog, confirmDialog } from "../../shared/ui/dialogs";
 import { Spinner } from "../../shared/ui/Spinner";
-import {
-  AnnotationBulkActionDialog,
-  type AnnotationBulkAction,
-} from "./components/AnnotationBulkActionDialog";
-import { AssetDeletionDialog } from "./components/AssetDeletionDialog";
+import { AnnotationBulkActionDialog } from "./components/AnnotationBulkActionDialog";
 import { AssetBrowser } from "./components/AssetBrowser";
+import { AssetDeletionDialog } from "./components/AssetDeletionDialog";
 import { ImageStage } from "./components/ImageStage";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { PaneResizeHandle } from "./components/PaneResizeHandle";
@@ -40,7 +22,6 @@ import {
   useWorkspaceLayout,
   WORKSPACE_LAYOUT_LIMITS,
 } from "./hooks/useWorkspaceLayout";
-import { useAssetDestructiveActions } from "./hooks/useAssetDestructiveActions";
 import "./workspace.css";
 
 const AnnotationEditor = lazy(() =>
@@ -50,133 +31,53 @@ const AnnotationEditor = lazy(() =>
 );
 
 interface WorkspacePageProps {
-  mode?: "assets" | "review";
+  mode?: WorkspaceBrowserMode;
 }
-
-interface AnnotationBulkDialogState {
-  open: boolean;
-  action: AnnotationBulkAction;
-  assetIds: string[];
-}
-
-const DEFAULT_EDITOR_TARGET: AnnotationChannelTarget = {
-  channel: "description",
-  language: "",
-};
-
-const CLOSED_ANNOTATION_DIALOG: AnnotationBulkDialogState = {
-  open: false,
-  action: "review",
-  assetIds: [],
-};
 
 export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const { projectId = "" } = useParams();
   const navigate = useNavigate();
-  const workspace = useWorkspace(projectId);
-  const rescan = useRescanWorkspace(projectId);
-  const updateWorkspace = useUpdateWorkspace(projectId);
-  const checkedAssetIds = useAppStore((state) => state.checkedAssetIds);
-  const setAssetsChecked = useAppStore((state) => state.setAssetsChecked);
-  const setActiveProject = useAppStore((state) => state.setActiveProject);
-  const browserScope = browserScopeKey(projectId, mode);
-  const { search, statusFilter, folderPath, selectedAssetId } =
-    assetBrowserViewState.useValue(browserScope);
-  const selectAsset = useCallback(
-    (assetId: string | null) =>
-      assetBrowserViewState.patch(browserScope, { selectedAssetId: assetId }),
-    [browserScope],
-  );
-  const setSearch = useCallback(
-    (value: string) => assetBrowserViewState.patch(browserScope, { search: value }),
-    [browserScope],
-  );
-  const setStatusFilter = useCallback(
-    (value: AssetFilterStatus | null) =>
-      assetBrowserViewState.patch(browserScope, { statusFilter: value }),
-    [browserScope],
-  );
-  const setFolderPath = useCallback(
-    (value: string) => assetBrowserViewState.patch(browserScope, { folderPath: value }),
-    [browserScope],
-  );
-  const [editorDirty, setEditorDirty] = useState(false);
-  const [editorDirtyKind, setEditorDirtyKind] = useState<"tags" | "annotation" | null>(null);
-  const [editorTarget, setEditorTarget] = useState<AnnotationChannelTarget>(DEFAULT_EDITOR_TARGET);
-  const [editorRevision, setEditorRevision] = useState(0);
-  const [annotationDialog, setAnnotationDialog] =
-    useState<AnnotationBulkDialogState>(CLOSED_ANNOTATION_DIALOG);
+  const rescan = useLegacyRescanWorkspace(projectId);
+  const controller = useWorkspaceAssetsController({
+    projectId,
+    mode,
+    confirm: legacyConfirm,
+    alert: legacyAlert,
+  });
+  const {
+    workspace,
+    assets,
+    folders,
+    assetItems,
+    assetResult,
+    selectedAsset,
+    selectedAssetId,
+    checkedAssetIds,
+    search,
+    statusFilter,
+    folderPath,
+    editorRevision,
+    annotationDialog,
+    blockedAnnotationTarget,
+    allMatchingSelected,
+    selectAllPending,
+    setAssetsChecked,
+    setSearch,
+    setStatusFilter,
+    requestFolderSelect,
+    requestSelectAsset,
+    loadMoreAssets,
+    toggleAllMatchingAssets,
+    openAnnotationDialog,
+    closeAnnotationDialog,
+    updateEditorDirty,
+    setEditorTarget,
+    updateRecursiveScan,
+    assetDeletion,
+  } = controller;
   const workspaceBodyRef = useRef<HTMLDivElement>(null);
   const mediaColumnRef = useRef<HTMLDivElement>(null);
   const { layout, setLayout } = useWorkspaceLayout(projectId);
-
-  const assetQuery = useMemo(
-    () => ({ search, status: statusFilter, folderPath }),
-    [folderPath, search, statusFilter],
-  );
-  const assets = useInfiniteAssets(projectId, assetQuery);
-  const matchingAssetIds = useAssetIds(projectId, assetQuery);
-  const folders = useAssetFolders(projectId);
-  const discardEditorDraft = useCallback(() => {
-    setEditorDirty(false);
-    setEditorDirtyKind(null);
-    setEditorRevision((current) => current + 1);
-  }, []);
-  const updateEditorDirty = useCallback((dirty: boolean, kind: "tags" | "annotation" | null) => {
-    setEditorDirty(dirty);
-    setEditorDirtyKind(dirty ? kind : null);
-  }, []);
-  const assetActions = useAssetDestructiveActions({
-    contextKey: `${projectId}:${mode}`,
-    selectedAssetId,
-    editorDirty,
-    discardEditorDraft,
-    selectAsset,
-  });
-  const assetItems = useMemo(
-    () => assets.data?.pages.flatMap((page) => page.items) ?? [],
-    [assets.data?.pages],
-  );
-  const assetResult = assets.data?.pages[0];
-  const loadedMatchingAssetIds = useMemo(() => {
-    if (!assetResult || assets.hasNextPage || assetItems.length !== assetResult.total) return null;
-    return assetItems.map((asset) => asset.id);
-  }, [assetItems, assetResult, assets.hasNextPage]);
-  const knownMatchingAssetIds =
-    matchingAssetIds.data &&
-    !matchingAssetIds.isStale &&
-    matchingAssetIds.data.total === assetResult?.total
-      ? matchingAssetIds.data.ids
-      : loadedMatchingAssetIds;
-  const allMatchingSelected = useMemo(() => {
-    if (!knownMatchingAssetIds?.length) return false;
-    const checked = new Set(checkedAssetIds);
-    return knownMatchingAssetIds.every((assetId) => checked.has(assetId));
-  }, [checkedAssetIds, knownMatchingAssetIds]);
-  const { fetchNextPage, hasNextPage, isFetchingNextPage } = assets;
-  const loadMoreAssets = useCallback(() => {
-    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
-
-  useEffect(() => {
-    setActiveProject(projectId);
-    setEditorDirty(false);
-    setEditorDirtyKind(null);
-    setEditorTarget(DEFAULT_EDITOR_TARGET);
-    setEditorRevision(0);
-    setAnnotationDialog(CLOSED_ANNOTATION_DIALOG);
-  }, [mode, projectId, setActiveProject]);
-
-  useEffect(() => {
-    if (
-      editorDirty ||
-      !folders.data ||
-      folders.data.items.some((folder) => folder.path === folderPath)
-    ) {
-      return;
-    }
-    setFolderPath("");
-  }, [editorDirty, folderPath, folders.data, setFolderPath]);
 
   useEffect(() => {
     const body = workspaceBodyRef.current;
@@ -190,100 +91,6 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     observer.observe(body);
     return () => observer.disconnect();
   }, [setLayout, workspace.data]);
-
-  useEffect(() => {
-    const items = assetItems;
-    if (editorDirty || assets.isLoading) return;
-    if (!items?.length) {
-      if (selectedAssetId) selectAsset(null);
-      return;
-    }
-    if (!selectedAssetId || !items.some((asset) => asset.id === selectedAssetId)) {
-      selectAsset(items[0].id);
-    }
-  }, [assetItems, assets.isLoading, editorDirty, selectAsset, selectedAssetId]);
-
-  const selectedAsset = assetItems.find((asset) => asset.id === selectedAssetId) ?? null;
-
-  const requestSelectAsset = useCallback(
-    async (assetId: string): Promise<boolean> => {
-      if (!editorDirty) {
-        selectAsset(assetId);
-        return true;
-      }
-      const message =
-        editorDirtyKind === "tags"
-          ? "当前 Tags 修改尚未保存，切换图片会丢弃这些修改。"
-          : "当前标注尚未保存，切换图片会丢弃未保存的修改。";
-      const confirmed = await confirmDialog(message, {
-        title: "尚未保存",
-        tone: "danger",
-        confirmLabel: "丢弃并切换",
-        cancelLabel: "继续编辑",
-      });
-      if (!confirmed) return false;
-      selectAsset(assetId);
-      return true;
-    },
-    [editorDirty, editorDirtyKind, selectAsset],
-  );
-
-  const requestFolderSelect = useCallback(
-    async (nextFolderPath: string): Promise<boolean> => {
-      if (nextFolderPath === folderPath) return true;
-      if (editorDirty) {
-        const message =
-          editorDirtyKind === "tags"
-            ? "当前 Tags 修改尚未保存，切换目录会丢弃这些修改。"
-            : "当前标注尚未保存，切换目录会丢弃未保存的修改。";
-        const confirmed = await confirmDialog(message, {
-          title: "尚未保存",
-          tone: "danger",
-          confirmLabel: "丢弃并切换",
-          cancelLabel: "继续编辑",
-        });
-        if (!confirmed) return false;
-        discardEditorDraft();
-      }
-      setFolderPath(nextFolderPath);
-      return true;
-    },
-    [discardEditorDraft, editorDirty, editorDirtyKind, folderPath, setFolderPath],
-  );
-
-  const toggleAllMatchingAssets = useCallback(async () => {
-    let assetIds = knownMatchingAssetIds;
-    if (!assetIds) {
-      const result = await matchingAssetIds.refetch();
-      if (!result.data) {
-        await alertDialog(
-          result.error instanceof Error ? result.error.message : "读取全选范围失败，请稍后重试。",
-          { title: "全选失败" },
-        );
-        return;
-      }
-      assetIds = result.data.ids;
-    }
-
-    const checked = new Set(useAppStore.getState().checkedAssetIds);
-    const shouldCheck = !assetIds.length || !assetIds.every((assetId) => checked.has(assetId));
-    setAssetsChecked(assetIds, shouldCheck);
-  }, [knownMatchingAssetIds, matchingAssetIds, setAssetsChecked]);
-
-  const openAnnotationDialog = useCallback((action: AnnotationBulkAction) => {
-    const assetIds = [...useAppStore.getState().checkedAssetIds];
-    if (!assetIds.length) return;
-    setAnnotationDialog({ open: true, action, assetIds });
-  }, []);
-
-  const closeAnnotationDialog = useCallback(() => {
-    setAnnotationDialog((current) => ({ ...current, open: false }));
-  }, []);
-
-  const blockedAnnotationTarget =
-    editorDirty && selectedAssetId && annotationDialog.assetIds.includes(selectedAssetId)
-      ? editorTarget
-      : null;
 
   const layoutStyle = {
     "--asset-pane-width": `${layout.assetPaneWidth}px`,
@@ -349,7 +156,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         hasMore={Boolean(assets.hasNextPage)}
         loading={assets.isLoading}
         loadingMore={assets.isFetchingNextPage}
-        selectAllPending={matchingAssetIds.isFetching}
+        selectAllPending={selectAllPending}
         allMatchingSelected={allMatchingSelected}
         error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
         bulkActionPending={annotationDialog.open}
@@ -363,20 +170,9 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         onToggleAll={() => void toggleAllMatchingAssets()}
         onReviewCheckedAnnotations={() => openAnnotationDialog("review")}
         onDeleteCheckedAnnotations={() => openAnnotationDialog("delete")}
-        onDeleteCheckedAssets={assetActions.openCheckedAssetDeletion}
-        onOpenDeletionHistory={assetActions.openDeletionHistory}
-        onRecursiveChange={(recursive_scan) =>
-          updateWorkspace.mutate(
-            { recursive_scan },
-            {
-              onError: (error) =>
-                void alertDialog(
-                  error instanceof Error ? error.message : "无法更新递归扫描设置。",
-                  { title: "保存扫描设置失败" },
-                ),
-            },
-          )
-        }
+        onDeleteCheckedAssets={assetDeletion.openCheckedAssetDeletion}
+        onOpenDeletionHistory={assetDeletion.openDeletionHistory}
+        onRecursiveChange={updateRecursiveScan}
       />
       <PaneResizeHandle
         orientation="vertical"
@@ -485,16 +281,16 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         projectId={projectId}
         workspace={workspace.data}
         asset={selectedAsset}
-        onDeleteAsset={assetActions.openAssetDeletion}
+        onDeleteAsset={assetDeletion.openAssetDeletion}
       />
       <AssetDeletionDialog
         projectId={projectId}
-        open={assetActions.deletionDialog.open}
-        assetIds={assetActions.deletionDialog.assetIds}
-        initialView={assetActions.deletionDialog.initialView}
-        beforeExecute={assetActions.beforeDeleteAssets}
-        onDeleted={assetActions.handleAssetsDeleted}
-        onClose={assetActions.closeDeletionDialog}
+        open={assetDeletion.deletionDialog.open}
+        assetIds={assetDeletion.deletionDialog.assetIds}
+        initialView={assetDeletion.deletionDialog.initialView}
+        beforeExecute={assetDeletion.beforeDeleteAssets}
+        onDeleted={assetDeletion.handleAssetsDeleted}
+        onClose={assetDeletion.closeDeletionDialog}
       />
       <AnnotationBulkActionDialog
         projectId={projectId}

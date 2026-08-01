@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath, URL } from "node:url";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -26,6 +27,14 @@ const hmr = host
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        legacy: fileURLToPath(new URL("./legacy.html", import.meta.url)),
+      },
+    },
+  },
   server: {
     port: frontendPort,
     strictPort: true,

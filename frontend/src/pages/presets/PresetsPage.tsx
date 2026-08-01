@@ -3,7 +3,7 @@ import { ArrowLeft, Braces, Cable, Languages, Plus } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { resolvePresetTab, type PresetTab } from "../../features/presets/navigation";
-import { useUnsavedChangesGuard } from "../../shared/desktop/useUnsavedChanges";
+import { useLegacyUnsavedChangesGuard } from "../../legacy/hooks/useLegacyUnsavedChangesGuard";
 import { Button } from "../../shared/ui/Button";
 import { ProviderProfilesPanel } from "./components/ProviderProfilesPanel";
 import { SystemPresetsPanel } from "./components/SystemPresetsPanel";
@@ -14,7 +14,7 @@ export function PresetsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { confirmDiscard } = useUnsavedChangesGuard();
+  const { confirmDiscard } = useLegacyUnsavedChangesGuard();
   const [tab, setTab] = useState<PresetTab>(() => resolvePresetTab(searchParams.get("tab")));
   const [createSignal, setCreateSignal] = useState(0);
   const handledCreateLocation = useRef<string | null>(null);

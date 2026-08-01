@@ -6,7 +6,7 @@ import { useAnnotationTrace, usePromptPreview } from "../../../features/assets/h
 import { useSystemPresets } from "../../../features/presets/hooks";
 import { taggerSelectionModeLabel } from "../../../features/taggers/labels";
 import { useUpdateWorkspace } from "../../../features/workspaces/hooks";
-import { useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
+import { useUnsavedScope } from "../../../application/useUnsavedScope";
 import type {
   AssetAnnotationTrace,
   AssetSummary,

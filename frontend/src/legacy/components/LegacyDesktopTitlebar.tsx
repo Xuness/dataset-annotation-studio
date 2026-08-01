@@ -1,26 +1,27 @@
-import { isTauri } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minus, Square, X } from "lucide-react";
 
 import appIconUrl from "../../assets/app-icon.png";
-import { usesNativeWindowDecorations } from "./runtimePlatform";
-import "./desktop-titlebar.css";
+import {
+  closeDesktopWindow,
+  minimizeDesktopWindow,
+  toggleDesktopWindowMaximized,
+  usesCustomDesktopTitlebar,
+} from "../../shared/desktop/windowControls";
+import "./legacy-desktop-titlebar.css";
 
 function runWindowAction(action: () => Promise<void>) {
   void action().catch(() => undefined);
 }
 
-export function DesktopTitlebar() {
-  if (!isTauri() || usesNativeWindowDecorations()) return null;
-
-  const appWindow = getCurrentWindow();
+export function LegacyDesktopTitlebar() {
+  if (!usesCustomDesktopTitlebar()) return null;
 
   return (
     <header className="desktop-titlebar">
       <div
         className="desktop-titlebar__drag-region"
         data-tauri-drag-region=""
-        onDoubleClick={() => runWindowAction(() => appWindow.toggleMaximize())}
+        onDoubleClick={() => runWindowAction(toggleDesktopWindowMaximized)}
       >
         <span className="desktop-titlebar__mark" aria-hidden="true" data-tauri-drag-region="">
           <img src={appIconUrl} alt="" draggable={false} data-tauri-drag-region="" />
@@ -32,7 +33,7 @@ export function DesktopTitlebar() {
           type="button"
           aria-label="最小化"
           title="最小化"
-          onClick={() => runWindowAction(() => appWindow.minimize())}
+          onClick={() => runWindowAction(minimizeDesktopWindow)}
         >
           <Minus size={14} strokeWidth={1.5} aria-hidden="true" />
         </button>
@@ -40,7 +41,7 @@ export function DesktopTitlebar() {
           type="button"
           aria-label="最大化或还原"
           title="最大化或还原"
-          onClick={() => runWindowAction(() => appWindow.toggleMaximize())}
+          onClick={() => runWindowAction(toggleDesktopWindowMaximized)}
         >
           <Square size={11} strokeWidth={1.4} aria-hidden="true" />
         </button>
@@ -49,7 +50,7 @@ export function DesktopTitlebar() {
           className="desktop-titlebar__close"
           aria-label="关闭窗口"
           title="关闭窗口"
-          onClick={() => runWindowAction(() => appWindow.close())}
+          onClick={() => runWindowAction(closeDesktopWindow)}
         >
           <X size={14} strokeWidth={1.45} aria-hidden="true" />
         </button>

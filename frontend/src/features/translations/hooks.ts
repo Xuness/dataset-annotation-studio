@@ -1,10 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { TranslationProducerKind, TranslationSourceKind } from "../../shared/api/types";
-import { annotationHistoryKeys, annotationKeys } from "../annotations/queryKeys";
-import { assetKeys } from "../assets/queryKeys";
-import { statisticsKeys } from "../statistics/queryKeys";
-import { workspaceKeys } from "../workspaces/queryKeys";
+import { invalidateWorkspaceMutation } from "../../shared/query/workspaceQueries";
 import { getTranslation, listTranslations, refreshLocalDictionaryTranslation } from "./api";
 import { translationKeys } from "./queryKeys";
 
@@ -41,14 +38,6 @@ export function useRefreshLocalDictionaryTranslation(
       expectedSourceRevisionId: string;
       expectedTranslationRevisionId: string | null;
     }) => refreshLocalDictionaryTranslation(projectId, assetId, language, input),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) }),
-        queryClient.invalidateQueries({ queryKey: annotationKeys.project(projectId) }),
-        queryClient.invalidateQueries({ queryKey: annotationHistoryKeys.project(projectId) }),
-        queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) }),
-        queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) }),
-        queryClient.invalidateQueries({ queryKey: statisticsKeys.project(projectId) }),
-      ]),
+    onSuccess: () => invalidateWorkspaceMutation(queryClient, projectId, "translation-refreshed"),
   });
 }

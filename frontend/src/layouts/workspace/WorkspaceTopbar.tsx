@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useExportOperations } from "../../features/exports/hooks";
 import { useJobs } from "../../features/jobs/hooks";
 import type { WorkspaceSummary } from "../../shared/api/types";
-import { useUnsavedChangesGuard } from "../../shared/desktop/useUnsavedChanges";
+import { useLegacyUnsavedChangesGuard } from "../../legacy/hooks/useLegacyUnsavedChangesGuard";
 import { Button } from "../../shared/ui/Button";
 import { InterfaceScaleControl } from "../../shared/ui/InterfaceScaleControl";
 import { Spinner } from "../../shared/ui/Spinner";
@@ -23,7 +23,7 @@ export function WorkspaceTopbar({
   onRescan,
 }: WorkspaceTopbarProps) {
   const navigate = useNavigate();
-  const { confirmDiscard } = useUnsavedChangesGuard();
+  const { confirmDiscard } = useLegacyUnsavedChangesGuard();
   const jobs = useJobs(workspace.project_id);
   const exports = useExportOperations(workspace.project_id);
   const activeExportCount =

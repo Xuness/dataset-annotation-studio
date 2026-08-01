@@ -1,8 +1,9 @@
+import { workspaceQueryKeys } from "../../shared/query/workspaceQueries";
+
 export const annotationKeys = {
-  all: ["annotation"] as const,
-  project: (projectId: string) => ["annotation", projectId] as const,
+  project: (projectId: string) => workspaceQueryKeys.scope(projectId, "annotations"),
   bundle: (projectId: string, assetId: string | null) =>
-    ["annotation", projectId, assetId, "bundle"] as const,
+    [...workspaceQueryKeys.scope(projectId, "annotations"), "bundle", assetId] as const,
   channel: (
     projectId: string,
     assetId: string | null,
@@ -12,8 +13,7 @@ export const annotationKeys = {
     translationProducerKind = "",
   ) =>
     [
-      "annotation",
-      projectId,
+      ...workspaceQueryKeys.scope(projectId, "annotations"),
       assetId,
       channel,
       language,
@@ -21,12 +21,11 @@ export const annotationKeys = {
       translationProducerKind,
     ] as const,
   batchOptions: (projectId: string, assetIdsKey: string) =>
-    ["annotation", projectId, "batch-options", assetIdsKey] as const,
+    [...workspaceQueryKeys.scope(projectId, "annotations"), "batch-options", assetIdsKey] as const,
 };
 
 export const annotationHistoryKeys = {
-  all: ["annotation-history"] as const,
-  project: (projectId: string) => ["annotation-history", projectId] as const,
+  project: (projectId: string) => workspaceQueryKeys.scope(projectId, "annotation-history"),
   channel: (
     projectId: string,
     assetId: string | null,
@@ -36,8 +35,7 @@ export const annotationHistoryKeys = {
     translationProducerKind = "",
   ) =>
     [
-      "annotation-history",
-      projectId,
+      ...workspaceQueryKeys.scope(projectId, "annotation-history"),
       assetId,
       channel,
       language,

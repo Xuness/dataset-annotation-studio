@@ -1,4 +1,3 @@
-import { isTauri } from "@tauri-apps/api/core";
 import {
   CheckCircle2,
   CircleAlert,
@@ -16,6 +15,7 @@ import { useSystemDiagnostics } from "../../../features/system/hooks";
 import { API_BASE_URL } from "../../../shared/api/client";
 import { resolveDesktopLogDirectory } from "../../../shared/desktop/logDirectories";
 import { openLocalFolder } from "../../../shared/desktop/openLocalFolder";
+import { isDesktopRuntime } from "../../../shared/desktop/runtime";
 import { writeClipboardText } from "../../../shared/desktop/writeClipboardText";
 import { SettingsSectionHeader } from "../../../shared/settings/components/SettingsSectionHeader";
 import "../../../shared/settings/styles/about-settings.css";
@@ -29,7 +29,7 @@ function formatCheckedAt(timestamp: number): string {
 
 export function AboutSettings({ onClose }: { onClose: () => void }) {
   const diagnostics = useSystemDiagnostics();
-  const desktopRuntime = isTauri();
+  const desktopRuntime = isDesktopRuntime();
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [desktopLogDirectory, setDesktopLogDirectory] = useState<string | null>(null);

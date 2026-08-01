@@ -1,12 +1,4 @@
-export interface FrequencyBucket {
-  value: string;
-  count: number;
-  share: number;
-}
+import type { ApiOutput } from "../schema";
 
-export interface AnnotationStatistics {
-  analyzer: string;
-  document_count: number;
-  occurrence_count: number;
-  buckets: FrequencyBucket[];
-}
+export type FrequencyBucket = ApiOutput<"FrequencyBucket">;
+export type AnnotationStatistics = ApiOutput<"AnnotationStatistics">;

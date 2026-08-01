@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { promptPreviewKeys } from "../assets/queryKeys";
+import { invalidateWorkspaceScopeAcrossProjects } from "../../shared/query/workspaceQueries";
 import {
   cancelCodexLogin,
   createProviderProfile,
@@ -79,7 +79,7 @@ export function useSystemPresetMutations() {
   const queryClient = useQueryClient();
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: presetKeys.system });
-    void queryClient.invalidateQueries({ queryKey: promptPreviewKeys.all });
+    void invalidateWorkspaceScopeAcrossProjects(queryClient, "prompt-preview");
   };
   return {
     create: useMutation({ mutationFn: createSystemPreset, onSuccess: invalidate }),

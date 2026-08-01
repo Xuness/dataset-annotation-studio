@@ -1,8 +1,15 @@
+import { workspaceQueryKeys } from "../../shared/query/workspaceQueries";
+
 export const preprocessingKeys = {
-  all: ["preprocessing"] as const,
-  project: (projectId: string) => ["preprocessing", projectId] as const,
-  operations: (projectId: string) => ["preprocessing", projectId, "operations"] as const,
+  project: (projectId: string) => workspaceQueryKeys.scope(projectId, "preprocessing"),
+  operations: (projectId: string) =>
+    [...workspaceQueryKeys.scope(projectId, "preprocessing"), "operations"] as const,
   executionPlan: (projectId: string, previewToken: string, execution: object) =>
-    ["preprocessing", projectId, "execution-plan", previewToken, execution] as const,
+    [
+      ...workspaceQueryKeys.scope(projectId, "preprocessing"),
+      "execution-plan",
+      previewToken,
+      execution,
+    ] as const,
   backends: ["system", "image-processing", "backends"] as const,
 };

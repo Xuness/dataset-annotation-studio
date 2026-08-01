@@ -1,4 +1,4 @@
-import type { AnnotationTag } from "../../../shared/api/types";
+import type { AnnotationTag } from "../../shared/api/types";
 
 export const TAG_CATEGORY_ORDER = [
   "character",

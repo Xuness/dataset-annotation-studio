@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { FileText, Save, Trash2 } from "lucide-react";
 
 import { useSystemPresetMutations, useSystemPresets } from "../../../features/presets/hooks";
-import { useUnsavedChangesGuard, useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
+import { useUnsavedScope } from "../../../application/useUnsavedScope";
+import { useLegacyUnsavedChangesGuard } from "../../../legacy/hooks/useLegacyUnsavedChangesGuard";
 import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
@@ -13,7 +14,7 @@ export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
   const mutations = useSystemPresetMutations();
   const selection = usePresetEditorSelection(presets.data, createSignal);
   const selected = selection.selected;
-  const { confirmDiscard } = useUnsavedChangesGuard();
+  const { confirmDiscard } = useLegacyUnsavedChangesGuard();
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);

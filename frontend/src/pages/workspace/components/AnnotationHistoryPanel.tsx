@@ -8,7 +8,7 @@ import type {
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { revisionSourceLabel } from "./annotationLabels";
-import { tagsToDraft } from "./annotationEditorState";
+import { tagsToDraft } from "../../../application/annotations/annotationDraft";
 
 interface AnnotationHistoryPanelProps {
   activeChannel: AnnotationChannel;

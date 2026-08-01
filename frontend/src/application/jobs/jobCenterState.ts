@@ -1,6 +1,6 @@
 import { createScopedViewState } from "../../shared/store/scopedViewState";
 
-export interface JobsView {
+export interface JobCenterView {
   selectedJobId: string | null;
 }
 
@@ -15,6 +15,6 @@ export function reconcileSelectedJobId(
   return loadedJobIds[0] ?? null;
 }
 
-export const jobsViewState = createScopedViewState<JobsView>(() => ({
+export const jobCenterViewState = createScopedViewState<JobCenterView>(() => ({
   selectedJobId: null,
 }));

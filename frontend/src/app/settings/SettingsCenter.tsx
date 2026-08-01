@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import { Settings } from "lucide-react";
 
-import { UpdateAnnouncementIndicator } from "../../features/updateAnnouncements/UpdateAnnouncementIndicator";
 import { useHasUnreadUpdateAnnouncement } from "../../features/updateAnnouncements/readState";
+import { UpdateAnnouncementIndicator } from "../../legacy/components/UpdateAnnouncementIndicator";
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 import { ModalLayer } from "../../shared/ui/ModalLayer";
 import { Spinner } from "../../shared/ui/Spinner";

@@ -1,13 +1,18 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
-import { exportViewState } from "../../src/pages/export/exportViewState";
-import { jobsViewState, reconcileSelectedJobId } from "../../src/pages/jobs/jobsViewState";
-import { preprocessViewState } from "../../src/pages/preprocess/preprocessViewState";
+import { annotationEditorViewState } from "../../src/application/annotations/annotationEditorState";
+import { exportWorkbenchState } from "../../src/application/exports/exportState";
 import {
-  annotationEditorViewState,
+  jobCenterViewState,
+  reconcileSelectedJobId,
+} from "../../src/application/jobs/jobCenterState";
+import { preprocessWorkbenchState } from "../../src/application/preprocessing/preprocessState";
+import {
   assetBrowserViewState,
   browserScopeKey,
+} from "../../src/application/workspace/assetBrowserState";
+import {
   folderTreeViewState,
   inspectorViewState,
 } from "../../src/pages/workspace/workspaceViewState";
@@ -29,12 +34,12 @@ afterEach(() => {
   folderTreeViewState.reset(PROJECT_B);
   inspectorViewState.reset(PROJECT_A);
   inspectorViewState.reset(PROJECT_B);
-  jobsViewState.reset(PROJECT_A);
-  jobsViewState.reset(PROJECT_B);
-  preprocessViewState.reset(PROJECT_A);
-  preprocessViewState.reset(PROJECT_B);
-  exportViewState.reset(PROJECT_A);
-  exportViewState.reset(PROJECT_B);
+  jobCenterViewState.reset(PROJECT_A);
+  jobCenterViewState.reset(PROJECT_B);
+  preprocessWorkbenchState.reset(PROJECT_A);
+  preprocessWorkbenchState.reset(PROJECT_B);
+  exportWorkbenchState.reset(PROJECT_A);
+  exportWorkbenchState.reset(PROJECT_B);
 });
 
 describe("session-scoped workspace view state", () => {
@@ -117,8 +122,8 @@ describe("session-scoped workspace view state", () => {
 
   test("retains task and form work without writing process state to localStorage", () => {
     act(() => {
-      jobsViewState.patch(PROJECT_A, { selectedJobId: "job-7" });
-      preprocessViewState.patch(PROJECT_A, (current) => ({
+      jobCenterViewState.patch(PROJECT_A, { selectedJobId: "job-7" });
+      preprocessWorkbenchState.patch(PROJECT_A, (current) => ({
         form: {
           ...current.form,
           scope: "selected",
@@ -127,7 +132,7 @@ describe("session-scoped workspace view state", () => {
         },
         selectedOperationId: "operation-3",
       }));
-      exportViewState.patch(PROJECT_A, (current) => ({
+      exportWorkbenchState.patch(PROJECT_A, (current) => ({
         form: {
           ...current.form,
           destinationPath: "D:\\exports\\dataset",
@@ -137,8 +142,8 @@ describe("session-scoped workspace view state", () => {
       }));
     });
 
-    expect(jobsViewState.get(PROJECT_A).selectedJobId).toBe("job-7");
-    expect(preprocessViewState.get(PROJECT_A)).toMatchObject({
+    expect(jobCenterViewState.get(PROJECT_A).selectedJobId).toBe("job-7");
+    expect(preprocessWorkbenchState.get(PROJECT_A)).toMatchObject({
       form: {
         scope: "selected",
         maxEdge: 1536,
@@ -146,15 +151,15 @@ describe("session-scoped workspace view state", () => {
       },
       selectedOperationId: "operation-3",
     });
-    expect(exportViewState.get(PROJECT_A).form).toMatchObject({
+    expect(exportWorkbenchState.get(PROJECT_A).form).toMatchObject({
       destinationPath: "D:\\exports\\dataset",
       formats: ["txt", "json"],
       packaging: "zip",
     });
 
-    expect(jobsViewState.get(PROJECT_B).selectedJobId).toBeNull();
-    expect(preprocessViewState.get(PROJECT_B).form.maxEdge).toBe(2048);
-    expect(exportViewState.get(PROJECT_B).form.destinationPath).toBe("");
+    expect(jobCenterViewState.get(PROJECT_B).selectedJobId).toBeNull();
+    expect(preprocessWorkbenchState.get(PROJECT_B).form.maxEdge).toBe(2048);
+    expect(exportWorkbenchState.get(PROJECT_B).form.destinationPath).toBe("");
     expect(window.localStorage.length).toBe(0);
   });
 

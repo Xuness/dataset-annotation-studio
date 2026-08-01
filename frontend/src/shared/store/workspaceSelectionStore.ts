@@ -1,25 +1,19 @@
 import { create } from "zustand";
 
-interface AppState {
-  activeProjectId: string | null;
+interface WorkspaceSelectionState {
+  projectId: string | null;
   checkedAssetIds: string[];
-  dirtyScopes: Record<string, true>;
   setActiveProject: (projectId: string | null) => void;
   toggleCheckedAsset: (assetId: string) => void;
   setAssetsChecked: (assetIds: string[], checked: boolean) => void;
   clearCheckedAssets: () => void;
-  setDirtyScope: (scope: string, dirty: boolean) => void;
-  clearDirtyScopes: () => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  activeProjectId: null,
+export const useWorkspaceSelectionStore = create<WorkspaceSelectionState>((set) => ({
+  projectId: null,
   checkedAssetIds: [],
-  dirtyScopes: {},
-  setActiveProject: (activeProjectId) =>
-    set((state) =>
-      state.activeProjectId === activeProjectId ? state : { activeProjectId, checkedAssetIds: [] },
-    ),
+  setActiveProject: (projectId) =>
+    set((state) => (state.projectId === projectId ? state : { projectId, checkedAssetIds: [] })),
   toggleCheckedAsset: (assetId) =>
     set((state) => ({
       checkedAssetIds: state.checkedAssetIds.includes(assetId)
@@ -42,16 +36,4 @@ export const useAppStore = create<AppState>((set) => ({
       return changed ? { checkedAssetIds: [...next] } : state;
     }),
   clearCheckedAssets: () => set({ checkedAssetIds: [] }),
-  setDirtyScope: (scope, dirty) =>
-    set((state) => {
-      if (dirty) {
-        if (state.dirtyScopes[scope]) return state;
-        return { dirtyScopes: { ...state.dirtyScopes, [scope]: true } };
-      }
-      if (!state.dirtyScopes[scope]) return state;
-      const next = { ...state.dirtyScopes };
-      delete next[scope];
-      return { dirtyScopes: next };
-    }),
-  clearDirtyScopes: () => set({ dirtyScopes: {} }),
 }));

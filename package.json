@@ -32,8 +32,8 @@
     "build:cuda": "pnpm build:sidecar:cuda && tauri build --config src-tauri/tauri.release.conf.json",
     "icons:generate": "tauri icon assets/app-icon.png --output src-tauri/icons --ios-color \"#050607\" && node scripts/sync-app-icon.mjs",
     "clean": "pwsh -NoProfile -File scripts/clean-generated.ps1",
-    "check": "node --test scripts/dev-ports.test.mjs && pnpm --dir frontend check && uv run --project backend --no-sync ruff check backend/src backend/tests && uv run --project backend --no-sync pytest && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo check --manifest-path src-tauri/Cargo.toml",
-    "format": "pnpm --dir frontend format && uv run --project backend --no-sync ruff format backend/src backend/tests"
+    "check": "node --test scripts/dev-ports.test.mjs && pnpm --dir frontend check && uv run --project backend --no-sync ruff check backend/src backend/tests scripts/export-openapi.py && uv run --project backend --no-sync pytest && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo check --manifest-path src-tauri/Cargo.toml",
+    "format": "pnpm --dir frontend format && uv run --project backend --no-sync ruff format backend/src backend/tests scripts/export-openapi.py"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.8.5",

@@ -1,15 +1,15 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { isTauri } from "@tauri-apps/api/core";
 
-import { DesktopTitlebar } from "../shared/desktop/DesktopTitlebar";
+import { SettingsCenter } from "../app/settings/SettingsCenter";
+import { useCloseGuard } from "../application/useCloseGuard";
+import { isDesktopRuntime } from "../shared/desktop/runtime";
 import { useClipboardHistoryBridge } from "../shared/desktop/useClipboardHistoryBridge";
 import { useDesktopWindowBehavior } from "../shared/desktop/useDesktopWindowBehavior";
 import { useApplyInterfaceScale } from "../shared/desktop/useInterfaceScale";
 import { DialogHost } from "../shared/ui/DialogHost";
 import { Spinner } from "../shared/ui/Spinner";
-import { SettingsCenter } from "./settings/SettingsCenter";
-import { useCloseGuard } from "./useCloseGuard";
+import { LegacyDesktopTitlebar } from "./components/LegacyDesktopTitlebar";
 
 const HomePage = lazy(() =>
   import("../pages/home/HomePage").then((module) => ({ default: module.HomePage })),
@@ -38,12 +38,12 @@ const PresetsPage = lazy(() =>
   })),
 );
 
-export function App() {
+export function LegacyApp() {
   useClipboardHistoryBridge();
   useDesktopWindowBehavior();
   useCloseGuard();
   useApplyInterfaceScale();
-  const desktopRuntime = isTauri();
+  const desktopRuntime = isDesktopRuntime();
   const location = useLocation();
   const desktopSceneTarget = location.pathname === "/" ? "home" : "workspace";
 
@@ -52,7 +52,7 @@ export function App() {
       className={`desktop-shell ${desktopRuntime ? "desktop-shell--tauri" : ""}`.trim()}
       data-scene-target={desktopSceneTarget}
     >
-      <DesktopTitlebar />
+      <LegacyDesktopTitlebar />
       <div className="desktop-shell__viewport">
         <Suspense
           fallback={

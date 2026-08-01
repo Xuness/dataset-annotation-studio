@@ -1,141 +1,53 @@
-import { useEffect, useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useAssets } from "../../features/assets/hooks";
-import {
-  useImageProcessingBackends,
-  usePreprocessExecutionPlan,
-  usePreprocessOperations,
-  usePreprocessingActions,
-} from "../../features/preprocessing/hooks";
-import { useRescanWorkspace, useWorkspace } from "../../features/workspaces/hooks";
+import { usePreprocessController } from "../../application/preprocessing/usePreprocessController";
+import { useLegacyRescanWorkspace } from "../../legacy/hooks/useLegacyRescanWorkspace";
+import { legacyConfirm } from "../../legacy/legacyInteractions";
 import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
-import type { PreprocessExecutionOptions, PreprocessRequest } from "../../shared/api/types";
-import { useAppStore } from "../../shared/store/appStore";
-import { confirmDialog } from "../../shared/ui/dialogs";
-import { Spinner } from "../../shared/ui/Spinner";
 import { Button } from "../../shared/ui/Button";
+import { Spinner } from "../../shared/ui/Spinner";
 import { PreprocessHistoryPanel } from "./components/PreprocessHistoryPanel";
 import { PreprocessOperationDetailPanel } from "./components/PreprocessOperationDetailPanel";
 import { PreprocessPreviewPanel } from "./components/PreprocessPreviewPanel";
 import { PreprocessSettingsPanel } from "./components/PreprocessSettingsPanel";
-import { activePreprocessStatuses } from "./operationProgress";
-import { preprocessViewState } from "./preprocessViewState";
 import "./preprocess.css";
-import type { PreprocessFormState } from "./types";
 
 export function PreprocessPage() {
   const { projectId = "" } = useParams();
   const navigate = useNavigate();
-  const workspace = useWorkspace(projectId);
-  const assets = useAssets(projectId, { limit: 1 });
-  const rescan = useRescanWorkspace(projectId);
-  const imageBackends = useImageProcessingBackends();
-  const actions = usePreprocessingActions(projectId);
-  const operations = usePreprocessOperations(
+  const rescan = useLegacyRescanWorkspace(projectId);
+  const controller = usePreprocessController({
     projectId,
-    actions.execute.isPending || actions.undo.isPending,
-  );
-  const checkedAssetIds = useAppStore((state) => state.checkedAssetIds);
-  const setActiveProject = useAppStore((state) => state.setActiveProject);
-  const { form, selectedOperationId } = preprocessViewState.useValue(projectId);
-  const patchForm = (update: Partial<PreprocessFormState>) =>
-    preprocessViewState.patch(projectId, (current) => ({ form: { ...current.form, ...update } }));
-  const setSelectedOperationId = (operationId: string | null) =>
-    preprocessViewState.patch(projectId, { selectedOperationId: operationId });
-  const [error, setError] = useState<string | null>(null);
-  const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
-
-  useEffect(() => {
-    setActiveProject(projectId);
-    setError(null);
-    setPreviewFingerprint(null);
-  }, [projectId, setActiveProject]);
-  useEffect(() => {
-    const operationItems = operations.data;
-    if (!operationItems) return;
-    preprocessViewState.patch(projectId, (current) => {
-      if (
-        current.selectedOperationId &&
-        operationItems.some((operation) => operation.id === current.selectedOperationId)
-      ) {
-        return {};
-      }
-      return {
-        selectedOperationId:
-          operationItems.find((operation) => activePreprocessStatuses.has(operation.status))?.id ??
-          null,
-      };
-    });
-  }, [operations.data, projectId]);
-  const request = useMemo<PreprocessRequest>(
-    () => ({
-      asset_ids: form.scope === "selected" ? checkedAssetIds : [],
-      resize: form.resizeEnabled
-        ? {
-            max_edge: form.maxEdge,
-            allow_upscale: form.allowUpscale,
-            algorithm: form.resizeAlgorithm,
-          }
-        : null,
-      convert: form.convertEnabled
-        ? { format: form.format, quality: form.quality, effort: form.effort }
-        : null,
-      rename: form.renameEnabled
-        ? {
-            template: form.renameTemplate,
-            start_index: form.renameStartIndex,
-            padding: form.renamePadding,
-          }
-        : null,
-    }),
-    [checkedAssetIds, form],
-  );
-  const resolvedAcceleratorId = useMemo(() => {
-    if (form.executionMode !== "prefer_accelerator") return null;
-    const usable = imageBackends.data?.backends.filter(
-      (backend) => backend.id !== "cpu" && backend.status !== "unavailable",
-    );
-    return (
-      usable?.find((backend) => backend.id === form.acceleratorId)?.id ?? usable?.[0]?.id ?? null
-    );
-  }, [form.acceleratorId, form.executionMode, imageBackends.data]);
-  const execution = useMemo<PreprocessExecutionOptions>(
-    () => ({
-      mode: form.executionMode,
-      accelerator_id: resolvedAcceleratorId,
-      max_workers: form.concurrencyMode === "manual" ? form.maxWorkers : null,
-      batch_size: form.batchMode === "manual" ? form.batchSize : null,
-    }),
-    [
-      form.batchMode,
-      form.batchSize,
-      form.concurrencyMode,
-      form.executionMode,
-      form.maxWorkers,
-      resolvedAcceleratorId,
-    ],
-  );
-  const requestFingerprint = useMemo(
-    () => JSON.stringify([projectId, request]),
-    [projectId, request],
-  );
-  const validPreview = previewFingerprint === requestFingerprint ? actions.preview.data : undefined;
-  const executionPlan = usePreprocessExecutionPlan(
-    projectId,
-    request,
-    validPreview?.preview_token,
-    execution,
-  );
-  const activeOperation = operations.data?.find((operation) =>
-    activePreprocessStatuses.has(operation.status),
-  );
-  const selectedOperation =
-    operations.data?.find((operation) => operation.id === selectedOperationId) ?? null;
-  const filesChanging =
-    actions.execute.isPending || actions.undo.isPending || Boolean(activeOperation);
-  const workspaceBusy = filesChanging || rescan.isPending;
+    rescanPending: rescan.isPending,
+    confirm: legacyConfirm,
+  });
+  const {
+    workspace,
+    form,
+    patchForm,
+    assetCount,
+    checkedCount,
+    preview,
+    previewPending,
+    executePending,
+    error,
+    backends,
+    backendsPending,
+    executionPlan,
+    executionPlanPending,
+    executionPlanError,
+    selectedOperation,
+    selectedOperationId,
+    setSelectedOperationId,
+    operations,
+    undoPending,
+    filesChanging,
+    workspaceBusy,
+    previewAction,
+    executeAction,
+    undoAction,
+  } = controller;
 
   if (workspace.isError) {
     return (
@@ -154,61 +66,6 @@ export function PreprocessPage() {
         <p>正在打开预处理工作台…</p>
       </div>
     );
-  }
-
-  async function preview() {
-    setError(null);
-    setPreviewFingerprint(null);
-    try {
-      await actions.preview.mutateAsync(request);
-      setPreviewFingerprint(requestFingerprint);
-      setSelectedOperationId(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法生成预览。");
-    }
-  }
-
-  async function execute() {
-    const previewData = validPreview;
-    if (!previewData || previewData.warning_count) return;
-    const confirmed = await confirmDialog(
-      `对 ${previewData.changed_count} 张图片执行预处理？原文件会保存在当前项目的恢复区。${
-        executionPlan.data
-          ? `预计 ${executionPlan.data.route_counts.accelerated_full ?? 0} 项使用加速管线、${
-              executionPlan.data.route_counts.accelerated_resize ?? 0
-            } 项仅加速缩放、${executionPlan.data.route_counts.cpu ?? 0} 项使用 CPU。`
-          : ""
-      }${request.rename ? "原标注、所有语言译文和 .json 也会一起重命名。" : ""}`,
-      { title: "执行预处理", confirmLabel: "执行" },
-    );
-    if (!confirmed) return;
-    setError(null);
-    setSelectedOperationId(null);
-    try {
-      await actions.execute.mutateAsync({
-        request,
-        previewToken: previewData.preview_token,
-        execution,
-      });
-      actions.preview.reset();
-      setPreviewFingerprint(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "预处理失败。");
-    }
-  }
-
-  async function undo(operationId: string) {
-    const confirmed = await confirmDialog(
-      "撤销这次预处理并恢复原文件？撤销前会再次校验当前文件。",
-      { title: "撤销预处理", tone: "danger", confirmLabel: "撤销并恢复" },
-    );
-    if (!confirmed) return;
-    setError(null);
-    try {
-      await actions.undo.mutateAsync(operationId);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "撤销预处理失败。");
-    }
   }
 
   return (
@@ -231,18 +88,18 @@ export function PreprocessPage() {
       <PreprocessSettingsPanel
         form={form}
         onChange={patchForm}
-        assetCount={assets.data?.total ?? 0}
-        checkedCount={checkedAssetIds.length}
-        preview={validPreview}
-        previewPending={actions.preview.isPending || workspaceBusy}
-        executePending={workspaceBusy}
+        assetCount={assetCount}
+        checkedCount={checkedCount}
+        preview={preview}
+        previewPending={previewPending}
+        executePending={executePending}
         error={error}
-        backends={imageBackends.data}
-        backendsPending={imageBackends.isPending}
-        executionPlan={executionPlan.data}
-        executionPlanPending={executionPlan.isFetching}
-        onPreview={() => void preview()}
-        onExecute={() => void execute()}
+        backends={backends}
+        backendsPending={backendsPending}
+        executionPlan={executionPlan}
+        executionPlanPending={executionPlanPending}
+        onPreview={() => void previewAction()}
+        onExecute={() => void executeAction()}
       />
       {selectedOperation ? (
         <PreprocessOperationDetailPanel
@@ -251,20 +108,18 @@ export function PreprocessPage() {
         />
       ) : (
         <PreprocessPreviewPanel
-          preview={validPreview}
-          executionPlan={executionPlan.data}
-          executionPlanPending={executionPlan.isFetching}
-          executionPlanError={
-            executionPlan.error instanceof Error ? executionPlan.error.message : null
-          }
+          preview={preview}
+          executionPlan={executionPlan}
+          executionPlanPending={executionPlanPending}
+          executionPlanError={executionPlanError}
         />
       )}
       <PreprocessHistoryPanel
-        operations={operations.data ?? []}
+        operations={operations}
         selectedOperationId={selectedOperationId}
-        undoPending={workspaceBusy}
+        undoPending={undoPending}
         onSelect={setSelectedOperationId}
-        onUndo={(id) => void undo(id)}
+        onUndo={(id) => void undoAction(id)}
       />
     </WorkspaceFrame>
   );

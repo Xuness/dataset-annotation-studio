@@ -8,7 +8,8 @@ import type {
   ProviderModelSummary,
   ProviderType,
 } from "../../../shared/api/types";
-import { useUnsavedChangesGuard, useUnsavedScope } from "../../../shared/desktop/useUnsavedChanges";
+import { useUnsavedScope } from "../../../application/useUnsavedScope";
+import { useLegacyUnsavedChangesGuard } from "../../../legacy/hooks/useLegacyUnsavedChangesGuard";
 import { Button } from "../../../shared/ui/Button";
 import { confirmDialog } from "../../../shared/ui/dialogs";
 import { Spinner } from "../../../shared/ui/Spinner";
@@ -28,7 +29,7 @@ export function ProviderProfilesPanel({ createSignal }: { createSignal: number }
   const mutations = useProviderProfileMutations();
   const selection = usePresetEditorSelection(profiles.data, createSignal);
   const selected = selection.selected;
-  const { confirmDiscard } = useUnsavedChangesGuard();
+  const { confirmDiscard } = useLegacyUnsavedChangesGuard();
   const [form, setForm] = useState<ProviderProfileForm>(() => emptyProviderProfileForm());
   const [selectedModelId, setSelectedModelId] = useState("");
   const [error, setError] = useState<string | null>(null);

@@ -1,24 +1,21 @@
 import { useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { confirm, message } from "@tauri-apps/plugin-dialog";
 
 import { getActiveJobs, stopAllWorkspaceJobs } from "../features/jobs/api";
-import { useAppStore } from "../shared/store/appStore";
 import {
-  ACKNOWLEDGE_EXIT_REQUEST_COMMAND,
-  DESKTOP_EXIT_REQUESTED_EVENT,
-  EXIT_APPLICATION_COMMAND,
-  runDesktopExit,
-  type DesktopExitRequestPayload,
-} from "./desktopExit";
-
-function isTauriRuntime(): boolean {
-  return "__TAURI_INTERNALS__" in window;
-}
+  acknowledgeDesktopExitRequest,
+  canHandleDesktopExitRequests,
+  confirmDesktopWarning,
+  exitDesktopApplication,
+  listenForDesktopExitRequest,
+  showDesktopWarning,
+} from "../shared/desktop/desktopExitBridge";
+import { useUnsavedChangesStore } from "../shared/store/unsavedChangesStore";
+import { runDesktopExit } from "./desktopExit";
 
 export function useCloseGuard(): void {
-  const hasUnsavedChanges = useAppStore((state) => Object.keys(state.dirtyScopes).length > 0);
+  const hasUnsavedChanges = useUnsavedChangesStore(
+    (state) => Object.keys(state.dirtyScopes).length > 0,
+  );
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   const exitRequestInFlightRef = useRef(false);
 
@@ -37,14 +34,13 @@ export function useCloseGuard(): void {
   }, [hasUnsavedChanges]);
 
   useEffect(() => {
-    if (!isTauriRuntime()) return;
+    if (!canHandleDesktopExitRequests()) return;
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
     const requestExit = (requestId: number) => {
       if (!Number.isSafeInteger(requestId) || requestId <= 0) return;
-      const acknowledgeRequest = () =>
-        invoke<boolean>(ACKNOWLEDGE_EXIT_REQUEST_COMMAND, { requestId });
+      const acknowledgeRequest = () => acknowledgeDesktopExitRequest(requestId);
 
       if (exitRequestInFlightRef.current) {
         void acknowledgeRequest().catch(() => undefined);
@@ -54,15 +50,13 @@ export function useCloseGuard(): void {
       void acknowledgeRequest()
         .then(() =>
           runDesktopExit(hasUnsavedChangesRef.current, {
-            confirm,
-            message,
+            confirm: (text, options) => confirmDesktopWarning(text, options.title),
+            message: (text, options) => showDesktopWarning(text, options.title),
             getActiveJobs,
             stopAllWorkspaceJobs,
             delay: (milliseconds) =>
               new Promise((resolve) => window.setTimeout(resolve, milliseconds)),
-            exitApplication: async () => {
-              await invoke(EXIT_APPLICATION_COMMAND);
-            },
+            exitApplication: exitDesktopApplication,
           }),
         )
         .catch(() => undefined)
@@ -71,8 +65,8 @@ export function useCloseGuard(): void {
         });
     };
 
-    void listen<DesktopExitRequestPayload>(DESKTOP_EXIT_REQUESTED_EVENT, (event) => {
-      requestExit(event.payload.request_id);
+    void listenForDesktopExitRequest((payload) => {
+      requestExit(payload.request_id);
     })
       .then((stopListening) => {
         if (disposed) stopListening();

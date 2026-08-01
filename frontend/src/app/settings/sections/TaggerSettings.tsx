@@ -1,4 +1,3 @@
-import { isTauri } from "@tauri-apps/api/core";
 import {
   CheckCircle2,
   CloudDownload,
@@ -16,6 +15,7 @@ import { useTaggerActions, useTaggerLibrary } from "../../../features/taggers/ho
 import { taggerSelectionModeLabel } from "../../../features/taggers/labels";
 import { openLocalFolder } from "../../../shared/desktop/openLocalFolder";
 import { pickTaggerLibraryFolder, pickTaggerModelFolder } from "../../../shared/desktop/pickFolder";
+import { isDesktopRuntime } from "../../../shared/desktop/runtime";
 import { formatBytes } from "../../../shared/format/bytes";
 import { SettingsSectionHeader } from "../../../shared/settings/components/SettingsSectionHeader";
 import "../../../shared/settings/styles/tagger-settings.css";
@@ -242,7 +242,7 @@ export function TaggerSettings({ onClose }: { onClose: () => void }) {
                   <div>
                     <Button
                       icon={<FolderOpen size={13} />}
-                      disabled={!isTauri()}
+                      disabled={!isDesktopRuntime()}
                       onClick={() => void openFolder(data.model_root)}
                     >
                       打开目录
@@ -383,7 +383,7 @@ export function TaggerSettings({ onClose }: { onClose: () => void }) {
                         <footer>
                           <Button
                             icon={<FolderOpen size={13} />}
-                            disabled={!isTauri()}
+                            disabled={!isDesktopRuntime()}
                             onClick={() => void openFolder(selectedInstallation.path)}
                           >
                             查看文件

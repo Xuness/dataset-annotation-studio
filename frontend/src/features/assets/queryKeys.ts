@@ -1,31 +1,32 @@
 import type { AssetQuery } from "./api";
+import { workspaceQueryKeys } from "../../shared/query/workspaceQueries";
 
 export const assetKeys = {
-  all: ["assets"] as const,
-  project: (projectId: string) => ["assets", projectId] as const,
-  list: (projectId: string, query: AssetQuery) => ["assets", projectId, query] as const,
+  project: (projectId: string) => workspaceQueryKeys.scope(projectId, "assets"),
+  list: (projectId: string, query: AssetQuery) =>
+    [...workspaceQueryKeys.scope(projectId, "assets"), "list", query] as const,
   infinite: (projectId: string, query: AssetQuery, pageSize: number) =>
-    ["assets", projectId, "infinite", query, pageSize] as const,
-  ids: (projectId: string, query: AssetQuery) => ["assets", projectId, "ids", query] as const,
-  folders: (projectId: string) => ["assets", projectId, "folders"] as const,
+    [...workspaceQueryKeys.scope(projectId, "assets"), "infinite", query, pageSize] as const,
+  ids: (projectId: string, query: AssetQuery) =>
+    [...workspaceQueryKeys.scope(projectId, "assets"), "ids", query] as const,
+  folders: (projectId: string) =>
+    [...workspaceQueryKeys.scope(projectId, "assets"), "folders"] as const,
 };
 
 export const promptPreviewKeys = {
-  all: ["prompt-preview"] as const,
-  project: (projectId: string) => ["prompt-preview", projectId] as const,
+  project: (projectId: string) => workspaceQueryKeys.scope(projectId, "prompt-preview"),
   detail: (projectId: string, assetId: string | null) =>
-    ["prompt-preview", projectId, assetId] as const,
+    [...workspaceQueryKeys.scope(projectId, "prompt-preview"), assetId] as const,
 };
 
 export const annotationTraceKeys = {
-  all: ["annotation-trace"] as const,
-  project: (projectId: string) => ["annotation-trace", projectId] as const,
+  project: (projectId: string) => workspaceQueryKeys.scope(projectId, "annotation-trace"),
   detail: (projectId: string, assetId: string | null) =>
-    ["annotation-trace", projectId, assetId] as const,
+    [...workspaceQueryKeys.scope(projectId, "annotation-trace"), assetId] as const,
 };
 
 export const metadataKeys = {
-  all: ["metadata"] as const,
-  project: (projectId: string) => ["metadata", projectId] as const,
-  detail: (projectId: string, assetId: string | null) => ["metadata", projectId, assetId] as const,
+  project: (projectId: string) => workspaceQueryKeys.scope(projectId, "metadata"),
+  detail: (projectId: string, assetId: string | null) =>
+    [...workspaceQueryKeys.scope(projectId, "metadata"), assetId] as const,
 };

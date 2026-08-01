@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { useAppStore } from "../../../shared/store/appStore";
-import { confirmDialog } from "../../../shared/ui/dialogs";
+import { useWorkspaceSelectionStore } from "../../shared/store/workspaceSelectionStore";
+import type { ConfirmInteraction } from "../interaction";
 
-interface UseAssetDestructiveActionsOptions {
+interface UseAssetDeletionControllerOptions {
   contextKey: string;
   selectedAssetId: string | null;
   editorDirty: boolean;
   discardEditorDraft: () => void;
   selectAsset: (assetId: string | null) => void;
+  confirm: ConfirmInteraction;
 }
 
 interface AssetDeletionDialogState {
@@ -23,14 +24,15 @@ const CLOSED_DIALOG: AssetDeletionDialogState = {
   initialView: "history",
 };
 
-export function useAssetDestructiveActions({
+export function useAssetDeletionController({
   contextKey,
   selectedAssetId,
   editorDirty,
   discardEditorDraft,
   selectAsset,
-}: UseAssetDestructiveActionsOptions) {
-  const setAssetsChecked = useAppStore((state) => state.setAssetsChecked);
+  confirm,
+}: UseAssetDeletionControllerOptions) {
+  const setAssetsChecked = useWorkspaceSelectionStore((state) => state.setAssetsChecked);
   const [deletionDialog, setDeletionDialog] = useState<AssetDeletionDialogState>(CLOSED_DIALOG);
 
   useEffect(() => {
@@ -40,17 +42,15 @@ export function useAssetDestructiveActions({
   const beforeDeleteAssets = useCallback(
     async (assetIds: string[]): Promise<boolean> => {
       if (!editorDirty || !selectedAssetId || !assetIds.includes(selectedAssetId)) return true;
-      return confirmDialog(
-        "当前图片的标注尚未保存。删除这张素材会丢弃编辑器中的修改，仍要继续吗？",
-        {
-          title: "未保存的标注",
-          tone: "danger",
-          confirmLabel: "丢弃并删除",
-          cancelLabel: "继续编辑",
-        },
-      );
+      return confirm({
+        message: "当前图片的标注尚未保存。删除这张素材会丢弃编辑器中的修改，仍要继续吗？",
+        title: "未保存的标注",
+        tone: "danger",
+        confirmLabel: "丢弃并删除",
+        cancelLabel: "继续编辑",
+      });
     },
-    [editorDirty, selectedAssetId],
+    [confirm, editorDirty, selectedAssetId],
   );
 
   const handleAssetsDeleted = useCallback(
@@ -65,17 +65,13 @@ export function useAssetDestructiveActions({
   );
 
   const openCheckedAssetDeletion = useCallback(() => {
-    const assetIds = [...useAppStore.getState().checkedAssetIds];
+    const assetIds = [...useWorkspaceSelectionStore.getState().checkedAssetIds];
     if (!assetIds.length) return;
     setDeletionDialog({ open: true, assetIds, initialView: "preview" });
   }, []);
 
   const openAssetDeletion = useCallback((assetId: string) => {
-    setDeletionDialog({
-      open: true,
-      assetIds: [assetId],
-      initialView: "preview",
-    });
+    setDeletionDialog({ open: true, assetIds: [assetId], initialView: "preview" });
   }, []);
 
   const openDeletionHistory = useCallback(() => {

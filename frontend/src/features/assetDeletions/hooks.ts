@@ -1,10 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { annotationKeys } from "../annotations/queryKeys";
-import { assetKeys } from "../assets/queryKeys";
-import { statisticsKeys } from "../statistics/queryKeys";
-import { translationKeys } from "../translations/queryKeys";
-import { workspaceKeys } from "../workspaces/queryKeys";
+import { invalidateWorkspaceMutation } from "../../shared/query/workspaceQueries";
 import {
   executeAssetDeletion,
   listAssetDeletions,
@@ -24,12 +20,7 @@ export function useAssetDeletionOperations(projectId: string, enabled = true) {
 export function useAssetDeletionActions(projectId: string) {
   const queryClient = useQueryClient();
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: assetDeletionKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: annotationKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: translationKeys.project(projectId) });
-    void queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(projectId) });
-    void queryClient.invalidateQueries({ queryKey: statisticsKeys.project(projectId) });
+    void invalidateWorkspaceMutation(queryClient, projectId, "asset-deletion-changed");
   };
 
   return {

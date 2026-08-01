@@ -8,7 +8,7 @@ import type {
 } from "../../../shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
-import type { ExportFormState } from "../types";
+import type { ExportFormState } from "../../../application/exports/exportState";
 
 interface Props {
   form: ExportFormState;

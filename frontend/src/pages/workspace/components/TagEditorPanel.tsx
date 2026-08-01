@@ -1,32 +1,17 @@
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type WheelEvent,
-} from "react";
+import { useId, useRef, type KeyboardEvent, type WheelEvent } from "react";
 import { Plus, Search, X } from "lucide-react";
 
 import {
-  useTagDictionaryResolution,
-  useTagDictionarySearch,
-} from "../../../features/tagDictionaries/hooks";
-import { useTaggerLibrary, useTaggerVocabularySearch } from "../../../features/taggers/hooks";
+  AUTO_VOCABULARY,
+  useTagEditorController,
+  type TagSuggestion,
+} from "../../../application/tags/useTagEditorController";
+import { normalizeTagKey } from "../../../application/tags/tagDraft";
 import type {
   AnnotationTag,
   AnnotationTaggerSource,
   TaggerInstallation,
 } from "../../../shared/api/types";
-import {
-  appendManualTags,
-  appendVocabularyTag,
-  groupTags,
-  normalizeTagKey,
-  removeTag,
-  type AppendTagsResult,
-} from "./tagEditorState";
 import { annotationTagTitle, tagCategoryLabel, tagCategoryTone } from "./tagPresentation";
 
 interface TagEditorPanelProps {
@@ -42,28 +27,6 @@ interface TagEditorPanelProps {
   onTagHoverChange?: (key: string | null) => void;
   onTagSelectionChange?: (keys: string[]) => void;
   compact?: boolean;
-}
-
-interface TagSuggestion {
-  name: string;
-  category: string | null;
-  translation: string | null;
-}
-
-const AUTO_VOCABULARY = "auto";
-const VOCABULARY_STORAGE_PREFIX = "dataset-studio.tag-vocabulary-source";
-const HAN_CHARACTER = /\p{Script=Han}/u;
-
-function vocabularyStorageKey(projectId: string): string {
-  return `${VOCABULARY_STORAGE_PREFIX}.${projectId}`;
-}
-
-function readVocabularyMode(projectId: string): string {
-  return window.localStorage.getItem(vocabularyStorageKey(projectId)) || AUTO_VOCABULARY;
-}
-
-function isChineseTagQuery(value: string): boolean {
-  return HAN_CHARACTER.test(value);
 }
 
 function collectSelectedTagKeys(container: HTMLElement, selection: Selection | null): string[] {
@@ -103,196 +66,62 @@ export function TagEditorPanel({
   compact = false,
 }: TagEditorPanelProps) {
   const listboxId = `tag-vocabulary-${useId().replaceAll(":", "")}`;
-  const library = useTaggerLibrary();
-  const [vocabularyMode, setVocabularyMode] = useState(() => readVocabularyMode(projectId));
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
-  const [activeSuggestion, setActiveSuggestion] = useState(0);
-  const [highlightedTag, setHighlightedTag] = useState<string | null>(null);
-  const [armedTag, setArmedTag] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState("");
-  const highlightTimer = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const groupsRef = useRef<HTMLDivElement>(null);
-
-  const readyInstallations = useMemo(
-    () => library.data?.installations.filter((item) => item.status === "ready") ?? [],
-    [library.data?.installations],
-  );
-  const sourceInstallation = useMemo(
-    () =>
-      readyInstallations.find(
-        (item) =>
-          item.id === taggerSource?.installation_id &&
-          item.fingerprint === taggerSource.fingerprint,
-      ) ?? null,
-    [readyInstallations, taggerSource],
-  );
-  const selectedInstallation = useMemo(() => {
-    if (vocabularyMode === AUTO_VOCABULARY) {
-      if (sourceInstallation) return sourceInstallation;
-      return taggerSource === null && readyInstallations.length === 1
-        ? readyInstallations[0]
-        : null;
-    }
-    return readyInstallations.find((item) => item.id === vocabularyMode) ?? null;
-  }, [readyInstallations, sourceInstallation, taggerSource, vocabularyMode]);
-
-  useEffect(() => {
-    setVocabularyMode(readVocabularyMode(projectId));
-  }, [projectId]);
-
-  useEffect(() => {
-    setQuery("");
-    setDebouncedQuery("");
-    setSuggestionsOpen(false);
-    setActiveSuggestion(0);
-    setHighlightedTag(null);
-    setArmedTag(null);
-    setStatusMessage("");
-  }, [assetId]);
-
-  useEffect(() => {
-    if (
-      library.data &&
-      vocabularyMode !== AUTO_VOCABULARY &&
-      !readyInstallations.some((item) => item.id === vocabularyMode)
-    ) {
-      setVocabularyMode(AUTO_VOCABULARY);
-      window.localStorage.setItem(vocabularyStorageKey(projectId), AUTO_VOCABULARY);
-    }
-  }, [library.data, projectId, readyInstallations, vocabularyMode]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
-    return () => window.clearTimeout(timer);
-  }, [query]);
-
-  useEffect(
-    () => () => {
-      if (highlightTimer.current !== null) window.clearTimeout(highlightTimer.current);
-    },
-    [],
-  );
-
-  const normalizedQuery = query.trim();
-  const searchSettled = normalizedQuery === debouncedQuery;
-  const chineseQuery = isChineseTagQuery(normalizedQuery);
-  const debouncedChineseQuery = isChineseTagQuery(debouncedQuery);
-  const vocabulary = useTaggerVocabularySearch(
-    debouncedChineseQuery ? null : (selectedInstallation?.id ?? null),
-    selectedInstallation?.fingerprint ?? "",
-    debouncedChineseQuery ? "" : debouncedQuery,
-  );
-  const dictionarySearch = useTagDictionarySearch(
-    debouncedChineseQuery ? debouncedQuery : "",
-    "zh-CN",
-  );
-  const suggestions = useMemo<TagSuggestion[]>(() => {
-    if (!searchSettled) return [];
-    if (debouncedChineseQuery) {
-      return (
-        dictionarySearch.data?.items.map((item) => ({
-          name: item.tag,
-          category: item.category,
-          translation: item.effective_translation?.trim() || null,
-        })) ?? []
-      );
-    }
-    const result = vocabulary.data;
-    return result && result.fingerprint === selectedInstallation?.fingerprint
-      ? result.items.map((item) => ({
-          ...item,
-          translation: null,
-        }))
-      : [];
-  }, [
-    debouncedChineseQuery,
-    dictionarySearch.data?.items,
-    searchSettled,
-    selectedInstallation?.fingerprint,
-    vocabulary.data,
-  ]);
-  const suggestionTags = useMemo(
-    () =>
-      debouncedChineseQuery
-        ? []
-        : suggestions.map((item) => ({ name: item.name, category: item.category })),
-    [debouncedChineseQuery, suggestions],
-  );
-  const suggestionTranslations = useTagDictionaryResolution(
-    suggestionTags,
-    "zh-CN",
-    suggestionsOpen && suggestionTags.length > 0,
-  );
-  const existingKeys = useMemo(() => new Set(tags.map((tag) => normalizeTagKey(tag.name))), [tags]);
-  const groups = useMemo(() => groupTags(tags), [tags]);
-  const currentOption = suggestions[activeSuggestion] ?? null;
-  const showSuggestions =
-    suggestionsOpen && Boolean(normalizedQuery) && (chineseQuery || Boolean(selectedInstallation));
-  const suggestionsFetching =
-    !searchSettled || (chineseQuery ? dictionarySearch.isFetching : vocabulary.isFetching);
-  const suggestionsError =
-    searchSettled && (chineseQuery ? dictionarySearch.isError : vocabulary.isError);
-
-  useEffect(() => {
-    setActiveSuggestion(0);
-  }, [debouncedQuery, selectedInstallation?.id]);
+  const controller = useTagEditorController({
+    projectId,
+    assetId,
+    tags,
+    taggerSource,
+    onChange,
+  });
+  const {
+    vocabularyMode,
+    query,
+    setQuery,
+    setSuggestionsOpen,
+    activeSuggestion,
+    setActiveSuggestion,
+    highlightedTag,
+    armedTag,
+    setArmedTag,
+    statusMessage,
+    readyInstallations,
+    suggestions,
+    suggestionTranslations,
+    existingKeys,
+    groups,
+    currentOption,
+    showSuggestions,
+    suggestionsFetching,
+    suggestionsError,
+    chineseQuery,
+    setVocabulary: updateVocabulary,
+    addManual: appendManual,
+    addSuggestion: appendSuggestion,
+    deleteTag,
+    handleBackspace,
+    autoVocabularyLabel,
+    vocabularyHint,
+  } = controller;
 
   function setVocabulary(value: string) {
-    setVocabularyMode(value);
-    window.localStorage.setItem(vocabularyStorageKey(projectId), value);
-    setQuery("");
-    setDebouncedQuery("");
-    setSuggestionsOpen(false);
-    inputRef.current?.focus();
-  }
-
-  function flashTag(key: string) {
-    if (highlightTimer.current !== null) window.clearTimeout(highlightTimer.current);
-    setHighlightedTag(key);
-    highlightTimer.current = window.setTimeout(() => {
-      setHighlightedTag(null);
-      highlightTimer.current = null;
-    }, 900);
-  }
-
-  function applyAppend(result: AppendTagsResult) {
-    if (result.addedCount) {
-      onChange(result.tags);
-      setStatusMessage(`已添加 ${result.addedCount} 个 Tag。`);
-    }
-    if (result.duplicateKey) {
-      flashTag(result.duplicateKey);
-      setStatusMessage("这个 Tag 已经存在。");
-    }
-    setQuery("");
-    setDebouncedQuery("");
-    setSuggestionsOpen(false);
-    setArmedTag(null);
+    updateVocabulary(value);
     inputRef.current?.focus();
   }
 
   function addManual(value = query) {
-    if (!value.trim()) return;
-    applyAppend(appendManualTags(tags, value));
+    appendManual(value);
+    inputRef.current?.focus();
   }
 
   function addSuggestion(item: TagSuggestion) {
-    applyAppend(appendVocabularyTag(tags, item));
-  }
-
-  function deleteTag(key: string) {
-    const tag = tags.find((item) => normalizeTagKey(item.name) === key);
-    onChange(removeTag(tags, key));
-    setArmedTag(null);
-    setStatusMessage(tag ? `已删除 ${tag.name}。` : "已删除 Tag。");
+    appendSuggestion(item);
+    inputRef.current?.focus();
   }
 
   function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (readOnly) return;
-    if (event.nativeEvent.isComposing) return;
+    if (readOnly || event.nativeEvent.isComposing) return;
     if (event.key === "ArrowDown" && showSuggestions && suggestions.length) {
       event.preventDefault();
       setActiveSuggestion((current) => (current + 1) % suggestions.length);
@@ -320,13 +149,7 @@ export function TagEditorPanel({
     }
     if (event.key === "Backspace" && !query && tags.length) {
       event.preventDefault();
-      const lastKey = normalizeTagKey(tags.at(-1)!.name);
-      if (armedTag === lastKey) {
-        deleteTag(lastKey);
-      } else {
-        setArmedTag(lastKey);
-        setStatusMessage(`再次按 Backspace 删除 ${tags.at(-1)!.name}。`);
-      }
+      handleBackspace();
     }
   }
 
@@ -334,30 +157,6 @@ export function TagEditorPanel({
     if (!event.ctrlKey || event.deltaY === 0) return;
     event.preventDefault();
     onFontSizeChange(Math.min(22, Math.max(10, fontSize + (event.deltaY < 0 ? 1 : -1))));
-  }
-
-  function autoVocabularyLabel(): string {
-    if (sourceInstallation) return `跟随来源 · ${sourceInstallation.name}`;
-    if (taggerSource) return `跟随来源 · ${taggerSource.installation_name}（不可用）`;
-    if (readyInstallations.length === 1) return `自动 · ${readyInstallations[0].name}`;
-    return "跟随标注来源";
-  }
-
-  function vocabularyHint(): string {
-    if (selectedInstallation) {
-      if (vocabularyMode === AUTO_VOCABULARY && sourceInstallation) {
-        return `正在跟随当前标注来源：${selectedInstallation.name} · ${selectedInstallation.model_version}`;
-      }
-      if (vocabularyMode === AUTO_VOCABULARY) {
-        return `当前标注没有模型来源，自动使用唯一可用词库：${selectedInstallation.name}`;
-      }
-      return `已手动选择词库：${selectedInstallation.name} · ${selectedInstallation.model_version}`;
-    }
-    if (taggerSource) {
-      return "当前标注的来源模型已删除或文件发生变化，请手动选择一个可用词库。";
-    }
-    if (readyInstallations.length > 1) return "当前标注没有模型来源，请选择自动补全词库。";
-    return "没有可用的本地 Tagger 词库，仍可手动添加 Tag。";
   }
 
   return (
@@ -405,7 +204,7 @@ export function TagEditorPanel({
                 const pasted = event.clipboardData.getData("text");
                 if (!/[,\r\n]/u.test(pasted)) return;
                 event.preventDefault();
-                applyAppend(appendManualTags(tags, pasted));
+                addManual(pasted);
               }}
             />
             {showSuggestions && suggestionsFetching ? (

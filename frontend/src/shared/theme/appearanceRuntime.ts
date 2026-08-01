@@ -1,10 +1,12 @@
-import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-
 import {
   filterTransparentRegionsForWindowDecorations,
   usesNativeDesktopWindowDecorations,
 } from "../desktop/runtimePlatform";
+import {
+  isDesktopRuntime,
+  resolveDesktopAssetUrl,
+  setDesktopWindowTheme,
+} from "../desktop/runtime";
 import {
   APP_SURFACE_REGIONS,
   resolveAppearance,
@@ -16,17 +18,13 @@ function cssUrl(value: string): string {
   return `url(${JSON.stringify(value)})`;
 }
 
-function resolveImageUrl(path: string): string {
-  return isTauri() ? convertFileSrc(path) : path;
-}
-
 export function applyPreferences(preferences: AppPreferences) {
   if (typeof document === "undefined") return;
 
   const resolved = resolveAppearance(preferences);
   const customBackground = resolved.customBackground;
   const sceneImage = customBackground
-    ? resolveImageUrl(customBackground.path)
+    ? resolveDesktopAssetUrl(customBackground.path)
     : resolved.theme.scene.image;
   const homePresentation = customBackground
     ? { position: "center", size: "contain" }
@@ -59,15 +57,11 @@ export function applyPreferences(preferences: AppPreferences) {
   );
   root.dataset.transparentRegions = filterTransparentRegionsForWindowDecorations(
     APP_SURFACE_REGIONS.filter((region) => surfaceTransparency[region]),
-    usesNativeDesktopWindowDecorations(isTauri()),
+    usesNativeDesktopWindowDecorations(isDesktopRuntime()),
   ).join(" ");
   root
     .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
     ?.setAttribute("content", resolved.theme.browserThemeColor);
 
-  if (isTauri()) {
-    void getCurrentWindow()
-      .setTheme(resolved.theme.nativeWindowTheme)
-      .catch(() => undefined);
-  }
+  void setDesktopWindowTheme(resolved.theme.nativeWindowTheme).catch(() => undefined);
 }

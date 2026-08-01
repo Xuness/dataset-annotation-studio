@@ -1,29 +1,29 @@
-import { useEffect, useState } from "react";
 import { Check, CircleStop, FileWarning, Play, RefreshCw } from "lucide-react";
 
-import { useJob, useJobActions } from "../../../features/jobs/hooks";
+import { useJobDetailController } from "../../../application/jobs/useJobDetailController";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 
 export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId: string | null }) {
-  const [itemLimit, setItemLimit] = useState(200);
-  const job = useJob(projectId, jobId, itemLimit);
-  const actions = useJobActions(projectId);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setItemLimit(200);
-    setActionError(null);
-  }, [jobId]);
-
-  async function runAction(action: () => Promise<unknown>) {
-    setActionError(null);
-    try {
-      await action();
-    } catch (reason) {
-      setActionError(reason instanceof Error ? reason.message : "任务操作失败。");
-    }
-  }
+  const controller = useJobDetailController(projectId, jobId);
+  const {
+    job,
+    error: actionError,
+    active,
+    stopping,
+    resumable,
+    exceptionItems,
+    exceptionCount,
+    stopPending,
+    resumePending,
+    retryPending,
+    acceptPending,
+    stop,
+    resume,
+    retry,
+    accept,
+    loadMore,
+  } = controller;
 
   if (!jobId)
     return (
@@ -53,14 +53,6 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
         <Spinner />
       </section>
     );
-
-  const active = ["queued", "running", "stopping"].includes(job.data.status);
-  const stopping = job.data.status === "stopping";
-  const resumable = ["stopped", "interrupted"].includes(job.data.status);
-  const exceptionItems = job.data.items.filter(
-    (item) => item.status === "failed" || item.result_disposition === "candidate",
-  );
-  const exceptionCount = job.data.failed + job.data.candidate_results;
 
   return (
     <section
@@ -93,9 +85,9 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
           {active ? (
             <Button
               tone="danger"
-              icon={actions.stop.isPending ? <Spinner /> : <CircleStop size={14} />}
-              onClick={() => void runAction(() => actions.stop.mutateAsync(job.data.id))}
-              disabled={stopping || actions.stop.isPending}
+              icon={stopPending ? <Spinner /> : <CircleStop size={14} />}
+              onClick={() => void stop(job.data.id)}
+              disabled={stopping || stopPending}
             >
               {stopping ? "正在停止" : "停止任务"}
             </Button>
@@ -103,18 +95,18 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
           {resumable ? (
             <Button
               tone="primary"
-              icon={actions.resume.isPending ? <Spinner /> : <Play size={14} />}
-              onClick={() => void runAction(() => actions.resume.mutateAsync(job.data.id))}
-              disabled={actions.resume.isPending}
+              icon={resumePending ? <Spinner /> : <Play size={14} />}
+              onClick={() => void resume(job.data.id)}
+              disabled={resumePending}
             >
               继续任务
             </Button>
           ) : null}
           {job.data.status === "completed_with_errors" && job.data.failed ? (
             <Button
-              icon={actions.retry.isPending ? <Spinner /> : <RefreshCw size={14} />}
-              onClick={() => void runAction(() => actions.retry.mutateAsync(job.data.id))}
-              disabled={actions.retry.isPending}
+              icon={retryPending ? <Spinner /> : <RefreshCw size={14} />}
+              onClick={() => void retry(job.data.id)}
+              disabled={retryPending}
             >
               仅重试失败项
             </Button>
@@ -184,12 +176,8 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
               {adoptableResponse?.response_content ? (
                 <Button
                   icon={<Check size={13} />}
-                  onClick={() =>
-                    void runAction(() =>
-                      actions.accept.mutateAsync({ jobId: job.data.id, itemId: item.id }),
-                    )
-                  }
-                  disabled={actions.accept.isPending}
+                  onClick={() => void accept(job.data.id, item.id)}
+                  disabled={acceptPending}
                 >
                   {job.data.kind === "translation"
                     ? `人工确认并写入 ${
@@ -210,7 +198,7 @@ export function JobDetailPanel({ projectId, jobId }: { projectId: string; jobId:
         {exceptionItems.length < exceptionCount ? (
           <Button
             icon={<RefreshCw size={13} />}
-            onClick={() => setItemLimit((current) => Math.min(current + 200, exceptionCount))}
+            onClick={() => loadMore(exceptionCount)}
             disabled={job.isFetching}
           >
             载入更多失败项

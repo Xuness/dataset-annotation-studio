@@ -8,7 +8,7 @@ import type {
 import { formatBytes } from "../../../shared/format/bytes";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
-import type { PreprocessFormState } from "../types";
+import type { PreprocessFormState } from "../../../application/preprocessing/preprocessState";
 
 const resizeAlgorithmDescriptions: Record<PreprocessFormState["resizeAlgorithm"], string> = {
   lanczos3: "Lanczos 3 保留较多细节，作为锐利默认值。",

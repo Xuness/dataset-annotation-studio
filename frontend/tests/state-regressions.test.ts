@@ -1,20 +1,34 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
+import { QueryClient } from "@tanstack/react-query";
 
+import {
+  runDesktopExit,
+  type ActiveDesktopJobs,
+  type DesktopExitDependencies,
+} from "../src/application/desktopExit.ts";
 import {
   ACKNOWLEDGE_EXIT_REQUEST_COMMAND,
   DESKTOP_EXIT_REQUESTED_EVENT,
   EXIT_APPLICATION_COMMAND,
-  runDesktopExit,
-  type ActiveDesktopJobs,
-  type DesktopExitDependencies,
-} from "../src/app/desktopExit.ts";
+} from "../src/shared/desktop/desktopExitProtocol.ts";
 import { providerCredentialCacheToken } from "../src/features/presets/queryKeys.ts";
 import {
   hasExistingAnnotationDocument,
   reconcilePersistedContent,
-} from "../src/pages/workspace/components/annotationEditorState.ts";
+} from "../src/application/annotations/annotationDraft.ts";
+import { annotationOptionKey } from "../src/application/annotations/annotationBulk.ts";
+import {
+  buildExportRequest,
+  createInitialExportForm,
+  hasActiveExport,
+} from "../src/application/exports/exportState.ts";
+import {
+  buildPreprocessExecution,
+  buildPreprocessRequest,
+  createInitialPreprocessForm,
+} from "../src/application/preprocessing/preprocessState.ts";
 import {
   annotationTagsEqual,
   appendManualTags,
@@ -23,7 +37,17 @@ import {
   parseTagDraft,
   reconcilePersistedTags,
   removeTag,
-} from "../src/pages/workspace/components/tagEditorState.ts";
+} from "../src/application/tags/tagDraft.ts";
+import {
+  buildTranslationComparisonModel,
+  uniqueAlignmentIds,
+} from "../src/application/translations/translationComparison.ts";
+import {
+  areAllAssetsChecked,
+  editorDiscardMessage,
+  resolveKnownMatchingAssetIds,
+} from "../src/application/workspace/workspaceAssets.ts";
+import type { TagDictionaryResolution, TranslationDocument } from "../src/shared/api/types.ts";
 import {
   createDesktopFullscreenToggle,
   isFullscreenShortcut,
@@ -37,6 +61,13 @@ import {
   usesNativeWindowDecorations,
 } from "../src/shared/desktop/runtimePlatform.ts";
 import { DEFAULT_INTERFACE_SCALE } from "../src/shared/desktop/useInterfaceScale.ts";
+import {
+  invalidateWorkspaceMutation,
+  invalidateWorkspaceScopeAcrossProjects,
+  workspaceQueryKeys,
+} from "../src/shared/query/workspaceQueries.ts";
+import { useUnsavedChangesStore } from "../src/shared/store/unsavedChangesStore.ts";
+import { useWorkspaceSelectionStore } from "../src/shared/store/workspaceSelectionStore.ts";
 import { DEFAULT_WORKSPACE_LAYOUT } from "../src/pages/workspace/hooks/useWorkspaceLayout.ts";
 import {
   DEFAULT_HOME_CONTENT,
@@ -84,6 +115,163 @@ test("existing annotation tab is exposed only when the current asset has importe
       { channel: "existing_annotation", exists: true },
     ]),
     true,
+  );
+});
+
+test("workspace asset projection trusts a complete page or a matching fresh id query", () => {
+  assert.deepEqual(
+    resolveKnownMatchingAssetIds({
+      loadedAssets: [{ id: "asset-1" }, { id: "asset-2" }],
+      total: 2,
+      hasNextPage: false,
+      queriedIds: undefined,
+      queriedTotal: undefined,
+      queriedIdsStale: true,
+    }),
+    ["asset-1", "asset-2"],
+  );
+  assert.deepEqual(
+    resolveKnownMatchingAssetIds({
+      loadedAssets: [{ id: "asset-1" }],
+      total: 3,
+      hasNextPage: true,
+      queriedIds: ["asset-1", "asset-2", "asset-3"],
+      queriedTotal: 3,
+      queriedIdsStale: false,
+    }),
+    ["asset-1", "asset-2", "asset-3"],
+  );
+  assert.equal(
+    resolveKnownMatchingAssetIds({
+      loadedAssets: [{ id: "asset-1" }],
+      total: 3,
+      hasNextPage: true,
+      queriedIds: ["asset-1", "asset-2"],
+      queriedTotal: 2,
+      queriedIdsStale: false,
+    }),
+    null,
+  );
+});
+
+test("workspace selection and discard policy stay independent from presentation", () => {
+  assert.equal(areAllAssetsChecked(["asset-1", "asset-2"], ["asset-2", "asset-1"]), true);
+  assert.equal(areAllAssetsChecked([], []), false);
+  assert.match(editorDiscardMessage("tags", "folder"), /Tags/);
+  assert.match(editorDiscardMessage("annotation", "asset"), /标注/);
+});
+
+test("preprocessing controller maps form state into request and execution contracts", () => {
+  const form = {
+    ...createInitialPreprocessForm(),
+    scope: "selected" as const,
+    convertEnabled: true,
+    renameEnabled: true,
+    concurrencyMode: "manual" as const,
+    maxWorkers: 4,
+  };
+  const request = buildPreprocessRequest(form, ["asset-7"]);
+  const execution = buildPreprocessExecution(form, "cuda");
+
+  assert.deepEqual(request.asset_ids, ["asset-7"]);
+  assert.equal(request.convert?.format, "webp");
+  assert.equal(request.rename?.template, "image_{index}");
+  assert.equal(execution.accelerator_id, "cuda");
+  assert.equal(execution.max_workers, 4);
+  assert.equal(execution.batch_size, null);
+});
+
+test("export controller freezes selected scope without mutating selection state", () => {
+  const form = {
+    ...createInitialExportForm(),
+    scope: "selected" as const,
+    destinationPath: "D:\\exports\\dataset",
+    packaging: "zip" as const,
+  };
+  const checked = ["asset-1", "asset-2"];
+  const request = buildExportRequest(form, checked);
+
+  assert.deepEqual(request.asset_ids, checked);
+  assert.notEqual(request.asset_ids, checked);
+  assert.equal(request.packaging, "zip");
+  assert.equal(hasActiveExport([{ status: "running" }] as never), true);
+  assert.equal(hasActiveExport([{ status: "completed" }] as never), false);
+});
+
+test("translation comparison model derives aligned tokens from the active source", () => {
+  const translation = {
+    asset_id: "asset-1",
+    language: "zh-CN",
+    source_kind: "tags",
+    producer_kind: "local_dictionary",
+    status: "current",
+    alignment_status: "aligned",
+    source_exists: true,
+    source_tags: [
+      {
+        name: "blue_hair",
+        category: "general",
+        confidence: 0.9,
+        origin: "tagger",
+      },
+    ],
+    alignment_parts: [
+      {
+        id: "blue_hair",
+        kind: "tag",
+        source_text: "blue_hair",
+        translated_text: "蓝发",
+        category: "general",
+        confidence: 0.9,
+      },
+    ],
+    source_content: "blue_hair",
+    content: "蓝发",
+    modified_at: "2026-08-01T00:00:00Z",
+  } as TranslationDocument;
+  const dictionaryPreview = {
+    entries: [
+      {
+        requested_tag: "blue_hair",
+        translation: "蓝发",
+        matched: true,
+      },
+    ],
+  } as TagDictionaryResolution;
+  const model = buildTranslationComparisonModel({
+    translation,
+    editing: false,
+    editContent: "",
+    editorTags: translation.source_tags,
+    editorTagsDirty: false,
+    dictionaryPreview,
+    dictionaryPreviewLoading: false,
+    dictionaryPreviewError: null,
+  });
+
+  assert.equal(model.previewAligned, true);
+  assert.equal(model.canRenderPersistedTags, true);
+  assert.deepEqual(model.tokenCountItems, [
+    { id: "source", text: "blue_hair" },
+    { id: "translated", text: "蓝发" },
+  ]);
+  assert.deepEqual(uniqueAlignmentIds(["tag-a", "tag-a", "", "tag-b"]), ["tag-a", "tag-b"]);
+});
+
+test("annotation bulk target identity includes translation source and producer", () => {
+  assert.notEqual(
+    annotationOptionKey({
+      channel: "translation",
+      language: "zh-CN",
+      translation_source_kind: "tags",
+      translation_producer_kind: "llm",
+    } as never),
+    annotationOptionKey({
+      channel: "translation",
+      language: "zh-CN",
+      translation_source_kind: "description",
+      translation_producer_kind: "llm",
+    } as never),
   );
 });
 
@@ -222,6 +410,63 @@ test("provider credential cache tokens distinguish non-empty keys without retain
   assert.notEqual(first, second);
   assert.equal(first.includes("secret-key-a"), false);
   assert.equal(second.includes("secret-key-b"), false);
+});
+
+test("workspace mutation invalidation stays inside the affected project and projection set", async () => {
+  const queryClient = new QueryClient();
+  const projectId = "project-a";
+  const otherProjectId = "project-b";
+  const affected = workspaceQueryKeys.scope(projectId, "annotations");
+  const unaffectedScope = workspaceQueryKeys.scope(projectId, "exports");
+  const unaffectedProject = workspaceQueryKeys.scope(otherProjectId, "annotations");
+  queryClient.setQueryData(affected, { value: 1 });
+  queryClient.setQueryData(unaffectedScope, { value: 2 });
+  queryClient.setQueryData(unaffectedProject, { value: 3 });
+
+  await invalidateWorkspaceMutation(queryClient, projectId, "annotation-written");
+
+  assert.equal(queryClient.getQueryState(affected)?.isInvalidated, true);
+  assert.equal(queryClient.getQueryState(unaffectedScope)?.isInvalidated, false);
+  assert.equal(queryClient.getQueryState(unaffectedProject)?.isInvalidated, false);
+});
+
+test("global scope invalidation reaches the same projection in every open project", async () => {
+  const queryClient = new QueryClient();
+  const first = workspaceQueryKeys.scope("project-a", "prompt-preview");
+  const second = workspaceQueryKeys.scope("project-b", "prompt-preview");
+  const unrelated = workspaceQueryKeys.scope("project-b", "assets");
+  queryClient.setQueryData(first, { value: 1 });
+  queryClient.setQueryData(second, { value: 2 });
+  queryClient.setQueryData(unrelated, { value: 3 });
+
+  await invalidateWorkspaceScopeAcrossProjects(queryClient, "prompt-preview");
+
+  assert.equal(queryClient.getQueryState(first)?.isInvalidated, true);
+  assert.equal(queryClient.getQueryState(second)?.isInvalidated, true);
+  assert.equal(queryClient.getQueryState(unrelated)?.isInvalidated, false);
+});
+
+test("workspace batch selection is preserved within a project and reset across projects", () => {
+  useWorkspaceSelectionStore.setState({ projectId: null, checkedAssetIds: [] });
+  const selection = useWorkspaceSelectionStore.getState();
+  selection.setActiveProject("project-a");
+  selection.setAssetsChecked(["asset-1", "asset-2"], true);
+  useWorkspaceSelectionStore.getState().setActiveProject("project-a");
+  assert.deepEqual(useWorkspaceSelectionStore.getState().checkedAssetIds, ["asset-1", "asset-2"]);
+
+  useWorkspaceSelectionStore.getState().setActiveProject("project-b");
+  assert.deepEqual(useWorkspaceSelectionStore.getState().checkedAssetIds, []);
+});
+
+test("unsaved-change tracking is independent from workspace batch selection", () => {
+  useUnsavedChangesStore.setState({ dirtyScopes: {} });
+  useWorkspaceSelectionStore.setState({ projectId: "project-a", checkedAssetIds: ["asset-1"] });
+  useUnsavedChangesStore.getState().setDirtyScope("annotation:asset-1", true);
+  useWorkspaceSelectionStore.getState().clearCheckedAssets();
+
+  assert.deepEqual(useUnsavedChangesStore.getState().dirtyScopes, {
+    "annotation:asset-1": true,
+  });
 });
 
 test("fullscreen shortcut accepts only an unmodified first F11 press", () => {
@@ -1098,7 +1343,10 @@ test("desktop lifecycle bridge names stay aligned with the Rust host", () => {
     "utf8",
   );
   const tauriEntry = readFileSync(new URL("../../src-tauri/src/lib.rs", import.meta.url), "utf8");
-  const closeGuard = readFileSync(new URL("../src/app/useCloseGuard.ts", import.meta.url), "utf8");
+  const closeGuard = readFileSync(
+    new URL("../src/application/useCloseGuard.ts", import.meta.url),
+    "utf8",
+  );
 
   assert.match(
     desktopHost,
