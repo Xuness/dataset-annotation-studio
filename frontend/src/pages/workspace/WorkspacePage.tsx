@@ -33,6 +33,7 @@ import { AssetBrowser } from "./components/AssetBrowser";
 import { ImageStage } from "./components/ImageStage";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { PaneResizeHandle } from "./components/PaneResizeHandle";
+import { TagBatchEditDialog } from "./components/TagBatchEditDialog";
 import {
   clamp,
   DEFAULT_WORKSPACE_LAYOUT,
@@ -59,6 +60,11 @@ interface AnnotationBulkDialogState {
   assetIds: string[];
 }
 
+interface TagBatchDialogState {
+  open: boolean;
+  assetIds: string[];
+}
+
 const DEFAULT_EDITOR_TARGET: AnnotationChannelTarget = {
   channel: "description",
   language: "",
@@ -67,6 +73,11 @@ const DEFAULT_EDITOR_TARGET: AnnotationChannelTarget = {
 const CLOSED_ANNOTATION_DIALOG: AnnotationBulkDialogState = {
   open: false,
   action: "review",
+  assetIds: [],
+};
+
+const CLOSED_TAG_BATCH_DIALOG: TagBatchDialogState = {
+  open: false,
   assetIds: [],
 };
 
@@ -106,6 +117,8 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const [editorRevision, setEditorRevision] = useState(0);
   const [annotationDialog, setAnnotationDialog] =
     useState<AnnotationBulkDialogState>(CLOSED_ANNOTATION_DIALOG);
+  const [tagBatchDialog, setTagBatchDialog] =
+    useState<TagBatchDialogState>(CLOSED_TAG_BATCH_DIALOG);
   const workspaceBodyRef = useRef<HTMLDivElement>(null);
   const mediaColumnRef = useRef<HTMLDivElement>(null);
   const { layout, setLayout } = useWorkspaceLayout(projectId);
@@ -165,6 +178,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     setEditorTarget(DEFAULT_EDITOR_TARGET);
     setEditorRevision(0);
     setAnnotationDialog(CLOSED_ANNOTATION_DIALOG);
+    setTagBatchDialog(CLOSED_TAG_BATCH_DIALOG);
   }, [mode, projectId, setActiveProject]);
 
   useEffect(() => {
@@ -280,10 +294,26 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     setAnnotationDialog((current) => ({ ...current, open: false }));
   }, []);
 
+  const openTagBatchDialog = useCallback(() => {
+    const assetIds = [...useAppStore.getState().checkedAssetIds];
+    if (!assetIds.length) return;
+    setTagBatchDialog({ open: true, assetIds });
+  }, []);
+
+  const closeTagBatchDialog = useCallback(() => {
+    setTagBatchDialog((current) => ({ ...current, open: false }));
+  }, []);
+
   const blockedAnnotationTarget =
     editorDirty && selectedAssetId && annotationDialog.assetIds.includes(selectedAssetId)
       ? editorTarget
       : null;
+  const blockedTagDraft = Boolean(
+    editorDirty &&
+    editorDirtyKind === "tags" &&
+    selectedAssetId &&
+    tagBatchDialog.assetIds.includes(selectedAssetId),
+  );
 
   const layoutStyle = {
     "--asset-pane-width": `${layout.assetPaneWidth}px`,
@@ -352,7 +382,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         selectAllPending={matchingAssetIds.isFetching}
         allMatchingSelected={allMatchingSelected}
         error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
-        bulkActionPending={annotationDialog.open}
+        bulkActionPending={annotationDialog.open || tagBatchDialog.open}
         onLoadMore={loadMoreAssets}
         recursive={workspace.data.settings.recursive_scan}
         onSearchChange={setSearch}
@@ -362,6 +392,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         onSetChecked={setAssetsChecked}
         onToggleAll={() => void toggleAllMatchingAssets()}
         onReviewCheckedAnnotations={() => openAnnotationDialog("review")}
+        onEditCheckedTags={openTagBatchDialog}
         onDeleteCheckedAnnotations={() => openAnnotationDialog("delete")}
         onDeleteCheckedAssets={assetActions.openCheckedAssetDeletion}
         onOpenDeletionHistory={assetActions.openDeletionHistory}
@@ -503,6 +534,13 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         assetIds={annotationDialog.assetIds}
         blockedTarget={blockedAnnotationTarget}
         onClose={closeAnnotationDialog}
+      />
+      <TagBatchEditDialog
+        projectId={projectId}
+        open={tagBatchDialog.open}
+        assetIds={tagBatchDialog.assetIds}
+        blockedTagDraft={blockedTagDraft}
+        onClose={closeTagBatchDialog}
       />
     </WorkspaceFrame>
   );

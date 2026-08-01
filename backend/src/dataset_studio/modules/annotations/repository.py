@@ -41,6 +41,16 @@ class RevisionWrite:
     became_head: bool
 
 
+@dataclass(frozen=True, slots=True)
+class TagRevisionWriteRequest:
+    asset_id: str
+    tags: tuple[AnnotationTag, ...]
+    source: str
+    validation_status: AnnotationStatus
+    image_content_hash: str
+    expected_head_revision_id: str | None
+
+
 def channel_definition(
     channel: AnnotationChannel,
     language: str = "",
@@ -287,6 +297,43 @@ class AnnotationRepository:
         finally:
             connection.close()
 
+    def revision_tags_many(
+        self,
+        revision_ids: Sequence[str],
+    ) -> dict[str, list[AnnotationTag]]:
+        unique_ids = list(dict.fromkeys(revision_id for revision_id in revision_ids if revision_id))
+        result = {revision_id: [] for revision_id in unique_ids}
+        if not unique_ids:
+            return result
+        connection = connect(self._database_path)
+        try:
+            for start in range(0, len(unique_ids), 500):
+                batch = unique_ids[start : start + 500]
+                placeholders = ",".join("?" for _ in batch)
+                rows = connection.execute(
+                    f"""
+                    SELECT revision_id, name, category, confidence, origin
+                    FROM annotation_tag_items
+                    WHERE revision_id IN ({placeholders})
+                    ORDER BY revision_id, position
+                    """,
+                    batch,
+                ).fetchall()
+                for row in rows:
+                    result[str(row["revision_id"])].append(
+                        AnnotationTag.model_validate(
+                            {
+                                "name": row["name"],
+                                "category": row["category"],
+                                "confidence": row["confidence"],
+                                "origin": row["origin"],
+                            }
+                        )
+                    )
+        finally:
+            connection.close()
+        return result
+
     def usable_revision_id(
         self,
         asset_id: str,
@@ -456,6 +503,41 @@ class AnnotationRepository:
             raw_bytes=None,
             **kwargs,
         )
+
+    def write_tags_many(
+        self,
+        requests: Sequence[TagRevisionWriteRequest],
+    ) -> list[RevisionWrite]:
+        if not requests:
+            return []
+        writes: list[RevisionWrite] = []
+        with transaction(self._database_path) as connection:
+            for request in requests:
+                asset = connection.execute(
+                    "SELECT content_hash FROM assets WHERE id = ? AND is_present = 1",
+                    (request.asset_id,),
+                ).fetchone()
+                if asset is None:
+                    raise ResourceConflictError("批量编辑目标素材已不存在，未写入任何 Tags。")
+                if str(asset["content_hash"]) != request.image_content_hash:
+                    raise ResourceConflictError("素材在批量编辑期间发生变化，请重新预览。")
+                writes.append(
+                    self.write_tags_in_transaction(
+                        connection,
+                        asset_id=request.asset_id,
+                        tags=request.tags,
+                        source=request.source,
+                        validation_status=request.validation_status,
+                        image_content_hash=request.image_content_hash,
+                        expected_head_revision_id=request.expected_head_revision_id,
+                        review=False,
+                        source_job_item_id=None,
+                        input_revisions=(),
+                        metadata=None,
+                        allow_candidate_on_conflict=False,
+                    )
+                )
+        return writes
 
     def delete(
         self,

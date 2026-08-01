@@ -6,6 +6,9 @@ import type {
 
 const revisionSourceLabels: Record<string, string> = {
   manual_edit: "手动保存",
+  manual_tag_batch_add: "批量添加 Tags",
+  manual_tag_batch_remove: "批量删除 Tags",
+  manual_tag_batch_replace: "批量替换 Tags",
   model_response: "LLM 生成",
   local_tagger: "Tagger 生成",
   manual_accept: "人工采用",

@@ -4,6 +4,9 @@ import type {
   AnnotationChannel,
   AnnotationChannelTarget,
   AnnotationTag,
+  AnnotationTagBatchEditExecuteRequest,
+  AnnotationTagBatchEditPreviewOptions,
+  AnnotationTagBatchEditRequest,
   TranslationProducerKind,
   TranslationSourceKind,
 } from "../../shared/api/types";
@@ -20,6 +23,8 @@ import {
   getAnnotationChannelHistory,
   reviewAnnotationChannel,
   reviewAnnotations,
+  executeTagBatchEdit,
+  previewTagBatchEdit,
   saveAnnotationChannel,
 } from "./api";
 import { annotationHistoryKeys, annotationKeys } from "./queryKeys";
@@ -225,6 +230,27 @@ export function useReviewAnnotations(projectId: string) {
       assetIds: string[];
       targets: AnnotationChannelTarget[];
     }) => reviewAnnotations(projectId, assetIds, targets),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePreviewTagBatchEdit(projectId: string) {
+  return useMutation({
+    mutationFn: ({
+      request,
+      options,
+    }: {
+      request: AnnotationTagBatchEditRequest;
+      options?: AnnotationTagBatchEditPreviewOptions;
+    }) => previewTagBatchEdit(projectId, request, options),
+  });
+}
+
+export function useExecuteTagBatchEdit(projectId: string) {
+  const invalidate = useInvalidateAnnotation(projectId);
+  return useMutation({
+    mutationFn: (request: AnnotationTagBatchEditExecuteRequest) =>
+      executeTagBatchEdit(projectId, request),
     onSuccess: invalidate,
   });
 }

@@ -5,7 +5,7 @@ import os
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
 from io import BytesIO
@@ -67,6 +67,8 @@ class _RuntimeEntry:
     batch_size_lock: threading.Lock
     serialize_runs: bool
     run_lock: threading.Lock
+    last_used: float
+    in_use: bool = False
 
 
 @dataclass(slots=True)
@@ -146,24 +148,28 @@ class TaggerInferenceSession:
         inputs = self.entry.adapter.collate(inference_inputs, self.entry.runtime_spec)
         run_guard = self.entry.run_lock if self.entry.serialize_runs else nullcontext()
         started = time.perf_counter()
+        self.entry.in_use = True
         try:
-            with run_guard:
-                outputs = self.entry.session.run(
-                    [output.name for output in self.entry.runtime_spec.outputs],
-                    inputs,
-                )
-        except Exception as error:
-            raise ValueError(f"ONNX 本地推理失败：{error}") from error
-        elapsed_ms = (time.perf_counter() - started) * 1_000
-        active_provider = self._validate_active_provider()
-        results = self.entry.adapter.postprocess(
-            outputs,
-            self.entry.vocabulary,
-            selection=self.profile.selection,
-            categories=tuple(self.profile.categories),
-            provider=active_provider,
-            inference_ms=elapsed_ms,
-        )
+            try:
+                with run_guard:
+                    outputs = self.entry.session.run(
+                        [output.name for output in self.entry.runtime_spec.outputs],
+                        inputs,
+                    )
+            except Exception as error:
+                raise ValueError(f"ONNX 本地推理失败：{error}") from error
+            elapsed_ms = (time.perf_counter() - started) * 1_000
+            active_provider = self._validate_active_provider()
+            results = self.entry.adapter.postprocess(
+                outputs,
+                self.entry.vocabulary,
+                selection=self.profile.selection,
+                categories=tuple(self.profile.categories),
+                provider=active_provider,
+                inference_ms=elapsed_ms,
+            )
+        finally:
+            self.entry.in_use = False
         if len(results) != len(inference_inputs):
             raise ValueError(
                 f"打标器返回了 {len(results)} 条结果，但推理批次包含 "
@@ -201,9 +207,11 @@ class TaggerRuntime:
         self,
         taggers: TaggerService,
         session_factory: _SessionFactory | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._taggers = taggers
         self._session_factory = session_factory or self._create_onnx_session
+        self._clock = clock
         self._entries: OrderedDict[tuple[str, str, str], _RuntimeEntry] = OrderedDict()
         self._entry_lock = threading.Lock()
 
@@ -251,6 +259,31 @@ class TaggerRuntime:
             if not self._taggers.has_installation(installation_id):
                 self.evict(installation_id)
 
+    def prune_idle(self, timeout_seconds: float | None) -> None:
+        """Release sessions that have been idle longer than the timeout.
+
+        A session in active use is kept regardless of its idle time. A timeout
+        of zero or None keeps the current behavior of never releasing.
+        """
+        if timeout_seconds is None or timeout_seconds <= 0:
+            return
+        with self._entry_lock:
+            now = self._clock()
+            expired = [
+                (key, entry)
+                for key, entry in self._entries.items()
+                if not entry.in_use and now - entry.last_used > timeout_seconds
+            ]
+            for key, entry in expired:
+                self._entries.pop(key, None)
+                LOGGER.info(
+                    "Releasing idle local tagger session for installation %s "
+                    "(%.0fs idle, timeout %ss).",
+                    entry.installation_id,
+                    now - entry.last_used,
+                    timeout_seconds,
+                )
+
     def _entry(
         self,
         profile: TaggerExecutionProfile,
@@ -262,6 +295,7 @@ class TaggerRuntime:
         with self._entry_lock:
             existing = self._entries.pop(key, None)
             if existing is not None:
+                existing.last_used = self._clock()
                 self._entries[key] = existing
                 return existing
             runtime_spec = adapter.runtime_spec(directory)
@@ -286,6 +320,7 @@ class TaggerRuntime:
                 batch_size_lock=threading.Lock(),
                 serialize_runs=actual[0] == "DmlExecutionProvider",
                 run_lock=threading.Lock(),
+                last_used=self._clock(),
             )
             self._entries[key] = entry
             while len(self._entries) > 1:
@@ -345,7 +380,13 @@ class TaggerRuntime:
             return candidates
         provider = _DEVICE_PROVIDERS[device]
         if provider not in available:
-            raise ValueError(f"当前 ONNX Runtime 不支持执行设备：{device.value}")
+            raise ValueError(
+                f"当前 ONNX Runtime 不支持执行设备：{device.value}"
+                f"（可用执行设备：{'、'.join(available)}）。"
+                "请用 CUDA Runtime 启动应用（Linux：启动开发版.sh --cuda，"
+                "Windows：启动开发版.bat -Runtime cuda），"
+                "或将打标配置的设备改为 auto/cpu。"
+            )
         return [TaggerRuntime._provider_chain(provider, available)]
 
     @staticmethod

@@ -43,8 +43,9 @@ describe("asset browser rows", () => {
     const onSelect = vi.fn(async () => true);
     const onSetChecked = vi.fn();
     const onReviewCheckedAnnotations = vi.fn();
+    const onEditCheckedTags = vi.fn();
 
-    render(
+    const { container } = render(
       <AssetBrowser
         projectId="project-a"
         assets={[asset]}
@@ -88,6 +89,7 @@ describe("asset browser rows", () => {
         onToggleAll={() => undefined}
         onRecursiveChange={() => undefined}
         onReviewCheckedAnnotations={onReviewCheckedAnnotations}
+        onEditCheckedTags={onEditCheckedTags}
         onDeleteCheckedAnnotations={() => undefined}
         onDeleteCheckedAssets={() => undefined}
         onOpenDeletionHistory={() => undefined}
@@ -96,6 +98,7 @@ describe("asset browser rows", () => {
     );
 
     const checkbox = screen.getByRole("checkbox", { name: "选择 sample.png" });
+    expect(container.querySelector(".asset-selection-toolbar__actions")?.children).toHaveLength(4);
     const openButton = screen.getByRole("button", { name: /sample\.png/ });
     expect(openButton.contains(checkbox)).toBe(false);
     expect(screen.getByTitle("LLM 描述：已复核").textContent).toBe("L");
@@ -107,6 +110,9 @@ describe("asset browser rows", () => {
 
     await user.click(screen.getByRole("button", { name: "标记已复核" }));
     expect(onReviewCheckedAnnotations).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole("button", { name: "编辑 Tags" }));
+    expect(onEditCheckedTags).toHaveBeenCalledOnce();
 
     await user.click(openButton);
     expect(onSelect).toHaveBeenCalledWith("asset-1");

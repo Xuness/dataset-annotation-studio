@@ -1,5 +1,6 @@
 @import "./styles/asset-browser.css";
 @import "./styles/annotation-bulk-action.css";
+@import "./styles/tag-batch-edit.css";
 @import "./styles/asset-deletion.css";
 @import "./styles/image-stage.css";
 @import "./styles/annotation-editor.css";

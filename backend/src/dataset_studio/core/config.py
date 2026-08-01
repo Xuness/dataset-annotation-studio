@@ -43,6 +43,7 @@ class Settings:
     thumbnail_size: int = 320
     source_root: Path | None = None
     frontend_port: int = 5173
+    tagger_idle_timeout_seconds: int = 60
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -55,6 +56,9 @@ class Settings:
             frontend_port=int(os.environ.get("DATASET_STUDIO_FRONTEND_PORT", "5173")),
             source_root=(
                 Path(configured_source_root).resolve() if configured_source_root else None
+            ),
+            tagger_idle_timeout_seconds=int(
+                os.environ.get("DATASET_STUDIO_TAGGER_IDLE_TIMEOUT", "60")
             ),
         )
 

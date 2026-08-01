@@ -8,6 +8,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Protocol
 
+from dataset_studio.core.config import Settings
 from dataset_studio.core.errors import WorkspaceNotFoundError
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.assets.deletions.service import AssetDeletionService
@@ -43,6 +44,7 @@ _LOCAL_TAGGER_CLAIM_SIZE = 16
 
 
 class AnnotationWorkerContainer(Protocol):
+    settings: Settings
     workspaces: WorkspaceService
     presets: PresetService
     translations: TranslationService
@@ -87,6 +89,9 @@ class AnnotationWorker:
         while not stopped.is_set():
             self._reap_finished_tasks()
             self._container.tagger_runtime.prune_missing_installations()
+            self._container.tagger_runtime.prune_idle(
+                self._container.settings.tagger_idle_timeout_seconds
+            )
             self._schedule_available_items()
             with suppress(TimeoutError):
                 await asyncio.wait_for(stopped.wait(), timeout=0.5)

@@ -7,6 +7,7 @@ RUNTIME_REQUEST="${DATASET_STUDIO_RUNTIME:-auto}"
 GRAPHICS="${DATASET_STUDIO_LINUX_GRAPHICS:-cpu-paint}"
 CHECK_ONLY=0
 SKIP_SYNC=0
+SKIP_STALE_CHECK=0
 ORIGINAL_TERMINAL_STATE=""
 
 usage() {
@@ -23,6 +24,7 @@ Dataset Annotation Studio Linux 开发版启动器
   --graphics MODE        cpu-paint（默认）| native | nvidia-sync | dmabuf-off | software
   --check-only           只检查并同步依赖，不启动应用
   --skip-sync            跳过 pnpm install 与 uv sync
+  --skip-stale-check     跳过残留开发进程检测
   -h, --help             显示帮助
 
 示例：
@@ -47,6 +49,7 @@ while (($#)); do
       ;;
     --check-only) CHECK_ONLY=1 ;;
     --skip-sync) SKIP_SYNC=1 ;;
+    --skip-stale-check) SKIP_STALE_CHECK=1 ;;
     -h | --help)
       usage
       exit 0
@@ -138,6 +141,75 @@ select_dev_ports() {
   echo "[Dataset Studio] 可用开发端口：Vite $frontend_port，API $api_port"
 }
 
+stop_stale_processes() {
+  local pid
+  local cmdline
+  local -a stale_pids=()
+  local -A seen=()
+  local -a unique_pids=()
+
+  local -A protected=()
+  local ancestor_pid="$$"
+  while [[ "$ancestor_pid" =~ ^[0-9]+$ && "$ancestor_pid" != "1" ]]; do
+    protected[$ancestor_pid]=1
+    ancestor_pid="$(ps -o ppid= -p "$ancestor_pid" 2>/dev/null | tr -d ' ')"
+  done
+
+  while IFS= read -r pid; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    [[ -n "${protected[$pid]:-}" ]] && continue
+    cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)" || continue
+    case "$cmdline" in
+      *"$BACKEND/.venv"*"dataset-studio-api"* | \
+      *"$BACKEND/.venv"*"dataset-studio-worker"* | \
+      *"$BACKEND/.venv"*"uvicorn"*)
+        stale_pids+=("$pid")
+        ;;
+    esac
+  done < <(pgrep -f "$BACKEND" 2>/dev/null || true)
+
+  while IFS= read -r pid; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    [[ -n "${protected[$pid]:-}" ]] && continue
+    cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)" || continue
+    case "$cmdline" in
+      *"$ROOT/frontend"*"vite"*)
+        stale_pids+=("$pid")
+        ;;
+    esac
+  done < <(pgrep -f "$ROOT/frontend" 2>/dev/null || true)
+
+  for pid in "${stale_pids[@]}"; do
+    [[ -n "${seen[$pid]:-}" ]] && continue
+    seen[$pid]=1
+    unique_pids+=("$pid")
+  done
+  if ((${#unique_pids[@]} == 0)); then
+    return
+  fi
+
+  echo "[Dataset Studio] 检测到残留开发进程（来自已结束的会话，flock 无法阻止）："
+  for pid in "${unique_pids[@]}"; do
+    cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+    echo "  PID $pid: ${cmdline:-未知命令}"
+  done
+
+  if [[ "${1:-}" == "warn" ]]; then
+    echo "[Dataset Studio] 当前为 --check-only，仅警告，不终止进程。"
+    return
+  fi
+
+  kill "${unique_pids[@]}" 2>/dev/null || true
+  sleep 2
+  for pid in "${unique_pids[@]}"; do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+      echo "  PID $pid 未响应 SIGTERM，已强制终止。"
+    fi
+  done
+  echo "[Dataset Studio] 残留进程已清理。"
+}
+
 RUNTIME="$(resolve_runtime)"
 ENVIRONMENT_DIR="$BACKEND/.venv-$RUNTIME"
 export UV_PROJECT_ENVIRONMENT="$ENVIRONMENT_DIR"
@@ -166,6 +238,14 @@ fi
 
 if [[ $CHECK_ONLY -eq 0 ]]; then
   select_dev_ports
+fi
+
+if [[ $SKIP_STALE_CHECK -eq 0 ]]; then
+  if [[ $CHECK_ONLY -eq 1 ]]; then
+    stop_stale_processes "warn"
+  else
+    stop_stale_processes
+  fi
 fi
 
 if [[ $SKIP_SYNC -eq 0 ]]; then

@@ -1,4 +1,5 @@
 import json
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -383,6 +384,158 @@ def test_runtime_filters_categories_and_formats_confidence_order(
     runtime.prune_missing_installations()
 
     assert not runtime._entries
+
+
+def test_runtime_releases_idle_session_after_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service(tmp_path, monkeypatch)
+    library = service.import_local(TaggerImportRequest(path=str(_model_source(tmp_path))))
+    profile = service.resolve_execution_profile(library.profiles[0].id)
+    now = [0.0]
+    runtime = TaggerRuntime(
+        service,
+        session_factory=lambda _path, _providers: FakeSession(),
+        clock=lambda: now[0],
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_provider_candidates_for_device",
+        lambda _device: [["CPUExecutionProvider"]],
+    )
+    image_path = tmp_path / "image.png"
+    Image.new("RGB", (32, 16), "white").save(image_path)
+    runtime.tag(profile, image_path)
+    assert runtime._entries
+
+    now[0] += 59.0
+    runtime.prune_idle(60.0)
+    assert runtime._entries
+
+    now[0] += 2.0
+    runtime.prune_idle(60.0)
+    assert not runtime._entries
+
+
+def test_runtime_bind_refreshes_idle_deadline_on_reuse(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service(tmp_path, monkeypatch)
+    library = service.import_local(TaggerImportRequest(path=str(_model_source(tmp_path))))
+    profile = service.resolve_execution_profile(library.profiles[0].id)
+    now = [0.0]
+    runtime = TaggerRuntime(
+        service,
+        session_factory=lambda _path, _providers: FakeSession(),
+        clock=lambda: now[0],
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_provider_candidates_for_device",
+        lambda _device: [["CPUExecutionProvider"]],
+    )
+    image_path = tmp_path / "image.png"
+    Image.new("RGB", (32, 16), "white").save(image_path)
+    runtime.tag(profile, image_path)
+
+    now[0] += 50.0
+    runtime.bind(profile)
+    now[0] += 50.0
+    runtime.prune_idle(60.0)
+    assert runtime._entries
+
+    now[0] += 20.0
+    runtime.prune_idle(60.0)
+    assert not runtime._entries
+
+
+def test_runtime_keeps_busy_session_loaded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service(tmp_path, monkeypatch)
+    library = service.import_local(TaggerImportRequest(path=str(_model_source(tmp_path))))
+    profile = service.resolve_execution_profile(library.profiles[0].id)
+    started = threading.Event()
+    released = threading.Event()
+
+    class BlockingSession(FakeSession):
+        def run(self, output_names, input_feed):
+            started.set()
+            released.wait(timeout=5)
+            return super().run(output_names, input_feed)
+
+    now = [0.0]
+    runtime = TaggerRuntime(
+        service,
+        session_factory=lambda _path, _providers: BlockingSession(),
+        clock=lambda: now[0],
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_provider_candidates_for_device",
+        lambda _device: [["CPUExecutionProvider"]],
+    )
+    image_path = tmp_path / "image.png"
+    Image.new("RGB", (32, 16), "white").save(image_path)
+    session = runtime.bind(profile)
+    failures: list[Exception] = []
+
+    def _infer() -> None:
+        try:
+            session.infer_batch((session.preprocess_bytes(image_path.read_bytes()),))
+        except Exception as error:
+            failures.append(error)
+
+    thread = threading.Thread(target=_infer)
+    thread.start()
+    assert started.wait(timeout=2)
+
+    now[0] += 120.0
+    runtime.prune_idle(60.0)
+    assert runtime._entries
+
+    released.set()
+    thread.join(timeout=5)
+    assert failures == []
+
+    now[0] += 120.0
+    runtime.prune_idle(60.0)
+    assert not runtime._entries
+
+
+def test_runtime_prune_idle_can_be_disabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service(tmp_path, monkeypatch)
+    library = service.import_local(TaggerImportRequest(path=str(_model_source(tmp_path))))
+    profile = service.resolve_execution_profile(library.profiles[0].id)
+    now = [0.0]
+    runtime = TaggerRuntime(
+        service,
+        session_factory=lambda _path, _providers: FakeSession(),
+        clock=lambda: now[0],
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_provider_candidates_for_device",
+        lambda _device: [["CPUExecutionProvider"]],
+    )
+    image_path = tmp_path / "image.png"
+    Image.new("RGB", (32, 16), "white").save(image_path)
+    runtime.tag(profile, image_path)
+    assert runtime._entries
+
+    now[0] += 3600.0
+    runtime.prune_idle(0)
+    assert runtime._entries
+    runtime.prune_idle(-1)
+    assert runtime._entries
+    runtime.prune_idle(None)
+    assert runtime._entries
 
 
 def test_v1_execution_snapshot_reuses_concurrency_as_requested_batch_size() -> None:
@@ -867,6 +1020,24 @@ def test_provider_candidates_keep_operator_and_session_level_cpu_fallback(
     assert TaggerRuntime._provider_candidates_for_device(TaggerDevice.CUDA) == [
         ["CUDAExecutionProvider", "CPUExecutionProvider"]
     ]
+
+
+def test_explicit_cuda_error_lists_available_providers_and_guidance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import onnxruntime as ort
+
+    monkeypatch.setattr(
+        ort,
+        "get_available_providers",
+        lambda: ["CPUExecutionProvider"],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=r"不支持执行设备：cuda.*可用执行设备：CPUExecutionProvider.*auto/cpu",
+    ):
+        TaggerRuntime._provider_candidates_for_device(TaggerDevice.CUDA)
 
 
 def test_nvidia_dll_directories_discovers_wheel_bin_directories(tmp_path: Path) -> None:

@@ -130,3 +130,96 @@ export interface AnnotationBatchReviewResult {
   blocked_count: number;
   asset_ids: string[];
 }
+
+export interface AnnotationManualTagInput {
+  name: string;
+  category: string | null;
+}
+
+export type AnnotationTagInsertPosition =
+  | { kind: "start" }
+  | { kind: "end" }
+  | { kind: "index"; index: number }
+  | { kind: "before"; anchor_name: string }
+  | { kind: "after"; anchor_name: string };
+
+export type AnnotationTagBatchOperation =
+  | {
+      kind: "add";
+      tags: AnnotationManualTagInput[];
+      position?: AnnotationTagInsertPosition;
+    }
+  | { kind: "remove"; tag_names: string[] }
+  | {
+      kind: "replace";
+      source_name: string;
+      replacement: AnnotationManualTagInput;
+    };
+
+export interface AnnotationTagBatchEditRequest {
+  asset_ids: string[];
+  operation: AnnotationTagBatchOperation;
+}
+
+export type AnnotationTagBatchDetailFilter = "changed" | "position_skipped" | "all";
+
+export interface AnnotationTagBatchEditPreviewOptions {
+  detailFilter?: AnnotationTagBatchDetailFilter;
+  detailOffset?: number;
+  detailLimit?: number;
+}
+
+export interface AnnotationTagBatchTermSummary {
+  name: string;
+  present_before_count: number;
+  added_count: number;
+  removed_count: number;
+}
+
+export interface AnnotationTagBatchEditSummary {
+  requested_count: number;
+  changed_count: number;
+  unchanged_count: number;
+  created_or_revived_count: number;
+  emptied_count: number;
+  stale_rebound_count: number;
+  invalidated_tag_translation_count: number;
+  position_skipped_count: number;
+  position_clamped_count: number;
+  terms: AnnotationTagBatchTermSummary[];
+}
+
+export interface AnnotationTagBatchEditPreviewItem {
+  asset_id: string;
+  filename: string;
+  relative_path: string;
+  content_version: string;
+  changed: boolean;
+  position_skipped: boolean;
+  position_clamped: boolean;
+  before_tags: AnnotationTag[];
+  after_tags: AnnotationTag[];
+  removed_indices: number[];
+  added_indices: number[];
+}
+
+export interface AnnotationTagBatchEditPreviewPage {
+  filter: AnnotationTagBatchDetailFilter;
+  offset: number;
+  limit: number;
+  total: number;
+  items: AnnotationTagBatchEditPreviewItem[];
+}
+
+export interface AnnotationTagBatchEditPreview extends AnnotationTagBatchEditSummary {
+  preview_token: string;
+  details: AnnotationTagBatchEditPreviewPage;
+}
+
+export interface AnnotationTagBatchEditExecuteRequest extends AnnotationTagBatchEditRequest {
+  preview_token: string;
+}
+
+export interface AnnotationTagBatchEditResult extends AnnotationTagBatchEditSummary {
+  changed_asset_ids: string[];
+}

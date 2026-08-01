@@ -137,6 +137,9 @@ class StaticTaggerRuntime:
     def prune_missing_installations(self) -> None:
         pass
 
+    def prune_idle(self, _timeout_seconds: float | None) -> None:
+        pass
+
     def bind(self, _profile: TaggerExecutionProfile):
         return self
 

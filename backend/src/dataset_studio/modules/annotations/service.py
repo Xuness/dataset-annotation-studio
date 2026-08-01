@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
-from dataset_studio.core.errors import AssetNotFoundError
+from dataset_studio.core.errors import AssetNotFoundError, ResourceConflictError
 from dataset_studio.core.languages import normalize_language_code
 from dataset_studio.modules.annotations.models import (
     AnnotationAvailabilityStatus,
@@ -20,6 +20,11 @@ from dataset_studio.modules.annotations.models import (
     AnnotationRevision,
     AnnotationStatus,
     AnnotationTag,
+    AnnotationTagBatchDetailFilter,
+    AnnotationTagBatchEditExecuteRequest,
+    AnnotationTagBatchEditPreview,
+    AnnotationTagBatchEditRequest,
+    AnnotationTagBatchEditResult,
     AnnotationTaggerSource,
     AnnotationWriteResult,
     ValidationIssue,
@@ -32,9 +37,17 @@ from dataset_studio.modules.annotations.projection import (
 from dataset_studio.modules.annotations.repository import (
     EXPECTED_HEAD_UNSET,
     AnnotationRepository,
+    TagRevisionWriteRequest,
     channel_definition,
 )
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
+from dataset_studio.modules.annotations.tag_batch_edit import (
+    build_tag_batch_edit_plan,
+    tag_batch_edit_preview_token,
+    tag_batch_edit_source,
+    to_tag_batch_edit_preview,
+    to_tag_batch_edit_result,
+)
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.output_resources import (
     OutputResourceClaim,
@@ -264,6 +277,64 @@ class AnnotationService:
             revision_id=write.revision_id,
             became_head=write.became_head,
         )
+
+    def preview_tag_batch_edit(
+        self,
+        project_id: str,
+        request: AnnotationTagBatchEditRequest,
+        *,
+        detail_filter: AnnotationTagBatchDetailFilter = "changed",
+        detail_offset: int = 0,
+        detail_limit: int = 20,
+    ) -> AnnotationTagBatchEditPreview:
+        paths, _ = self._workspaces.get(project_id)
+        plan = build_tag_batch_edit_plan(paths.database, request)
+        return to_tag_batch_edit_preview(
+            request,
+            plan,
+            detail_filter=detail_filter,
+            detail_offset=detail_offset,
+            detail_limit=detail_limit,
+        )
+
+    def execute_tag_batch_edit(
+        self,
+        project_id: str,
+        request: AnnotationTagBatchEditExecuteRequest,
+    ) -> AnnotationTagBatchEditResult:
+        paths, _ = self._workspaces.get(project_id)
+        asset_ids = self._validated_asset_ids(paths.database, request.asset_ids)
+        batch_request = AnnotationTagBatchEditRequest(
+            asset_ids=asset_ids,
+            operation=request.operation,
+        )
+        claims = [
+            OutputResourceClaim(
+                annotation_document_resource_key(asset_id, AnnotationChannel.TAGS.value)
+            )
+            for asset_id in sorted(asset_ids)
+        ]
+        with hold_output_resources(paths.database, claims):
+            plan = build_tag_batch_edit_plan(paths.database, batch_request)
+            current_token = tag_batch_edit_preview_token(batch_request, plan)
+            if current_token != request.preview_token:
+                raise ResourceConflictError("批量编辑预览已过期，请重新预览后再执行。")
+            source = tag_batch_edit_source(batch_request)
+            writes = [
+                TagRevisionWriteRequest(
+                    asset_id=item.asset_id,
+                    tags=item.after_tags,
+                    source=source,
+                    validation_status=(
+                        AnnotationStatus.VALID if item.after_tags else AnnotationStatus.EMPTY
+                    ),
+                    image_content_hash=item.image_content_hash,
+                    expected_head_revision_id=item.head_revision_id,
+                )
+                for item in plan.changed_items
+            ]
+            AnnotationRepository(paths.database).write_tags_many(writes)
+        return to_tag_batch_edit_result(plan)
 
     def save_generated(
         self,

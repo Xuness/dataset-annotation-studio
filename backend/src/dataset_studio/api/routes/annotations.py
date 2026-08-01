@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
@@ -18,6 +18,11 @@ from dataset_studio.modules.annotations.models import (
     AnnotationDocument,
     AnnotationReviewRequest,
     AnnotationRevision,
+    AnnotationTagBatchDetailFilter,
+    AnnotationTagBatchEditExecuteRequest,
+    AnnotationTagBatchEditPreview,
+    AnnotationTagBatchEditRequest,
+    AnnotationTagBatchEditResult,
     AnnotationUpdate,
 )
 from dataset_studio.modules.translations.identity import (
@@ -143,6 +148,42 @@ def review_tag_annotations(
         container.asset_deletions.ensure_persisted_inactive(project_id)
         container.exports.ensure_inactive(project_id)
         return container.annotations.review_tags_many(project_id, request.asset_ids)
+
+
+@batch_router.post(
+    "/tags/edit/preview",
+    response_model=AnnotationTagBatchEditPreview,
+)
+def preview_tag_batch_edit(
+    project_id: str,
+    request: AnnotationTagBatchEditRequest,
+    container: Container,
+    detail_filter: AnnotationTagBatchDetailFilter = "changed",
+    detail_offset: int = Query(default=0, ge=0),
+    detail_limit: int = Query(default=20, ge=1, le=50),
+):
+    return container.annotations.preview_tag_batch_edit(
+        project_id,
+        request,
+        detail_filter=detail_filter,
+        detail_offset=detail_offset,
+        detail_limit=detail_limit,
+    )
+
+
+@batch_router.post(
+    "/tags/edit/execute",
+    response_model=AnnotationTagBatchEditResult,
+)
+def execute_tag_batch_edit(
+    project_id: str,
+    request: AnnotationTagBatchEditExecuteRequest,
+    container: Container,
+):
+    with container.preprocessing.guard_workspace(project_id, "edit-tags-batch"):
+        container.asset_deletions.ensure_persisted_inactive(project_id)
+        container.exports.ensure_inactive(project_id)
+        return container.annotations.execute_tag_batch_edit(project_id, request)
 
 
 @channels_router.get("", response_model=AnnotationBundle)
