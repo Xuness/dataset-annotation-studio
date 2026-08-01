@@ -7,12 +7,25 @@
 
 - `index.html -> src/main.tsx` 是产品默认入口。V2 开始开发前，它暂时转交给 Legacy 入口；
   V2 可用后只需把这里切换到 `v2-main.tsx`。
-- `legacy.html -> src/legacy-main.tsx` 是稳定的旧界面入口，路径与 HashRouter 可以组合为
+- `legacy.html -> Legacy/main.tsx` 是稳定的旧界面入口，路径与 HashRouter 可以组合为
   `/legacy.html#/workspace/<project-id>`。
-- 只有 `legacy-main.tsx` 可以加载 `styles/global.css`、旧主题初始化与旧界面根组件。
+- 只有 `Legacy/main.tsx` 可以加载 `Legacy/styles/global.css`、旧主题初始化与旧界面根组件。
   V2 入口不得导入这条链，因此构建时不会继承旧 CSS。
 - 两个 HTML 都由 Vite 构建并进入 Tauri 的 `frontendDist`；切换界面体系应执行整页导航，
-  不在同一个 DOM 中热切换全局样式。
+不在同一个 DOM 中热切换全局样式。
+
+当前目录边界如下：
+
+```text
+frontend/
+├─ Legacy/              # 旧页面、布局、设置、主题、UI、样式与 UI 测试
+├─ legacy.html          # 稳定兼容入口
+└─ src/
+   ├─ main.tsx          # 默认入口桥接；V2 可用后在这里切换
+   ├─ application/      # UI 无关的工作流编排
+   ├─ features/         # API 与查询适配
+   └─ shared/           # 契约、状态、格式与通用桌面端口
+```
 
 ## 依赖方向
 
@@ -35,10 +48,10 @@ flowchart TB
 1. `shared` 不得依赖应用、功能或任何界面层。
 2. 一个 `feature` 不得导入另一个 `feature`，也不得依赖主题、弹窗、设置或桌面实现。
 3. `application` 只协调功能与共享能力，不得导入 Legacy 或 V2 页面。
-4. 只有 `shared/desktop` 可以直接导入 `@tauri-apps/*`。
+4. 只有 `src/shared/desktop` 与 Legacy 自己的 `Legacy/shared/desktop` 边界可以直接导入
+   `@tauri-apps/*`；V2 只能使用前者。
 5. 只有 `shared/api/client.ts` 可以直接调用 `fetch`。
-6. V2 不得导入 `pages`、`layouts`、`legacy`、旧 `app/settings`、`shared/ui`、
-   `shared/theme` 或 `shared/settings`。
+6. V2 不得导入 `frontend/Legacy` 下的页面、布局、设置、主题、UI 或样式。
 7. 所有 TypeScript 内部依赖必须保持无环。
 
 ## API 契约
@@ -103,8 +116,9 @@ V2 所需的核心工作流已经从 Legacy 页面提取到 `src/application`：
 架构检查额外锁定这些已接入控制器的页面：不得重新直接导入 `features/*/hooks.ts` 或
 `features/*/api.ts`。未来 V2 可以复用控制器或其中的纯投影函数，不需要渲染任何旧组件。
 
-`WorkspaceTopbar`、`NavigationRail`、旧设置中心和旧主题系统继续属于 Legacy 表现层。除非某段行为确实
-需要被 V2 复用，否则不为了“代码整洁”继续重构它们；这样可以避免把旧布局抽象成新体系的隐性框架。
+`Legacy/layouts/workspace/WorkspaceTopbar`、`NavigationRail`、旧设置中心和旧主题系统继续属于 Legacy
+表现层。除非某段行为确实需要被 V2 复用，否则不为了“代码整洁”继续重构它们；这样可以避免把旧布局
+抽象成新体系的隐性框架。
 
 ## 合入门槛
 

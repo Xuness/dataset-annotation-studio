@@ -4,21 +4,22 @@ import ts from "typescript";
 
 const frontendRoot = resolve(import.meta.dirname, "..");
 const sourceRoot = join(frontendRoot, "src");
+const legacyRoot = join(frontendRoot, "Legacy");
 const sourceExtensions = new Set([".ts", ".tsx"]);
 const controllerBoundPresentation = new Set([
-  "pages/workspace/WorkspacePage.tsx",
-  "pages/workspace/components/AnnotationEditor.tsx",
-  "pages/workspace/components/TranslationComparePanel.tsx",
-  "pages/workspace/components/TagEditorPanel.tsx",
-  "pages/workspace/components/AnnotationBulkActionDialog.tsx",
-  "pages/workspace/components/TagBatchEditDialog.tsx",
-  "pages/workspace/components/TagBatchPreviewDetails.tsx",
-  "pages/workspace/components/AssetDeletionDialog.tsx",
-  "pages/jobs/JobsPage.tsx",
-  "pages/jobs/components/NewJobPanel.tsx",
-  "pages/jobs/components/JobDetailPanel.tsx",
-  "pages/preprocess/PreprocessPage.tsx",
-  "pages/export/ExportPage.tsx",
+  "Legacy/pages/workspace/WorkspacePage.tsx",
+  "Legacy/pages/workspace/components/AnnotationEditor.tsx",
+  "Legacy/pages/workspace/components/TranslationComparePanel.tsx",
+  "Legacy/pages/workspace/components/TagEditorPanel.tsx",
+  "Legacy/pages/workspace/components/AnnotationBulkActionDialog.tsx",
+  "Legacy/pages/workspace/components/TagBatchEditDialog.tsx",
+  "Legacy/pages/workspace/components/TagBatchPreviewDetails.tsx",
+  "Legacy/pages/workspace/components/AssetDeletionDialog.tsx",
+  "Legacy/pages/jobs/JobsPage.tsx",
+  "Legacy/pages/jobs/components/NewJobPanel.tsx",
+  "Legacy/pages/jobs/components/JobDetailPanel.tsx",
+  "Legacy/pages/preprocess/PreprocessPage.tsx",
+  "Legacy/pages/export/ExportPage.tsx",
 ]);
 
 function collectSourceFiles(directory) {
@@ -30,6 +31,9 @@ function collectSourceFiles(directory) {
 }
 
 function sourcePath(path) {
+  if (path === legacyRoot || path.startsWith(`${legacyRoot}${sep}`)) {
+    return `Legacy/${relative(legacyRoot, path).split(sep).join("/")}`;
+  }
   return relative(sourceRoot, path).split(sep).join("/");
 }
 
@@ -76,7 +80,8 @@ function importSpecifiers(sourceFile) {
 }
 
 function topLevelArea(path) {
-  return sourcePath(path).split("/")[0];
+  const normalized = sourcePath(path);
+  return normalized.startsWith("Legacy/") ? "legacy" : normalized.split("/")[0];
 }
 
 function featureName(path) {
@@ -131,7 +136,10 @@ function findCycle(graph) {
   return null;
 }
 
-const files = collectSourceFiles(sourceRoot);
+const legacyTestsRoot = join(legacyRoot, "tests");
+const files = [sourceRoot, legacyRoot]
+  .flatMap(collectSourceFiles)
+  .filter((file) => file !== legacyTestsRoot && !file.startsWith(`${legacyTestsRoot}${sep}`));
 const graph = new Map(files.map((file) => [file, []]));
 const violations = [];
 
@@ -150,11 +158,15 @@ for (const file of files) {
   }
 
   for (const specifier of importSpecifiers(sourceFile)) {
-    if (specifier.endsWith("/styles/global.css") && relativeFile !== "legacy-main.tsx") {
-      report("legacy global styles may only be loaded by legacy-main.tsx.");
+    if (specifier.endsWith("/styles/global.css") && relativeFile !== "Legacy/main.tsx") {
+      report("legacy global styles may only be loaded by Legacy/main.tsx.");
     }
-    if (specifier.startsWith("@tauri-apps/") && !relativeFile.startsWith("shared/desktop/")) {
-      report(`Tauri import "${specifier}" must be isolated under shared/desktop.`);
+    if (
+      specifier.startsWith("@tauri-apps/") &&
+      !relativeFile.startsWith("shared/desktop/") &&
+      !relativeFile.startsWith("Legacy/shared/desktop/")
+    ) {
+      report(`Tauri import "${specifier}" must be isolated under a desktop boundary.`);
     }
 
     const dependency = resolveSourceImport(file, specifier);
@@ -163,6 +175,9 @@ for (const file of files) {
 
     const sourceArea = topLevelArea(file);
     const dependencyArea = topLevelArea(dependency);
+    if (dependencyArea === "legacy" && sourceArea !== "legacy" && relativeFile !== "main.tsx") {
+      report(`core code cannot depend on legacy presentation ${sourcePath(dependency)}.`);
+    }
     if (controllerBoundPresentation.has(relativeFile) && isFeatureRuntimeModule(dependency)) {
       report(
         `controller-bound presentation cannot call feature runtime ${sourcePath(dependency)} directly.`,
@@ -189,13 +204,13 @@ for (const file of files) {
     }
     if (
       sourceArea === "features" &&
-      ["app", "application", "layouts", "legacy", "pages", "v2"].includes(dependencyArea)
+      ["app", "application", "layouts", "pages", "v2"].includes(dependencyArea)
     ) {
       report(`feature code cannot depend on ${sourcePath(dependency)}.`);
     }
     if (
       sourceArea === "application" &&
-      ["app", "layouts", "legacy", "pages", "v2"].includes(dependencyArea)
+      ["app", "layouts", "pages", "v2"].includes(dependencyArea)
     ) {
       report(`application code cannot depend on presentation module ${sourcePath(dependency)}.`);
     }

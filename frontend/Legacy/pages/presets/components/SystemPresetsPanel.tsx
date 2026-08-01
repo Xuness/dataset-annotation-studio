@@ -1,0 +1,146 @@
+import { useEffect, useState } from "react";
+import { FileText, Save, Trash2 } from "lucide-react";
+
+import { useSystemPresetMutations, useSystemPresets } from "../../../../src/features/presets/hooks";
+import { useUnsavedScope } from "../../../../src/application/useUnsavedScope";
+import { useLegacyUnsavedChangesGuard } from "../../../legacy/hooks/useLegacyUnsavedChangesGuard";
+import { Button } from "../../../shared/ui/Button";
+import { confirmDialog } from "../../../shared/ui/dialogs";
+import { Spinner } from "../../../shared/ui/Spinner";
+import { usePresetEditorSelection } from "../hooks/usePresetEditorSelection";
+
+export function SystemPresetsPanel({ createSignal }: { createSignal: number }) {
+  const presets = useSystemPresets();
+  const mutations = useSystemPresetMutations();
+  const selection = usePresetEditorSelection(presets.data, createSignal);
+  const selected = selection.selected;
+  const { confirmDiscard } = useLegacyUnsavedChangesGuard();
+  const [name, setName] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(selected?.name ?? "");
+    setPrompt(selected?.system_prompt ?? "");
+    setError(null);
+  }, [selected]);
+
+  async function save() {
+    setError(null);
+    try {
+      if (selected) {
+        await mutations.update.mutateAsync({
+          id: selected.id,
+          input: { name, system_prompt: prompt },
+        });
+      } else {
+        const created = await mutations.create.mutateAsync({ name, system_prompt: prompt });
+        selection.select(created.id);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法保存预设。");
+    }
+  }
+
+  async function remove() {
+    if (!selected) return;
+    const confirmed = await confirmDialog(`删除全局预设“${selected.name}”？`, {
+      title: "删除预设",
+      tone: "danger",
+      confirmLabel: "删除",
+    });
+    if (!confirmed) return;
+    setError(null);
+    try {
+      await mutations.remove.mutateAsync(selected.id);
+      selection.clear();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法删除预设。");
+    }
+  }
+
+  const dirty = selected
+    ? name !== selected.name || prompt !== selected.system_prompt
+    : name !== "" || prompt !== "";
+  const canSave = Boolean(name.trim() && prompt.trim());
+  useUnsavedScope("system-preset", dirty);
+  const pending =
+    mutations.create.isPending || mutations.update.isPending || mutations.remove.isPending;
+
+  return (
+    <section className="preset-workarea">
+      <aside className="preset-list">
+        <header>
+          <span className="eyebrow">System Prompt</span>
+          <strong>{presets.data?.length ?? 0} 套预设</strong>
+        </header>
+        <div>
+          {presets.data?.map((preset) => (
+            <button
+              key={preset.id}
+              className={
+                !selection.isCreating && selection.selectedId === preset.id ? "is-active" : ""
+              }
+              onClick={() => {
+                if (selection.selectedId === preset.id && !selection.isCreating) return;
+                void confirmDiscard().then((confirmed) => {
+                  if (confirmed) selection.select(preset.id);
+                });
+              }}
+            >
+              <FileText size={15} />
+              <span>
+                <strong>{preset.name}</strong>
+                <small>{preset.system_prompt.slice(0, 70)}</small>
+              </span>
+            </button>
+          ))}
+          {!presets.data?.length ? <p>还没有全局 System Prompt 预设。</p> : null}
+        </div>
+      </aside>
+      <div className="preset-editor">
+        <header>
+          <div>
+            <span className="eyebrow">{selected ? "Edit preset" : "New preset"}</span>
+            <h1>{selected ? selected.name : "新的 System Prompt"}</h1>
+          </div>
+          <div>
+            <Button
+              tone="danger"
+              icon={<Trash2 size={14} />}
+              disabled={!selected || pending}
+              onClick={() => void remove()}
+            >
+              删除
+            </Button>
+            <Button
+              tone="primary"
+              icon={pending ? <Spinner /> : <Save size={14} />}
+              disabled={!dirty || !canSave || pending}
+              onClick={() => void save()}
+            >
+              保存
+            </Button>
+          </div>
+        </header>
+        <label className="form-field">
+          <span>预设名称</span>
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="例如：Krea 结构化描述"
+          />
+        </label>
+        <label className="form-field form-field--grow">
+          <span>System Prompt</span>
+          <textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder="输入发送给模型的完整 System Prompt…"
+          />
+        </label>
+        {error ? <p className="form-error">{error}</p> : null}
+      </div>
+    </section>
+  );
+}

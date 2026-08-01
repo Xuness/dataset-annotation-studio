@@ -68,7 +68,7 @@ import {
 } from "../src/shared/query/workspaceQueries.ts";
 import { useUnsavedChangesStore } from "../src/shared/store/unsavedChangesStore.ts";
 import { useWorkspaceSelectionStore } from "../src/shared/store/workspaceSelectionStore.ts";
-import { DEFAULT_WORKSPACE_LAYOUT } from "../src/pages/workspace/hooks/useWorkspaceLayout.ts";
+import { DEFAULT_WORKSPACE_LAYOUT } from "../Legacy/pages/workspace/hooks/useWorkspaceLayout.ts";
 import {
   DEFAULT_HOME_CONTENT,
   HOME_CONTENT_LIMITS,
@@ -78,13 +78,13 @@ import {
   normalizePreferences,
   resolveAppearance,
   resolveSurfaceTransparency,
-} from "../src/shared/theme/appearance.ts";
+} from "../Legacy/shared/theme/appearance.ts";
 import {
   DEFAULT_THEME_ID,
   getThemeDefinition,
   THEMES,
   type ThemeId,
-} from "../src/shared/theme/themes.ts";
+} from "../Legacy/shared/theme/themes.ts";
 
 test("save reconciliation preserves edits made while the request is pending", () => {
   assert.equal(
@@ -517,7 +517,7 @@ test("runtime platform detection keeps native decorations and scene ownership on
 
 test("Linux visual degradation is scoped to the explicit software mode", () => {
   const linuxCompatibility = readFileSync(
-    new URL("../src/styles/platforms/linux-compat.css", import.meta.url),
+    new URL("../Legacy/styles/platforms/linux-compat.css", import.meta.url),
     "utf8",
   );
   const reducedCompositionDeclaration =
@@ -541,13 +541,16 @@ test("Linux visual degradation is scoped to the explicit software mode", () => {
 });
 
 test("large page scenes use paint containment without changing shared animation timing", () => {
-  const homeStyles = readFileSync(new URL("../src/pages/home/home.css", import.meta.url), "utf8");
+  const homeStyles = readFileSync(
+    new URL("../Legacy/pages/home/home.css", import.meta.url),
+    "utf8",
+  );
   const workspaceStyles = readFileSync(
-    new URL("../src/layouts/workspace/workspace-shell.css", import.meta.url),
+    new URL("../Legacy/layouts/workspace/workspace-shell.css", import.meta.url),
     "utf8",
   );
   const workspaceMaterialStyles = readFileSync(
-    new URL("../src/layouts/workspace/workspace-surface-materials.css", import.meta.url),
+    new URL("../Legacy/layouts/workspace/workspace-surface-materials.css", import.meta.url),
     "utf8",
   );
 
@@ -560,7 +563,7 @@ test("large page scenes use paint containment without changing shared animation 
 
 test("tag editor follows the content region transparency setting", () => {
   const workspaceContentMaterialStyles = readFileSync(
-    new URL("../src/pages/workspace/styles/surface-materials.css", import.meta.url),
+    new URL("../Legacy/pages/workspace/styles/surface-materials.css", import.meta.url),
     "utf8",
   );
   const transparentContentRule = workspaceContentMaterialStyles
@@ -578,11 +581,11 @@ test("tag editor follows the content region transparency setting", () => {
 
 test("rainveil immersive wallpaper uses only a higher-contrast copyright label color", () => {
   const themeStyles = readFileSync(
-    new URL("../src/styles/themes/sea-fog.css", import.meta.url),
+    new URL("../Legacy/styles/themes/sea-fog.css", import.meta.url),
     "utf8",
   );
   const tagEditorStyles = readFileSync(
-    new URL("../src/pages/workspace/styles/tag-editor.css", import.meta.url),
+    new URL("../Legacy/pages/workspace/styles/tag-editor.css", import.meta.url),
     "utf8",
   );
 
@@ -677,14 +680,17 @@ test("desktop capabilities allow opening verified local folders", () => {
 });
 
 test("preprocess scope controls use eager route-independent styles", () => {
-  const globalStyles = readFileSync(new URL("../src/styles/global.css", import.meta.url), "utf8");
-  const formStyles = readFileSync(new URL("../src/styles/forms.css", import.meta.url), "utf8");
+  const globalStyles = readFileSync(
+    new URL("../Legacy/styles/global.css", import.meta.url),
+    "utf8",
+  );
+  const formStyles = readFileSync(new URL("../Legacy/styles/forms.css", import.meta.url), "utf8");
   const preprocessStyles = readFileSync(
-    new URL("../src/pages/preprocess/preprocess.css", import.meta.url),
+    new URL("../Legacy/pages/preprocess/preprocess.css", import.meta.url),
     "utf8",
   );
   const preprocessPanel = readFileSync(
-    new URL("../src/pages/preprocess/components/PreprocessSettingsPanel.tsx", import.meta.url),
+    new URL("../Legacy/pages/preprocess/components/PreprocessSettingsPanel.tsx", import.meta.url),
     "utf8",
   );
 
@@ -734,7 +740,7 @@ test("theme styles keep a complete shared token contract and the configured defa
   const styles = Object.fromEntries(
     Object.entries(styleFiles).map(([themeId, filename]) => [
       themeId,
-      readFileSync(new URL(`../src/styles/themes/${filename}`, import.meta.url), "utf8"),
+      readFileSync(new URL(`../Legacy/styles/themes/${filename}`, import.meta.url), "utf8"),
     ]),
   ) as Record<ThemeId, string>;
   const tokenNames = (css: string) =>
@@ -1418,15 +1424,15 @@ test("development launchers select shared ports before synchronizing dependencie
 
 test("large application panels do not create nested native dialogs", () => {
   const settingsCenter = readFileSync(
-    new URL("../src/app/settings/SettingsCenter.tsx", import.meta.url),
+    new URL("../Legacy/app/settings/SettingsCenter.tsx", import.meta.url),
     "utf8",
   );
   const assetDeletion = readFileSync(
-    new URL("../src/pages/workspace/components/AssetDeletionDialog.tsx", import.meta.url),
+    new URL("../Legacy/pages/workspace/components/AssetDeletionDialog.tsx", import.meta.url),
     "utf8",
   );
   const dialogHost = readFileSync(
-    new URL("../src/shared/ui/DialogHost.tsx", import.meta.url),
+    new URL("../Legacy/shared/ui/DialogHost.tsx", import.meta.url),
     "utf8",
   );
 
