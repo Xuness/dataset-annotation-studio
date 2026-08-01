@@ -11,6 +11,8 @@ const controllerBoundPresentation = new Set([
   "pages/workspace/components/TranslationComparePanel.tsx",
   "pages/workspace/components/TagEditorPanel.tsx",
   "pages/workspace/components/AnnotationBulkActionDialog.tsx",
+  "pages/workspace/components/TagBatchEditDialog.tsx",
+  "pages/workspace/components/TagBatchPreviewDetails.tsx",
   "pages/workspace/components/AssetDeletionDialog.tsx",
   "pages/jobs/JobsPage.tsx",
   "pages/jobs/components/NewJobPanel.tsx",

@@ -19,3 +19,21 @@ export type AnnotationBatchTargetOption = ApiOutput<"AnnotationBatchTargetOption
 export type AnnotationBatchOptions = ApiOutput<"AnnotationBatchOptions">;
 export type AnnotationBatchDeleteResult = ApiOutput<"AnnotationBatchDeleteResult">;
 export type AnnotationBatchReviewResult = ApiOutput<"AnnotationBatchReviewResult">;
+export type AnnotationManualTagInput = ApiSchema<"AnnotationManualTagInput">;
+export type AnnotationTagInsertPosition = NonNullable<
+  ApiSchema<"AnnotationTagBatchAddOperation">["position"]
+>;
+export type AnnotationTagBatchOperation = ApiSchema<"AnnotationTagBatchEditRequest">["operation"];
+export type AnnotationTagBatchEditRequest = ApiSchema<"AnnotationTagBatchEditRequest">;
+export type AnnotationTagBatchEditExecuteRequest =
+  ApiSchema<"AnnotationTagBatchEditExecuteRequest">;
+export type AnnotationTagBatchEditPreview = ApiOutput<"AnnotationTagBatchEditPreview">;
+export type AnnotationTagBatchEditResult = ApiOutput<"AnnotationTagBatchEditResult">;
+export type AnnotationTagBatchDetailFilter =
+  ApiOutput<"AnnotationTagBatchEditPreviewPage">["filter"];
+
+export interface AnnotationTagBatchEditPreviewOptions {
+  detailFilter?: AnnotationTagBatchDetailFilter;
+  detailOffset?: number;
+  detailLimit?: number;
+}

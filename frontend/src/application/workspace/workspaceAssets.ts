@@ -13,9 +13,19 @@ export interface AnnotationBulkDialogState {
   assetIds: string[];
 }
 
+export interface TagBatchDialogState {
+  open: boolean;
+  assetIds: string[];
+}
+
 export const CLOSED_ANNOTATION_DIALOG: AnnotationBulkDialogState = {
   open: false,
   action: "review",
+  assetIds: [],
+};
+
+export const CLOSED_TAG_BATCH_DIALOG: TagBatchDialogState = {
+  open: false,
   assetIds: [],
 };
 

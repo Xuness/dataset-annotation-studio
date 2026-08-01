@@ -15,6 +15,7 @@ import { useAssetDeletionController } from "./useAssetDeletionController";
 import {
   areAllAssetsChecked,
   CLOSED_ANNOTATION_DIALOG,
+  CLOSED_TAG_BATCH_DIALOG,
   DEFAULT_EDITOR_TARGET,
   editorDiscardMessage,
   resolveKnownMatchingAssetIds,
@@ -47,6 +48,7 @@ export function useWorkspaceAssetsController({
   const [editorTarget, setEditorTarget] = useState<AnnotationChannelTarget>(DEFAULT_EDITOR_TARGET);
   const [editorRevision, setEditorRevision] = useState(0);
   const [annotationDialog, setAnnotationDialog] = useState(CLOSED_ANNOTATION_DIALOG);
+  const [tagBatchDialog, setTagBatchDialog] = useState(CLOSED_TAG_BATCH_DIALOG);
 
   const selectAsset = useCallback(
     (assetId: string | null) =>
@@ -130,6 +132,7 @@ export function useWorkspaceAssetsController({
     setEditorTarget(DEFAULT_EDITOR_TARGET);
     setEditorRevision(0);
     setAnnotationDialog(CLOSED_ANNOTATION_DIALOG);
+    setTagBatchDialog(CLOSED_TAG_BATCH_DIALOG);
   }, [mode, projectId, setActiveProject]);
 
   useEffect(() => {
@@ -226,6 +229,16 @@ export function useWorkspaceAssetsController({
     setAnnotationDialog((current) => ({ ...current, open: false }));
   }, []);
 
+  const openTagBatchDialog = useCallback(() => {
+    const assetIds = [...useWorkspaceSelectionStore.getState().checkedAssetIds];
+    if (!assetIds.length) return;
+    setTagBatchDialog({ open: true, assetIds });
+  }, []);
+
+  const closeTagBatchDialog = useCallback(() => {
+    setTagBatchDialog((current) => ({ ...current, open: false }));
+  }, []);
+
   const updateRecursiveScan = useCallback(
     (recursiveScan: boolean) =>
       updateWorkspace.mutate(
@@ -245,6 +258,12 @@ export function useWorkspaceAssetsController({
     editorDirty && selectedAssetId && annotationDialog.assetIds.includes(selectedAssetId)
       ? editorTarget
       : null;
+  const blockedTagDraft = Boolean(
+    editorDirty &&
+    editorDirtyKind === "tags" &&
+    selectedAssetId &&
+    tagBatchDialog.assetIds.includes(selectedAssetId),
+  );
 
   return {
     workspace,
@@ -260,7 +279,9 @@ export function useWorkspaceAssetsController({
     folderPath,
     editorRevision,
     annotationDialog,
+    tagBatchDialog,
     blockedAnnotationTarget,
+    blockedTagDraft,
     allMatchingSelected,
     selectAllPending: matchingAssetIds.isFetching,
     setAssetsChecked,
@@ -272,6 +293,8 @@ export function useWorkspaceAssetsController({
     toggleAllMatchingAssets,
     openAnnotationDialog,
     closeAnnotationDialog,
+    openTagBatchDialog,
+    closeTagBatchDialog,
     updateEditorDirty,
     setEditorTarget,
     updateRecursiveScan,

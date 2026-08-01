@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Annotated, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -96,6 +97,31 @@ class AnnotationTag(BaseModel):
         if not normalized:
             raise ValueError("Tag 来源不能为空。")
         return normalized
+
+
+class AnnotationManualTagInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=500)
+    category: str | None = Field(default=None, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        return AnnotationTag.normalize_name(value)
+
+    @field_validator("category")
+    @classmethod
+    def normalize_category(cls, value: str | None) -> str | None:
+        return AnnotationTag.normalize_optional_text(value)
+
+    def to_annotation_tag(self) -> AnnotationTag:
+        return AnnotationTag(
+            name=self.name,
+            category=self.category,
+            confidence=None,
+            origin="manual",
+        )
 
 
 class AnnotationTaggerSource(BaseModel):
@@ -246,6 +272,189 @@ def _validate_optional_targets(
     value: list[AnnotationChannelTarget] | None,
 ) -> list[AnnotationChannelTarget] | None:
     return _validate_targets(value) if value is not None else None
+
+
+def _normalize_manual_tags(
+    value: list[AnnotationManualTagInput],
+) -> list[AnnotationManualTagInput]:
+    normalized: list[AnnotationManualTagInput] = []
+    seen: set[str] = set()
+    for tag in value:
+        key = tag.name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(tag)
+    return normalized
+
+
+def _normalize_tag_names(value: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for name in value:
+        clean = AnnotationTag.normalize_name(name)
+        key = clean.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(clean)
+    return normalized
+
+
+class AnnotationTagBatchInsertStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["start"]
+
+
+class AnnotationTagBatchInsertEnd(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["end"]
+
+
+class AnnotationTagBatchInsertIndex(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["index"]
+    index: int = Field(ge=0)
+
+
+class AnnotationTagBatchInsertAnchor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["before", "after"]
+    anchor_name: str = Field(min_length=1, max_length=500)
+
+    @field_validator("anchor_name")
+    @classmethod
+    def normalize_anchor_name(cls, value: str) -> str:
+        return AnnotationTag.normalize_name(value)
+
+
+AnnotationTagBatchInsertPosition = Annotated[
+    AnnotationTagBatchInsertStart
+    | AnnotationTagBatchInsertEnd
+    | AnnotationTagBatchInsertIndex
+    | AnnotationTagBatchInsertAnchor,
+    Field(discriminator="kind"),
+]
+
+
+class AnnotationTagBatchAddOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["add"]
+    tags: list[AnnotationManualTagInput] = Field(min_length=1)
+    position: AnnotationTagBatchInsertPosition = Field(
+        default_factory=lambda: AnnotationTagBatchInsertEnd(kind="end")
+    )
+
+    _normalize_tags = field_validator("tags")(_normalize_manual_tags)
+
+
+class AnnotationTagBatchRemoveOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["remove"]
+    tag_names: list[str] = Field(min_length=1)
+
+    _normalize_names = field_validator("tag_names")(_normalize_tag_names)
+
+
+class AnnotationTagBatchReplaceOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["replace"]
+    source_name: str = Field(min_length=1, max_length=500)
+    replacement: AnnotationManualTagInput
+
+    @field_validator("source_name")
+    @classmethod
+    def normalize_source_name(cls, value: str) -> str:
+        return AnnotationTag.normalize_name(value)
+
+    @model_validator(mode="after")
+    def validate_distinct_names(self) -> AnnotationTagBatchReplaceOperation:
+        if self.source_name.casefold() == self.replacement.name.casefold():
+            raise ValueError("替换前后的 Tag 不能相同。")
+        return self
+
+
+AnnotationTagBatchOperation = Annotated[
+    AnnotationTagBatchAddOperation
+    | AnnotationTagBatchRemoveOperation
+    | AnnotationTagBatchReplaceOperation,
+    Field(discriminator="kind"),
+]
+
+AnnotationTagBatchDetailFilter = Literal["changed", "position_skipped", "all"]
+
+
+class AnnotationTagBatchEditRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_ids: list[str]
+    operation: AnnotationTagBatchOperation
+
+    _normalize_asset_ids = field_validator("asset_ids")(_normalize_asset_ids)
+
+
+class AnnotationTagBatchTermSummary(BaseModel):
+    name: str
+    present_before_count: int
+    added_count: int
+    removed_count: int
+
+
+class AnnotationTagBatchEditSummary(BaseModel):
+    requested_count: int
+    changed_count: int
+    unchanged_count: int
+    created_or_revived_count: int
+    emptied_count: int
+    stale_rebound_count: int
+    invalidated_tag_translation_count: int
+    position_skipped_count: int
+    position_clamped_count: int
+    terms: list[AnnotationTagBatchTermSummary] = Field(default_factory=list)
+
+
+class AnnotationTagBatchEditPreviewItem(BaseModel):
+    asset_id: str
+    filename: str
+    relative_path: str
+    content_version: str
+    changed: bool
+    position_skipped: bool
+    position_clamped: bool
+    before_tags: list[AnnotationTag] = Field(default_factory=list)
+    after_tags: list[AnnotationTag] = Field(default_factory=list)
+    removed_indices: list[int] = Field(default_factory=list)
+    added_indices: list[int] = Field(default_factory=list)
+
+
+class AnnotationTagBatchEditPreviewPage(BaseModel):
+    filter: AnnotationTagBatchDetailFilter
+    offset: int
+    limit: int
+    total: int
+    items: list[AnnotationTagBatchEditPreviewItem] = Field(default_factory=list)
+
+
+class AnnotationTagBatchEditPreview(AnnotationTagBatchEditSummary):
+    preview_token: str = Field(pattern=r"^[0-9a-f]{64}$")
+    details: AnnotationTagBatchEditPreviewPage
+
+
+class AnnotationTagBatchEditExecuteRequest(AnnotationTagBatchEditRequest):
+    model_config = ConfigDict(extra="forbid")
+
+    preview_token: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class AnnotationTagBatchEditResult(AnnotationTagBatchEditSummary):
+    changed_asset_ids: list[str] = Field(default_factory=list)
 
 
 class AnnotationBatchOptionsRequest(BaseModel):

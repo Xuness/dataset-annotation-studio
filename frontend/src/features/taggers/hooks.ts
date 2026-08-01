@@ -29,8 +29,8 @@ import {
 } from "./api";
 import { taggerKeys } from "./queryKeys";
 
-export function useTaggerLibrary() {
-  return useQuery({ queryKey: taggerKeys.library, queryFn: getTaggerLibrary });
+export function useTaggerLibrary(enabled = true) {
+  return useQuery({ queryKey: taggerKeys.library, queryFn: getTaggerLibrary, enabled });
 }
 
 export function useTaggerVocabularySearch(

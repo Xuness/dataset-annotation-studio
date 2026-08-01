@@ -15,6 +15,7 @@ import { AssetDeletionDialog } from "./components/AssetDeletionDialog";
 import { ImageStage } from "./components/ImageStage";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { PaneResizeHandle } from "./components/PaneResizeHandle";
+import { TagBatchEditDialog } from "./components/TagBatchEditDialog";
 import {
   clamp,
   DEFAULT_WORKSPACE_LAYOUT,
@@ -58,7 +59,9 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     folderPath,
     editorRevision,
     annotationDialog,
+    tagBatchDialog,
     blockedAnnotationTarget,
+    blockedTagDraft,
     allMatchingSelected,
     selectAllPending,
     setAssetsChecked,
@@ -70,6 +73,8 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     toggleAllMatchingAssets,
     openAnnotationDialog,
     closeAnnotationDialog,
+    openTagBatchDialog,
+    closeTagBatchDialog,
     updateEditorDirty,
     setEditorTarget,
     updateRecursiveScan,
@@ -159,7 +164,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         selectAllPending={selectAllPending}
         allMatchingSelected={allMatchingSelected}
         error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
-        bulkActionPending={annotationDialog.open}
+        bulkActionPending={annotationDialog.open || tagBatchDialog.open}
         onLoadMore={loadMoreAssets}
         recursive={workspace.data.settings.recursive_scan}
         onSearchChange={setSearch}
@@ -169,6 +174,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         onSetChecked={setAssetsChecked}
         onToggleAll={() => void toggleAllMatchingAssets()}
         onReviewCheckedAnnotations={() => openAnnotationDialog("review")}
+        onEditCheckedTags={openTagBatchDialog}
         onDeleteCheckedAnnotations={() => openAnnotationDialog("delete")}
         onDeleteCheckedAssets={assetDeletion.openCheckedAssetDeletion}
         onOpenDeletionHistory={assetDeletion.openDeletionHistory}
@@ -299,6 +305,13 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         assetIds={annotationDialog.assetIds}
         blockedTarget={blockedAnnotationTarget}
         onClose={closeAnnotationDialog}
+      />
+      <TagBatchEditDialog
+        projectId={projectId}
+        open={tagBatchDialog.open}
+        assetIds={tagBatchDialog.assetIds}
+        blockedTagDraft={blockedTagDraft}
+        onClose={closeTagBatchDialog}
       />
     </WorkspaceFrame>
   );

@@ -9,6 +9,11 @@ import type {
   AnnotationDocument,
   AnnotationRevision,
   AnnotationTag,
+  AnnotationTagBatchEditExecuteRequest,
+  AnnotationTagBatchEditPreview,
+  AnnotationTagBatchEditPreviewOptions,
+  AnnotationTagBatchEditRequest,
+  AnnotationTagBatchEditResult,
   TranslationProducerKind,
   TranslationSourceKind,
 } from "../../shared/api/types";
@@ -189,5 +194,31 @@ export function reviewAnnotations(
   return apiRequest(`/api/v1/workspaces/${projectId}/annotations/review`, {
     method: "POST",
     body: JSON.stringify({ asset_ids: assetIds, targets }),
+  });
+}
+
+export function previewTagBatchEdit(
+  projectId: string,
+  request: AnnotationTagBatchEditRequest,
+  options: AnnotationTagBatchEditPreviewOptions = {},
+): Promise<AnnotationTagBatchEditPreview> {
+  const parameters = new URLSearchParams({
+    detail_filter: options.detailFilter ?? "changed",
+    detail_offset: String(options.detailOffset ?? 0),
+    detail_limit: String(options.detailLimit ?? 20),
+  });
+  return apiRequest(`/api/v1/workspaces/${projectId}/annotations/tags/edit/preview?${parameters}`, {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+}
+
+export function executeTagBatchEdit(
+  projectId: string,
+  request: AnnotationTagBatchEditExecuteRequest,
+): Promise<AnnotationTagBatchEditResult> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/annotations/tags/edit/execute`, {
+    method: "POST",
+    body: JSON.stringify(request),
   });
 }

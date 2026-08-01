@@ -852,6 +852,40 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/annotations/tags/edit/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute Tag Batch Edit */
+        post: operations["execute_tag_batch_edit_api_v1_workspaces__project_id__annotations_tags_edit_execute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/annotations/tags/edit/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Tag Batch Edit */
+        post: operations["preview_tag_batch_edit_api_v1_workspaces__project_id__annotations_tags_edit_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/annotations/tags/review": {
         parameters: {
             query?: never;
@@ -1845,6 +1879,13 @@ export type components = {
             validation?: components["schemas"]["ValidationResult"] | null;
             validation_status?: components["schemas"]["AnnotationStatus"] | null;
         };
+        /** AnnotationManualTagInput */
+        AnnotationManualTagInput: {
+            /** Category */
+            category?: string | null;
+            /** Name */
+            name: string;
+        };
         /** AnnotationReviewRequest */
         AnnotationReviewRequest: {
             /** Expected Head Revision Id */
@@ -1923,6 +1964,194 @@ export type components = {
              * @default manual
              */
             origin: string;
+        };
+        /** AnnotationTagBatchAddOperation */
+        AnnotationTagBatchAddOperation: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "add";
+            /** Position */
+            position?: components["schemas"]["AnnotationTagBatchInsertStart"] | components["schemas"]["AnnotationTagBatchInsertEnd"] | components["schemas"]["AnnotationTagBatchInsertIndex"] | components["schemas"]["AnnotationTagBatchInsertAnchor"];
+            /** Tags */
+            tags: components["schemas"]["AnnotationManualTagInput"][];
+        };
+        /** AnnotationTagBatchEditExecuteRequest */
+        AnnotationTagBatchEditExecuteRequest: {
+            /** Asset Ids */
+            asset_ids: string[];
+            /** Operation */
+            operation: components["schemas"]["AnnotationTagBatchAddOperation"] | components["schemas"]["AnnotationTagBatchRemoveOperation"] | components["schemas"]["AnnotationTagBatchReplaceOperation"];
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** AnnotationTagBatchEditPreview */
+        AnnotationTagBatchEditPreview: {
+            /** Changed Count */
+            changed_count: number;
+            /** Created Or Revived Count */
+            created_or_revived_count: number;
+            details: components["schemas"]["AnnotationTagBatchEditPreviewPage"];
+            /** Emptied Count */
+            emptied_count: number;
+            /** Invalidated Tag Translation Count */
+            invalidated_tag_translation_count: number;
+            /** Position Clamped Count */
+            position_clamped_count: number;
+            /** Position Skipped Count */
+            position_skipped_count: number;
+            /** Preview Token */
+            preview_token: string;
+            /** Requested Count */
+            requested_count: number;
+            /** Stale Rebound Count */
+            stale_rebound_count: number;
+            /** Terms */
+            terms?: components["schemas"]["AnnotationTagBatchTermSummary"][];
+            /** Unchanged Count */
+            unchanged_count: number;
+        };
+        /** AnnotationTagBatchEditPreviewItem */
+        AnnotationTagBatchEditPreviewItem: {
+            /** Added Indices */
+            added_indices?: number[];
+            /** After Tags */
+            after_tags?: components["schemas"]["AnnotationTag"][];
+            /** Asset Id */
+            asset_id: string;
+            /** Before Tags */
+            before_tags?: components["schemas"]["AnnotationTag"][];
+            /** Changed */
+            changed: boolean;
+            /** Content Version */
+            content_version: string;
+            /** Filename */
+            filename: string;
+            /** Position Clamped */
+            position_clamped: boolean;
+            /** Position Skipped */
+            position_skipped: boolean;
+            /** Relative Path */
+            relative_path: string;
+            /** Removed Indices */
+            removed_indices?: number[];
+        };
+        /** AnnotationTagBatchEditPreviewPage */
+        AnnotationTagBatchEditPreviewPage: {
+            /**
+             * Filter
+             * @enum {string}
+             */
+            filter: "changed" | "position_skipped" | "all";
+            /** Items */
+            items?: components["schemas"]["AnnotationTagBatchEditPreviewItem"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** AnnotationTagBatchEditRequest */
+        AnnotationTagBatchEditRequest: {
+            /** Asset Ids */
+            asset_ids: string[];
+            /** Operation */
+            operation: components["schemas"]["AnnotationTagBatchAddOperation"] | components["schemas"]["AnnotationTagBatchRemoveOperation"] | components["schemas"]["AnnotationTagBatchReplaceOperation"];
+        };
+        /** AnnotationTagBatchEditResult */
+        AnnotationTagBatchEditResult: {
+            /** Changed Asset Ids */
+            changed_asset_ids?: string[];
+            /** Changed Count */
+            changed_count: number;
+            /** Created Or Revived Count */
+            created_or_revived_count: number;
+            /** Emptied Count */
+            emptied_count: number;
+            /** Invalidated Tag Translation Count */
+            invalidated_tag_translation_count: number;
+            /** Position Clamped Count */
+            position_clamped_count: number;
+            /** Position Skipped Count */
+            position_skipped_count: number;
+            /** Requested Count */
+            requested_count: number;
+            /** Stale Rebound Count */
+            stale_rebound_count: number;
+            /** Terms */
+            terms?: components["schemas"]["AnnotationTagBatchTermSummary"][];
+            /** Unchanged Count */
+            unchanged_count: number;
+        };
+        /** AnnotationTagBatchInsertAnchor */
+        AnnotationTagBatchInsertAnchor: {
+            /** Anchor Name */
+            anchor_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "after" | "before";
+        };
+        /** AnnotationTagBatchInsertEnd */
+        AnnotationTagBatchInsertEnd: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "end";
+        };
+        /** AnnotationTagBatchInsertIndex */
+        AnnotationTagBatchInsertIndex: {
+            /** Index */
+            index: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "index";
+        };
+        /** AnnotationTagBatchInsertStart */
+        AnnotationTagBatchInsertStart: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "start";
+        };
+        /** AnnotationTagBatchRemoveOperation */
+        AnnotationTagBatchRemoveOperation: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "remove";
+            /** Tag Names */
+            tag_names: string[];
+        };
+        /** AnnotationTagBatchReplaceOperation */
+        AnnotationTagBatchReplaceOperation: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "replace";
+            replacement: components["schemas"]["AnnotationManualTagInput"];
+            /** Source Name */
+            source_name: string;
+        };
+        /** AnnotationTagBatchTermSummary */
+        AnnotationTagBatchTermSummary: {
+            /** Added Count */
+            added_count: number;
+            /** Name */
+            name: string;
+            /** Present Before Count */
+            present_before_count: number;
+            /** Removed Count */
+            removed_count: number;
         };
         /** AnnotationTaggerSource */
         AnnotationTaggerSource: {
@@ -6293,6 +6522,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnnotationBatchReviewResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_tag_batch_edit_api_v1_workspaces__project_id__annotations_tags_edit_execute_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnotationTagBatchEditExecuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnotationTagBatchEditResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_tag_batch_edit_api_v1_workspaces__project_id__annotations_tags_edit_preview_post: {
+        parameters: {
+            query?: {
+                detail_filter?: "changed" | "position_skipped" | "all";
+                detail_offset?: number;
+                detail_limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnotationTagBatchEditRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnotationTagBatchEditPreview"];
                 };
             };
             /** @description Validation Error */

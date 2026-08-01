@@ -718,6 +718,34 @@
         "title": "AnnotationDocument",
         "type": "object"
       },
+      "AnnotationManualTagInput": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "AnnotationManualTagInput",
+        "type": "object"
+      },
       "AnnotationReviewRequest": {
         "additionalProperties": false,
         "properties": {
@@ -955,6 +983,545 @@
           "name"
         ],
         "title": "AnnotationTag",
+        "type": "object"
+      },
+      "AnnotationTagBatchAddOperation": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "add",
+            "title": "Kind",
+            "type": "string"
+          },
+          "position": {
+            "discriminator": {
+              "mapping": {
+                "after": "#/components/schemas/AnnotationTagBatchInsertAnchor",
+                "before": "#/components/schemas/AnnotationTagBatchInsertAnchor",
+                "end": "#/components/schemas/AnnotationTagBatchInsertEnd",
+                "index": "#/components/schemas/AnnotationTagBatchInsertIndex",
+                "start": "#/components/schemas/AnnotationTagBatchInsertStart"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationTagBatchInsertStart"
+              },
+              {
+                "$ref": "#/components/schemas/AnnotationTagBatchInsertEnd"
+              },
+              {
+                "$ref": "#/components/schemas/AnnotationTagBatchInsertIndex"
+              },
+              {
+                "$ref": "#/components/schemas/AnnotationTagBatchInsertAnchor"
+              }
+            ],
+            "title": "Position"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationManualTagInput"
+            },
+            "minItems": 1,
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "tags"
+        ],
+        "title": "AnnotationTagBatchAddOperation",
+        "type": "object"
+      },
+      "AnnotationTagBatchEditExecuteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "operation": {
+            "discriminator": {
+              "mapping": {
+                "add": "#/components/schemas/AnnotationTagBatchAddOperation",
+                "remove": "#/components/schemas/AnnotationTagBatchRemoveOperation",
+                "replace": "#/components/schemas/AnnotationTagBatchReplaceOperation"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationTagBatchAddOperation"
+              },
+              {
+                "$ref": "#/components/schemas/AnnotationTagBatchRemoveOperation"
+              },
+              {
+                "$ref": "#/components/schemas/AnnotationTagBatchReplaceOperation"
+              }
+            ],
+            "title": "Operation"
+          },
+          "preview_token": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_ids",
+          "operation",
+          "preview_token"
+        ],
+        "title": "AnnotationTagBatchEditExecuteRequest",
+        "type": "object"
+      },
+      "AnnotationTagBatchEditPreview": {
+        "properties": {
+          "changed_count": {
+            "title": "Changed Count",
+            "type": "integer"
+          },
+          "created_or_revived_count": {
+            "title": "Created Or Revived Count",
+            "type": "integer"
+          },
+          "details": {
+            "$ref": "#/components/schemas/AnnotationTagBatchEditPreviewPage"
+          },
+          "emptied_count": {
+            "title": "Emptied Count",
+            "type": "integer"
+          },
+          "invalidated_tag_translation_count": {
+            "title": "Invalidated Tag Translation Count",
+            "type": "integer"
+          },
+          "position_clamped_count": {
+            "title": "Position Clamped Count",
+            "type": "integer"
+          },
+          "position_skipped_count": {
+            "title": "Position Skipped Count",
+            "type": "integer"
+          },
+          "preview_token": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Token",
+            "type": "string"
+          },
+          "requested_count": {
+            "title": "Requested Count",
+            "type": "integer"
+          },
+          "stale_rebound_count": {
+            "title": "Stale Rebound Count",
+            "type": "integer"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationTagBatchTermSummary"
+            },
+            "title": "Terms",
+            "type": "array"
+          },
+          "unchanged_count": {
+            "title": "Unchanged Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requested_count",
+          "changed_count",
+          "unchanged_count",
+          "created_or_revived_count",
+          "emptied_count",
+          "stale_rebound_count",
+          "invalidated_tag_translation_count",
+          "position_skipped_count",
+          "position_clamped_count",
+          "preview_token",
+          "details"
+        ],
+        "title": "AnnotationTagBatchEditPreview",
+        "type": "object"
+      },
+      "AnnotationTagBatchEditPreviewItem": {
+        "properties": {
+          "added_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Added Indices",
+            "type": "array"
+          },
+          "after_tags": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationTag"
+            },
+            "title": "After Tags",
+            "type": "array"
+          },
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "before_tags": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationTag"
+            },
+            "title": "Before Tags",
+            "type": "array"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "content_version": {
+            "title": "Content Version",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "position_clamped": {
+            "title": "Position Clamped",
+            "type": "boolean"
+          },
+          "position_skipped": {
+            "title": "Position Skipped",
+            "type": "boolean"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "removed_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Removed Indices",
+            "type": "array"
+          }
+        },
+        "required": [
+          "asset_id",
+          "filename",
+          "relative_path",
+          "content_version",
+          "changed",
+          "position_skipped",
+          "position_clamped"
+        ],
+        "title": "AnnotationTagBatchEditPreviewItem",
+        "type": "object"
+      },
+      "AnnotationTagBatchEditPreviewPage": {
+        "properties": {
+          "filter": {
+            "enum": [
+              "changed",
+              "position_skipped",
+              "all"
+            ],
+            "title": "Filter",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationTagBatchEditPreviewItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filter",
+          "offset",
+          "limit",
+          "total"
+        ],
+        "title": "AnnotationTagBatchEditPreviewPage",
+        "type": "object"
+      },
+      "AnnotationTagBatchEditRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "operation": {
+            "discriminator": {
+              "mapping": {
+                "add": "#/components/schemas/AnnotationTagBatchAddOperation",
+                "remove": "#/components/schemas/AnnotationTagBatchRemoveOperation",
+                "replace": "#/components/schemas/AnnotationTagBatchReplaceOperation"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationTagBatchAddOperation"
+              },
+              {
+                "$ref": "#/components/schemas/AnnotationTagBatchRemoveOperation"
+              },
+              {
+                "$ref": "#/components/schemas/AnnotationTagBatchReplaceOperation"
+              }
+            ],
+            "title": "Operation"
+          }
+        },
+        "required": [
+          "asset_ids",
+          "operation"
+        ],
+        "title": "AnnotationTagBatchEditRequest",
+        "type": "object"
+      },
+      "AnnotationTagBatchEditResult": {
+        "properties": {
+          "changed_asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Asset Ids",
+            "type": "array"
+          },
+          "changed_count": {
+            "title": "Changed Count",
+            "type": "integer"
+          },
+          "created_or_revived_count": {
+            "title": "Created Or Revived Count",
+            "type": "integer"
+          },
+          "emptied_count": {
+            "title": "Emptied Count",
+            "type": "integer"
+          },
+          "invalidated_tag_translation_count": {
+            "title": "Invalidated Tag Translation Count",
+            "type": "integer"
+          },
+          "position_clamped_count": {
+            "title": "Position Clamped Count",
+            "type": "integer"
+          },
+          "position_skipped_count": {
+            "title": "Position Skipped Count",
+            "type": "integer"
+          },
+          "requested_count": {
+            "title": "Requested Count",
+            "type": "integer"
+          },
+          "stale_rebound_count": {
+            "title": "Stale Rebound Count",
+            "type": "integer"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationTagBatchTermSummary"
+            },
+            "title": "Terms",
+            "type": "array"
+          },
+          "unchanged_count": {
+            "title": "Unchanged Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requested_count",
+          "changed_count",
+          "unchanged_count",
+          "created_or_revived_count",
+          "emptied_count",
+          "stale_rebound_count",
+          "invalidated_tag_translation_count",
+          "position_skipped_count",
+          "position_clamped_count"
+        ],
+        "title": "AnnotationTagBatchEditResult",
+        "type": "object"
+      },
+      "AnnotationTagBatchInsertAnchor": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Anchor Name",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "before",
+              "after"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "anchor_name"
+        ],
+        "title": "AnnotationTagBatchInsertAnchor",
+        "type": "object"
+      },
+      "AnnotationTagBatchInsertEnd": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "end",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "AnnotationTagBatchInsertEnd",
+        "type": "object"
+      },
+      "AnnotationTagBatchInsertIndex": {
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "index",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "index"
+        ],
+        "title": "AnnotationTagBatchInsertIndex",
+        "type": "object"
+      },
+      "AnnotationTagBatchInsertStart": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "start",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "AnnotationTagBatchInsertStart",
+        "type": "object"
+      },
+      "AnnotationTagBatchRemoveOperation": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "remove",
+            "title": "Kind",
+            "type": "string"
+          },
+          "tag_names": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Tag Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "tag_names"
+        ],
+        "title": "AnnotationTagBatchRemoveOperation",
+        "type": "object"
+      },
+      "AnnotationTagBatchReplaceOperation": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "replace",
+            "title": "Kind",
+            "type": "string"
+          },
+          "replacement": {
+            "$ref": "#/components/schemas/AnnotationManualTagInput"
+          },
+          "source_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Source Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "source_name",
+          "replacement"
+        ],
+        "title": "AnnotationTagBatchReplaceOperation",
+        "type": "object"
+      },
+      "AnnotationTagBatchTermSummary": {
+        "properties": {
+          "added_count": {
+            "title": "Added Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "present_before_count": {
+            "title": "Present Before Count",
+            "type": "integer"
+          },
+          "removed_count": {
+            "title": "Removed Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "present_before_count",
+          "added_count",
+          "removed_count"
+        ],
+        "title": "AnnotationTagBatchTermSummary",
         "type": "object"
       },
       "AnnotationTaggerSource": {
@@ -10873,6 +11440,148 @@
           }
         },
         "summary": "Review Annotations",
+        "tags": [
+          "annotations"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/annotations/tags/edit/execute": {
+      "post": {
+        "operationId": "execute_tag_batch_edit_api_v1_workspaces__project_id__annotations_tags_edit_execute_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationTagBatchEditExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationTagBatchEditResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Execute Tag Batch Edit",
+        "tags": [
+          "annotations"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/annotations/tags/edit/preview": {
+      "post": {
+        "operationId": "preview_tag_batch_edit_api_v1_workspaces__project_id__annotations_tags_edit_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "detail_filter",
+            "required": false,
+            "schema": {
+              "default": "changed",
+              "enum": [
+                "changed",
+                "position_skipped",
+                "all"
+              ],
+              "title": "Detail Filter",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "detail_offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Detail Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "detail_limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Detail Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationTagBatchEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationTagBatchEditPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Tag Batch Edit",
         "tags": [
           "annotations"
         ]

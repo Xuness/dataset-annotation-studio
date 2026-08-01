@@ -7,6 +7,7 @@ import {
   FileQuestion,
   History,
   Search,
+  Tags,
   Trash2,
   Unlink,
 } from "lucide-react";
@@ -53,6 +54,7 @@ interface AssetBrowserProps {
   onToggleAll: () => void;
   onRecursiveChange: (value: boolean) => void;
   onReviewCheckedAnnotations: () => void;
+  onEditCheckedTags: () => void;
   onDeleteCheckedAnnotations: () => void;
   onDeleteCheckedAssets: () => void;
   onOpenDeletionHistory: () => void;
@@ -148,6 +150,7 @@ export function AssetBrowser({
   onToggleAll,
   onRecursiveChange,
   onReviewCheckedAnnotations,
+  onEditCheckedTags,
   onDeleteCheckedAnnotations,
   onDeleteCheckedAssets,
   onOpenDeletionHistory,
@@ -357,6 +360,14 @@ export function AssetBrowser({
           </span>
         </div>
         <div className="asset-selection-toolbar__actions">
+          <button
+            type="button"
+            disabled={!checkedAssetIds.length || bulkActionPending}
+            onClick={onEditCheckedTags}
+          >
+            <Tags size={13} />
+            编辑 Tags
+          </button>
           <button
             type="button"
             disabled={!checkedAssetIds.length || bulkActionPending}
