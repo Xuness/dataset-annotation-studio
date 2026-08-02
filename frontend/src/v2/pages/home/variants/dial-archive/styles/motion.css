@@ -1,0 +1,129 @@
+@keyframes dial-archive-index-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-ghost-wipe {
+  from {
+    clip-path: inset(100% 0 0);
+  }
+  to {
+    clip-path: inset(-5% 0 0);
+  }
+}
+
+@keyframes dial-archive-core-pulse {
+  0% {
+    transform: translateY(5.5px) scale(0.965);
+  }
+  58% {
+    transform: translateY(-1.6px) scale(1.018);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-block-wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@keyframes dial-archive-number-in {
+  from {
+    transform: translateY(108%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes dial-archive-scan-down {
+  from {
+    transform: translateY(-110%);
+  }
+  to {
+    transform: translateY(330%);
+  }
+}
+
+@keyframes dial-archive-info-confirm {
+  from {
+    transform: translateX(5.5px);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-sweep-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@keyframes dial-archive-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+.dial-archive-home .dial-archive-index {
+  animation: dial-archive-index-reveal 720ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-home__ghost span.is-wiping {
+  animation: dial-archive-ghost-wipe 450ms var(--dial-archive-ease) 100ms both;
+}
+
+.dial-archive-core__frame.is-pulsing {
+  animation: dial-archive-core-pulse 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.dial-archive-core__block.is-wiping {
+  animation: dial-archive-block-wipe 320ms var(--dial-archive-ease) 40ms both;
+}
+
+.dial-archive-core__number.is-entering {
+  animation: dial-archive-number-in 300ms var(--dial-archive-ease) 60ms both;
+}
+
+.dial-archive-core__scan.is-running {
+  animation: dial-archive-scan-down 420ms linear 80ms both;
+}
+
+.dial-archive-info.is-confirming {
+  animation: dial-archive-info-confirm 220ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-home__sweep.is-running {
+  animation: dial-archive-sweep-in 500ms cubic-bezier(0.7, 0, 0.2, 1) forwards;
+}
+
+.dial-archive-home__sweep.is-running span {
+  animation: dial-archive-fade-in 200ms 350ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dial-archive-home *,
+  .dial-archive-home *::before,
+  .dial-archive-home *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

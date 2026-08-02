@@ -1,0 +1,314 @@
+.dial-archive-dial {
+  position: absolute;
+  top: 432px;
+  left: 1478px;
+  z-index: 2;
+  width: 860px;
+  height: 860px;
+  transform: translate(-50%, -50%)
+    translate3d(var(--dial-archive-dial-x), var(--dial-archive-dial-y), 0)
+    rotateX(var(--dial-archive-dial-rx)) rotateY(var(--dial-archive-dial-ry));
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.dial-archive-dial svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.dial-archive-dial__fixed-frame,
+.dial-archive-dial__inner-rotor,
+.dial-archive-dial__gap-slot,
+.dial-archive-dial__numbers {
+  pointer-events: none;
+}
+
+.dial-archive-dial__segment {
+  cursor: pointer;
+  opacity: 0.92;
+  transition:
+    opacity 160ms ease,
+    stroke 160ms ease;
+}
+
+.dial-archive-dial__segment:hover,
+.dial-archive-dial__segment:focus-visible {
+  stroke: #000000;
+  opacity: 1;
+  outline: none;
+}
+
+.dial-archive-dial__segment:focus-visible {
+  filter: drop-shadow(0 0 4px var(--dial-archive-yellow));
+}
+
+.dial-archive-dial__micro-code {
+  fill: var(--dial-archive-gray-9);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+
+.dial-archive-dial__numbers text {
+  fill: var(--dial-archive-gray-9);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 15px;
+  transition: fill 160ms ease;
+}
+
+.dial-archive-dial__numbers text.is-current {
+  fill: var(--dial-archive-carbon);
+  font-weight: 600;
+}
+
+.dial-archive-dial__numbers .dial-archive-dial__number-gap {
+  letter-spacing: 2px;
+}
+
+.dial-archive-dial-tag {
+  position: absolute;
+  top: 124px;
+  left: 1075px;
+  z-index: 3;
+  color: var(--dial-archive-gray-9);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+}
+
+.dial-archive-core {
+  position: absolute;
+  top: 432px;
+  left: 1478px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.dial-archive-core__frame {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  isolation: isolate;
+}
+
+.dial-archive-core__frame::before {
+  position: absolute;
+  inset: -12px;
+  z-index: 0;
+  background:
+    linear-gradient(var(--dial-archive-carbon), var(--dial-archive-carbon)) left top / 42px 1px
+      no-repeat,
+    linear-gradient(var(--dial-archive-carbon), var(--dial-archive-carbon)) left top / 1px 42px
+      no-repeat,
+    linear-gradient(var(--dial-archive-carbon), var(--dial-archive-carbon)) right top / 42px 1px
+      no-repeat,
+    linear-gradient(var(--dial-archive-carbon), var(--dial-archive-carbon)) right top / 1px 42px
+      no-repeat,
+    linear-gradient(var(--dial-archive-carbon), var(--dial-archive-carbon)) left bottom / 42px 1px
+      no-repeat,
+    linear-gradient(var(--dial-archive-carbon), var(--dial-archive-carbon)) left bottom / 1px 42px
+      no-repeat,
+    linear-gradient(var(--dial-archive-carbon), var(--dial-archive-carbon)) right bottom / 42px 1px
+      no-repeat,
+    linear-gradient(var(--dial-archive-carbon), var(--dial-archive-carbon)) right bottom / 1px 42px
+      no-repeat;
+  content: "";
+  opacity: 0.44;
+}
+
+.dial-archive-core__frame::after {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  z-index: 0;
+  width: 1px;
+  height: 80px;
+  background: linear-gradient(transparent, rgba(25, 25, 25, 0.55));
+  content: "";
+}
+
+.dial-archive-core__block {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 200px;
+  height: 200px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-core__block::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  background: var(--dial-archive-carbon);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  content: "";
+}
+
+.dial-archive-core__number {
+  color: var(--dial-archive-carbon);
+  font-family: var(--dial-archive-font-display);
+  font-size: 110px;
+  font-stretch: 125%;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.dial-archive-core__scan {
+  position: absolute;
+  top: -45%;
+  right: 0;
+  left: 0;
+  height: 45%;
+  background: linear-gradient(180deg, transparent, rgba(25, 25, 25, 0.12), transparent);
+  transform: translateY(-110%);
+}
+
+.dial-archive-core__meta {
+  color: #777777;
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+}
+
+.dial-archive-info {
+  position: absolute;
+  top: 799px;
+  left: 1048px;
+  z-index: 4;
+  max-width: 691px;
+}
+
+.dial-archive-info__kicker {
+  margin-bottom: 8px;
+  color: var(--dial-archive-gray-9);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+}
+
+.dial-archive-info__heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.dial-archive-info__heading h1 {
+  display: inline-block;
+  margin: 0;
+  padding: 7px 15px;
+  color: var(--dial-archive-paper);
+  font-family: var(--dial-archive-font-display);
+  font-size: 34px;
+  font-stretch: 115%;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  line-height: 1.05;
+  text-transform: uppercase;
+  background: var(--dial-archive-carbon);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+}
+
+.dial-archive-info__heading span {
+  color: var(--dial-archive-gray-6);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+}
+
+.dial-archive-info__description {
+  max-width: 42ch;
+  margin: 10px 0 12px;
+  color: #4a4a4a;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.dial-archive-info__specification {
+  display: flex;
+  align-items: center;
+  margin: 0 0 18px;
+  color: var(--dial-archive-gray-9);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+.dial-archive-info__specification span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 15px;
+  border-left: 1px solid var(--dial-archive-hairline);
+}
+
+.dial-archive-info__specification span:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.dial-archive-info__specification b {
+  color: var(--dial-archive-carbon);
+  font-weight: 600;
+}
+
+.dial-archive-info__enter {
+  position: relative;
+  display: inline-flex;
+  height: 56px;
+  align-items: center;
+  gap: 24px;
+  padding: 0 26px;
+  border: 0;
+  color: var(--dial-archive-carbon);
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--dial-archive-yellow);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  cursor: pointer;
+}
+
+.dial-archive-info__enter b {
+  font-family: var(--dial-archive-font-mono);
+  font-weight: 600;
+  transition: transform 180ms var(--dial-archive-ease);
+}
+
+.dial-archive-info__enter::after {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--dial-archive-carbon);
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 200ms var(--dial-archive-ease);
+}
+
+.dial-archive-info__enter:hover b {
+  transform: translateX(6px);
+}
+
+.dial-archive-info__enter:hover::after {
+  transform: scaleX(1);
+}
+
+.dial-archive-info__enter:focus-visible {
+  outline: 2px solid var(--dial-archive-carbon);
+  outline-offset: 4px;
+}
