@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   getAdjacentHomeSpace,
+  getHomeSpaceByRoute,
   HOME_SPACES,
   PRIMARY_HOME_SPACES,
   SUPPORT_HOME_SPACES,
@@ -20,5 +21,10 @@ describe("new frontend home space registry", () => {
     expect(getAdjacentHomeSpace("archive", -1)).toBe("capability");
     expect(getAdjacentHomeSpace("capability", 1)).toBe("archive");
     expect(getAdjacentHomeSpace("annotation", 1)).toBe("quality");
+  });
+
+  test("resolves stable product routes without theme knowledge", () => {
+    expect(getHomeSpaceByRoute("/archive")?.id).toBe("archive");
+    expect(getHomeSpaceByRoute("/missing")).toBeNull();
   });
 });

@@ -86,6 +86,10 @@ export function getHomeSpace(id: HomeSpaceId): HomeSpace {
   return space;
 }
 
+export function getHomeSpaceByRoute(route: string): HomeSpace | null {
+  return HOME_SPACES.find((space) => space.route === route) ?? null;
+}
+
 export function getAdjacentHomeSpace(id: HomeSpaceId, delta: number): HomeSpaceId {
   const index = HOME_SPACES.findIndex((space) => space.id === id);
   const nextIndex = (index + delta + HOME_SPACES.length) % HOME_SPACES.length;

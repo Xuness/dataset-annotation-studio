@@ -89,6 +89,21 @@ function featureName(path) {
   return parts[0] === "features" ? parts[1] : null;
 }
 
+function themePackageName(path) {
+  return /^v2\/themes\/([^/]+)\//u.exec(sourcePath(path))?.[1] ?? null;
+}
+
+function isThemeSafeDependency(themeName, path) {
+  const normalized = sourcePath(path);
+  return (
+    normalized.startsWith(`v2/themes/${themeName}/`) ||
+    normalized === "v2/themes/themeTypes.ts" ||
+    normalized.startsWith("v2/navigation/") ||
+    normalized === "v2/pages/spaces/spacePageModel.ts" ||
+    normalized === "shared/desktop/windowControls.ts"
+  );
+}
+
 function isV2SafeSharedPath(path) {
   const normalized = sourcePath(path);
   if (normalized.startsWith("shared/desktop/")) return normalized.endsWith(".ts");
@@ -158,6 +173,10 @@ for (const file of files) {
   }
 
   for (const specifier of importSpecifiers(sourceFile)) {
+    const sourceTheme = themePackageName(file);
+    if (sourceTheme && specifier === "react-router-dom") {
+      report("theme packages must emit semantic navigation intents instead of importing Router.");
+    }
     if (specifier.endsWith("/styles/global.css") && relativeFile !== "Legacy/main.tsx") {
       report("legacy global styles may only be loaded by Legacy/main.tsx.");
     }
@@ -234,6 +253,17 @@ for (const file of files) {
         report(`V2 code cannot depend on legacy presentation module ${sourcePath(dependency)}.`);
       }
     }
+    if (sourceTheme && !isThemeSafeDependency(sourceTheme, dependency)) {
+      report(
+        `theme "${sourceTheme}" cannot own product runtime dependency ${sourcePath(dependency)}.`,
+      );
+    }
+    if (
+      relativeFile.startsWith("v2/pages/") &&
+      /^v2\/themes\/[^/]+\//u.test(sourcePath(dependency))
+    ) {
+      report(`neutral V2 pages cannot depend on concrete theme ${sourcePath(dependency)}.`);
+    }
   }
 
   function checkCalls(node) {
@@ -244,6 +274,15 @@ for (const file of files) {
       relativeFile !== "shared/api/client.ts"
     ) {
       report("direct fetch calls must go through shared/api/client.ts.");
+    }
+    if (
+      themePackageName(file) &&
+      ts.isPropertyAccessExpression(node) &&
+      node.name.text === "location" &&
+      ts.isIdentifier(node.expression) &&
+      ["window", "document", "globalThis"].includes(node.expression.text)
+    ) {
+      report("theme packages cannot read URL location; route state must be injected as props.");
     }
     ts.forEachChild(node, checkCalls);
   }

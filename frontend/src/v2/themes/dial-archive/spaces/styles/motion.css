@@ -1,0 +1,271 @@
+@keyframes dial-archive-space-cursor-cell-route {
+  0% {
+    transform: scaleY(1);
+    animation-timing-function: var(--dial-archive-route-out);
+  }
+  24% {
+    transform: scaleY(0.035);
+    animation-timing-function: linear;
+  }
+  68% {
+    transform: scaleY(0.035);
+    animation-timing-function: var(--dial-archive-route-in);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes dial-archive-space-cursor-tether {
+  0%,
+  6% {
+    right: 0;
+    width: 12px;
+  }
+  20%,
+  58% {
+    right: 0;
+    width: 30px;
+  }
+  78% {
+    right: 0;
+    width: 17px;
+  }
+  100% {
+    right: 0;
+    width: 12px;
+  }
+}
+
+@keyframes dial-archive-space-handoff-underlay {
+  0% {
+    opacity: 1;
+    clip-path: inset(48.5% 100% 48.5% 0);
+    animation-timing-function: linear;
+  }
+  20% {
+    opacity: 1;
+    clip-path: inset(48.5% 0 48.5% 0);
+    animation-timing-function: var(--dial-archive-route-in);
+  }
+  34%,
+  52% {
+    opacity: 1;
+    clip-path: inset(0);
+    animation-timing-function: var(--dial-archive-route-in);
+  }
+  70% {
+    opacity: 1;
+    clip-path: inset(48.5% 0 48.5% 0);
+    animation-timing-function: var(--dial-archive-route-out);
+  }
+  98% {
+    opacity: 1;
+    clip-path: inset(48.5% 0 48.5% 100%);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(48.5% 0 48.5% 100%);
+  }
+}
+
+@keyframes dial-archive-space-handoff-copy {
+  0%,
+  28% {
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-12px);
+  }
+  39%,
+  54% {
+    clip-path: inset(0);
+    transform: none;
+  }
+  68%,
+  100% {
+    clip-path: inset(0 0 0 100%);
+    transform: translateX(18px);
+  }
+}
+
+@keyframes dial-archive-space-handoff-head {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(calc(100vw - var(--dial-archive-space-rail-w) - 2px));
+  }
+  28%,
+  100% {
+    opacity: 0;
+    transform: translateX(calc(100vw - var(--dial-archive-space-rail-w) - 2px));
+  }
+}
+
+@keyframes dial-archive-space-hero-word-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-22px);
+  }
+  to {
+    clip-path: inset(0);
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-space-hero-copy-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+    transform: translateY(24px);
+  }
+  to {
+    clip-path: inset(0);
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-project-stage-in {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-project-content-next {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-project-content-prev {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 0 100%);
+    transform: translateX(-32px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-project-orbit-shift {
+  from {
+    opacity: 0.35;
+    transform: rotate(-16deg) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-project-index-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-project-detail-swap {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: none;
+  }
+}
+
+.dial-archive-space-rail__cursor.is-routing::before {
+  animation: dial-archive-space-cursor-cell-route 320ms linear both;
+}
+
+.dial-archive-space-rail__cursor.is-routing::after {
+  animation: dial-archive-space-cursor-tether 700ms var(--dial-archive-route-in) both;
+}
+
+.dial-archive-space-handoff.is-running {
+  animation: dial-archive-space-handoff-underlay 700ms linear both;
+}
+
+.dial-archive-space-handoff.is-running::before {
+  animation: dial-archive-space-handoff-head 700ms linear both;
+}
+
+.dial-archive-space-handoff.is-running span {
+  animation: dial-archive-space-handoff-copy 700ms linear both;
+}
+
+.dial-archive-archive-page .dial-archive-space-hero__word {
+  animation: dial-archive-space-hero-word-in 720ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-archive-page .dial-archive-space-hero__grid {
+  animation: dial-archive-space-hero-copy-in 620ms 90ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-pending-space__word {
+  animation: dial-archive-space-hero-word-in 620ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-pending-space__body {
+  animation: dial-archive-space-hero-copy-in 540ms 70ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-project-stage {
+  animation: dial-archive-project-stage-in 720ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-project-stage.is-next .dial-archive-project-visual__content {
+  animation: dial-archive-project-content-next 480ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-project-stage.is-prev .dial-archive-project-visual__content {
+  animation: dial-archive-project-content-prev 480ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-project-stage.is-changing .dial-archive-project-orbit {
+  animation: dial-archive-project-orbit-shift 560ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-project-stage.is-changing .dial-archive-project-marker__index {
+  animation: dial-archive-project-index-pop 410ms var(--dial-archive-ease) both;
+}
+
+.dial-archive-project-detail__grid {
+  animation: dial-archive-project-detail-swap 400ms var(--dial-archive-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dial-archive-space *,
+  .dial-archive-space *::before,
+  .dial-archive-space *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -5,16 +5,16 @@
 
 ## 术语与命名
 
-- **新前端**：当前产品默认入口承载的新一代表现层，可同时容纳多个独立视觉方案。
+- **新前端**：当前产品默认入口承载的新一代表现层，可同时容纳多个完整且独立的视觉主题。
 - **`src/v2`**：新前端的代码代际目录，只表示依赖边界；不得用 `V2` 代称某个视觉方案。
-- **`dial-archive`**：当前默认首页方案 ID，由已确认的断环档案仪原型演进而来；方案私有实现使用
-  `dial-archive-*` 类名和 `--dial-archive-*` CSS 变量。
+- **`dial-archive`**：当前默认主题 ID，由已确认的断环档案仪首页与终末地 / 莱茵档案空间演进而来；
+  主题私有实现使用 `dial-archive-*` 类名和 `--dial-archive-*` CSS 变量。
 - **Legacy**：位于 `frontend/Legacy`、通过 `legacy.html` 访问的旧表现层。
 
 ## 双入口策略
 
 - `index.html -> src/main.tsx -> src/frontend-main.tsx` 是新前端的产品默认入口，加载视觉中立的
-  `FrontendApp` 与首页方案宿主。
+  `FrontendApp`、数据 Provider、路由与主题宿主。
 - `legacy.html -> Legacy/main.tsx` 是稳定的旧界面入口，路径与 HashRouter 可以组合为
   `/legacy.html#/workspace/<project-id>`。
 - 只有 `Legacy/main.tsx` 可以加载 `Legacy/styles/global.css`、旧主题初始化与旧界面根组件。
@@ -35,57 +35,69 @@ frontend/
    ├─ features/         # API 与查询适配
    ├─ shared/           # 契约、状态、格式与通用桌面端口
    └─ v2/
-      ├─ app/                       # 新前端根组件与运行时错误恢复
-      ├─ navigation/                # 跨方案稳定的信息架构
-      ├─ pages/home/
-      │  ├─ HomeVariantHost.tsx     # 按 URL 选择首页方案
-      │  ├─ homeVariantRegistry.ts  # 自动发现独立方案目录
-      │  └─ variants/<variant-id>/  # 每个视觉方案的私有实现、样式与测试
+      ├─ app/                       # Provider、稳定路由、主题装配与运行时恢复
+      ├─ navigation/                # 跨主题稳定的信息架构
+      ├─ pages/spaces/              # 视觉中立的空间视图模型与业务控制器
+      ├─ themes/
+      │  ├─ themeRegistry.ts        # 自动发现完整主题包
+      │  ├─ themeTypes.ts           # 主题页面插槽与语义动作契约
+      │  └─ <theme-id>/             # 首页、空间页、私有组件、样式、动效与资产
       └─ styles/                    # 仅含中立 reset 与宿主状态样式
 ```
 
-## 首页视觉方案边界
+## 完整主题边界
 
-`src/v2` 只表示新一代前端代码边界，不代表任何具体视觉语言。当前默认方案 `dial-archive` 的组件、
+`src/v2` 只表示新一代前端代码边界，不代表任何具体视觉语言。当前默认主题 `dial-archive` 的组件、
 `dial-archive-*` 类名、`--dial-archive-*` 令牌、动效与测试全部位于
-`v2/pages/home/variants/dial-archive/`。
+`v2/themes/dial-archive/`。终末地 / 莱茵风格不得进入 `v2/app`、`v2/navigation`、`v2/pages` 或
+`v2/styles` 的中立代码。
 
-其它模型或设计方向在 `variants/<variant-id>/index.tsx` 默认导出自己的页面组件即可，由
-`import.meta.glob("./variants/*/index.tsx")` 自动发现，不需要共同修改中央清单。`variant-id` 只允许
-小写字母、数字和连字符。使用 `/?home=<variant-id>` 独立加载和比较；未知 ID 回退到默认方案。
+其它模型或设计方向在 `themes/<theme-id>/index.tsx` 导出 `HomePage` 与 `SpacePage` 两个命名页面插槽，
+由主题注册表自动发现，不需要共同修改中央视觉清单。`theme-id` 只允许小写字母、数字和连字符。使用
+`/?theme=<theme-id>` 独立加载和比较；未知 ID 回退到默认主题。旧的 `?home=` 参数只保留兼容读取，
+新链接不得继续生成它。
 
 当前默认 ID 是 `dial-archive`，但“当前默认”不代表“通用模板”。改变
-`DEFAULT_HOME_VARIANT_ID` 属于共享产品决策，应与某个方案的视觉实现分开评审和提交。通用宿主只负责
-加载、错误恢复与稳定信息架构，不提供配色、字体、几何或动效主题。
+`DEFAULT_FRONTEND_THEME_ID` 属于共享产品决策，应与某个主题的视觉实现分开评审和提交。通用宿主只负责
+Provider、加载、错误恢复与稳定信息架构，不提供配色、字体、几何或动效主题。
+
+主题组件不得自行读取 URL、调用 React Router、查询 API、选择本地文件夹或操作跨页面 Store。首页通过
+`onEnterSpace(spaceId)` 交还语义意图；空间页通过 `onNavigateSpace(spaceId)` 与
+`onReturnHome(spaceId)` 交还导航意图。项目档案的数据查询和桌面动作由
+`pages/spaces/archive/useArchiveSpaceController.ts` 完成，再以 `ArchiveSpaceContent` 视图模型注入主题。
+这样更换主题不会复制业务调用，也不会让路由层依赖某个主题的动效。
 
 ### `dial-archive` 正式实现边界
 
-当前默认方案已由独立 HTML 探索稿迁移到 `variants/dial-archive/`：页面组件只协调预览、锁定、内容意图
-与过渡状态；`components/` 保存语义视图，`hooks/` 保存画布适配、指针视差与逐帧弹簧驱动，`model/`
-保存空间表现映射、SVG 几何和纯运动积分，`styles/` 与 `assets/` 仅服务该主题。详细所有权和变更规则见
-方案目录自己的 `README.md`。
+当前默认主题已由两份独立 HTML 探索稿迁移到 `themes/dial-archive/`：`home/` 保存断环首页，`spaces/`
+保存六空间共用骨架与项目档案页面，主题根目录的 `components/`、`hooks/`、`model/`、`styles/` 和
+`assets/` 只存放首页与空间页已经共同使用的真实主题能力。详细所有权和变更规则见主题目录自己的
+`README.md`。
 
 圆环目标对指针即时响应，内容区使用 56 ms 意图门槛并只提交最后稳定项。键盘焦点和锁定不经过门槛；
 外环与内校准环共享动力但使用不同惯性。逐帧运动不得进入 React 状态，左侧固定语义按钮仍是唯一的悬停
 预览命中层。方案使用固定参考画布等比适配，不得把它的几何数值或字体提升到视觉中立的 `v2/styles/`。
 
-V2 二级页面宿主尚未建立，所以当前“进入空间”只演示扫幕，稳定 `route` 仍留在
-`navigation/spaceRegistry.ts` 等待后续路由层消费。Legacy 只能通过独立 `legacy.html` 入口访问；主题不得
-为了临时可用而内嵌旧页面或伪造新路由。
+`FrontendRoutes.tsx` 消费 `navigation/spaceRegistry.ts` 的稳定路径：首页只负责选择空间并播放离场，
+路由完成后由同一主题的空间页接手。项目档案使用真实最近工作区数据；02–06 在各自业务控制器完成前只呈现
+主题内的明确待接入页，不伪造任务或项目数据。Legacy 只能通过独立 `legacy.html` 入口访问；主题不得为了
+临时可用而内嵌旧页面。
 
 ## 多模型文件所有权
 
-每个视觉方案只拥有自己的 `variants/<variant-id>/` 目录。新增方案时应直接建立新目录，不复制或改写
-现有方案来伪装成通用基础层。以下文件是共享契约：
+每个视觉主题只拥有自己的 `themes/<theme-id>/` 目录。新增主题时应直接建立新目录，不复制或改写现有主题
+来伪装成通用基础层。以下文件是共享契约：
 
 - `navigation/spaceRegistry.ts`：一级空间的稳定 ID、名称、顺序与语义。
-- `HomeVariantHost.tsx`、`homeVariantRegistry.ts`：方案发现、选择和回退协议。
+- `themeTypes.ts`、`themeRegistry.ts`：完整主题发现、页面插槽、选择和回退协议。
+- `app/FrontendRoutes.tsx`：URL、主题保持与语义导航交接。
+- `pages/spaces/`：空间业务视图模型与控制器；不得出现具体主题样式。
 - `app/`、`styles/reset.css`、`styles/shell.css`：视觉中立的入口与恢复层。
 - `src/application`、`src/features`、`src/shared`：业务编排、API、状态和桌面端口。
 - `frontend/Legacy` 与 `legacy.html`：旧界面的稳定退路。
 
-需要改动共享契约时，必须说明所有受影响方案，并将共享改动与单个方案的视觉改动拆成可独立审阅的
-差异。只有出现至少两个已确认的真实使用方后，才从方案目录提取共享视觉组件；不得为了假想复用预建
+需要改动共享契约时，必须说明所有受影响主题，并将共享改动与单个主题的视觉改动拆成可独立审阅的
+差异。只有出现至少两个已确认的真实使用方后，才从主题页面目录提取主题内共享视觉组件；不得为了假想复用预建
 全局组件库、动效层或主题令牌。
 
 ## 交互与样式基础规则
@@ -129,6 +141,10 @@ flowchart TB
 5. 只有 `shared/api/client.ts` 可以直接调用 `fetch`。
 6. 新前端不得导入 `frontend/Legacy` 下的页面、布局、设置、主题、UI 或样式。
 7. 所有 TypeScript 内部依赖必须保持无环。
+8. `themes/<theme-id>` 不得导入 Router、业务 Feature、Application、查询缓存或 Store；除窗口控制端口外，
+   主题只可依赖自己的目录、主题页面契约、稳定空间注册表与视觉中立空间视图模型。主题不得读取
+   `window.location` / `document.location`。
+9. `v2/pages` 不得反向导入具体主题；数据控制器与视图模型必须可以被任意主题消费。
 
 ## API 契约
 
@@ -198,16 +214,16 @@ FastAPI schema
 
 ## 其他模型接手顺序
 
-1. 先阅读本文、`pages/home/README.md`、`spaceRegistry.ts` 和当前方案目录，不从 Legacy 页面猜测新首页
+1. 先阅读本文、`themes/README.md`、`spaceRegistry.ts` 和当前主题目录，不从 Legacy 页面猜测新前端
    信息架构。
 2. 执行 `git status --short`，确认工作区中已有修改的所有权；不得覆盖其它模型或用户的未提交文件。
-3. 为新设计分配唯一 `variant-id`，只新增 `variants/<variant-id>/`，通过
-   `/?home=<variant-id>` 预览。不要先改默认 ID，也不要删除其它方案。
-4. 在方案目录内完成根组件、私有组件、Hooks、样式、动效和测试；只有确定缺失共享业务能力时，才提出
+3. 为新设计分配唯一 `theme-id`，只新增 `themes/<theme-id>/`，通过
+   `/?theme=<theme-id>` 预览。不要先改默认 ID，也不要删除其它主题。
+4. 在主题目录内完成首页、空间页、私有组件、Hooks、样式、动效和测试；只有确定缺失共享业务能力时，才提出
    独立的共享契约改动。
-5. 先运行方案范围测试和真实交互检查，再运行全量前端门槛。JSDOM 行为测试不能替代浏览器中的
+5. 先运行主题范围测试和真实交互检查，再运行全量前端门槛。JSDOM 行为测试不能替代浏览器中的
    `:hover` 命中、裁切、层叠和动效验证。
-6. 交接时明确记录方案 ID、预览 URL、修改文件、共享契约改动、已运行检查、已知问题和是否已提交；
+6. 交接时明确记录主题 ID、预览 URL、修改文件、共享契约改动、已运行检查、已知问题和是否已提交；
    不以“测试通过”代替视觉结论。
 
 ## 合入门槛
@@ -227,5 +243,5 @@ FastAPI schema
 - `git diff --check`
 
 当抽取涉及桌面生命周期或后端契约时，再追加 Rust 与后端对应测试；纯表现层不得反向要求后端改动。
-视觉方案还必须在目标分辨率中检查默认、悬停、键盘焦点、减少动态和快速跨模块扫动；截图、临时浏览器
+视觉主题还必须在目标分辨率中检查默认、悬停、键盘焦点、减少动态和快速跨模块扫动；截图、临时浏览器
 配置和构建产物不得提交。

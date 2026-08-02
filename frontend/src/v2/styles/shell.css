@@ -1,9 +1,9 @@
-.frontend-home-variant-host {
+.frontend-theme-host {
   width: 100%;
   height: 100%;
 }
 
-.frontend-home-variant-loading {
+.frontend-theme-loading {
   display: grid;
   width: 100%;
   height: 100%;
