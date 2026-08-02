@@ -21,6 +21,9 @@ export const INNER_DIAL_SPRING: SpringSpecification = Object.freeze({
   maximumVelocity: 360,
 });
 
+export const IDLE_FRAME_DEGREES_PER_SECOND = 2.4;
+export const IDLE_INNER_DEGREES_PER_SECOND = -3.2;
+
 export function integrateSpring(
   state: SpringState,
   target: number,
@@ -45,6 +48,25 @@ export function integrateSpring(
 
 export function springIsSettled(state: SpringState, target: number): boolean {
   return Math.abs(target - state.position) < 0.05 && Math.abs(state.velocity) < 0.6;
+}
+
+export function dampedValue(
+  current: number,
+  target: number,
+  elapsedSeconds: number,
+  response = 5,
+): number {
+  const elapsed = Math.max(0, elapsedSeconds);
+  return target + (current - target) * Math.exp(-response * elapsed);
+}
+
+export function nearestEquivalentAngle(target: number, current: number): number {
+  return target + 360 * Math.round((current - target) / 360);
+}
+
+export function normalizeDegrees(value: number): number {
+  const normalized = ((((value + 180) % 360) + 360) % 360) - 180;
+  return Object.is(normalized, -0) ? 0 : normalized;
 }
 
 export function formatDialDegrees(value: number): string {

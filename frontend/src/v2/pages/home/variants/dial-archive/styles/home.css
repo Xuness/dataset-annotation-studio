@@ -7,8 +7,8 @@
   color: var(--dial-archive-carbon);
   font-family: var(--dial-archive-font-ui);
   background: var(--dial-archive-paper);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: geometricprecision;
+  -webkit-font-smoothing: auto;
+  text-rendering: auto;
 }
 
 .dial-archive-home__canvas {
@@ -20,8 +20,15 @@
   overflow: hidden;
   perspective: 1600px;
   background: var(--dial-archive-paper);
-  transform: translate(-50%, -50%) scale(var(--dial-archive-canvas-scale));
+  transform: translate(-50%, -50%);
   transform-origin: center;
+  zoom: var(--dial-archive-canvas-scale);
+}
+
+@supports not (zoom: 1) {
+  .dial-archive-home__canvas {
+    transform: translate(-50%, -50%) scale(var(--dial-archive-canvas-scale));
+  }
 }
 
 .dial-archive-home__ghost {
@@ -96,6 +103,7 @@
 
 .dial-archive-chrome__system {
   display: flex;
+  height: 100%;
   align-items: center;
   gap: 28px;
   color: var(--dial-archive-gray-9);
@@ -111,15 +119,24 @@
 
 .dial-archive-chrome__window-controls {
   display: flex;
-  align-self: stretch;
-  margin: -18px -32px -18px -10px;
+  height: 100%;
+  align-items: stretch;
+  margin: 0 -48px 0 -10px;
 }
 
 .dial-archive-chrome__window-controls button {
-  width: 38px;
+  display: grid;
+  width: var(--dial-archive-window-control-width);
+  height: 100%;
+  padding: 0;
+  place-items: center;
+  border: 0;
   color: var(--dial-archive-gray-9);
   background: transparent;
   cursor: pointer;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
 }
 
 .dial-archive-chrome__window-controls button:hover,
@@ -133,6 +150,59 @@
 .dial-archive-chrome__window-controls button:last-child:focus-visible {
   color: var(--dial-archive-paper);
   background: var(--dial-archive-carbon);
+}
+
+.dial-archive-chrome__window-glyphs {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--dial-archive-gray-9);
+}
+
+.dial-archive-chrome__window-icon {
+  position: relative;
+  display: inline-block;
+  width: var(--dial-archive-window-icon-size);
+  height: var(--dial-archive-window-icon-size);
+  flex: none;
+}
+
+.dial-archive-chrome__window-icon::before,
+.dial-archive-chrome__window-icon::after {
+  position: absolute;
+  display: block;
+  background: currentcolor;
+  content: "";
+}
+
+.dial-archive-chrome__window-icon.is-minimize::before {
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: var(--dial-archive-window-icon-stroke);
+  transform: translateY(-50%);
+}
+
+.dial-archive-chrome__window-icon.is-maximize::before {
+  inset: var(--dial-archive-window-icon-stroke);
+  border: var(--dial-archive-window-icon-stroke) solid currentcolor;
+  background: transparent;
+}
+
+.dial-archive-chrome__window-icon.is-close::before,
+.dial-archive-chrome__window-icon.is-close::after {
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: var(--dial-archive-window-icon-stroke);
+}
+
+.dial-archive-chrome__window-icon.is-close::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.dial-archive-chrome__window-icon.is-close::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .dial-archive-chrome__tools {

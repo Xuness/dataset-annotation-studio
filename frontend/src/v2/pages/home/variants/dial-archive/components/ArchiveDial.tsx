@@ -22,6 +22,7 @@ interface ArchiveDialProps {
   selectedIndex: number;
   contentIndex: number;
   reducedMotion: boolean;
+  interactionActive: boolean;
   onFocusPreview(index: number | null): void;
   onCommit(index: number): void;
 }
@@ -44,7 +45,13 @@ function SegmentEndCap({ angle }: { angle: number }) {
   );
 }
 
-function FixedDialFrame() {
+function FixedDialFrame({
+  initialRotation,
+  ambientRotorRef,
+}: {
+  initialRotation: number;
+  ambientRotorRef: ReturnType<typeof useDialMotion>["ambientRotorRef"];
+}) {
   const [bottomStartX, bottomStartY] = polarPoint(306, 90);
   const [bottomEndX, bottomEndY] = polarPoint(318, 90);
   const [calibrationX, calibrationY] = polarPoint(330, 100);
@@ -53,7 +60,14 @@ function FixedDialFrame() {
   return (
     <>
       <g className="dial-archive-dial__fixed-frame">
-        <g stroke="#999999" strokeWidth="1" opacity="0.48">
+        <g
+          ref={ambientRotorRef}
+          className="dial-archive-dial__ambient-rotor"
+          transform={`rotate(${initialRotation} ${DIAL_CENTER} ${DIAL_CENTER})`}
+          stroke="#999999"
+          strokeWidth="1"
+          opacity="0.48"
+        >
           <circle cx={DIAL_CENTER} cy={DIAL_CENTER} r="470" fill="none" />
           {TEN_DEGREE_TICKS.map((angle) => {
             const long = angle % 30 === 0;
@@ -255,11 +269,12 @@ export function ArchiveDial({
   selectedIndex,
   contentIndex,
   reducedMotion,
+  interactionActive,
   onFocusPreview,
   onCommit,
 }: ArchiveDialProps) {
   const titleId = useId();
-  const motion = useDialMotion(displayIndex, reducedMotion);
+  const motion = useDialMotion(displayIndex, reducedMotion, interactionActive);
   const handleFocusOut = (event: FocusEvent<HTMLDivElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget)) onFocusPreview(null);
   };
@@ -282,7 +297,10 @@ export function ArchiveDial({
       >
         <svg viewBox="0 0 1000 1000" role="group" aria-labelledby={titleId}>
           <title id={titleId}>空间选择断环仪</title>
-          <FixedDialFrame />
+          <FixedDialFrame
+            initialRotation={motion.initialAmbientRotation}
+            ambientRotorRef={motion.ambientRotorRef}
+          />
           <InnerCalibrationRotor
             initialRotation={motion.initialInnerRotation}
             innerRotorRef={motion.innerRotorRef}

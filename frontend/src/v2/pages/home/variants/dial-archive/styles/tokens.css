@@ -43,6 +43,9 @@
   --dial-archive-font-ui:
     "Dial Archive Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei UI", sans-serif;
   --dial-archive-canvas-scale: 1;
+  --dial-archive-window-control-width: 44px;
+  --dial-archive-window-icon-size: 14px;
+  --dial-archive-window-icon-stroke: 1.5px;
   --dial-archive-ghost-x: 0px;
   --dial-archive-ghost-y: 0px;
   --dial-archive-dial-x: 0px;

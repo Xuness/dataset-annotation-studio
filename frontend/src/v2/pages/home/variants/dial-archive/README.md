@@ -11,7 +11,7 @@ DialArchiveHomePage.tsx       interaction orchestration and transition state
 components/                   semantic view pieces; no business or API calls
 hooks/useDialMotion.ts        imperative requestAnimationFrame spring engine
 hooks/usePointerParallax.ts   coalesced pointer input written to private CSS variables
-hooks/useCanvasScale.ts       1920 x 1080 reference-canvas fitting
+hooks/useCanvasScale.ts       crisp 1920 x 1080 fitting and screen-space chrome metrics
 model/spacePresentation.ts    visual metadata joined onto shared HOME_SPACES
 model/dialGeometry.ts         pure SVG geometry and channel-to-angle mapping
 model/dialMotion.ts           pure spring integration and formatting
@@ -32,10 +32,18 @@ roles live in `model/spacePresentation.ts` because they describe this compositio
   and the small information confirmation even when the same space is selected again.
 - Only the fixed left-side buttons own hover preview. Moving SVG segments accept focus and commit,
   but never drive hover rotation, so the ring cannot chase its own moving hit geometry.
-- The outer selection rotor and counter-rotating inner calibration rotor share one spring engine
-  with distinct inertia. Motion and pointer parallax write directly to owned SVG nodes or private
-  CSS variables instead of causing frame-rate React renders.
-- Reduced-motion mode snaps the mechanism to its target and suppresses presentation-only sweeps.
+- At rest, the decorative perimeter and inner calibration rotor turn slowly in opposite directions;
+  the black selection rotor stays aligned with the current channel and fixed reader.
+- Pointer preview, keyboard focus or a channel change smoothly brakes the idle motion, then hands
+  both functional rotors to the existing spring engine. Idle rotation resumes only after the
+  interaction settles.
+- Motion and pointer parallax write directly to owned SVG nodes or private CSS variables instead of
+  causing frame-rate React renders. Reduced-motion mode disables idle rotation, snaps the mechanism
+  to its target and suppresses presentation-only sweeps.
+- The reference canvas uses layout-level zoom on Chromium/WebView2 so fractional window fitting does
+  not resample already-rasterized CJK glyphs. A transform fallback remains for engines without zoom.
+- Window-control widths and icon strokes are compensated against the canvas scale, keeping their
+  perceived size stable between the default window and fullscreen layouts.
 
 The yellow “进入空间” action currently exercises the approved transition sweep only. V2 has no
 second-level route host yet, so this theme deliberately does not redirect to an invented route or

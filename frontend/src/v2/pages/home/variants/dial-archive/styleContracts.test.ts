@@ -29,4 +29,20 @@ describe("dial archive source contracts", () => {
     expect(keyframes.every((name) => name.startsWith("dial-archive-"))).toBe(true);
     expect(properties.every((name) => name.startsWith("--dial-archive-"))).toBe(true);
   });
+
+  test("keeps text crisp and desktop window controls stable across canvas scales", () => {
+    const homeStyles = style("home.css");
+    const tokenStyles = style("tokens.css");
+    const canvasRule = homeStyles.match(/\.dial-archive-home__canvas\s*\{[^}]*\}/su)?.[0];
+    const controlRule = homeStyles.match(
+      /\.dial-archive-chrome__window-controls button\s*\{[^}]*\}/su,
+    )?.[0];
+    expect(canvasRule).toMatch(/zoom:\s*var\(--dial-archive-canvas-scale\);/u);
+    expect(canvasRule).not.toMatch(/scale\(var\(--dial-archive-canvas-scale\)\)/u);
+    expect(homeStyles).toMatch(/text-rendering:\s*auto;/u);
+    expect(tokenStyles).toMatch(/--dial-archive-window-control-width:\s*44px;/u);
+    expect(tokenStyles).toMatch(/--dial-archive-window-icon-size:\s*14px;/u);
+    expect(controlRule).toMatch(/width:\s*var\(--dial-archive-window-control-width\);/u);
+    expect(controlRule).toMatch(/height:\s*100%;/u);
+  });
 });

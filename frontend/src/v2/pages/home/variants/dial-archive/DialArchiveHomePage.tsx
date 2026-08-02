@@ -55,6 +55,7 @@ export function DialArchiveHomePage() {
 
   const displayIndex = pointerPreviewIndex ?? focusPreviewIndex ?? selectedIndex;
   const previewIndex = pointerPreviewIndex ?? focusPreviewIndex;
+  const dialInteractionActive = pointerPreviewIndex !== null || focusPreviewIndex !== null;
   const selectedSpace = DIAL_ARCHIVE_SPACES[selectedIndex];
   const contentSpace = DIAL_ARCHIVE_SPACES[content.index];
 
@@ -148,6 +149,7 @@ export function DialArchiveHomePage() {
           selectedIndex={selectedIndex}
           contentIndex={content.index}
           reducedMotion={reducedMotion}
+          interactionActive={dialInteractionActive}
           onFocusPreview={setFocusPreviewIndex}
           onCommit={commitSpace}
         />

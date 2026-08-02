@@ -17,11 +17,19 @@ function runWindowAction(action: () => Promise<void>): void {
   void action().catch(() => undefined);
 }
 
+type WindowControlKind = "minimize" | "maximize" | "close";
+
+function WindowControlIcon({ kind }: { kind: WindowControlKind }) {
+  return <span className={`dial-archive-chrome__window-icon is-${kind}`} aria-hidden="true" />;
+}
+
 function WindowControls() {
   if (!usesCustomDesktopTitlebar()) {
     return (
       <span className="dial-archive-chrome__window-glyphs" aria-hidden="true">
-        — ▢ ✕
+        <WindowControlIcon kind="minimize" />
+        <WindowControlIcon kind="maximize" />
+        <WindowControlIcon kind="close" />
       </span>
     );
   }
@@ -33,21 +41,21 @@ function WindowControls() {
         aria-label="最小化窗口"
         onClick={() => runWindowAction(minimizeDesktopWindow)}
       >
-        —
+        <WindowControlIcon kind="minimize" />
       </button>
       <button
         type="button"
         aria-label="切换最大化窗口"
         onClick={() => runWindowAction(toggleDesktopWindowMaximized)}
       >
-        ▢
+        <WindowControlIcon kind="maximize" />
       </button>
       <button
         type="button"
         aria-label="关闭窗口"
         onClick={() => runWindowAction(closeDesktopWindow)}
       >
-        ✕
+        <WindowControlIcon kind="close" />
       </button>
     </span>
   );
