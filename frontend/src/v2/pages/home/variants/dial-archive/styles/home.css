@@ -1,0 +1,41 @@
+.dial-archive-home {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-paper);
+}
+
+.dial-archive-bootstrap {
+  max-width: 520px;
+  padding: 48px;
+  border-left: 2px solid var(--dial-archive-carbon);
+}
+
+.dial-archive-bootstrap span {
+  font:
+    11px/1.4 "Cascadia Mono",
+    "Consolas",
+    monospace;
+  letter-spacing: 0.2em;
+  color: var(--dial-archive-muted);
+}
+
+.dial-archive-bootstrap h1 {
+  margin: 14px 0;
+  font-size: 36px;
+}
+
+.dial-archive-bootstrap p {
+  margin: 0 0 28px;
+  color: var(--dial-archive-muted);
+}
+
+.dial-archive-bootstrap a {
+  display: inline-flex;
+  padding: 10px 14px;
+  color: var(--dial-archive-paper);
+  text-decoration: none;
+  background: var(--dial-archive-carbon);
+}

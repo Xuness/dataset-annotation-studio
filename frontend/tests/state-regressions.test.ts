@@ -731,7 +731,7 @@ test("fresh appearance preferences use the rainveil gothic theme", () => {
   });
 });
 
-test("theme styles keep a complete shared token contract and the configured default baseline", () => {
+test("Legacy theme styles keep a complete shared token contract and default baseline", () => {
   const styleFiles: Record<ThemeId, string> = {
     "warm-paper": "warm-paper.css",
     "silent-gallery": "silent-gallery.css",
@@ -760,13 +760,19 @@ test("theme styles keep a complete shared token contract and the configured defa
     assert.doesNotMatch(styles[theme.id], /^:root,/m);
   }
 
-  const documentHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const documentHtml = readFileSync(new URL("../legacy.html", import.meta.url), "utf8");
   assert.match(
     documentHtml,
     new RegExp(
       `<meta name="theme-color" content="${getThemeDefinition(DEFAULT_THEME_ID).browserThemeColor}"`,
     ),
   );
+});
+
+test("the new frontend document starts from a variant-neutral white canvas", () => {
+  const documentHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+
+  assert.match(documentHtml, /<meta name="theme-color" content="#ffffff"/);
 });
 
 test("theme defaults bundle the selected wallpapers and current scene clarity", () => {

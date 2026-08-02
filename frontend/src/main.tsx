@@ -1,4 +1,3 @@
-// The default entry temporarily boots the legacy application. The V2 rewrite can
-// replace this import without pulling legacy styles into its bundle; legacy.html
-// remains a stable fallback entry.
-import "../Legacy/main";
+// The new frontend owns the default product entry. The original interface remains available
+// through legacy.html and keeps its presentation bundle completely isolated.
+import "./frontend-main";
