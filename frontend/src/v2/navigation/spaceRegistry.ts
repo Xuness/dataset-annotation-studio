@@ -3,9 +3,6 @@ export type HomeSpaceId =
 
 export type HomeSpaceLane = "primary" | "support";
 
-export type HomeSpaceGlyph =
-  "archive" | "preparation" | "annotation" | "quality" | "delivery" | "capability";
-
 export interface HomeSpace {
   id: HomeSpaceId;
   index: string;
@@ -15,8 +12,6 @@ export interface HomeSpace {
   description: string;
   route: string;
   lane: HomeSpaceLane;
-  glyph: HomeSpaceGlyph;
-  focusAngle: number;
 }
 
 export const HOME_SPACES: readonly HomeSpace[] = [
@@ -29,8 +24,6 @@ export const HOME_SPACES: readonly HomeSpace[] = [
     description: "接入、组织并管理数据集、项目与素材。",
     route: "/archive",
     lane: "primary",
-    glyph: "archive",
-    focusAngle: -56,
   },
   {
     id: "preparation",
@@ -41,8 +34,6 @@ export const HOME_SPACES: readonly HomeSpace[] = [
     description: "在标注前完成可预览、可恢复的数据处理。",
     route: "/preparation",
     lane: "primary",
-    glyph: "preparation",
-    focusAngle: -18,
   },
   {
     id: "annotation",
@@ -53,8 +44,6 @@ export const HOME_SPACES: readonly HomeSpace[] = [
     description: "生成、编辑并翻译多通道标注内容。",
     route: "/annotation",
     lane: "primary",
-    glyph: "annotation",
-    focusAngle: 24,
   },
   {
     id: "quality",
@@ -65,8 +54,6 @@ export const HOME_SPACES: readonly HomeSpace[] = [
     description: "复核内容完整性、可靠性与交付质量。",
     route: "/quality",
     lane: "primary",
-    glyph: "quality",
-    focusAngle: 62,
   },
   {
     id: "delivery",
@@ -77,8 +64,6 @@ export const HOME_SPACES: readonly HomeSpace[] = [
     description: "冻结修订并规划、输出可交付的数据集。",
     route: "/delivery",
     lane: "support",
-    glyph: "delivery",
-    focusAngle: 112,
   },
   {
     id: "capability",
@@ -89,8 +74,6 @@ export const HOME_SPACES: readonly HomeSpace[] = [
     description: "管理模型、词典、预设与共享生产能力。",
     route: "/capability",
     lane: "support",
-    glyph: "capability",
-    focusAngle: 154,
   },
 ] as const;
 
