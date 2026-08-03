@@ -13,6 +13,10 @@ export type AnnotationTag = ApiOutput<"AnnotationTag">;
 export type AnnotationTaggerSource = ApiOutput<"AnnotationTaggerSource">;
 export type AnnotationDocument = ApiOutput<"AnnotationDocument">;
 export type AnnotationBundle = ApiOutput<"AnnotationBundle">;
+export type AnnotationChannelOverview = ApiOutput<"AnnotationChannelOverview">;
+export type AnnotationTranslationVariantOverview =
+  ApiOutput<"AnnotationTranslationVariantOverview">;
+export type AnnotationOverview = ApiOutput<"AnnotationOverview">;
 export type AnnotationRevision = ApiOutput<"AnnotationRevision">;
 export type AnnotationChannelTarget = ApiSchema<"AnnotationChannelTarget">;
 export type AnnotationBatchTargetOption = ApiOutput<"AnnotationBatchTargetOption">;

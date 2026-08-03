@@ -402,6 +402,54 @@
         "title": "AnnotationChannel",
         "type": "string"
       },
+      "AnnotationChannelOverview": {
+        "properties": {
+          "active_document_count": {
+            "minimum": 0.0,
+            "title": "Active Document Count",
+            "type": "integer"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/AnnotationChannel"
+          },
+          "invalid_asset_count": {
+            "minimum": 0.0,
+            "title": "Invalid Asset Count",
+            "type": "integer"
+          },
+          "missing_asset_count": {
+            "minimum": 0.0,
+            "title": "Missing Asset Count",
+            "type": "integer"
+          },
+          "present_asset_count": {
+            "minimum": 0.0,
+            "title": "Present Asset Count",
+            "type": "integer"
+          },
+          "stale_asset_count": {
+            "minimum": 0.0,
+            "title": "Stale Asset Count",
+            "type": "integer"
+          },
+          "usable_asset_count": {
+            "minimum": 0.0,
+            "title": "Usable Asset Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "active_document_count",
+          "present_asset_count",
+          "usable_asset_count",
+          "stale_asset_count",
+          "invalid_asset_count",
+          "missing_asset_count",
+          "channel"
+        ],
+        "title": "AnnotationChannelOverview",
+        "type": "object"
+      },
       "AnnotationChannelTarget": {
         "additionalProperties": false,
         "properties": {
@@ -744,6 +792,34 @@
           "name"
         ],
         "title": "AnnotationManualTagInput",
+        "type": "object"
+      },
+      "AnnotationOverview": {
+        "properties": {
+          "asset_count": {
+            "minimum": 0.0,
+            "title": "Asset Count",
+            "type": "integer"
+          },
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationChannelOverview"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "translation_variants": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationTranslationVariantOverview"
+            },
+            "title": "Translation Variants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "asset_count"
+        ],
+        "title": "AnnotationOverview",
         "type": "object"
       },
       "AnnotationReviewRequest": {
@@ -1555,6 +1631,68 @@
           "fingerprint"
         ],
         "title": "AnnotationTaggerSource",
+        "type": "object"
+      },
+      "AnnotationTranslationVariantOverview": {
+        "properties": {
+          "active_document_count": {
+            "minimum": 0.0,
+            "title": "Active Document Count",
+            "type": "integer"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "invalid_asset_count": {
+            "minimum": 0.0,
+            "title": "Invalid Asset Count",
+            "type": "integer"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "missing_asset_count": {
+            "minimum": 0.0,
+            "title": "Missing Asset Count",
+            "type": "integer"
+          },
+          "present_asset_count": {
+            "minimum": 0.0,
+            "title": "Present Asset Count",
+            "type": "integer"
+          },
+          "stale_asset_count": {
+            "minimum": 0.0,
+            "title": "Stale Asset Count",
+            "type": "integer"
+          },
+          "translation_producer_kind": {
+            "$ref": "#/components/schemas/TranslationProducerKind"
+          },
+          "translation_source_kind": {
+            "$ref": "#/components/schemas/TranslationSourceKind"
+          },
+          "usable_asset_count": {
+            "minimum": 0.0,
+            "title": "Usable Asset Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "active_document_count",
+          "present_asset_count",
+          "usable_asset_count",
+          "stale_asset_count",
+          "invalid_asset_count",
+          "missing_asset_count",
+          "language",
+          "translation_source_kind",
+          "translation_producer_kind",
+          "display_name"
+        ],
+        "title": "AnnotationTranslationVariantOverview",
         "type": "object"
       },
       "AnnotationUpdate": {
@@ -11388,6 +11526,48 @@
           }
         },
         "summary": "Annotation Batch Options",
+        "tags": [
+          "annotations"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/annotations/overview": {
+      "get": {
+        "operationId": "annotation_overview_api_v1_workspaces__project_id__annotations_overview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Annotation Overview",
         "tags": [
           "annotations"
         ]

@@ -835,6 +835,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/annotations/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Annotation Overview */
+        get: operations["annotation_overview_api_v1_workspaces__project_id__annotations_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/annotations/review": {
         parameters: {
             query?: never;
@@ -1790,6 +1807,22 @@ export type components = {
          * @enum {string}
          */
         AnnotationChannel: "existing_annotation" | "tags" | "description" | "translation";
+        /** AnnotationChannelOverview */
+        AnnotationChannelOverview: {
+            /** Active Document Count */
+            active_document_count: number;
+            channel: components["schemas"]["AnnotationChannel"];
+            /** Invalid Asset Count */
+            invalid_asset_count: number;
+            /** Missing Asset Count */
+            missing_asset_count: number;
+            /** Present Asset Count */
+            present_asset_count: number;
+            /** Stale Asset Count */
+            stale_asset_count: number;
+            /** Usable Asset Count */
+            usable_asset_count: number;
+        };
         /** AnnotationChannelTarget */
         AnnotationChannelTarget: {
             channel: components["schemas"]["AnnotationChannel"];
@@ -1885,6 +1918,15 @@ export type components = {
             category?: string | null;
             /** Name */
             name: string;
+        };
+        /** AnnotationOverview */
+        AnnotationOverview: {
+            /** Asset Count */
+            asset_count: number;
+            /** Channels */
+            channels?: components["schemas"]["AnnotationChannelOverview"][];
+            /** Translation Variants */
+            translation_variants?: components["schemas"]["AnnotationTranslationVariantOverview"][];
         };
         /** AnnotationReviewRequest */
         AnnotationReviewRequest: {
@@ -2165,6 +2207,27 @@ export type components = {
             installation_name: string;
             /** Model Version */
             model_version: string;
+        };
+        /** AnnotationTranslationVariantOverview */
+        AnnotationTranslationVariantOverview: {
+            /** Active Document Count */
+            active_document_count: number;
+            /** Display Name */
+            display_name: string;
+            /** Invalid Asset Count */
+            invalid_asset_count: number;
+            /** Language */
+            language: string;
+            /** Missing Asset Count */
+            missing_asset_count: number;
+            /** Present Asset Count */
+            present_asset_count: number;
+            /** Stale Asset Count */
+            stale_asset_count: number;
+            translation_producer_kind: components["schemas"]["TranslationProducerKind"];
+            translation_source_kind: components["schemas"]["TranslationSourceKind"];
+            /** Usable Asset Count */
+            usable_asset_count: number;
         };
         /**
          * AnnotationUpdate
@@ -6487,6 +6550,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnnotationBatchOptions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    annotation_overview_api_v1_workspaces__project_id__annotations_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnotationOverview"];
                 };
             };
             /** @description Validation Error */

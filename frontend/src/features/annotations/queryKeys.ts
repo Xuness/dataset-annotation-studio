@@ -2,6 +2,8 @@ import { workspaceQueryKeys } from "../../shared/query/workspaceQueries";
 
 export const annotationKeys = {
   project: (projectId: string) => workspaceQueryKeys.scope(projectId, "annotations"),
+  overview: (projectId: string) =>
+    [...workspaceQueryKeys.scope(projectId, "annotations"), "overview"] as const,
   bundle: (projectId: string, assetId: string | null) =>
     [...workspaceQueryKeys.scope(projectId, "annotations"), "bundle", assetId] as const,
   channel: (

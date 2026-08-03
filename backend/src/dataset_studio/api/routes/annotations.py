@@ -16,6 +16,7 @@ from dataset_studio.modules.annotations.models import (
     AnnotationChannel,
     AnnotationChannelUpdate,
     AnnotationDocument,
+    AnnotationOverview,
     AnnotationReviewRequest,
     AnnotationRevision,
     AnnotationTagBatchDetailFilter,
@@ -45,6 +46,11 @@ channels_router = APIRouter(
     tags=["annotations"],
 )
 Container = Annotated[AppContainer, Depends(get_container)]
+
+
+@batch_router.get("/overview", response_model=AnnotationOverview)
+def annotation_overview(project_id: str, container: Container):
+    return container.annotations.overview(project_id)
 
 
 @router.get("", response_model=AnnotationDocument, deprecated=True)

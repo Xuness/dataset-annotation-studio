@@ -172,6 +172,32 @@ class AnnotationBundle(BaseModel):
     documents: list[AnnotationDocument] = Field(default_factory=list)
 
 
+class AnnotationCoverage(BaseModel):
+    active_document_count: int = Field(ge=0)
+    present_asset_count: int = Field(ge=0)
+    usable_asset_count: int = Field(ge=0)
+    stale_asset_count: int = Field(ge=0)
+    invalid_asset_count: int = Field(ge=0)
+    missing_asset_count: int = Field(ge=0)
+
+
+class AnnotationChannelOverview(AnnotationCoverage):
+    channel: AnnotationChannel
+
+
+class AnnotationTranslationVariantOverview(AnnotationCoverage):
+    language: str
+    translation_source_kind: TranslationSourceKind
+    translation_producer_kind: TranslationProducerKind
+    display_name: str
+
+
+class AnnotationOverview(BaseModel):
+    asset_count: int = Field(ge=0)
+    channels: list[AnnotationChannelOverview] = Field(default_factory=list)
+    translation_variants: list[AnnotationTranslationVariantOverview] = Field(default_factory=list)
+
+
 class AnnotationUpdate(BaseModel):
     """Compatibility request for the default description channel."""
 

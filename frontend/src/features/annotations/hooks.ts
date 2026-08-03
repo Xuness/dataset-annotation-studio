@@ -18,6 +18,7 @@ import {
   getAnnotationBundle,
   getAnnotationChannel,
   getAnnotationChannelHistory,
+  getAnnotationOverview,
   reviewAnnotationChannel,
   reviewAnnotations,
   executeTagBatchEdit,
@@ -25,6 +26,14 @@ import {
   saveAnnotationChannel,
 } from "./api";
 import { annotationHistoryKeys, annotationKeys } from "./queryKeys";
+
+export function useAnnotationOverview(projectId: string) {
+  return useQuery({
+    queryKey: annotationKeys.overview(projectId),
+    queryFn: () => getAnnotationOverview(projectId),
+    enabled: Boolean(projectId),
+  });
+}
 
 export function useAnnotationBundle(projectId: string, assetId: string | null) {
   return useQuery({

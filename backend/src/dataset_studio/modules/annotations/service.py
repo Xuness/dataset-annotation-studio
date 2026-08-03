@@ -16,6 +16,7 @@ from dataset_studio.modules.annotations.models import (
     AnnotationChannelTarget,
     AnnotationContentKind,
     AnnotationDocument,
+    AnnotationOverview,
     AnnotationReviewStatus,
     AnnotationRevision,
     AnnotationStatus,
@@ -30,6 +31,7 @@ from dataset_studio.modules.annotations.models import (
     ValidationIssue,
     ValidationResult,
 )
+from dataset_studio.modules.annotations.overview import build_annotation_overview
 from dataset_studio.modules.annotations.projection import (
     INVALID_VALIDATION_STATUSES,
     resolve_document_row_state,
@@ -70,6 +72,10 @@ _EXPECTED_VERSION_UNSET = EXPECTED_HEAD_UNSET
 class AnnotationService:
     def __init__(self, workspaces: WorkspaceService) -> None:
         self._workspaces = workspaces
+
+    def overview(self, project_id: str) -> AnnotationOverview:
+        paths, _ = self._workspaces.get(project_id)
+        return build_annotation_overview(paths.database)
 
     def list(self, project_id: str, asset_id: str) -> AnnotationBundle:
         paths, _ = self._workspaces.get(project_id)

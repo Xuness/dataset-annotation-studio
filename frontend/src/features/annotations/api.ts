@@ -7,6 +7,7 @@ import type {
   AnnotationChannel,
   AnnotationChannelTarget,
   AnnotationDocument,
+  AnnotationOverview,
   AnnotationRevision,
   AnnotationTag,
   AnnotationTagBatchEditExecuteRequest,
@@ -20,6 +21,10 @@ import type {
 
 const annotationsPath = (projectId: string, assetId: string) =>
   `/api/v1/workspaces/${projectId}/assets/${assetId}/annotations`;
+
+export function getAnnotationOverview(projectId: string): Promise<AnnotationOverview> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/annotations/overview`);
+}
 
 function channelPath(
   projectId: string,
