@@ -1015,3 +1015,25 @@ def test_thumbnail_cache_key_changes_with_image_content(tmp_path: Path) -> None:
     assert first_thumbnail != second_thumbnail
     assert first_thumbnail.is_file()
     assert second_thumbnail.is_file()
+
+
+def test_thumbnail_creation_accepts_a_fresh_concurrent_winner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    image_path = tmp_path / "image.png"
+    thumbnail_path = tmp_path / "cache" / "image-96.webp"
+    _write_image(image_path)
+
+    def replace_after_competing_request(source: str | Path, target: str | Path) -> None:
+        target_path = Path(target)
+        target_path.write_bytes(Path(source).read_bytes())
+        raise PermissionError("destination is already open")
+
+    monkeypatch.setattr(
+        "dataset_studio.modules.assets.service.os.replace", replace_after_competing_request
+    )
+
+    AssetService._create_thumbnail(image_path, thumbnail_path, 96)
+
+    assert thumbnail_path.is_file()
+    assert not list(thumbnail_path.parent.glob(f".{thumbnail_path.stem}.*.webp"))

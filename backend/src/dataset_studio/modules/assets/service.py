@@ -209,7 +209,19 @@ class AssetService:
                 if image.mode not in {"RGB", "RGBA"}:
                     image = image.convert("RGBA" if "transparency" in image.info else "RGB")
                 image.save(temporary_path, format="WEBP", quality=82, method=4)
-            os.replace(temporary_path, thumbnail_path)
+            try:
+                os.replace(temporary_path, thumbnail_path)
+            except PermissionError:
+                # Concurrent development requests can both finish the same cache entry.
+                # Windows refuses to replace the winner while FileResponse is reading it;
+                # accept that winner only when it is already fresh for this source image.
+                if (
+                    thumbnail_path.is_file()
+                    and thumbnail_path.stat().st_mtime_ns >= image_path.stat().st_mtime_ns
+                ):
+                    temporary_path.unlink(missing_ok=True)
+                    return
+                raise
         except BaseException:
             temporary_path.unlink(missing_ok=True)
             raise
