@@ -4,6 +4,7 @@ import { PREPARATION_CANVAS_NODE_IDS } from "../../../../../pages/spaces/spacePa
 import {
   PREPARATION_CANVAS_LAYOUT,
   createPreparationCanvasEdgePath,
+  getPreparationCanvasEdgePoints,
   getPreparationCanvasNodeCenter,
   projectPreparationCanvasPointToMinimap,
   type PreparationCanvasNodeLayouts,
@@ -12,13 +13,24 @@ import {
 describe("dial archive preparation canvas layout", () => {
   test("defines every neutral node once and keeps it inside the surface", () => {
     expect(Object.keys(PREPARATION_CANVAS_LAYOUT.nodes)).toEqual([...PREPARATION_CANVAS_NODE_IDS]);
+    const revealOrders = new Set<number>();
     for (const node of PREPARATION_CANVAS_NODE_IDS) {
-      const { rect } = PREPARATION_CANVAS_LAYOUT.nodes[node];
+      const { rect, revealOrder } = PREPARATION_CANVAS_LAYOUT.nodes[node];
+      revealOrders.add(revealOrder);
       expect(rect.x).toBeGreaterThanOrEqual(0);
       expect(rect.y).toBeGreaterThanOrEqual(0);
       expect(rect.x + rect.width).toBeLessThanOrEqual(PREPARATION_CANVAS_LAYOUT.surface.width);
       expect(rect.y + rect.height).toBeLessThanOrEqual(PREPARATION_CANVAS_LAYOUT.surface.height);
+      expect(rect.x).toBeGreaterThanOrEqual(PREPARATION_CANVAS_LAYOUT.taskBounds.x);
+      expect(rect.y).toBeGreaterThanOrEqual(PREPARATION_CANVAS_LAYOUT.taskBounds.y);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(
+        PREPARATION_CANVAS_LAYOUT.taskBounds.x + PREPARATION_CANVAS_LAYOUT.taskBounds.width,
+      );
+      expect(rect.y + rect.height).toBeLessThanOrEqual(
+        PREPARATION_CANVAS_LAYOUT.taskBounds.y + PREPARATION_CANVAS_LAYOUT.taskBounds.height,
+      );
     }
+    expect(revealOrders.size).toBe(PREPARATION_CANVAS_NODE_IDS.length);
   });
 
   test("derives connector endpoints and camera targets from node rectangles", () => {
@@ -29,6 +41,7 @@ describe("dial archive preparation canvas layout", () => {
     const movedLayouts: PreparationCanvasNodeLayouts = {
       ...PREPARATION_CANVAS_LAYOUT.nodes,
       scope: {
+        ...PREPARATION_CANVAS_LAYOUT.nodes.scope,
         rect: {
           ...PREPARATION_CANVAS_LAYOUT.nodes.scope.rect,
           x: PREPARATION_CANVAS_LAYOUT.nodes.scope.rect.x + 120,
@@ -45,12 +58,24 @@ describe("dial archive preparation canvas layout", () => {
 
   test("keeps topology references and minimap projections valid", () => {
     const edgeIds = new Set<string>();
+    const junctionIds = new Set(Object.keys(PREPARATION_CANVAS_LAYOUT.junctions));
     for (const edge of PREPARATION_CANVAS_LAYOUT.edges) {
       expect(edgeIds.has(edge.id)).toBe(false);
       edgeIds.add(edge.id);
-      expect(PREPARATION_CANVAS_NODE_IDS).toContain(edge.from.node);
-      expect(PREPARATION_CANVAS_NODE_IDS).toContain(edge.to.node);
-      expect(createPreparationCanvasEdgePath(edge)).toMatch(/^M [-\d.]+ [-\d.]+ C /u);
+      for (const endpoint of [edge.from, edge.to]) {
+        if ("node" in endpoint) expect(PREPARATION_CANVAS_NODE_IDS).toContain(endpoint.node);
+        else expect(junctionIds.has(endpoint.junction)).toBe(true);
+      }
+      expect(createPreparationCanvasEdgePath(edge)).toMatch(/^M [-\d.]+ [-\d.]+ L /u);
+      expect(createPreparationCanvasEdgePath(edge)).not.toMatch(/[CQA]/u);
+
+      const points = getPreparationCanvasEdgePoints(edge);
+      for (let index = 1; index < points.length; index += 1) {
+        const deltaX = Math.abs(points[index].x - points[index - 1].x);
+        const deltaY = Math.abs(points[index].y - points[index - 1].y);
+        expect(deltaX + deltaY).toBeGreaterThan(0);
+        expect(deltaX === 0 || deltaY === 0 || Math.abs(deltaX - deltaY) < 0.01).toBe(true);
+      }
     }
 
     for (const node of PREPARATION_CANVAS_NODE_IDS) {

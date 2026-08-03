@@ -97,4 +97,48 @@ describe("dial archive source contracts", () => {
       /\.dial-archive-preparation-minimap\s+\.is-(?:source|scope|geometry|encoding|identity|preview|commit|recovery)\s*\{/u,
     );
   });
+
+  test("keeps preparation workbench microcopy readable across canvas zoom", () => {
+    const workbenchStyles = readFileSync(
+      resolve(process.cwd(), "src/v2/themes/dial-archive/spaces/styles/workbench.css"),
+      "utf8",
+    );
+    const motionSource = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/v2/themes/dial-archive/spaces/preparation/hooks/usePreparationCanvasMotion.ts",
+      ),
+      "utf8",
+    );
+
+    expect(workbenchStyles).toMatch(/--dial-archive-workbench-type-ui-micro:\s*10px;/u);
+    expect(workbenchStyles).toMatch(/--dial-archive-workbench-type-canvas-micro:\s*12px;/u);
+    expect(workbenchStyles).not.toMatch(/font-size:\s*[789](?:\.\d+)?px;/u);
+    expect(workbenchStyles).toMatch(/-webkit-font-smoothing:\s*auto;/u);
+    expect(workbenchStyles).toMatch(/text-rendering:\s*auto;/u);
+    expect(motionSource).toMatch(/scene\.style\.setProperty\("zoom", String\(scale\)\);/u);
+    expect(motionSource).not.toMatch(/surface\.style\.transform\s*=\s*`[^`]*scale\(/u);
+  });
+
+  test("keeps preparation nodes free of detached grid platforms and yellow canvas halos", () => {
+    const canvasSource = readFileSync(
+      resolve(process.cwd(), "src/v2/themes/dial-archive/spaces/preparation/PreparationCanvas.tsx"),
+      "utf8",
+    );
+    const workbenchStyles = readFileSync(
+      resolve(process.cwd(), "src/v2/themes/dial-archive/spaces/styles/workbench.css"),
+      "utf8",
+    );
+    const canvasRule = workbenchStyles.match(
+      /\.dial-archive-preparation-canvas\s*\{[^}]*\}/su,
+    )?.[0];
+    const stateRule = workbenchStyles.match(
+      /\.dial-archive-preparation-workbench-state\s*\{[^}]*\}/su,
+    )?.[0];
+
+    expect(canvasSource).not.toMatch(/dial-archive-preparation-node__platform/u);
+    expect(workbenchStyles).not.toMatch(/\.dial-archive-preparation-node__platform/u);
+    expect(canvasRule).not.toMatch(/radial-gradient|rgba\(255,\s*250,\s*0/u);
+    expect(stateRule).not.toMatch(/radial-gradient|rgba\(255,\s*250,\s*0/u);
+  });
 });

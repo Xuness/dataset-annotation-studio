@@ -47,9 +47,10 @@ export function usePreparationCanvasMotion({
   occlusionRef,
   occlusionActive,
 }: UsePreparationCanvasMotionOptions) {
-  const { surface: canvasSize, camera } = PREPARATION_CANVAS_LAYOUT;
+  const { taskBounds, overviewBounds, camera } = PREPARATION_CANVAS_LAYOUT;
   const viewportRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<HTMLDivElement>(null);
   const scaleReadoutRef = useRef<HTMLOutputElement>(null);
   const minimapViewportRef = useRef<HTMLElement>(null);
   const transformRef = useRef<CanvasTransform>({
@@ -93,10 +94,14 @@ export function usePreparationCanvasMotion({
     const visible = getVisibleViewport();
     if (!minimapViewport || !visible) return;
     const { x, y, scale } = transformRef.current;
-    const left = clamp((visible.x - x) / scale, 0, canvasSize.width);
-    const top = clamp((visible.y - y) / scale, 0, canvasSize.height);
-    const right = clamp((visible.x + visible.width - x) / scale, 0, canvasSize.width);
-    const bottom = clamp((visible.y + visible.height - y) / scale, 0, canvasSize.height);
+    const worldLeft = (visible.x - x) / scale;
+    const worldTop = (visible.y - y) / scale;
+    const worldRight = (visible.x + visible.width - x) / scale;
+    const worldBottom = (visible.y + visible.height - y) / scale;
+    const left = clamp(worldLeft, overviewBounds.x, overviewBounds.x + overviewBounds.width);
+    const top = clamp(worldTop, overviewBounds.y, overviewBounds.y + overviewBounds.height);
+    const right = clamp(worldRight, overviewBounds.x, overviewBounds.x + overviewBounds.width);
+    const bottom = clamp(worldBottom, overviewBounds.y, overviewBounds.y + overviewBounds.height);
     if (right <= left || bottom <= top) {
       minimapViewport.style.opacity = "0";
       return;
@@ -111,20 +116,34 @@ export function usePreparationCanvasMotion({
     minimapViewport.style.transform = `translate3d(${projected.x}px, ${projected.y}px, 0)`;
     minimapViewport.style.width = `${Math.max(2, projected.width)}px`;
     minimapViewport.style.height = `${Math.max(2, projected.height)}px`;
-  }, [canvasSize.height, canvasSize.width, getVisibleViewport]);
+  }, [getVisibleViewport, overviewBounds]);
 
   const renderTransform = useCallback(
     (animate = false) => {
       cancelAnimationFrame(frameRef.current);
       frameRef.current = requestAnimationFrame(() => {
         const surface = surfaceRef.current;
-        if (!surface) return;
+        const scene = sceneRef.current;
+        if (!surface || !scene) return;
         const { x, y, scale } = transformRef.current;
-        surface.style.transition =
+        const pixelRatio = window.devicePixelRatio || 1;
+        const renderedX = Math.round(x * pixelRatio) / pixelRatio;
+        const renderedY = Math.round(y * pixelRatio) / pixelRatio;
+        const transition =
           animate && !reducedMotion
-            ? `transform ${camera.focusDurationMs}ms var(--dial-archive-ease)`
+            ? `${camera.focusDurationMs}ms var(--dial-archive-ease)`
             : "none";
-        surface.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+        surface.style.transition = transition === "none" ? "none" : `transform ${transition}`;
+        surface.style.transform = `translate3d(${renderedX}px, ${renderedY}px, 0)`;
+        if (CSS.supports("zoom", "1")) {
+          scene.style.transition = transition === "none" ? "none" : `zoom ${transition}`;
+          scene.style.setProperty("zoom", String(scale));
+          scene.style.transform = "none";
+        } else {
+          scene.style.transition = transition === "none" ? "none" : `transform ${transition}`;
+          scene.style.removeProperty("zoom");
+          scene.style.transform = `scale(${scale})`;
+        }
         if (scaleReadoutRef.current) {
           const readout = `${Math.round(scale * 100)}%`;
           scaleReadoutRef.current.value = readout;
@@ -146,19 +165,19 @@ export function usePreparationCanvasMotion({
       const availableWidth = Math.max(320, visible.width - inset * 2);
       const availableHeight = Math.max(260, visible.height - inset * 2);
       const scale = clamp(
-        Math.min(availableWidth / canvasSize.width, availableHeight / canvasSize.height),
+        Math.min(availableWidth / taskBounds.width, availableHeight / taskBounds.height),
         camera.minScale,
         camera.maxFitScale,
       );
       viewModeRef.current = { kind: "fit" };
       transformRef.current = {
-        x: visible.x + (visible.width - canvasSize.width * scale) / 2,
-        y: visible.y + (visible.height - canvasSize.height * scale) / 2,
+        x: visible.x + visible.width / 2 - (taskBounds.x + taskBounds.width / 2) * scale,
+        y: visible.y + visible.height / 2 - (taskBounds.y + taskBounds.height / 2) * scale,
         scale,
       };
       renderTransform(animate);
     },
-    [camera, canvasSize, getVisibleViewport, renderTransform],
+    [camera, getVisibleViewport, renderTransform, taskBounds],
   );
 
   const zoomAt = useCallback(
@@ -261,17 +280,22 @@ export function usePreparationCanvasMotion({
   const onWheel = useCallback<WheelEventHandler<HTMLDivElement>>(
     (event) => {
       event.preventDefault();
-      if (event.ctrlKey || event.metaKey) {
-        zoomAt(
-          transformRef.current.scale * Math.exp(-event.deltaY * camera.wheelZoomSensitivity),
-          event.clientX,
-          event.clientY,
-        );
+      const viewport = viewportRef.current;
+      const deltaUnit =
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 16
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? (viewport?.clientHeight ?? 800)
+            : 1;
+      if (event.shiftKey) {
+        panBy(-(event.deltaX + event.deltaY) * deltaUnit, 0);
         return;
       }
-      panBy(
-        -event.deltaX - (event.shiftKey ? event.deltaY : 0),
-        event.shiftKey ? 0 : -event.deltaY,
+      zoomAt(
+        transformRef.current.scale *
+          Math.exp(-event.deltaY * deltaUnit * camera.wheelZoomSensitivity),
+        event.clientX,
+        event.clientY,
       );
     },
     [camera.wheelZoomSensitivity, panBy, zoomAt],
@@ -328,6 +352,7 @@ export function usePreparationCanvasMotion({
   return {
     viewportRef,
     surfaceRef,
+    sceneRef,
     scaleReadoutRef,
     minimapViewportRef,
     onPointerDown,

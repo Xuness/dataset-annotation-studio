@@ -75,7 +75,7 @@ export function DialArchiveSpacePage(props: ThemeSpacePageProps) {
         className="dial-archive-space dial-archive-space--workbench"
         aria-label="Dataset Annotation Studio 数据整备任务画布"
       >
-        <SpaceChrome space={props.space} tone="dark" />
+        <SpaceChrome space={props.space} />
         <PreparationWorkbench content={props.content} />
       </main>
     );

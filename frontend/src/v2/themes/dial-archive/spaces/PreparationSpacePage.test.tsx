@@ -220,12 +220,16 @@ describe("dial archive preparation pages", () => {
     expect(identity.textContent).toContain("40%");
     expect(encoding.textContent).toContain("BYPASSED");
     expect(encoding.textContent).not.toContain("40%");
-    expect(
-      container.querySelector('[data-edge-id="scope-identity"]')?.getAttribute("class"),
-    ).toContain("is-active");
-    expect(
-      container.querySelector('[data-edge-id="scope-encoding"]')?.getAttribute("class"),
-    ).toContain("is-bypassed");
+    for (const edgeId of ["branch-identity", "identity-merge"]) {
+      expect(
+        container.querySelector(`[data-edge-id="${edgeId}"]`)?.getAttribute("class"),
+      ).toContain("is-active");
+    }
+    for (const edgeId of ["branch-encoding", "encoding-merge"]) {
+      expect(
+        container.querySelector(`[data-edge-id="${edgeId}"]`)?.getAttribute("class"),
+      ).toContain("is-bypassed");
+    }
   });
 
   test("keeps parameter controls wired through the neutral workbench contract", () => {
@@ -243,5 +247,22 @@ describe("dial archive preparation pages", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "启用格式与编码" }));
 
     expect(content.updateForm).toHaveBeenCalledWith({ convertEnabled: true });
+  });
+
+  test("keeps the node inspector closed after its canvas occlusion is removed", () => {
+    const content = workbenchContent();
+    render(
+      <DialArchiveSpacePage
+        space={getHomeSpace("preparation")}
+        content={content}
+        onNavigateSpace={vi.fn()}
+        onReturnHome={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "关闭节点检查器" }));
+
+    expect(screen.queryByRole("button", { name: "关闭节点检查器" })).toBeNull();
+    expect(screen.getByRole("button", { name: "INSPECT SOURCE →" })).not.toBeNull();
   });
 });
