@@ -18,6 +18,7 @@ export function usePreprocessOperations(projectId: string, forcePolling = false)
   return useQuery({
     queryKey: preprocessingKeys.operations(projectId),
     queryFn: () => listPreprocessOperations(projectId),
+    enabled: Boolean(projectId),
     refetchInterval: (query) =>
       forcePolling ||
       query.state.data?.some((operation) => activePreprocessStatuses.has(operation.status))

@@ -9,11 +9,15 @@ import { RouteHandoff } from "./components/RouteHandoff";
 import { SpaceChrome } from "./components/SpaceChrome";
 import { SpaceRail } from "./components/SpaceRail";
 import { useSpaceRouteTransition } from "./hooks/useSpaceRouteTransition";
+import { PreparationSpaceContent } from "./preparation/PreparationSpaceContent";
+import { PreparationWorkbench } from "./preparation/PreparationWorkbench";
 import "./styles/space.css";
 import "./styles/archive.css";
+import "./styles/preparation.css";
+import "./styles/workbench.css";
 import "./styles/motion.css";
 
-export function DialArchiveSpacePage({
+function DialArchiveSecondarySpacePage({
   space,
   content,
   onNavigateSpace,
@@ -52,6 +56,8 @@ export function DialArchiveSpacePage({
         >
           {space.id === "archive" && content.kind === "archive" ? (
             <ArchiveSpaceContent content={content} />
+          ) : space.id === "preparation" && content.kind === "preparation" ? (
+            <PreparationSpaceContent content={content} />
           ) : (
             <PendingSpaceContent space={space} />
           )}
@@ -60,4 +66,19 @@ export function DialArchiveSpacePage({
       <RouteHandoff spaceId={route.intentSpaceId} running={route.active} version={route.version} />
     </main>
   );
+}
+
+export function DialArchiveSpacePage(props: ThemeSpacePageProps) {
+  if (props.content.kind === "preparation-workbench") {
+    return (
+      <main
+        className="dial-archive-space dial-archive-space--workbench"
+        aria-label="Dataset Annotation Studio 数据整备任务画布"
+      >
+        <SpaceChrome space={props.space} tone="dark" />
+        <PreparationWorkbench content={props.content} />
+      </main>
+    );
+  }
+  return <DialArchiveSecondarySpacePage {...props} />;
 }

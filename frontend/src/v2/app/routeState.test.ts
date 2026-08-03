@@ -5,6 +5,7 @@ import {
   buildFrontendHref,
   readInitialHomeSpaceId,
   readProjectId,
+  readRouteIdentifier,
   replaceProjectIdInHref,
 } from "./routeState";
 
@@ -39,6 +40,25 @@ describe("new frontend route state", () => {
         initialSpace: getHomeSpace("preparation"),
       }),
     ).toBe("/?theme=dial-archive&project=project-1&s=2");
+  });
+
+  test("keeps bounded workbench state without allowing reserved fields to be overwritten", () => {
+    expect(
+      buildFrontendHref("/preparation/workbench", {
+        themeId: "dial-archive",
+        projectId: "project-1",
+        query: {
+          focus: "geometry",
+          operation: "operation-42",
+          theme: "unsafe-theme",
+        },
+      }),
+    ).toBe(
+      "/preparation/workbench?theme=dial-archive&project=project-1&focus=geometry&operation=operation-42",
+    );
+    expect(readRouteIdentifier("?operation=operation-42", "operation")).toBe("operation-42");
+    expect(readRouteIdentifier("?operation=unsafe%2Fsegment", "operation")).toBeNull();
+    expect(readRouteIdentifier("?theme=unsafe-theme", "theme")).toBeNull();
   });
 
   test("replaces only the project query field", () => {

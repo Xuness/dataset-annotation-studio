@@ -28,11 +28,12 @@ describe("dial archive source contracts", () => {
       style("index.css"),
       style("dial.css"),
       style("motion.css"),
-      ...["space.css", "archive.css", "motion.css"].map((name) =>
-        readFileSync(
-          resolve(process.cwd(), "src/v2/themes/dial-archive/spaces/styles", name),
-          "utf8",
-        ),
+      ...["space.css", "archive.css", "preparation.css", "workbench.css", "motion.css"].map(
+        (name) =>
+          readFileSync(
+            resolve(process.cwd(), "src/v2/themes/dial-archive/spaces/styles", name),
+            "utf8",
+          ),
       ),
     ].join("\n");
     const keyframes = [...styles.matchAll(/@keyframes\s+([\w-]+)/gu)].map((match) => match[1]);
@@ -75,5 +76,25 @@ describe("dial archive source contracts", () => {
     expect(handoffRule).not.toMatch(/gradient/u);
     expect(routingRule).not.toMatch(/opacity|filter|blur/u);
     expect(cursorTickRule).toMatch(/right:\s*0;/u);
+  });
+
+  test("keeps preparation canvas geometry out of component and CSS mirrors", () => {
+    const canvasSource = readFileSync(
+      resolve(process.cwd(), "src/v2/themes/dial-archive/spaces/preparation/PreparationCanvas.tsx"),
+      "utf8",
+    );
+    const workbenchStyles = readFileSync(
+      resolve(process.cwd(), "src/v2/themes/dial-archive/spaces/styles/workbench.css"),
+      "utf8",
+    );
+
+    expect(canvasSource).not.toMatch(/NODE_CENTERS|const SURFACE_(?:WIDTH|HEIGHT)/u);
+    expect(canvasSource).toMatch(/createPreparationCanvasEdgePath/u);
+    expect(workbenchStyles).not.toMatch(
+      /\.dial-archive-preparation-node\.is-(?:source|scope|geometry|encoding|identity|preview|commit|recovery)\s*\{/u,
+    );
+    expect(workbenchStyles).not.toMatch(
+      /\.dial-archive-preparation-minimap\s+\.is-(?:source|scope|geometry|encoding|identity|preview|commit|recovery)\s*\{/u,
+    );
   });
 });

@@ -9,16 +9,17 @@ import { getDialArchiveSpace } from "../../model/spacePresentation";
 
 interface SpaceChromeProps {
   space: HomeSpace;
+  tone?: "light" | "dark";
 }
 
-export function SpaceChrome({ space }: SpaceChromeProps) {
+export function SpaceChrome({ space, tone = "light" }: SpaceChromeProps) {
   const clock = useSystemClock();
   const presentation = getDialArchiveSpace(space.id);
   const customTitlebar = dialArchiveUsesCustomTitlebar();
 
   return (
     <header
-      className="dial-archive-space-chrome"
+      className={`dial-archive-space-chrome${tone === "dark" ? " is-dark" : ""}`}
       data-tauri-drag-region={customTitlebar ? "" : undefined}
       onDoubleClick={handleDialArchiveTitlebarDoubleClick}
     >

@@ -75,6 +75,19 @@ describe("new frontend routes", () => {
     expect(screen.getByLabelText("current route").textContent).toBe("/quality?theme=dial-archive");
   });
 
+  test("keeps the preparation workbench as an explicit third-level route", async () => {
+    renderRoutes("/preparation/workbench?theme=dial-archive&focus=geometry");
+
+    expect(await screen.findByRole("heading", { name: "任务画布等待项目源" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /返回整备空间/u }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/preparation?theme=dial-archive",
+      );
+    });
+  });
+
   test("preserves project context from home into a selected space", async () => {
     renderRoutes("/?theme=dial-archive&s=2&project=project-42");
 

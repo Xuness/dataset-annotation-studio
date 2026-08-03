@@ -29,9 +29,17 @@ export { ExampleSpacePage as SpacePage } from "./spaces/ExampleSpacePage";
 当前项目使用中立路由的 `project` 查询参数表达，并由 `app/useProjectRouteContext.ts` 同步到共享 Store；
 主题不得为了恢复项目上下文读取 `window.location` 或自行维护第二套项目选择状态。
 
+三级路由仍复用 `SpacePage` 插槽，由 `SpacePageContent.kind` 区分二级空间内容与具体工作间内容。
+嵌套路由参数必须由 `app/` 解析，再由 `pages/spaces/` 控制器转成语义回调；主题可以拥有画布、检查器、
+动效和局部交互状态，但不得把 URL、API DTO 或跨页面 Store 复制进主题目录。
+
 只有至少两个同主题页面已经真实使用某段视觉能力时，才将它提到该主题根目录；跨主题公共层仍不得承载
 配色、字体、几何或动效。所有样式必须由唯一根类限定范围，并支持键盘、快速连续输入和
 `prefers-reduced-motion`。
+
+同一组主题几何一旦同时驱动节点命中、SVG 连线、镜头定位或小地图等多个消费者，应在该主题内部建立一个
+纯布局模型作为唯一事实源。组件负责渲染，CSS 负责外观，二者不得各自再保存一份坐标表；高频镜头状态仍由
+主题 Hook 通过 ref 与 `requestAnimationFrame` 管理，不把逐帧坐标写入 React state 或中立业务模型。
 
 ## 验收
 

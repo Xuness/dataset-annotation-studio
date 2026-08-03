@@ -6,10 +6,13 @@ interface FrontendHrefOptions {
   themeId: string;
   projectId?: string | null;
   initialSpace?: HomeSpace;
+  query?: Readonly<Record<string, string | null | undefined>>;
 }
 
-function normalizeProjectId(projectId: string | null | undefined): string | null {
-  const normalized = projectId?.trim() ?? "";
+const RESERVED_QUERY_KEYS = new Set(["theme", "project", "s"]);
+
+function normalizeRouteIdentifier(value: string | null | undefined): string | null {
+  const normalized = value?.trim() ?? "";
   return PROJECT_ID_PATTERN.test(normalized) ? normalized : null;
 }
 
@@ -22,17 +25,27 @@ export function readInitialHomeSpaceId(search: string): HomeSpaceId | undefined 
 }
 
 export function readProjectId(search: string): string | null {
-  return normalizeProjectId(new URLSearchParams(search).get("project"));
+  return normalizeRouteIdentifier(new URLSearchParams(search).get("project"));
+}
+
+export function readRouteIdentifier(search: string, key: string): string | null {
+  if (RESERVED_QUERY_KEYS.has(key)) return null;
+  return normalizeRouteIdentifier(new URLSearchParams(search).get(key));
 }
 
 export function buildFrontendHref(
   path: string,
-  { themeId, projectId, initialSpace }: FrontendHrefOptions,
+  { themeId, projectId, initialSpace, query }: FrontendHrefOptions,
 ): string {
   const parameters = new URLSearchParams({ theme: themeId });
-  const normalizedProjectId = normalizeProjectId(projectId);
+  const normalizedProjectId = normalizeRouteIdentifier(projectId);
   if (normalizedProjectId) parameters.set("project", normalizedProjectId);
   if (initialSpace) parameters.set("s", String(Number.parseInt(initialSpace.index, 10)));
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (RESERVED_QUERY_KEYS.has(key)) continue;
+    const normalizedValue = normalizeRouteIdentifier(value);
+    if (normalizedValue) parameters.set(key, normalizedValue);
+  }
   return `${path}?${parameters.toString()}`;
 }
 
@@ -42,7 +55,7 @@ export function replaceProjectIdInHref(
   projectId: string | null,
 ): string {
   const parameters = new URLSearchParams(search);
-  const normalizedProjectId = normalizeProjectId(projectId);
+  const normalizedProjectId = normalizeRouteIdentifier(projectId);
   if (normalizedProjectId) parameters.set("project", normalizedProjectId);
   else parameters.delete("project");
   const query = parameters.toString();

@@ -65,23 +65,24 @@ Provider、加载、错误恢复与稳定信息架构，不提供配色、字体
 `onEnterSpace(spaceId)` 交还语义意图；空间页通过 `onNavigateSpace(spaceId)` 与
 `onReturnHome(spaceId)` 交还导航意图。项目档案的数据查询和桌面动作由
 `pages/spaces/archive/useArchiveSpaceController.ts` 完成，再以 `ArchiveSpaceContent` 视图模型注入主题。
-这样更换主题不会复制业务调用，也不会让路由层依赖某个主题的动效。
+数据整备同理由 `pages/spaces/preparation/` 将二级调度页和三级任务工作间所需的真实项目、预演、执行、
+操作记录与确认动作投影成中立内容模型。这样更换主题不会复制业务调用，也不会让路由层依赖某个主题的动效。
 
 ### `dial-archive` 正式实现边界
 
-当前默认主题已由两份独立 HTML 探索稿迁移到 `themes/dial-archive/`：`home/` 保存断环首页，`spaces/`
-保存六空间共用骨架与项目档案页面，主题根目录的 `components/`、`hooks/`、`model/`、`styles/` 和
-`assets/` 只存放首页与空间页已经共同使用的真实主题能力。详细所有权和变更规则见主题目录自己的
-`README.md`。
+当前默认主题已由独立 HTML 探索稿迁移到 `themes/dial-archive/`：`home/` 保存断环首页，`spaces/`
+保存六空间共用骨架、项目档案页以及数据整备的二级调度页与三级任务画布。主题根目录的
+`components/`、`hooks/`、`model/`、`styles/` 和 `assets/` 只存放首页与空间页已经共同使用的真实主题能力。
+详细所有权和变更规则见主题目录自己的 `README.md`。
 
 圆环目标对指针即时响应，内容区使用 56 ms 意图门槛并只提交最后稳定项。键盘焦点和锁定不经过门槛；
 外环与内校准环共享动力但使用不同惯性。逐帧运动不得进入 React 状态，左侧固定语义按钮仍是唯一的悬停
 预览命中层。方案使用固定参考画布等比适配，不得把它的几何数值或字体提升到视觉中立的 `v2/styles/`。
 
 `FrontendRoutes.tsx` 消费 `navigation/spaceRegistry.ts` 的稳定路径：首页只负责选择空间并播放离场，
-路由完成后由同一主题的空间页接手。项目档案使用真实最近工作区数据；02–06 在各自业务控制器完成前只呈现
-主题内的明确待接入页，不伪造任务或项目数据。Legacy 只能通过独立 `legacy.html` 入口访问；主题不得为了
-临时可用而内嵌旧页面。
+路由完成后由同一主题的空间页接手。项目档案使用真实最近工作区数据；数据整备已接入真实项目、素材样本、
+预演、执行计划、任务进度与安全恢复能力；03–06 在各自业务控制器完成前只呈现主题内的明确待接入页，
+不伪造任务或项目数据。Legacy 只能通过独立 `legacy.html` 入口访问；主题不得为了临时可用而内嵌旧页面。
 
 ### URL 项目上下文
 
@@ -90,6 +91,8 @@ Provider、加载、错误恢复与稳定信息架构，不提供配色、字体
 ```text
 /archive?theme=dial-archive&project=<project-id>
 /preparation?theme=dial-archive&project=<project-id>
+/preparation/workbench?theme=dial-archive&project=<project-id>&focus=<node-id>
+/preparation/workbench?theme=dial-archive&project=<project-id>&operation=<operation-id>
 ```
 
 `v2/app/useProjectRouteContext.ts` 是 URL 与 `workspaceSelectionStore` 之间唯一的同步边界：URL 是新前端的
@@ -97,9 +100,11 @@ Provider、加载、错误恢复与稳定信息架构，不提供配色、字体
 业务控制器只发出项目变化语义，由路由层更新查询参数。首页进入空间、六空间互相切换、返回首页和未知路径
 恢复都会保留合法项目上下文。项目 ID 只接受有界的路由安全字符，非法值不会进入 Store 或后续 API 路径。
 
-主题仍然不知道 `project` 查询参数，也不得读取 Router、Location 或 Store。空间业务控制器由中立路由层
-接收当前项目 ID 和变化回调，再把主题需要的数据与动作组装成视图模型。三级工作间路由尚未建立；后续应
-延续同一项目上下文，而不是在主题内部另建会话状态。
+主题仍然不知道 `project`、`focus` 或 `operation` 查询参数，也不得读取 Router、Location 或 Store。
+空间业务控制器由中立路由层接收当前项目 ID 和变化回调，再把主题需要的数据与动作组装成视图模型。
+`/preparation/workbench` 是已建立的首个三级工作间：`focus` 只表达稳定节点入口，`operation` 只表达真实
+预处理操作 ID；两者都经过有界路由标识校验，并继续沿用同一项目上下文。主题只能发出“打开工作间”、
+“选择操作”和“返回空间”等语义动作，不得在内部另建 URL 或项目会话状态。
 
 ## 多模型文件所有权
 
@@ -130,6 +135,8 @@ Provider、加载、错误恢复与稳定信息架构，不提供配色、字体
 - 方案内 DOM 查询限制在根节点 `ref`，禁止用全局 `document.querySelector` 寻找实例内部元素。
 - 指针位置等高频输入通过 `requestAnimationFrame` 合并后写入方案私有 CSS 变量；卸载、离开和失焦时
   必须复位并取消未完成帧。
+- 同一主题几何同时驱动节点命中、SVG 路径、镜头焦点或小地图时，必须在主题目录建立纯布局模型作为唯一
+  事实源；节点矩形派生中心与端口，路径和投影继续从端口派生，不在 TSX、CSS 和 Hook 中各留一份坐标。
 - SVG `defs`、DOM ID 与其它跨实例标识使用 React `useId()` 生成实例唯一前缀。
 - 所有动效支持 `prefers-reduced-motion`，且关闭动效后仍保留清楚的焦点、选中和禁用状态。
 
