@@ -8,6 +8,7 @@ import {
   type HomeSpaceId,
 } from "../navigation/spaceRegistry";
 import { useArchiveSpaceController } from "../pages/spaces/archive/useArchiveSpaceController";
+import { useAnnotationSpaceController } from "../pages/spaces/annotation/useAnnotationSpaceController";
 import {
   isPreparationCanvasNodeId,
   isPreparationCapabilityId,
@@ -18,6 +19,7 @@ import {
   usePreparationWorkbenchController,
 } from "../pages/spaces/preparation/usePreparationWorkbenchController";
 import type {
+  AnnotationLaneId,
   PreparationCanvasNodeId,
   PreparationCapabilityId,
   SpacePageContent,
@@ -166,6 +168,47 @@ function PreparationRoute({ Page, space, themeId, projectId }: PreparationRouteP
   );
 }
 
+interface AnnotationRouteProps {
+  Page: LazyExoticComponent<ComponentType<ThemeSpacePageProps>>;
+  space: HomeSpace;
+  themeId: string;
+  projectId: string | null;
+}
+
+function AnnotationRoute({ Page, space, themeId, projectId }: AnnotationRouteProps) {
+  const navigate = useNavigate();
+  const content = useAnnotationSpaceController({
+    projectId,
+    onOpenArchive: () =>
+      navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId, projectId })),
+    onOpenWorkbench: (assetId?: string, lane?: AnnotationLaneId) =>
+      navigate(
+        buildFrontendHref("/annotation/workbench", {
+          themeId,
+          projectId,
+          query: { asset: assetId, channel: lane },
+        }),
+      ),
+    onOpenProduction: (lane?: AnnotationLaneId, operationId?: string) =>
+      navigate(
+        buildFrontendHref("/annotation/production", {
+          themeId,
+          projectId,
+          query: { lane, operation: operationId },
+        }),
+      ),
+  });
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
 function SpaceRoute() {
   const location = useLocation();
   const { spaceId = "" } = useParams();
@@ -198,6 +241,33 @@ function SpaceRoute() {
       />
     );
   }
+  if (space.id === "annotation") {
+    return (
+      <AnnotationRoute
+        Page={theme.SpacePage}
+        space={space}
+        themeId={themeId}
+        projectId={projectId}
+      />
+    );
+  }
+  return (
+    <SpaceRouteView
+      Page={theme.SpacePage}
+      space={space}
+      content={{ kind: "pending" }}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
+function AnnotationDestinationRoute() {
+  const location = useLocation();
+  const { projectId } = useProjectRouteContext();
+  const themeId = resolveFrontendThemeId(location.search);
+  const theme = getFrontendTheme(themeId);
+  const space = getHomeSpace("annotation");
   return (
     <SpaceRouteView
       Page={theme.SpacePage}
@@ -318,6 +388,8 @@ export function FrontendRoutes() {
     <Routes>
       <Route path="/" element={<HomeRoute />} />
       <Route path="/preparation/workbench" element={<PreparationWorkbenchRoute />} />
+      <Route path="/annotation/workbench" element={<AnnotationDestinationRoute />} />
+      <Route path="/annotation/production" element={<AnnotationDestinationRoute />} />
       <Route path="/:spaceId" element={<SpaceRoute />} />
       <Route path="*" element={<FallbackRoute />} />
     </Routes>

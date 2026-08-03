@@ -32,6 +32,107 @@ export interface PendingSpaceContent {
   kind: "pending";
 }
 
+export const ANNOTATION_LANE_IDS = ["tags", "description", "translation"] as const;
+
+export type AnnotationLaneId = (typeof ANNOTATION_LANE_IDS)[number];
+
+export interface AnnotationProjectContext {
+  id: string;
+  name: string;
+  rootPath: string;
+  exists: boolean;
+  assetCount: number;
+  annotatedCount: number;
+  invalidCount: number;
+}
+
+export interface AnnotationAssetSample {
+  id: string;
+  filename: string;
+  relativePath: string;
+  width: number;
+  height: number;
+  imageUrl: string;
+  thumbnailUrl: string;
+  annotationStatus: string;
+  channelStatuses: Readonly<Record<string, string>>;
+}
+
+export interface AnnotationCoverageLane {
+  id: AnnotationLaneId;
+  activeDocumentCount: number;
+  presentAssetCount: number;
+  usableAssetCount: number;
+  staleAssetCount: number;
+  invalidAssetCount: number;
+  missingAssetCount: number;
+  coveragePercent: number;
+}
+
+export interface AnnotationTranslationVariant {
+  id: string;
+  language: string;
+  sourceKind: "description" | "tags";
+  producerKind: "llm" | "local_dictionary";
+  displayName: string;
+  presentAssetCount: number;
+  usableAssetCount: number;
+  staleAssetCount: number;
+  invalidAssetCount: number;
+  missingAssetCount: number;
+}
+
+export type AnnotationContextSignalId =
+  | "system-prompt"
+  | "user-context"
+  | "tags-context"
+  | "json-fields"
+  | "provider"
+  | "tagger"
+  | "translation-prompt"
+  | "dictionary";
+
+export interface AnnotationContextSignal {
+  id: AnnotationContextSignalId;
+  state: "ready" | "attention" | "loading" | "error";
+  value: string;
+  detail: string;
+}
+
+export interface AnnotationOperationSummary {
+  id: string;
+  kind: "annotation" | "translation";
+  lane: AnnotationLaneId | null;
+  status: string;
+  statusLabel: string;
+  progressPercent: number;
+  completedItems: number;
+  totalItems: number;
+  failedItems: number;
+  targetLanguage: string | null;
+  executionProfileName: string;
+  model: string;
+  createdAt: string;
+  updatedAt: string;
+  active: boolean;
+}
+
+export interface AnnotationSpaceContent {
+  kind: "annotation";
+  status: "no-context" | "loading" | "ready" | "error";
+  project: AnnotationProjectContext | null;
+  samples: readonly AnnotationAssetSample[];
+  checkedCount: number;
+  channels: readonly AnnotationCoverageLane[];
+  translationVariants: readonly AnnotationTranslationVariant[];
+  contextSignals: readonly AnnotationContextSignal[];
+  operation: AnnotationOperationSummary | null;
+  message: string | null;
+  openArchive(): void;
+  openWorkbench(assetId?: string, lane?: AnnotationLaneId): void;
+  openProduction(lane?: AnnotationLaneId, operationId?: string): void;
+}
+
 export const PREPARATION_CAPABILITY_IDS = ["geometry", "encoding", "identity"] as const;
 
 export type PreparationCapabilityId = (typeof PREPARATION_CAPABILITY_IDS)[number];
@@ -176,7 +277,11 @@ export interface PreparationWorkbenchContent {
 }
 
 export type SpacePageContent =
-  ArchiveSpaceContent | PreparationSpaceContent | PreparationWorkbenchContent | PendingSpaceContent;
+  | ArchiveSpaceContent
+  | AnnotationSpaceContent
+  | PreparationSpaceContent
+  | PreparationWorkbenchContent
+  | PendingSpaceContent;
 
 export interface SpacePageFrame {
   space: HomeSpace;

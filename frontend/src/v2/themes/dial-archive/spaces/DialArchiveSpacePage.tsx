@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useRef } from "react";
 
 import type {
+  AnnotationLaneId,
+  AnnotationSpaceContent as AnnotationSpaceContentModel,
   PreparationCanvasNodeId,
   PreparationCapabilityId,
   PreparationSpaceContent as PreparationSpaceContentModel,
@@ -10,6 +12,7 @@ import { RouteSweep } from "../components/RouteSweep";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useRouteSweepTransition } from "../hooks/useRouteSweepTransition";
 import "../styles/tokens.css";
+import { AnnotationSpaceContent } from "./annotation/AnnotationSpaceContent";
 import { ArchiveSpaceContent } from "./components/ArchiveSpaceContent";
 import { PendingSpaceContent } from "./components/PendingSpaceContent";
 import { RouteHandoff } from "./components/RouteHandoff";
@@ -20,6 +23,7 @@ import { PreparationSpaceContent } from "./preparation/PreparationSpaceContent";
 import { PreparationWorkbench } from "./preparation/PreparationWorkbench";
 import "./styles/space.css";
 import "./styles/archive.css";
+import "./styles/annotation.css";
 import "./styles/preparation.css";
 import "./styles/workbench.css";
 import "./styles/motion.css";
@@ -68,6 +72,22 @@ function DialArchiveSecondarySpacePage({
         enterPreparationWorkbench(() => content.openOperation(operationId, focus)),
     };
   }, [content, enterPreparationWorkbench]);
+  const annotationContent = useMemo<AnnotationSpaceContentModel | null>(() => {
+    if (content.kind !== "annotation") return null;
+    return {
+      ...content,
+      openWorkbench: (assetId?: string, lane?: AnnotationLaneId) =>
+        startRouteSweep({
+          label: "ENTERING // ANN — MATERIAL DESK",
+          onCommit: () => content.openWorkbench(assetId, lane),
+        }),
+      openProduction: (lane?: AnnotationLaneId, operationId?: string) =>
+        startRouteSweep({
+          label: "ENTERING // ANN — PRODUCTION ROUTE",
+          onCommit: () => content.openProduction(lane, operationId),
+        }),
+    };
+  }, [content, startRouteSweep]);
 
   return (
     <main
@@ -92,6 +112,8 @@ function DialArchiveSecondarySpacePage({
             <ArchiveSpaceContent content={content} />
           ) : space.id === "preparation" && preparationContent ? (
             <PreparationSpaceContent content={preparationContent} />
+          ) : space.id === "annotation" && annotationContent ? (
+            <AnnotationSpaceContent content={annotationContent} />
           ) : (
             <PendingSpaceContent space={space} />
           )}

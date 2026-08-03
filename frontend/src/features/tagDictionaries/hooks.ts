@@ -28,10 +28,11 @@ const ACTIVE_DOWNLOAD_STATUSES = new Set<TagDictionaryDownloadStatus>([
   "installing",
 ]);
 
-export function useTagDictionaryLibrary() {
+export function useTagDictionaryLibrary(enabled = true) {
   return useQuery({
     queryKey: tagDictionaryKeys.library,
     queryFn: getTagDictionaryLibrary,
+    enabled,
   });
 }
 

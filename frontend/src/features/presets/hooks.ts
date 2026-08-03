@@ -26,14 +26,15 @@ import {
 } from "./api";
 import { presetKeys } from "./queryKeys";
 
-export function useSystemPresets() {
-  return useQuery({ queryKey: presetKeys.system, queryFn: listSystemPresets });
+export function useSystemPresets(enabled = true) {
+  return useQuery({ queryKey: presetKeys.system, queryFn: listSystemPresets, enabled });
 }
 
-export function useTranslationPromptPresets() {
+export function useTranslationPromptPresets(enabled = true) {
   return useQuery({
     queryKey: presetKeys.translationPrompts,
     queryFn: listTranslationPromptPresets,
+    enabled,
   });
 }
 
@@ -62,8 +63,8 @@ export function useCodexAuthMutations() {
   };
 }
 
-export function useProviderProfiles() {
-  return useQuery({ queryKey: presetKeys.providers, queryFn: listProviderProfiles });
+export function useProviderProfiles(enabled = true) {
+  return useQuery({ queryKey: presetKeys.providers, queryFn: listProviderProfiles, enabled });
 }
 
 export function useProviderModelSearch(input: ProviderModelSearchInput, enabled: boolean) {
