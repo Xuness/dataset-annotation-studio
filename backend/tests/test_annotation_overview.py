@@ -141,3 +141,48 @@ def test_annotation_overview_aggregates_current_channel_and_translation_states(
         ("zh-CN", "description", "llm", 0, 1),
     ]
     assert not any(project.glob("*.txt"))
+
+
+def test_annotation_overview_excludes_assets_missing_from_the_current_scan(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+    settings.ensure_directories()
+    global_database = settings.app_data_dir / "global.sqlite3"
+    initialize_global_database(global_database)
+    workspaces = WorkspaceService(settings, WorkspaceRegistry(global_database))
+    project = tmp_path / "dataset"
+    project.mkdir()
+    for name in ("active", "retired"):
+        Image.new("RGB", (32, 32), "white").save(project / f"{name}.png")
+
+    workspace, _ = workspaces.open(str(project))
+    assets = AssetService(workspaces).list_assets(workspace.project_id).items
+    retired = next(asset for asset in assets if asset.filename == "retired.png")
+    AnnotationService(workspaces).save_text(
+        workspace.project_id,
+        retired.id,
+        AnnotationChannel.DESCRIPTION,
+        "<caption>historical record</caption>",
+    )
+    (project / "retired.png").unlink()
+    workspaces.rescan(workspace.project_id)
+
+    with TestClient(create_app(settings)) as client:
+        response = client.get(f"/api/v1/workspaces/{workspace.project_id}/annotations/overview")
+
+    assert response.status_code == 200
+    overview = response.json()
+    assert overview["asset_count"] == 1
+    description = next(
+        channel for channel in overview["channels"] if channel["channel"] == "description"
+    )
+    assert description == {
+        "channel": "description",
+        "active_document_count": 0,
+        "present_asset_count": 0,
+        "usable_asset_count": 0,
+        "stale_asset_count": 0,
+        "invalid_asset_count": 0,
+        "missing_asset_count": 1,
+    }

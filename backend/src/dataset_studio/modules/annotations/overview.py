@@ -61,7 +61,7 @@ def _overview_rows(connection: sqlite3.Connection) -> list[sqlite3.Row]:
                     ELSE NULL
                 END AS current_source_revision_id
             FROM annotation_documents d
-            JOIN assets a ON a.id = d.asset_id
+            JOIN assets a ON a.id = d.asset_id AND a.is_present = 1
             LEFT JOIN annotation_document_revisions r ON r.id = d.head_revision_id
         ),
         projected_documents AS (
@@ -207,7 +207,9 @@ def build_annotation_overview(database_path: Path) -> AnnotationOverview:
     connection = connect(database_path)
     try:
         connection.execute("BEGIN")
-        asset_count = int(connection.execute("SELECT COUNT(*) FROM assets").fetchone()[0])
+        asset_count = int(
+            connection.execute("SELECT COUNT(*) FROM assets WHERE is_present = 1").fetchone()[0]
+        )
         overview_rows = _overview_rows(connection)
         channel_rows = {
             AnnotationChannel(str(row["channel"])): row
