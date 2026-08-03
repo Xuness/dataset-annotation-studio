@@ -1,7 +1,14 @@
-import { useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
+import type {
+  PreparationCanvasNodeId,
+  PreparationCapabilityId,
+  PreparationSpaceContent as PreparationSpaceContentModel,
+} from "../../../pages/spaces/spacePageModel";
 import type { ThemeSpacePageProps } from "../../themeTypes";
+import { RouteSweep } from "../components/RouteSweep";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import { useRouteSweepTransition } from "../hooks/useRouteSweepTransition";
 import "../styles/tokens.css";
 import { ArchiveSpaceContent } from "./components/ArchiveSpaceContent";
 import { PendingSpaceContent } from "./components/PendingSpaceContent";
@@ -27,6 +34,12 @@ function DialArchiveSecondarySpacePage({
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const reducedMotion = usePrefersReducedMotion();
+  const {
+    label: routeSweepLabel,
+    running: routeSweepRunning,
+    start: startRouteSweep,
+    version: routeSweepVersion,
+  } = useRouteSweepTransition({ reducedMotion });
   const route = useSpaceRouteTransition({
     currentSpaceId: space.id,
     reducedMotion,
@@ -34,6 +47,27 @@ function DialArchiveSecondarySpacePage({
     scrollRef,
     onNavigateSpace,
   });
+  const enterPreparationWorkbench = useCallback(
+    (onCommit: () => void) => {
+      startRouteSweep({
+        label: "ENTERING // PRP — WORKBENCH",
+        onCommit,
+      });
+    },
+    [startRouteSweep],
+  );
+  const preparationContent = useMemo<PreparationSpaceContentModel | null>(() => {
+    if (content.kind !== "preparation") return null;
+    return {
+      ...content,
+      openWorkbench: (focus?: PreparationCapabilityId) =>
+        enterPreparationWorkbench(() =>
+          focus ? content.openWorkbench(focus) : content.openWorkbench(),
+        ),
+      openOperation: (operationId: string, focus?: PreparationCanvasNodeId) =>
+        enterPreparationWorkbench(() => content.openOperation(operationId, focus)),
+    };
+  }, [content, enterPreparationWorkbench]);
 
   return (
     <main
@@ -56,14 +90,15 @@ function DialArchiveSecondarySpacePage({
         >
           {space.id === "archive" && content.kind === "archive" ? (
             <ArchiveSpaceContent content={content} />
-          ) : space.id === "preparation" && content.kind === "preparation" ? (
-            <PreparationSpaceContent content={content} />
+          ) : space.id === "preparation" && preparationContent ? (
+            <PreparationSpaceContent content={preparationContent} />
           ) : (
             <PendingSpaceContent space={space} />
           )}
         </div>
       </div>
       <RouteHandoff spaceId={route.intentSpaceId} running={route.active} version={route.version} />
+      <RouteSweep label={routeSweepLabel} running={routeSweepRunning} version={routeSweepVersion} />
     </main>
   );
 }

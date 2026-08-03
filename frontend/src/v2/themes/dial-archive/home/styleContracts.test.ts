@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 
 function style(name: string): string {
   const directory =
-    name === "tokens.css"
+    name === "tokens.css" || name === "route-sweep.css"
       ? "src/v2/themes/dial-archive/styles"
       : "src/v2/themes/dial-archive/home/styles";
   return readFileSync(resolve(process.cwd(), directory, name), "utf8");
@@ -28,6 +28,7 @@ describe("dial archive source contracts", () => {
       style("index.css"),
       style("dial.css"),
       style("motion.css"),
+      style("route-sweep.css"),
       ...["space.css", "archive.css", "preparation.css", "workbench.css", "motion.css"].map(
         (name) =>
           readFileSync(
@@ -140,5 +141,24 @@ describe("dial archive source contracts", () => {
     expect(workbenchStyles).not.toMatch(/\.dial-archive-preparation-node__platform/u);
     expect(canvasRule).not.toMatch(/radial-gradient|rgba\(255,\s*250,\s*0/u);
     expect(stateRule).not.toMatch(/radial-gradient|rgba\(255,\s*250,\s*0/u);
+  });
+
+  test("shares one full-frame route sweep across home and preparation navigation", () => {
+    const transitionStyles = style("route-sweep.css");
+    const homeSource = readFileSync(
+      resolve(process.cwd(), "src/v2/themes/dial-archive/home/DialArchiveHomePage.tsx"),
+      "utf8",
+    );
+    const spaceSource = readFileSync(
+      resolve(process.cwd(), "src/v2/themes/dial-archive/spaces/DialArchiveSpacePage.tsx"),
+      "utf8",
+    );
+
+    expect(homeSource).toMatch(/<RouteSweep/u);
+    expect(spaceSource).toMatch(/<RouteSweep/u);
+    expect(transitionStyles).toMatch(/background:\s*var\(--dial-archive-yellow\);/u);
+    expect(transitionStyles).toMatch(/clip-path:\s*inset\(0 100% 0 0\);/u);
+    expect(transitionStyles).not.toMatch(/gradient|filter|blur/u);
+    expect(transitionStyles).toMatch(/@media \(prefers-reduced-motion: reduce\)/u);
   });
 });

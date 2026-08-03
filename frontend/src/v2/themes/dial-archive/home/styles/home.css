@@ -244,30 +244,6 @@
   fill: var(--dial-archive-gray-9);
 }
 
-.dial-archive-home__sweep {
-  position: absolute;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--dial-archive-yellow);
-  clip-path: inset(0 100% 0 0);
-}
-
-.dial-archive-home__sweep span {
-  color: var(--dial-archive-carbon);
-  font-family: var(--dial-archive-font-mono);
-  font-size: 14px;
-  letter-spacing: 0.3em;
-  opacity: 0;
-}
-
-.dial-archive-home__sweep.is-out {
-  opacity: 0;
-  transition: opacity 250ms;
-}
-
 .dial-archive-home__portrait-note {
   position: absolute;
   inset: 0;

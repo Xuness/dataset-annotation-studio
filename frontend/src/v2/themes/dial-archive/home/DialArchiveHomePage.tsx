@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { RouteSweep } from "../components/RouteSweep";
+import { useRouteSweepTransition } from "../hooks/useRouteSweepTransition";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import { DIAL_ARCHIVE_SPACES } from "../model/spacePresentation";
+import type { ThemeHomePageProps } from "../../themeTypes";
 import { ArchiveDial } from "./components/ArchiveDial";
 import { CoreReadout } from "./components/CoreReadout";
 import { DialArchiveChrome } from "./components/DialArchiveChrome";
@@ -7,9 +12,6 @@ import { SpaceDetails } from "./components/SpaceDetails";
 import { WorkspaceIndex } from "./components/WorkspaceIndex";
 import { useCanvasScale } from "./hooks/useCanvasScale";
 import { usePointerParallax } from "./hooks/usePointerParallax";
-import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
-import { DIAL_ARCHIVE_SPACES } from "../model/spacePresentation";
-import type { ThemeHomePageProps } from "../../themeTypes";
 import { DIAL_PREVIEW_INTENT_MS } from "./model/dialGeometry";
 import "../styles/tokens.css";
 import "./styles/home.css";
@@ -21,8 +23,6 @@ interface ContentState {
   index: number;
   motionVersion: number;
 }
-
-type SweepPhase = "idle" | "running" | "out";
 
 function editableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -37,8 +37,13 @@ export function DialArchiveHomePage({ initialSpaceId, onEnterSpace }: ThemeHomeP
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const sweepTimersRef = useRef<number[]>([]);
   const reducedMotion = usePrefersReducedMotion();
+  const {
+    label: routeSweepLabel,
+    running: routeSweepRunning,
+    start: startRouteSweep,
+    version: routeSweepVersion,
+  } = useRouteSweepTransition({ reducedMotion });
   const [selectedIndex, setSelectedIndex] = useState(initialIndex);
   const [pointerPreviewIndex, setPointerPreviewIndex] = useState<number | null>(null);
   const [focusPreviewIndex, setFocusPreviewIndex] = useState<number | null>(null);
@@ -47,9 +52,6 @@ export function DialArchiveHomePage({ initialSpaceId, onEnterSpace }: ThemeHomeP
     motionVersion: 0,
   });
   const [confirmationVersion, setConfirmationVersion] = useState(0);
-  const [sweepPhase, setSweepPhase] = useState<SweepPhase>("idle");
-  const [sweepVersion, setSweepVersion] = useState(0);
-  const [sweepSpaceIndex, setSweepSpaceIndex] = useState(initialIndex);
 
   useCanvasScale(rootRef, canvasRef);
   usePointerParallax(rootRef, reducedMotion);
@@ -103,25 +105,13 @@ export function DialArchiveHomePage({ initialSpaceId, onEnterSpace }: ThemeHomeP
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [commitSpace, selectedIndex]);
 
-  const clearSweepTimers = useCallback(() => {
-    sweepTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-    sweepTimersRef.current = [];
-  }, []);
-
-  useEffect(() => clearSweepTimers, [clearSweepTimers]);
-
   const enterSpace = useCallback(() => {
-    const spaceId = DIAL_ARCHIVE_SPACES[content.index].id;
-    if (reducedMotion) {
-      onEnterSpace(spaceId);
-      return;
-    }
-    clearSweepTimers();
-    setSweepSpaceIndex(content.index);
-    setSweepVersion((version) => version + 1);
-    setSweepPhase("running");
-    sweepTimersRef.current = [window.setTimeout(() => onEnterSpace(spaceId), 520)];
-  }, [clearSweepTimers, content.index, onEnterSpace, reducedMotion]);
+    const space = DIAL_ARCHIVE_SPACES[content.index];
+    startRouteSweep({
+      label: `ENTERING // ${space.code} — ${space.englishLabel}`,
+      onCommit: () => onEnterSpace(space.id),
+    });
+  }, [content.index, onEnterSpace, startRouteSweep]);
 
   return (
     <main className="dial-archive-home" ref={rootRef} aria-label="Dataset Annotation Studio 首页">
@@ -170,19 +160,7 @@ export function DialArchiveHomePage({ initialSpaceId, onEnterSpace }: ThemeHomeP
         <DialArchiveChrome selectedSpace={selectedSpace} />
       </div>
 
-      {sweepPhase !== "idle" ? (
-        <div
-          className={`dial-archive-home__sweep is-${sweepPhase}`}
-          key={`sweep-${sweepVersion}`}
-          role="status"
-          aria-live="assertive"
-        >
-          <span>
-            ENTERING // {DIAL_ARCHIVE_SPACES[sweepSpaceIndex].code} —{" "}
-            {DIAL_ARCHIVE_SPACES[sweepSpaceIndex].englishLabel}
-          </span>
-        </div>
-      ) : null}
+      <RouteSweep label={routeSweepLabel} running={routeSweepRunning} version={routeSweepVersion} />
 
       <div className="dial-archive-home__portrait-note">
         本构图为横屏桌面设计

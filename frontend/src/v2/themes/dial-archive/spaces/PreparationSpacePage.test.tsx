@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { getHomeSpace } from "../../../navigation/spaceRegistry";
@@ -10,6 +10,23 @@ import type {
 import { DialArchiveSpacePage } from "./DialArchiveSpacePage";
 
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
+
+function mockMatchMedia(matches: boolean) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: () =>
+      ({
+        matches,
+        media: "(prefers-reduced-motion: reduce)",
+        onchange: null,
+        addEventListener() {},
+        removeEventListener() {},
+        addListener() {},
+        removeListener() {},
+        dispatchEvent: () => false,
+      }) satisfies MediaQueryList,
+  });
+}
 
 function preparationForm(): PreparationWorkbenchContent["form"] {
   return {
@@ -132,24 +149,13 @@ function workbenchContent(
 
 describe("dial archive preparation pages", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      value: () =>
-        ({
-          matches: true,
-          media: "(prefers-reduced-motion: reduce)",
-          onchange: null,
-          addEventListener() {},
-          removeEventListener() {},
-          addListener() {},
-          removeListener() {},
-          dispatchEvent: () => false,
-        }) satisfies MediaQueryList,
-    });
+    mockMatchMedia(true);
   });
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     if (originalMatchMedia) Object.defineProperty(window, "matchMedia", originalMatchMedia);
     else Reflect.deleteProperty(window, "matchMedia");
   });
@@ -167,6 +173,22 @@ describe("dial archive preparation pages", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "进入尺寸与几何任务配置" }));
     expect(content.openWorkbench).toHaveBeenCalledWith("geometry");
+  });
+
+  test("keeps the generic task action mapped to the scope entry", () => {
+    const content = spaceContent({ recentOperation: null, recoverableOperation: null });
+    render(
+      <DialArchiveSpacePage
+        space={getHomeSpace("preparation")}
+        content={content}
+        onNavigateSpace={vi.fn()}
+        onReturnHome={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /创建整备任务/u }));
+
+    expect(content.openWorkbench).toHaveBeenCalledWith();
   });
 
   test("keeps result and recovery navigation as distinct intents", () => {
@@ -264,5 +286,34 @@ describe("dial archive preparation pages", () => {
 
     expect(screen.queryByRole("button", { name: "关闭节点检查器" })).toBeNull();
     expect(screen.getByRole("button", { name: "INSPECT SOURCE →" })).not.toBeNull();
+  });
+
+  test("uses the shared route sweep before opening the workbench", () => {
+    mockMatchMedia(false);
+    vi.useFakeTimers();
+    const content = spaceContent({ recentOperation: null, recoverableOperation: null });
+    render(
+      <DialArchiveSpacePage
+        space={getHomeSpace("preparation")}
+        content={content}
+        onNavigateSpace={vi.fn()}
+        onReturnHome={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "进入尺寸与几何任务配置" }));
+
+    expect(content.openWorkbench).not.toHaveBeenCalled();
+    const sweepCopy = screen.getByText("ENTERING // PRP — WORKBENCH");
+    expect(sweepCopy.closest(".dial-archive-route-sweep")).not.toBeNull();
+
+    act(() => vi.advanceTimersByTime(519));
+    expect(content.openWorkbench).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(1));
+    expect(content.openWorkbench).toHaveBeenCalledWith("geometry");
+
+    act(() => vi.advanceTimersByTime(180));
+    expect(screen.queryByText("ENTERING // PRP — WORKBENCH")).toBeNull();
   });
 });
