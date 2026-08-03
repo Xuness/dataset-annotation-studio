@@ -83,6 +83,24 @@ Provider、加载、错误恢复与稳定信息架构，不提供配色、字体
 主题内的明确待接入页，不伪造任务或项目数据。Legacy 只能通过独立 `legacy.html` 入口访问；主题不得为了
 临时可用而内嵌旧页面。
 
+### URL 项目上下文
+
+新前端使用 `project=<project-id>` 表达跨空间共享的当前项目上下文。例如：
+
+```text
+/archive?theme=dial-archive&project=<project-id>
+/preparation?theme=dial-archive&project=<project-id>
+```
+
+`v2/app/useProjectRouteContext.ts` 是 URL 与 `workspaceSelectionStore` 之间唯一的同步边界：URL 是新前端的
+规范来源，刷新以及浏览器前进 / 后退后都会恢复共享 Store；在项目档案中登记、装载或移除当前项目时，
+业务控制器只发出项目变化语义，由路由层更新查询参数。首页进入空间、六空间互相切换、返回首页和未知路径
+恢复都会保留合法项目上下文。项目 ID 只接受有界的路由安全字符，非法值不会进入 Store 或后续 API 路径。
+
+主题仍然不知道 `project` 查询参数，也不得读取 Router、Location 或 Store。空间业务控制器由中立路由层
+接收当前项目 ID 和变化回调，再把主题需要的数据与动作组装成视图模型。三级工作间路由尚未建立；后续应
+延续同一项目上下文，而不是在主题内部另建会话状态。
+
 ## 多模型文件所有权
 
 每个视觉主题只拥有自己的 `themes/<theme-id>/` 目录。新增主题时应直接建立新目录，不复制或改写现有主题
@@ -187,6 +205,8 @@ FastAPI schema
 - 安全退出编排位于 `application/useCloseGuard.ts`，依赖任务 API、未保存状态和桌面端口；
   两套 UI 复用同一退出协议。
 - 批量素材选择位于 `workspaceSelectionStore.ts`，按项目切换时清空。
+- 新前端的当前项目由 URL `project` 参数驱动，`useProjectRouteContext.ts` 将其同步到
+  `workspaceSelectionStore.ts`；Store 不再作为 V2 路由恢复的唯一来源。
 - 未保存修改位于 `unsavedChangesStore.ts`，不再与旧工作区布局状态共用 Store。
 - 新前端可以复用这两个明确的状态能力，也可以在不影响退出协议的前提下为自己的页面建立局部视图状态。
 

@@ -26,6 +26,8 @@ export { ExampleSpacePage as SpacePage } from "./spaces/ExampleSpacePage";
 主题首页只发出 `onEnterSpace(spaceId)`；主题空间页只发出 `onNavigateSpace(spaceId)` 与
 `onReturnHome(spaceId)`。主题不得自行调用 React Router、拼接 API、直接调用 Tauri 包或读取其它主题的
 内部文件。需要项目数据时消费 `SpacePageContent`，不得在主题中建立第二套 DTO 或假项目列表。
+当前项目使用中立路由的 `project` 查询参数表达，并由 `app/useProjectRouteContext.ts` 同步到共享 Store；
+主题不得为了恢复项目上下文读取 `window.location` 或自行维护第二套项目选择状态。
 
 只有至少两个同主题页面已经真实使用某段视觉能力时，才将它提到该主题根目录；跨主题公共层仍不得承载
 配色、字体、几何或动效。所有样式必须由唯一根类限定范围，并支持键盘、快速连续输入和

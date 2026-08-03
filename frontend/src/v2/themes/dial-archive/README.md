@@ -19,13 +19,15 @@ assets/fonts/         OFL 字体、许可与子集说明
 
 稳定空间语义只来自 `v2/navigation/spaceRegistry.ts`。主题私有的 `ARC / PRP / ANN` 代码、巨型幽灵字、
 断环几何和动效参数留在本目录。工作区查询、文件夹选择、当前项目 Store 和本地目录打开动作由
-`v2/pages/spaces/archive/useArchiveSpaceController.ts` 负责，主题只消费视图模型与回调。
+V2 中立层负责：`v2/app/useProjectRouteContext.ts` 管理 `project` URL 上下文并同步 Store，
+`v2/pages/spaces/archive/useArchiveSpaceController.ts` 负责项目业务动作。主题只消费视图模型与回调。
 
 ## 交互约束
 
 - 首页的选中、指针预览、焦点预览和内容落位保持分离；移动圆环不拥有悬停命中。
 - 首页“进入空间”先完成黄色扫幕，再把语义空间 ID 交给中立路由。
 - 空间页使用一个可滚动文档上下文；顶部 chrome 和左侧 01–06 轨道固定在主题根内。
+- 首页、空间轨道和 HOME 返回动作由中立路由保留当前 `project` 上下文；主题不得读取或拼接查询参数。
 - 轨道切换先移动左侧黄色游标，再以处于内容下方的实色黄色扫描带完成交接；页面本体不做模糊或透明淡化。
 - 项目索引只聚焦一个真实本地工作区，不保留探索稿里的模拟项目。
 - 项目详情处于白色文档流中，不使用旧版米色卡片；尚未接入的新三级工作间必须明确禁用，不伪造导航。

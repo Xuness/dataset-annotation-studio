@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useLocation, MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { useWorkspaceSelectionStore } from "../../shared/store/workspaceSelectionStore";
 import { FrontendRoutes } from "./FrontendRoutes";
-import { readInitialHomeSpaceId } from "./routeState";
 
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
 
@@ -51,6 +51,7 @@ describe("new frontend routes", () => {
 
   afterEach(() => {
     cleanup();
+    useWorkspaceSelectionStore.getState().setActiveProject(null);
     if (originalMatchMedia) Object.defineProperty(window, "matchMedia", originalMatchMedia);
     else Reflect.deleteProperty(window, "matchMedia");
   });
@@ -68,15 +69,75 @@ describe("new frontend routes", () => {
     expect(await screen.findByRole("heading", { name: "项目档案" })).toBeTruthy();
   });
 
-  test("parses the screenshot channel in the neutral route layer", () => {
-    expect(readInitialHomeSpaceId("?s=1")).toBe("archive");
-    expect(readInitialHomeSpaceId("?s=6")).toBe("capability");
-    expect(readInitialHomeSpaceId("?s=99")).toBeUndefined();
-  });
-
   test("renders non-archive spaces through the same complete theme package", async () => {
     renderRoutes("/quality?theme=dial-archive");
     expect(await screen.findByRole("heading", { name: "质量控制" })).toBeTruthy();
     expect(screen.getByLabelText("current route").textContent).toBe("/quality?theme=dial-archive");
+  });
+
+  test("preserves project context from home into a selected space", async () => {
+    renderRoutes("/?theme=dial-archive&s=2&project=project-42");
+
+    await waitFor(() => {
+      expect(useWorkspaceSelectionStore.getState().projectId).toBe("project-42");
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "进入空间" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/preparation?theme=dial-archive&project=project-42",
+      );
+    });
+  });
+
+  test("preserves project context when the space rail navigates", async () => {
+    renderRoutes("/archive?theme=dial-archive&project=project-42");
+    fireEvent.click(await screen.findByRole("button", { name: "进入空间 04 质量控制" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/quality?theme=dial-archive&project=project-42",
+      );
+    });
+  });
+
+  test("writes a project loaded from the archive into the route context", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            project_id: "project-1",
+            name: "Portraits",
+            root_path: "D:\\datasets\\portraits",
+            exists: true,
+            asset_count: 42,
+            annotated_count: 17,
+            invalid_count: 2,
+            created_at: "2026-08-01T10:00:00Z",
+            last_opened_at: null,
+            settings: {
+              json_fields: [],
+              recursive_scan: true,
+              system_preset_id: null,
+              use_tags_as_context: false,
+              user_prompt: "",
+              validation_mode: "tag_balance",
+            },
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    renderRoutes("/archive?theme=dial-archive");
+
+    fireEvent.click(await screen.findByRole("button", { name: /展开项目档案/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /装载为当前项目/ }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/archive?theme=dial-archive&project=project-1",
+      );
+      expect(useWorkspaceSelectionStore.getState().projectId).toBe("project-1");
+    });
   });
 });

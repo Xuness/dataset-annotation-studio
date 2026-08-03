@@ -11,13 +11,8 @@ import { useArchiveSpaceController } from "../pages/spaces/archive/useArchiveSpa
 import type { SpacePageContent } from "../pages/spaces/spacePageModel";
 import { getFrontendTheme, resolveFrontendThemeId } from "../themes/themeRegistry";
 import type { ThemeSpacePageProps } from "../themes/themeTypes";
-import { readInitialHomeSpaceId } from "./routeState";
-
-function themeHref(path: string, themeId: string, initialSpace?: HomeSpace): string {
-  const parameters = new URLSearchParams({ theme: themeId });
-  if (initialSpace) parameters.set("s", String(Number.parseInt(initialSpace.index, 10)));
-  return `${path}?${parameters.toString()}`;
-}
+import { buildFrontendHref, readInitialHomeSpaceId } from "./routeState";
+import { useProjectRouteContext } from "./useProjectRouteContext";
 
 interface ThemeFrameProps {
   themeId: string;
@@ -37,6 +32,7 @@ function ThemeFrame({ themeId, children }: ThemeFrameProps) {
 function HomeRoute() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { projectId } = useProjectRouteContext();
   const themeId = resolveFrontendThemeId(location.search);
   const { HomePage } = getFrontendTheme(themeId);
 
@@ -44,7 +40,14 @@ function HomeRoute() {
     <ThemeFrame themeId={themeId}>
       <HomePage
         initialSpaceId={readInitialHomeSpaceId(location.search)}
-        onEnterSpace={(spaceId) => navigate(themeHref(getHomeSpace(spaceId).route, themeId))}
+        onEnterSpace={(spaceId) =>
+          navigate(
+            buildFrontendHref(getHomeSpace(spaceId).route, {
+              themeId,
+              projectId,
+            }),
+          )
+        }
       />
     </ThemeFrame>
   );
@@ -55,15 +58,22 @@ interface SpaceRouteViewProps {
   space: HomeSpace;
   content: SpacePageContent;
   themeId: string;
+  projectId: string | null;
 }
 
-function SpaceRouteView({ Page, space, content, themeId }: SpaceRouteViewProps) {
+function SpaceRouteView({ Page, space, content, themeId, projectId }: SpaceRouteViewProps) {
   const navigate = useNavigate();
   const navigateSpace = (spaceId: HomeSpaceId) => {
-    navigate(themeHref(getHomeSpace(spaceId).route, themeId));
+    navigate(buildFrontendHref(getHomeSpace(spaceId).route, { themeId, projectId }));
   };
   const returnHome = (spaceId: HomeSpaceId) => {
-    navigate(themeHref("/", themeId, getHomeSpace(spaceId)));
+    navigate(
+      buildFrontendHref("/", {
+        themeId,
+        projectId,
+        initialSpace: getHomeSpace(spaceId),
+      }),
+    );
   };
 
   return (
@@ -82,23 +92,47 @@ interface ArchiveRouteProps {
   Page: LazyExoticComponent<ComponentType<ThemeSpacePageProps>>;
   space: HomeSpace;
   themeId: string;
+  projectId: string | null;
+  onProjectIdChange(projectId: string | null): void;
 }
 
-function ArchiveRoute({ Page, space, themeId }: ArchiveRouteProps) {
-  const content = useArchiveSpaceController();
-  return <SpaceRouteView Page={Page} space={space} content={content} themeId={themeId} />;
+function ArchiveRoute({ Page, space, themeId, projectId, onProjectIdChange }: ArchiveRouteProps) {
+  const content = useArchiveSpaceController({
+    activeProjectId: projectId,
+    onActiveProjectChange: onProjectIdChange,
+  });
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
 }
 
 function SpaceRoute() {
   const location = useLocation();
   const { spaceId = "" } = useParams();
+  const { projectId, setProjectId } = useProjectRouteContext();
   const themeId = resolveFrontendThemeId(location.search);
   const theme = getFrontendTheme(themeId);
   const space = getHomeSpaceByRoute(`/${spaceId}`);
 
-  if (!space) return <Navigate replace to={themeHref("/", themeId)} />;
+  if (!space) {
+    return <Navigate replace to={buildFrontendHref("/", { themeId, projectId })} />;
+  }
   if (space.id === "archive") {
-    return <ArchiveRoute Page={theme.SpacePage} space={space} themeId={themeId} />;
+    return (
+      <ArchiveRoute
+        Page={theme.SpacePage}
+        space={space}
+        themeId={themeId}
+        projectId={projectId}
+        onProjectIdChange={setProjectId}
+      />
+    );
   }
   return (
     <SpaceRouteView
@@ -106,8 +140,16 @@ function SpaceRoute() {
       space={space}
       content={{ kind: "pending" }}
       themeId={themeId}
+      projectId={projectId}
     />
   );
+}
+
+function FallbackRoute() {
+  const location = useLocation();
+  const { projectId } = useProjectRouteContext();
+  const themeId = resolveFrontendThemeId(location.search);
+  return <Navigate replace to={buildFrontendHref("/", { themeId, projectId })} />;
 }
 
 export function FrontendRoutes() {
@@ -115,7 +157,7 @@ export function FrontendRoutes() {
     <Routes>
       <Route path="/" element={<HomeRoute />} />
       <Route path="/:spaceId" element={<SpaceRoute />} />
-      <Route path="*" element={<Navigate replace to="/" />} />
+      <Route path="*" element={<FallbackRoute />} />
     </Routes>
   );
 }

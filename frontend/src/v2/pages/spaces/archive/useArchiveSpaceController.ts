@@ -7,7 +7,6 @@ import {
 } from "../../../../features/workspaces/hooks";
 import { openLocalFolder } from "../../../../shared/desktop/openLocalFolder";
 import { pickWorkspaceFolder } from "../../../../shared/desktop/pickFolder";
-import { useWorkspaceSelectionStore } from "../../../../shared/store/workspaceSelectionStore";
 import type { ArchiveSpaceContent } from "../spacePageModel";
 import { toArchiveProjectRecord } from "./archiveProjectModel";
 
@@ -15,12 +14,18 @@ function describeError(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
 }
 
-export function useArchiveSpaceController(): ArchiveSpaceContent {
+interface UseArchiveSpaceControllerOptions {
+  activeProjectId: string | null;
+  onActiveProjectChange(projectId: string | null): void;
+}
+
+export function useArchiveSpaceController({
+  activeProjectId,
+  onActiveProjectChange,
+}: UseArchiveSpaceControllerOptions): ArchiveSpaceContent {
   const recent = useRecentWorkspaces();
   const openWorkspace = useOpenWorkspace();
   const removeRecent = useRemoveRecentWorkspace();
-  const activeProjectId = useWorkspaceSelectionStore((state) => state.projectId);
-  const setActiveProject = useWorkspaceSelectionStore((state) => state.setActiveProject);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const projects = useMemo(() => (recent.data ?? []).map(toArchiveProjectRecord), [recent.data]);
@@ -31,21 +36,21 @@ export function useArchiveSpaceController(): ArchiveSpaceContent {
       const path = await pickWorkspaceFolder();
       if (!path) return null;
       const response = await openWorkspace.mutateAsync(path);
-      setActiveProject(response.workspace.project_id);
+      onActiveProjectChange(response.workspace.project_id);
       await recent.refetch();
       return response.workspace.project_id;
     } catch (reason) {
       setActionMessage(`无法登记这个工作区：${describeError(reason)}`);
       return null;
     }
-  }, [openWorkspace, recent, setActiveProject]);
+  }, [onActiveProjectChange, openWorkspace, recent]);
 
   const loadProject = useCallback(
     (projectId: string) => {
       setActionMessage(null);
-      setActiveProject(projectId);
+      onActiveProjectChange(projectId);
     },
-    [setActiveProject],
+    [onActiveProjectChange],
   );
 
   const revealProject = useCallback(
@@ -70,12 +75,12 @@ export function useArchiveSpaceController(): ArchiveSpaceContent {
       setActionMessage(null);
       try {
         await removeRecent.mutateAsync(projectId);
-        if (activeProjectId === projectId) setActiveProject(null);
+        if (activeProjectId === projectId) onActiveProjectChange(null);
       } catch (reason) {
         setActionMessage(`无法移除项目登记：${describeError(reason)}`);
       }
     },
-    [activeProjectId, removeRecent, setActiveProject],
+    [activeProjectId, onActiveProjectChange, removeRecent],
   );
 
   const queryMessage = recent.isError ? `无法读取项目登记：${describeError(recent.error)}` : null;
