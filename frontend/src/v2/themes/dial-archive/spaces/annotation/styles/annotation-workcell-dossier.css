@@ -1,0 +1,449 @@
+/* DOSSIER 工作间：终末地冷白展陈骨架 + 莱茵式证据登记，不使用米色档案皮肤。 */
+
+.dial-archive-dossier-workcell {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(360px, 42%) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(34px, 4vw, 78px);
+  padding: 24px clamp(18px, 2.3vw, 44px) 104px clamp(10px, 1.3vw, 26px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-color: rgba(25, 25, 25, 0.36) transparent;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0 42%,
+      rgba(25, 25, 25, 0.1) 42% calc(42% + 1px),
+      transparent calc(42% + 1px)
+    ),
+    #ffffff;
+}
+
+.dial-archive-dossier-workcell::-webkit-scrollbar:horizontal {
+  height: 0;
+}
+
+.dial-archive-workcell-viewport.is-dossier .dial-archive-workcell-viewport__body {
+  overflow: hidden;
+}
+
+.dial-archive-dossier-workcell::before {
+  position: absolute;
+  z-index: 0;
+  top: 13px;
+  right: 0;
+  width: 22%;
+  height: 5px;
+  background: var(--dial-archive-stage-ink);
+  content: "";
+  pointer-events: none;
+}
+
+.dial-archive-dossier-workcell::after {
+  position: absolute;
+  z-index: 0;
+  top: 13px;
+  right: 22%;
+  width: 7%;
+  height: 5px;
+  background: var(--dial-archive-yellow);
+  content: "";
+  pointer-events: none;
+}
+
+.dial-archive-dossier-workcell__yellow-field {
+  position: absolute;
+  z-index: 0;
+  top: clamp(108px, 14vh, 160px);
+  left: 0;
+  width: clamp(340px, 38%, 720px);
+  height: clamp(190px, 31vh, 340px);
+  background: var(--dial-archive-yellow);
+  clip-path: polygon(0 0, 94% 0, 100% 12%, 100% 100%, 7% 100%, 0 88%);
+  pointer-events: none;
+}
+
+.dial-archive-dossier-workcell__yellow-field::after {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, transparent 0 64%, rgba(25, 25, 25, 0.07) 64% 64.4%, transparent 64.4%),
+    linear-gradient(
+      90deg,
+      transparent 0 70%,
+      rgba(255, 255, 255, 0.26) 70% 70.3%,
+      transparent 70.3%
+    );
+  content: "";
+}
+
+.dial-archive-dossier-workcell__measure {
+  position: absolute;
+  z-index: 0;
+  top: 44px;
+  bottom: 0;
+  left: 42%;
+  width: 13px;
+  border-top: 1px solid rgba(25, 25, 25, 0.3);
+  background: repeating-linear-gradient(180deg, rgba(25, 25, 25, 0.32) 0 1px, transparent 1px 18px);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.dial-archive-dossier-state {
+  position: absolute;
+  inset: 9% 7%;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  border-top: 1px solid rgba(25, 25, 25, 0.28);
+  border-bottom: 1px solid rgba(25, 25, 25, 0.18);
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+}
+
+.dial-archive-dossier-state::after {
+  position: absolute;
+  top: -1px;
+  right: 0;
+  width: min(28%, 280px);
+  height: 7px;
+  background: var(--dial-archive-yellow);
+  content: "";
+}
+
+.dial-archive-dossier-state > span {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+}
+
+.dial-archive-dossier-state > b {
+  margin-top: 10px;
+  color: var(--dial-archive-stage-ink);
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(25px, 3vw, 52px);
+  letter-spacing: 0.04em;
+}
+
+.dial-archive-dossier-state > p {
+  max-width: 620px;
+  margin: 12px 0 0;
+  font: 12px/1.7 var(--dial-archive-font-sans);
+}
+
+.dial-archive-dossier-state > i {
+  width: min(420px, 56%);
+  height: 4px;
+  margin-top: 26px;
+  background: linear-gradient(90deg, var(--dial-archive-yellow) 0 26%, rgba(25, 25, 25, 0.12) 26%) 0
+    0 / 54px 100%;
+  animation: dial-archive-dossier-loading 760ms steps(6) infinite;
+}
+
+.dial-archive-dossier-state.is-error::after {
+  background: #e85d2e;
+}
+
+.dial-archive-dossier-evidence {
+  position: sticky;
+  z-index: 2;
+  top: 18px;
+  display: grid;
+  min-width: 0;
+  align-self: start;
+  padding: 76px clamp(18px, 2.3vw, 42px) 24px clamp(22px, 2.7vw, 52px);
+}
+
+.dial-archive-dossier-evidence__index {
+  position: absolute;
+  z-index: 5;
+  top: 4px;
+  right: clamp(18px, 2vw, 38px);
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  color: var(--dial-archive-stage-ink);
+}
+
+.dial-archive-dossier-evidence__index span {
+  margin-bottom: 8px;
+  padding: 3px 8px;
+  color: #ffffff;
+  font-family: var(--dial-archive-font-mono);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.18em;
+  background: var(--dial-archive-stage-ink);
+}
+
+.dial-archive-dossier-evidence__index b {
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(68px, 6.4vw, 118px);
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  line-height: 0.72;
+}
+
+.dial-archive-dossier-evidence__head {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  min-width: 0;
+  margin: 0 8% 12px 0;
+  padding: 0 0 11px 14px;
+  border-bottom: 1px solid var(--dial-archive-stage-ink);
+}
+
+.dial-archive-dossier-evidence__head::before {
+  position: absolute;
+  top: 0;
+  bottom: -1px;
+  left: 0;
+  width: 5px;
+  background: var(--dial-archive-stage-ink);
+  content: "";
+}
+
+.dial-archive-dossier-evidence__head span,
+.dial-archive-dossier-evidence__head small {
+  overflow: hidden;
+  color: rgba(25, 25, 25, 0.58);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-dossier-evidence__head b {
+  overflow: hidden;
+  margin-top: 4px;
+  font-size: clamp(19px, 1.8vw, 31px);
+  letter-spacing: 0.02em;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-dossier-evidence__head small {
+  margin-top: 4px;
+}
+
+.dial-archive-dossier-evidence__plate {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  min-width: 0;
+  height: clamp(290px, 48vh, 560px);
+  margin: 0;
+  place-items: center;
+  padding: 22px 22px 42px;
+  border: 1px solid rgba(25, 25, 25, 0.84);
+  background: #f2f3f1;
+  box-shadow:
+    13px 14px 0 rgba(25, 25, 25, 0.11),
+    -8px -8px 0 rgba(255, 255, 255, 0.72);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 17px) 0,
+    100% 17px,
+    100% 100%,
+    13px 100%,
+    0 calc(100% - 13px)
+  );
+}
+
+.dial-archive-dossier-evidence__plate::before {
+  position: absolute;
+  inset: 13px 13px 35px;
+  border: 1px solid rgba(25, 25, 25, 0.18);
+  content: "";
+  pointer-events: none;
+}
+
+.dial-archive-dossier-evidence__plate img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: none;
+}
+
+.dial-archive-dossier-evidence__plate > div[role="img"] {
+  display: grid;
+  color: rgba(25, 25, 25, 0.54);
+  font-family: var(--dial-archive-font-mono);
+  text-align: center;
+}
+
+.dial-archive-dossier-evidence__plate > div[role="img"] b {
+  margin-top: 8px;
+  color: var(--dial-archive-stage-ink);
+  font-size: 34px;
+}
+
+.dial-archive-dossier-evidence__plate > i {
+  position: absolute;
+  z-index: 3;
+  width: 20px;
+  height: 20px;
+  border-color: var(--dial-archive-stage-ink);
+  border-style: solid;
+  border-width: 0;
+}
+
+.dial-archive-dossier-evidence__plate > i.is-top-left {
+  top: 7px;
+  left: 7px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+
+.dial-archive-dossier-evidence__plate > i.is-top-right {
+  top: 7px;
+  right: 7px;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+
+.dial-archive-dossier-evidence__plate > i.is-bottom-left {
+  bottom: 7px;
+  left: 7px;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+
+.dial-archive-dossier-evidence__plate > i.is-bottom-right {
+  right: 7px;
+  bottom: 7px;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+}
+
+.dial-archive-dossier-evidence__plate figcaption {
+  position: absolute;
+  right: 14px;
+  bottom: 9px;
+  left: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-family: var(--dial-archive-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+}
+
+.dial-archive-dossier-evidence__plate figcaption b {
+  font-size: inherit;
+}
+
+.dial-archive-dossier-evidence__facts {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  margin: 22px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid rgba(25, 25, 25, 0.34);
+  border-left: 1px solid rgba(25, 25, 25, 0.2);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.dial-archive-dossier-evidence__facts > div {
+  display: grid;
+  min-width: 0;
+  padding: 9px 11px 10px;
+  border-right: 1px solid rgba(25, 25, 25, 0.2);
+  border-bottom: 1px solid rgba(25, 25, 25, 0.2);
+}
+
+.dial-archive-dossier-evidence__facts dt,
+.dial-archive-dossier-evidence__facts dd {
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--dial-archive-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-dossier-evidence__facts dt {
+  color: rgba(25, 25, 25, 0.48);
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+}
+
+.dial-archive-dossier-evidence__facts dd {
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 720;
+}
+
+.dial-archive-dossier-evidence__seal {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  min-height: 42px;
+  margin: 13px 0 0 auto;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 0 11px 0 14px;
+  color: #ffffff;
+  font-family: var(--dial-archive-font-mono);
+  background: var(--dial-archive-stage-ink);
+  clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px);
+}
+
+.dial-archive-dossier-evidence__seal span {
+  font-size: 8.5px;
+  letter-spacing: 0.17em;
+}
+
+.dial-archive-dossier-evidence__seal b {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-align: right;
+}
+
+.dial-archive-dossier-evidence__seal i {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--dial-archive-yellow);
+  background: var(--dial-archive-yellow);
+  transform: rotate(45deg);
+}
+
+/* 档案页使用自己的证据台；三级展台在过渡中向后收束，避免两张真彩图重叠。 */
+.dial-archive-stage.is-workcell-dossier:not(.is-workcell-closing) .dial-archive-stage-specimen {
+  top: 53%;
+  width: 38%;
+  opacity: 0;
+  transform: translate3d(-23vw, 2vh, -190px) scale(0.76);
+}
+
+.dial-archive-stage.is-workcell-dossier:not(.is-workcell-closing)
+  .dial-archive-stage-specimen__assembly {
+  width: min(38vw, 650px);
+  height: clamp(280px, 42vh, 470px);
+}
+
+.dial-archive-stage.is-workcell-dossier:not(.is-workcell-closing)
+  .dial-archive-stage-specimen__ring,
+.dial-archive-stage.is-workcell-dossier:not(.is-workcell-closing)
+  .dial-archive-stage-specimen__baseline {
+  opacity: 0;
+}
+
+@keyframes dial-archive-dossier-loading {
+  to {
+    background-position: 54px 0;
+  }
+}

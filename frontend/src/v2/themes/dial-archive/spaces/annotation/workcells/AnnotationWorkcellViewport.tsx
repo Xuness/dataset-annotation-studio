@@ -4,6 +4,7 @@ import {
   ANNOTATION_WORKCELL_IDS,
   type AnnotationConfirmation,
   type AnnotationCoverageLane,
+  type AnnotationDossierContent,
   type AnnotationEditContent,
   type AnnotationOperationSummary,
   type AnnotationProductionContent,
@@ -17,6 +18,7 @@ import {
   describeWorkcellStatus,
 } from "../stage/model/annotationStagePresentation";
 import { AnnotationEditWorkcell } from "./edit/AnnotationEditWorkcell";
+import { AnnotationDossierWorkcell } from "./dossier/AnnotationDossierWorkcell";
 import { AnnotationProductionWorkcell } from "./production/AnnotationProductionWorkcell";
 
 interface AnnotationWorkcellViewportProps {
@@ -28,6 +30,7 @@ interface AnnotationWorkcellViewportProps {
   operation: AnnotationOperationSummary | null;
   edit: AnnotationEditContent | null;
   production: AnnotationProductionContent | null;
+  dossier: AnnotationDossierContent | null;
   confirmation: AnnotationConfirmation | null;
   onClose(): void;
   onSwitch(workcell: AnnotationWorkcellId): void;
@@ -43,6 +46,7 @@ export function AnnotationWorkcellViewport({
   operation,
   edit,
   production,
+  dossier,
   confirmation,
   onClose,
   onSwitch,
@@ -145,12 +149,7 @@ export function AnnotationWorkcellViewport({
           ) : workcell === "production" ? (
             <AnnotationProductionWorkcell production={production} />
           ) : (
-            <div className="dial-archive-workcell-viewport__pending" role="status">
-              <span>{presentation.code} // STRUCTURE RESERVED</span>
-              <h2>{presentation.title}工作间</h2>
-              <p>{presentation.description}</p>
-              <b>本轮保留空间入口与切换关系，功能构图将在对应工作间设计时接入。</b>
-            </div>
+            <AnnotationDossierWorkcell asset={asset} dossier={dossier} />
           )}
         </div>
 

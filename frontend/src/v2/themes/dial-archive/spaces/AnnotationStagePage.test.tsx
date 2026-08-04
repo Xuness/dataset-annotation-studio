@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { getHomeSpace } from "../../../navigation/spaceRegistry";
 import type {
+  AnnotationDossierContent,
   AnnotationEditContent,
   AnnotationProductionContent,
   AnnotationProductionOperation,
@@ -305,6 +306,104 @@ function productionOperation(
   };
 }
 
+function dossierContent(
+  overrides: Partial<AnnotationDossierContent> = {},
+): AnnotationDossierContent {
+  return {
+    status: "ready",
+    message: null,
+    documents: [
+      {
+        id: "document-tags",
+        code: "TAG.01",
+        title: "标签记录",
+        status: "valid",
+        statusLabel: "当前可用",
+        availability: "usable",
+        language: null,
+        source: "Tagger 生成",
+        reviewStatus: "reviewed",
+        updatedAt: "2026-08-05T10:00:00Z",
+        revisionId: "revision-tags-001",
+        imageHash: "image-hash-001",
+        validationMessage: null,
+      },
+      {
+        id: "document-description",
+        code: "DSC.02",
+        title: "描述记录",
+        status: "valid",
+        statusLabel: "当前可用",
+        availability: "usable",
+        language: null,
+        source: "LLM 生成",
+        reviewStatus: "unreviewed",
+        updatedAt: "2026-08-05T10:03:00Z",
+        revisionId: "revision-description-001",
+        imageHash: "image-hash-001",
+        validationMessage: null,
+      },
+    ],
+    metadata: {
+      exists: true,
+      path: "metadata/asset-1.json",
+      fields: [
+        { id: "score:0", label: "score", value: "0.94", kind: "NUMBER" },
+        { id: "source:1", label: "source", value: "local camera", kind: "TEXT" },
+      ],
+      raw: '{\n  "score": 0.94\n}',
+      error: null,
+    },
+    revisions: [
+      {
+        id: "revision-description-001",
+        channel: "description",
+        channelLabel: "描述记录",
+        source: "LLM 生成",
+        createdAt: "2026-08-05T10:03:00Z",
+        preview: "A portrait specimen under controlled lighting.",
+        candidate: false,
+        tombstone: false,
+        validationStatus: "valid",
+        jobItemId: "job-item-001",
+        imageHash: "image-hash-001",
+      },
+    ],
+    translations: [
+      {
+        id: "zh-CN:description:llm",
+        language: "zh-CN",
+        sourceKind: "description",
+        producerKind: "llm",
+        status: "current",
+        statusLabel: "源版本一致",
+        producer: "语言模型",
+        model: "gpt-test",
+        provider: "primary",
+        updatedAt: "2026-08-05T10:04:00Z",
+        sourceRevisionId: "revision-description-001",
+        sourceHash: "source-hash-001",
+        currentSourceHash: "source-hash-001",
+        qualityStatus: "valid",
+        alignmentStatus: "aligned",
+        issue: null,
+        qualityIssues: [],
+      },
+    ],
+    provenance: {
+      source: "model_response",
+      current: true,
+      readings: [
+        { id: "job", label: "JOB", value: "job-001", detail: "completed" },
+        { id: "model", label: "MODEL", value: "gpt-test", detail: "provider" },
+      ],
+      requestJson: '{\n  "model": "gpt-test"\n}',
+      responseJson: '{\n  "finish_reason": "stop"\n}',
+    },
+    ...overrides,
+  };
+}
+
 function stageContent(overrides: Partial<AnnotationStageContent> = {}): AnnotationStageContent {
   const assets = [stageAsset("asset-1", 0), stageAsset("asset-2", 1), stageAsset("asset-3", 2)];
   return {
@@ -337,6 +436,7 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
     activeEditChannel: "tags",
     edit: editContent(),
     production: productionContent(),
+    dossier: dossierContent(),
     confirmation: null,
     message: null,
     selectAsset: vi.fn(),
@@ -600,6 +700,18 @@ describe("dial archive annotation stage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /停止任务/u }));
     expect(operation.stop).toHaveBeenCalledOnce();
+  });
+
+  test("opens a read-only object dossier from real evidence registers", () => {
+    renderStage(stageContent({ activeWorkcell: "dossier" }));
+
+    expect(screen.getByRole("region", { name: "对象档案工作间" })).not.toBeNull();
+    expect(screen.getByRole("complementary", { name: "当前对象证据台" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "对象档案" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "通道登记" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "修订证据链" })).not.toBeNull();
+    expect(screen.getByText("MATCHES CURRENT HEAD")).not.toBeNull();
+    expect(screen.getByText("RAW METADATA // 展开原始记录")).not.toBeNull();
   });
 
   test("keeps the same workcell plane mounted while it returns to the overview", () => {

@@ -1,0 +1,223 @@
+@media (max-width: 1500px), (max-height: 860px) {
+  .dial-archive-dossier-workcell {
+    grid-template-columns: minmax(315px, 39%) minmax(0, 1fr);
+    gap: clamp(24px, 3vw, 48px);
+    background:
+      linear-gradient(
+        90deg,
+        transparent 0 39%,
+        rgba(25, 25, 25, 0.1) 39% calc(39% + 1px),
+        transparent calc(39% + 1px)
+      ),
+      #ffffff;
+  }
+
+  .dial-archive-dossier-workcell__measure {
+    left: 39%;
+  }
+
+  .dial-archive-dossier-evidence {
+    padding-top: 64px;
+    padding-right: 22px;
+    padding-left: 30px;
+  }
+
+  .dial-archive-dossier-evidence__plate {
+    height: clamp(250px, 43vh, 430px);
+  }
+
+  .dial-archive-dossier-register__title {
+    min-height: 124px;
+  }
+
+  .dial-archive-dossier-channels > li {
+    grid-template-columns: 56px minmax(130px, 1.1fr) minmax(140px, 0.8fr) auto;
+    gap: 0 10px;
+  }
+
+  .dial-archive-dossier-timeline > li {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.85fr);
+  }
+
+  .dial-archive-dossier-translations > li {
+    grid-template-columns: 82px minmax(110px, 0.7fr) minmax(180px, 1fr) auto;
+    gap: 0 10px;
+  }
+}
+
+@media (max-width: 1240px) {
+  .dial-archive-dossier-workcell {
+    grid-template-columns: minmax(280px, 37%) minmax(0, 1fr);
+    background:
+      linear-gradient(
+        90deg,
+        transparent 0 37%,
+        rgba(25, 25, 25, 0.1) 37% calc(37% + 1px),
+        transparent calc(37% + 1px)
+      ),
+      #ffffff;
+  }
+
+  .dial-archive-dossier-workcell__measure {
+    left: 37%;
+  }
+
+  .dial-archive-dossier-evidence {
+    padding-right: 16px;
+    padding-left: 18px;
+  }
+
+  .dial-archive-dossier-evidence__index span,
+  .dial-archive-dossier-evidence__head span,
+  .dial-archive-dossier-evidence__head small {
+    display: none;
+  }
+
+  .dial-archive-dossier-evidence__plate {
+    height: clamp(220px, 38vh, 370px);
+  }
+
+  .dial-archive-dossier-channels > li {
+    grid-template-columns: 54px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "code title status"
+      "code issue issue";
+  }
+
+  .dial-archive-dossier-channels > li > dl,
+  .dial-archive-dossier-translations > li > dl {
+    display: none;
+  }
+
+  .dial-archive-dossier-timeline > li {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "head"
+      "preview"
+      "facts";
+  }
+
+  .dial-archive-dossier-translations > li {
+    grid-template-columns: 76px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "language identity status"
+      "issue issue issue";
+  }
+}
+
+@media (max-width: 1080px), (orientation: portrait) {
+  .dial-archive-dossier-workcell {
+    position: relative;
+    inset: auto;
+    display: block;
+    min-height: 980px;
+    padding: 12px 16px 100px;
+    overflow: visible;
+    background: #ffffff;
+  }
+
+  .dial-archive-dossier-workcell__measure {
+    display: none;
+  }
+
+  .dial-archive-dossier-workcell__yellow-field {
+    top: 92px;
+    width: 72%;
+    height: 250px;
+  }
+
+  .dial-archive-dossier-evidence {
+    position: relative;
+    top: auto;
+    width: min(680px, 94%);
+    margin: 0 auto;
+    padding: 72px 24px 28px;
+  }
+
+  .dial-archive-dossier-evidence__plate {
+    height: min(52vh, 510px);
+  }
+
+  .dial-archive-dossier-register {
+    padding: 20px 10px 80px;
+  }
+
+  .dial-archive-dossier-register__rail {
+    top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-evidence,
+  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-evidence {
+    animation: dial-archive-dossier-evidence-enter 720ms
+      var(--dial-archive-stage-workcell-open-ease) 120ms backwards;
+  }
+
+  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-register__title,
+  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-register__title {
+    animation: dial-archive-dossier-register-enter 660ms
+      var(--dial-archive-stage-workcell-open-ease) 180ms backwards;
+  }
+
+  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-register__rail,
+  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-register__rail {
+    animation: dial-archive-dossier-register-enter 620ms
+      var(--dial-archive-stage-workcell-open-ease) 250ms backwards;
+  }
+
+  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-section,
+  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-section {
+    animation: dial-archive-dossier-section-enter 560ms var(--dial-archive-stage-workcell-open-ease)
+      backwards;
+  }
+
+  .dial-archive-workcell-viewport.is-dossier.is-opening
+    .dial-archive-dossier-section:nth-of-type(1),
+  .dial-archive-workcell-viewport.is-dossier.is-switching
+    .dial-archive-dossier-section:nth-of-type(1) {
+    animation-delay: 310ms;
+  }
+
+  .dial-archive-workcell-viewport.is-dossier.is-opening
+    .dial-archive-dossier-section:nth-of-type(2),
+  .dial-archive-workcell-viewport.is-dossier.is-switching
+    .dial-archive-dossier-section:nth-of-type(2) {
+    animation-delay: 365ms;
+  }
+}
+
+@keyframes dial-archive-dossier-evidence-enter {
+  from {
+    opacity: 0;
+    clip-path: inset(18% 4% 0 12%);
+    transform: translate3d(-42px, 26px, -70px) rotateY(2deg);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: translate3d(0, 0, 0) rotateY(0);
+  }
+}
+
+@keyframes dial-archive-dossier-register-enter {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 0 82%);
+    transform: translate3d(38px, -4px, -24px);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes dial-archive-dossier-section-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, -18px);
+  }
+}

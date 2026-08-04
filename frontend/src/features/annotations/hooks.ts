@@ -35,11 +35,11 @@ export function useAnnotationOverview(projectId: string) {
   });
 }
 
-export function useAnnotationBundle(projectId: string, assetId: string | null) {
+export function useAnnotationBundle(projectId: string, assetId: string | null, enabled = true) {
   return useQuery({
     queryKey: annotationKeys.bundle(projectId, assetId),
     queryFn: () => getAnnotationBundle(projectId, assetId!),
-    enabled: Boolean(projectId && assetId),
+    enabled: Boolean(projectId && assetId && enabled),
   });
 }
 

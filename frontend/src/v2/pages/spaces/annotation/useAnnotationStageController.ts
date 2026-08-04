@@ -24,6 +24,7 @@ import {
   stepStageIndex,
   toAnnotationStageAsset,
 } from "./annotationStageModel";
+import { useAnnotationDossierController } from "./useAnnotationDossierController";
 import { useAnnotationEditController } from "./useAnnotationEditController";
 import { useAnnotationProductionController } from "./useAnnotationProductionController";
 
@@ -195,6 +196,11 @@ export function useAnnotationStageController({
     onLaneChange: onProductionLaneChange,
     onOperationChange: onProductionOperationChange,
   });
+  const dossier = useAnnotationDossierController({
+    projectId,
+    assetId: focus.asset?.id ?? null,
+    enabled: activeWorkcell === "dossier",
+  });
 
   const loadMore = useCallback(() => {
     if (!assets.hasNextPage || assets.isFetchingNextPage) return;
@@ -323,6 +329,7 @@ export function useAnnotationStageController({
     activeEditChannel: editContent.channel,
     edit: editContent,
     production,
+    dossier,
     confirmation: pendingConfirmation
       ? {
           title: pendingConfirmation.request.title ?? "确认操作",
@@ -376,6 +383,7 @@ export function createNoContextAnnotationStage({
     activeEditChannel: "tags",
     edit: null,
     production: null,
+    dossier: null,
     confirmation: null,
     message: null,
     selectAsset: () => {},

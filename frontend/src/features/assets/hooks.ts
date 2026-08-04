@@ -58,11 +58,11 @@ export function usePromptPreview(projectId: string, assetId: string | null) {
   });
 }
 
-export function useAnnotationTrace(projectId: string, assetId: string | null) {
+export function useAnnotationTrace(projectId: string, assetId: string | null, enabled = true) {
   return useQuery({
     queryKey: annotationTraceKeys.detail(projectId, assetId),
     queryFn: () => getAnnotationTrace(projectId, assetId!),
-    enabled: Boolean(projectId && assetId),
+    enabled: Boolean(projectId && assetId && enabled),
     refetchInterval: (query) => {
       const trace = query.state.data;
       if (!trace) return 5000;
@@ -74,10 +74,10 @@ export function useAnnotationTrace(projectId: string, assetId: string | null) {
   });
 }
 
-export function useAssetMetadata(projectId: string, assetId: string | null) {
+export function useAssetMetadata(projectId: string, assetId: string | null, enabled = true) {
   return useQuery({
     queryKey: metadataKeys.detail(projectId, assetId),
     queryFn: () => getMetadata(projectId, assetId!),
-    enabled: Boolean(projectId && assetId),
+    enabled: Boolean(projectId && assetId && enabled),
   });
 }

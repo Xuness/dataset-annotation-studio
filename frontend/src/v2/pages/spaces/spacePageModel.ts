@@ -335,6 +335,97 @@ export interface AnnotationEditContent {
   discard(): Promise<void>;
 }
 
+export interface AnnotationDossierDocument {
+  id: string;
+  code: string;
+  title: string;
+  status: string;
+  statusLabel: string;
+  availability: string;
+  language: string | null;
+  source: string | null;
+  reviewStatus: string | null;
+  updatedAt: string | null;
+  revisionId: string | null;
+  imageHash: string | null;
+  validationMessage: string | null;
+}
+
+export interface AnnotationDossierMetadataField {
+  id: string;
+  label: string;
+  value: string;
+  kind: string;
+}
+
+export interface AnnotationDossierMetadata {
+  exists: boolean;
+  path: string | null;
+  fields: readonly AnnotationDossierMetadataField[];
+  raw: string | null;
+  error: string | null;
+}
+
+export interface AnnotationDossierRevision {
+  id: string;
+  channel: string;
+  channelLabel: string;
+  source: string;
+  createdAt: string;
+  preview: string;
+  candidate: boolean;
+  tombstone: boolean;
+  validationStatus: string;
+  jobItemId: string | null;
+  imageHash: string | null;
+}
+
+export interface AnnotationDossierTranslation {
+  id: string;
+  language: string;
+  sourceKind: string;
+  producerKind: string;
+  status: string;
+  statusLabel: string;
+  producer: string;
+  model: string | null;
+  provider: string | null;
+  updatedAt: string | null;
+  sourceRevisionId: string | null;
+  sourceHash: string | null;
+  currentSourceHash: string | null;
+  qualityStatus: string;
+  alignmentStatus: string;
+  issue: string | null;
+  qualityIssues: readonly string[];
+}
+
+export interface AnnotationDossierReading {
+  id: string;
+  label: string;
+  value: string;
+  detail?: string;
+  tone?: "default" | "signal" | "attention";
+}
+
+export interface AnnotationDossierProvenance {
+  source: string | null;
+  current: boolean;
+  readings: readonly AnnotationDossierReading[];
+  requestJson: string;
+  responseJson: string;
+}
+
+export interface AnnotationDossierContent {
+  status: "inactive" | "no-object" | "loading" | "ready" | "error";
+  message: string | null;
+  documents: readonly AnnotationDossierDocument[];
+  metadata: AnnotationDossierMetadata;
+  revisions: readonly AnnotationDossierRevision[];
+  translations: readonly AnnotationDossierTranslation[];
+  provenance: AnnotationDossierProvenance | null;
+}
+
 export type AnnotationProductionBackendId = "provider" | "local_tagger" | "local_dictionary";
 
 export interface AnnotationProductionOption {
@@ -481,6 +572,7 @@ export interface AnnotationStageContent {
   activeEditChannel: AnnotationEditChannelId;
   edit: AnnotationEditContent | null;
   production: AnnotationProductionContent | null;
+  dossier: AnnotationDossierContent | null;
   confirmation: AnnotationConfirmation | null;
   message: string | null;
   selectAsset(assetId: string): void;

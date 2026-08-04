@@ -5,11 +5,11 @@ import { invalidateWorkspaceMutation } from "../../shared/query/workspaceQueries
 import { getTranslation, listTranslations, refreshLocalDictionaryTranslation } from "./api";
 import { translationKeys } from "./queryKeys";
 
-export function useTranslations(projectId: string, assetId: string | null) {
+export function useTranslations(projectId: string, assetId: string | null, enabled = true) {
   return useQuery({
     queryKey: translationKeys.asset(projectId, assetId),
     queryFn: () => listTranslations(projectId, assetId!),
-    enabled: Boolean(projectId && assetId),
+    enabled: Boolean(projectId && assetId && enabled),
   });
 }
 

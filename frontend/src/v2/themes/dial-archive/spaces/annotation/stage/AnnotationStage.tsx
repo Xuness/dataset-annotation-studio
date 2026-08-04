@@ -228,6 +228,7 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
             operation={content.operation}
             edit={content.edit}
             production={content.production}
+            dossier={content.dossier}
             confirmation={content.confirmation}
             onClose={content.closeWorkcell}
             onSwitch={content.openWorkcell}
