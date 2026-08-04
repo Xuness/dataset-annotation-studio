@@ -7,9 +7,11 @@ import { AnnotationSpecimen } from "./AnnotationSpecimen";
 import { AnnotationStageCanvas } from "./AnnotationStageCanvas";
 import { AnnotationStageReadout } from "./AnnotationStageReadout";
 import { AnnotationWorkcellMap } from "./AnnotationWorkcellMap";
+import { AnnotationWorkcellViewport } from "../workcells/AnnotationWorkcellViewport";
 import { useStageAssetNavigation } from "./hooks/useStageAssetNavigation";
 import { useStageCamera } from "./hooks/useStageCamera";
 import { useStageParallax } from "./hooks/useStageParallax";
+import { useWorkcellTransition } from "./hooks/useWorkcellTransition";
 import { createAnnotationStageStyle } from "./model/annotationStageLayout";
 
 /**
@@ -26,7 +28,15 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
   const reducedMotion = usePrefersReducedMotion();
   useStageParallax(rootRef, reducedMotion);
   const camera = useStageCamera(rootRef, reducedMotion);
+  const cancelCamera = camera.cancel;
   const navigation = useStageAssetNavigation(content, reducedMotion);
+  const workcellTransition = useWorkcellTransition(content.activeWorkcell, reducedMotion);
+  const displayedWorkcell = workcellTransition.displayedWorkcell;
+  const workcellVisible = displayedWorkcell !== null;
+
+  useEffect(() => {
+    if (content.activeWorkcell) cancelCamera();
+  }, [cancelCamera, content.activeWorkcell]);
 
   // 入场编舞只在首次装载数据时播放一次；走片与返回不得重播
   const enteredRef = useRef(false);
@@ -40,7 +50,15 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
       event.target instanceof Element &&
       Boolean(event.target.closest("input, textarea, select, [contenteditable='true']"));
     if (editable) return;
-    if (event.key === "ArrowRight") {
+    const insideWorkcell =
+      event.target instanceof Element &&
+      Boolean(event.target.closest("[data-stage-workcell-surface]"));
+    if (event.key === "Escape" && workcellVisible) {
+      event.preventDefault();
+      content.closeWorkcell();
+    } else if (insideWorkcell) {
+      return;
+    } else if (event.key === "ArrowRight") {
       event.preventDefault();
       navigation.stepAsset(1);
     } else if (event.key === "ArrowLeft") {
@@ -49,6 +67,7 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
     } else if (
       event.target === event.currentTarget &&
       event.key === "Enter" &&
+      !workcellVisible &&
       navigation.visualAsset
     ) {
       event.preventDefault();
@@ -128,20 +147,23 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
       ? " is-walking-forward"
       : " is-walking-backward"
     : "";
+  const workcellClass = displayedWorkcell
+    ? ` has-workcell is-workcell-${displayedWorkcell} is-workcell-${workcellTransition.phase}`
+    : "";
 
   return (
     <div
-      className={`dial-archive-stage${entering && !reducedMotion ? " is-entering" : ""}${walkClass}`}
+      className={`dial-archive-stage${entering && !reducedMotion ? " is-entering" : ""}${walkClass}${workcellClass}`}
       ref={rootRef}
       role="region"
       aria-label="素材施工场"
       tabIndex={0}
       style={createAnnotationStageStyle()}
       onKeyDown={handleKeyDown}
-      onPointerDown={camera.onPointerDown}
-      onPointerMove={camera.onPointerMove}
-      onPointerUp={camera.onPointerUp}
-      onPointerCancel={camera.onPointerCancel}
+      onPointerDown={workcellVisible ? undefined : camera.onPointerDown}
+      onPointerMove={workcellVisible ? undefined : camera.onPointerMove}
+      onPointerUp={workcellVisible ? undefined : camera.onPointerUp}
+      onPointerCancel={workcellVisible ? undefined : camera.onPointerCancel}
     >
       <AnnotationStageCanvas
         evidenceAssets={content.sequence.assets}
@@ -153,13 +175,18 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
         <button
           className="dial-archive-stage__return"
           type="button"
-          onClick={content.returnToSpace}
+          onClick={workcellVisible ? content.closeWorkcell : content.returnToSpace}
         >
-          <span aria-hidden="true">←</span> RETURN // SPACE 03
+          <span aria-hidden="true">←</span>{" "}
+          {workcellVisible ? "RETURN // STAGE OVERVIEW" : "RETURN // SPACE 03"}
         </button>
         <div className="dial-archive-stage__title">
-          <em>STAGE // MATERIAL YARD</em>
-          <b>素材施工场</b>
+          <em>
+            {workcellVisible
+              ? `WORKCELL // ${displayedWorkcell.toUpperCase()}`
+              : "STAGE // MATERIAL YARD"}
+          </em>
+          <b>{workcellVisible ? "标注工作间" : "素材施工场"}</b>
         </div>
         <button className="dial-archive-stage__camera-reset" type="button" onClick={camera.reset}>
           <span>CAMERA</span>
@@ -182,7 +209,7 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
             checkedCount={content.checkedAssetIds.length}
             channels={content.channels}
             operation={content.operation}
-            focusedWorkcell={content.initialWorkcell}
+            focusedWorkcell={displayedWorkcell}
             onOpenWorkcell={content.openWorkcell}
           />
           <AnnotationSpecimen
@@ -191,6 +218,19 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
             reducedMotion={reducedMotion}
             walk={navigation.walk}
             onOpenDefaultWorkcell={() => content.openWorkcell("edit")}
+          />
+          <AnnotationWorkcellViewport
+            transition={workcellTransition}
+            asset={navigation.visualAsset}
+            totalCount={content.sequence.totalCount}
+            checkedCount={content.checkedAssetIds.length}
+            channels={content.channels}
+            operation={content.operation}
+            activeEditChannel={content.activeEditChannel}
+            activeProductionLane={content.activeProductionLane}
+            onClose={content.closeWorkcell}
+            onSwitch={content.openWorkcell}
+            onSelectEditChannel={content.selectEditChannel}
           />
         </div>
         <AnnotationStageReadout

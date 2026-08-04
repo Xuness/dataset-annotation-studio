@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 
+import type { AnnotationWorkcellId } from "../../../../../../pages/spaces/spacePageModel";
+
 /**
  * 素材施工场唯一的装饰几何事实源。
  *
@@ -50,6 +52,13 @@ export interface StageWorkcellPlane {
   topPercent: number;
   width: number;
   height: number;
+  /** 为投影后的视觉面与独立二维热区预留的容器外扩量。 */
+  hitSlop: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
   translateZ: number;
   rotateX: number;
   rotateY: number;
@@ -214,6 +223,7 @@ export const ANNOTATION_STAGE_LAYOUT = {
         topPercent: 61,
         width: 386,
         height: 152,
+        hitSlop: { top: 24, right: 24, bottom: 24, left: 72 },
         translateZ: -142,
         rotateX: 0,
         rotateY: -5,
@@ -228,6 +238,7 @@ export const ANNOTATION_STAGE_LAYOUT = {
         topPercent: 34,
         width: 348,
         height: 136,
+        hitSlop: { top: 24, right: 24, bottom: 24, left: 112 },
         translateZ: -292,
         rotateX: -0.5,
         rotateY: -7,
@@ -242,6 +253,7 @@ export const ANNOTATION_STAGE_LAYOUT = {
         topPercent: 7,
         width: 310,
         height: 148,
+        hitSlop: { top: 24, right: 112, bottom: 40, left: 24 },
         translateZ: -226,
         rotateX: 0.5,
         rotateY: 5,
@@ -257,6 +269,9 @@ export const ANNOTATION_STAGE_LAYOUT = {
     assetWalkDurationMs: 280,
     filmstripDurationMs: 280,
     workcellPreviewDurationMs: 260,
+    workcellOpenDurationMs: 820,
+    workcellSwitchDurationMs: 640,
+    workcellCloseDurationMs: 700,
   },
   /** 巨型序号的补零位数 */
   indexPadding: 4,
@@ -267,6 +282,35 @@ export const ANNOTATION_STAGE_FILM_STEP =
 
 export type AnnotationStageStyle = CSSProperties &
   Record<`--dial-archive-stage-${string}`, string | number>;
+
+export type StageWorkcellPlaneStyle = CSSProperties &
+  Record<`--dial-archive-workcell-${string}`, string | number>;
+
+/** 总览入口与四级展开壳层共用同一组空间坐标，避免转场起点漂移。 */
+export function createStageWorkcellPlaneStyle(
+  workcell: AnnotationWorkcellId,
+): StageWorkcellPlaneStyle {
+  const plane = ANNOTATION_STAGE_LAYOUT.workcells.planes[workcell];
+  return {
+    "--dial-archive-workcell-left": `${plane.leftPercent}%`,
+    "--dial-archive-workcell-top": `${plane.topPercent}%`,
+    "--dial-archive-workcell-width": `${plane.width}px`,
+    "--dial-archive-workcell-height": `${plane.height}px`,
+    "--dial-archive-workcell-hit-top": `${plane.hitSlop.top}px`,
+    "--dial-archive-workcell-hit-right": `${plane.hitSlop.right}px`,
+    "--dial-archive-workcell-hit-bottom": `${plane.hitSlop.bottom}px`,
+    "--dial-archive-workcell-hit-left": `${plane.hitSlop.left}px`,
+    "--dial-archive-workcell-z": `${plane.translateZ}px`,
+    "--dial-archive-workcell-rx": `${plane.rotateX}deg`,
+    "--dial-archive-workcell-ry": `${plane.rotateY}deg`,
+    "--dial-archive-workcell-rz": `${plane.rotateZ}deg`,
+    "--dial-archive-workcell-idle-x": `${plane.idleX}px`,
+    "--dial-archive-workcell-idle-y": `${plane.idleY}px`,
+    "--dial-archive-workcell-idle-duration": `${plane.idleSeconds}s`,
+    "--dial-archive-workcell-idle-delay": `${plane.idleDelay}s`,
+    "--dial-archive-workcell-preview-lift": `${ANNOTATION_STAGE_LAYOUT.workcells.previewLift}px`,
+  };
+}
 
 /**
  * 将模型中的共享几何与关键动效节奏投影为 CSS 变量。
@@ -293,6 +337,9 @@ export function createAnnotationStageStyle(): AnnotationStageStyle {
     "--dial-archive-stage-walk-duration": `${motion.assetWalkDurationMs}ms`,
     "--dial-archive-stage-film-duration": `${motion.filmstripDurationMs}ms`,
     "--dial-archive-stage-workcell-preview-duration": `${motion.workcellPreviewDurationMs}ms`,
+    "--dial-archive-stage-workcell-open-duration": `${motion.workcellOpenDurationMs}ms`,
+    "--dial-archive-stage-workcell-switch-duration": `${motion.workcellSwitchDurationMs}ms`,
+    "--dial-archive-stage-workcell-close-duration": `${motion.workcellCloseDurationMs}ms`,
     "--dial-archive-stage-viewport-settle-duration": `${viewport.settleDurationMs}ms`,
     "--dial-archive-stage-camera-reset-duration": `${camera.resetDurationMs}ms`,
   };

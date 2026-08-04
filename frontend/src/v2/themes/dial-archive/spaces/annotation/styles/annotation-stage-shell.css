@@ -56,6 +56,8 @@
 }
 
 .dial-archive-stage {
+  --dial-archive-stage-workcell-open-ease: cubic-bezier(0.22, 0.72, 0.24, 1);
+  --dial-archive-stage-workcell-close-ease: cubic-bezier(0.4, 0, 0.2, 1);
   position: absolute;
   inset: var(--dial-archive-space-chrome-h) 0 0;
   display: flex;

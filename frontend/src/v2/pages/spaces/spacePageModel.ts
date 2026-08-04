@@ -171,14 +171,16 @@ export interface AnnotationStageContent {
   checkedAssetIds: readonly string[];
   channels: readonly AnnotationCoverageLane[];
   operation: AnnotationOperationSummary | null;
-  initialWorkcell: AnnotationWorkcellId | null;
-  initialLane: AnnotationLaneId | null;
+  activeWorkcell: AnnotationWorkcellId | null;
+  activeEditChannel: AnnotationLaneId;
+  activeProductionLane: AnnotationLaneId;
   message: string | null;
   selectAsset(assetId: string): void;
   stepAsset(offset: number): void;
   toggleAssetChecked(assetId: string): void;
   openWorkcell(workcell: AnnotationWorkcellId): void;
   closeWorkcell(): void;
+  selectEditChannel(channel: AnnotationLaneId): void;
   returnToSpace(): void;
   openArchive(): void;
 }

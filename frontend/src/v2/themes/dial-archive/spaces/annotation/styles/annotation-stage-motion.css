@@ -113,19 +113,19 @@
   animation-delay: 390ms;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-workcell {
+.dial-archive-stage.is-entering .dial-archive-stage-workcell-slot {
   animation: dial-archive-stage-card-deal 640ms var(--dial-archive-ease) backwards;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-workcell.is-dossier {
+.dial-archive-stage.is-entering .dial-archive-stage-workcell-slot.is-dossier {
   animation-delay: 360ms;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-workcell.is-production {
+.dial-archive-stage.is-entering .dial-archive-stage-workcell-slot.is-production {
   animation-delay: 450ms;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-workcell.is-edit {
+.dial-archive-stage.is-entering .dial-archive-stage-workcell-slot.is-edit {
   animation-delay: 540ms;
 }
 

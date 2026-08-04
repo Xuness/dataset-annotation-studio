@@ -8,12 +8,22 @@
   pointer-events: none;
 }
 
-.dial-archive-stage-workcell {
+.dial-archive-stage-workcell-slot {
   position: absolute;
   top: var(--dial-archive-workcell-top);
   left: var(--dial-archive-workcell-left);
   width: min(var(--dial-archive-workcell-width), 27vw);
   height: var(--dial-archive-workcell-height);
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.dial-archive-stage-workcell {
+  position: absolute;
+  top: calc(-1 * var(--dial-archive-workcell-hit-top));
+  right: calc(-1 * var(--dial-archive-workcell-hit-right));
+  bottom: calc(-1 * var(--dial-archive-workcell-hit-bottom));
+  left: calc(-1 * var(--dial-archive-workcell-hit-left));
   padding: 0;
   border: 0;
   color: var(--dial-archive-stage-ink);
@@ -21,10 +31,10 @@
   background: transparent;
   cursor: pointer;
   transform-style: preserve-3d;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
-.dial-archive-stage-workcell::before {
+.dial-archive-stage-workcell-slot::before {
   position: absolute;
   top: 52%;
   height: 1px;
@@ -33,7 +43,7 @@
   pointer-events: none;
 }
 
-.dial-archive-stage-workcell::after {
+.dial-archive-stage-workcell-slot::after {
   position: absolute;
   top: calc(52% - 4px);
   width: 8px;
@@ -45,36 +55,67 @@
   transform: rotate(45deg);
 }
 
-.dial-archive-stage-workcell.is-edit::before,
-.dial-archive-stage-workcell.is-production::before {
+.dial-archive-stage-workcell-slot.is-edit::before,
+.dial-archive-stage-workcell-slot.is-production::before {
   right: 98%;
   width: clamp(34px, 4vw, 84px);
 }
 
-.dial-archive-stage-workcell.is-edit::after,
-.dial-archive-stage-workcell.is-production::after {
+.dial-archive-stage-workcell-slot.is-edit::after,
+.dial-archive-stage-workcell-slot.is-production::after {
   right: calc(98% + clamp(31px, 3.8vw, 79px));
 }
 
-.dial-archive-stage-workcell.is-dossier::before {
+.dial-archive-stage-workcell-slot.is-dossier::before {
   left: 98%;
   width: clamp(34px, 4vw, 84px);
   background: linear-gradient(90deg, rgba(25, 25, 25, 0.28), transparent);
 }
 
-.dial-archive-stage-workcell.is-dossier::after {
+.dial-archive-stage-workcell-slot.is-dossier::after {
   left: calc(98% + clamp(31px, 3.8vw, 79px));
+}
+
+/*
+ * 视觉面位于负 Z 轴；浏览器会按投影前的祖先矩形裁定命中，不能直接拿它接收指针。
+ * 这个透明二维热区覆盖静止与前移投影的共同可见范围，并在窄视口中进一步收束，
+ * 从而既不漏掉卡片边缘，也不越界抢走相邻工作间的鼠标事件。
+ */
+.dial-archive-stage-workcell__hit-target {
+  position: absolute;
+  z-index: 2;
+  top: 6%;
+  right: 6%;
+  bottom: 6%;
+  left: 3%;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.dial-archive-stage-workcell.is-production .dial-archive-stage-workcell__hit-target {
+  top: 10%;
+  right: 18%;
+  bottom: 8%;
+  left: 6%;
+}
+
+.dial-archive-stage-workcell.is-dossier .dial-archive-stage-workcell__hit-target {
+  top: 16%;
+  right: 2%;
+  bottom: 2%;
+  left: 17%;
 }
 
 .dial-archive-stage-workcell__plane {
   position: absolute;
-  inset: 0;
+  inset: var(--dial-archive-workcell-hit-top) var(--dial-archive-workcell-hit-right)
+    var(--dial-archive-workcell-hit-bottom) var(--dial-archive-workcell-hit-left);
   transform: translateZ(var(--dial-archive-workcell-z)) rotateX(var(--dial-archive-workcell-rx))
     rotateY(var(--dial-archive-workcell-ry)) rotateZ(var(--dial-archive-workcell-rz));
-  transform-origin: center;
-  transform-style: preserve-3d;
   transition: transform var(--dial-archive-stage-workcell-preview-duration) var(--dial-archive-ease);
   will-change: transform;
+  pointer-events: none;
 }
 
 .dial-archive-stage-workcell__surface {
@@ -358,7 +399,7 @@
 
 /* 生产舱：折线工序与并行节点。 */
 .dial-archive-stage-workcell.is-production .dial-archive-stage-workcell__surface {
-  background: rgba(245, 246, 244, 0.96);
+  background: #ffffff;
 }
 
 .dial-archive-stage-workcell.is-production .dial-archive-stage-workcell__rear {

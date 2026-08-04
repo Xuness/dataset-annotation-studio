@@ -4,6 +4,8 @@
 @import "./annotation-stage-specimen.css";
 @import "./annotation-stage-readout.css";
 @import "./annotation-stage-workcells.css";
+@import "./annotation-workcell-viewport.css";
+@import "./annotation-workcell-edit.css";
 @import "./annotation-stage-filmstrip.css";
 @import "./annotation-stage-state.css";
 @import "./annotation-stage-motion.css";

@@ -38,11 +38,11 @@
     font-size: clamp(72px, 7.4vw, 108px);
   }
 
-  .dial-archive-stage-workcell {
+  .dial-archive-stage-workcell-slot {
     width: min(var(--dial-archive-workcell-width), 25vw);
   }
 
-  .dial-archive-stage-workcell.is-dossier {
+  .dial-archive-stage-workcell-slot.is-dossier {
     top: 1%;
     left: -4%;
     width: min(216px, 15.5vw);
@@ -61,18 +61,29 @@
     display: none;
   }
 
-  .dial-archive-stage-workcell.is-production {
+  .dial-archive-stage-workcell-slot.is-production {
     top: 40%;
     left: 72%;
   }
 
-  .dial-archive-stage-workcell.is-edit {
+  .dial-archive-stage-workcell-slot.is-edit {
     top: 66%;
     left: 71.5%;
   }
 
   .dial-archive-stage-workcell__diagram {
     width: 74px;
+  }
+
+  .dial-archive-stage-workcell.is-edit .dial-archive-stage-workcell__hit-target {
+    inset: 6%;
+  }
+
+  .dial-archive-stage-workcell.is-production .dial-archive-stage-workcell__hit-target {
+    top: 8%;
+    right: 15%;
+    bottom: 22%;
+    left: 10%;
   }
 }
 
@@ -101,11 +112,11 @@
     margin-top: 12px;
   }
 
-  .dial-archive-stage-workcell.is-production {
+  .dial-archive-stage-workcell-slot.is-production {
     top: 39%;
   }
 
-  .dial-archive-stage-workcell.is-edit {
+  .dial-archive-stage-workcell-slot.is-edit {
     top: 66%;
   }
 
@@ -136,8 +147,8 @@
     display: none;
   }
 
-  .dial-archive-stage-workcell.is-production,
-  .dial-archive-stage-workcell.is-edit {
+  .dial-archive-stage-workcell-slot.is-production,
+  .dial-archive-stage-workcell-slot.is-edit {
     left: 71%;
   }
 
@@ -202,24 +213,24 @@
     font-size: clamp(52px, 8vw, 74px);
   }
 
-  .dial-archive-stage-workcell {
+  .dial-archive-stage-workcell-slot {
     top: 75%;
     width: 29vw;
     height: 116px;
   }
 
-  .dial-archive-stage-workcell.is-dossier {
+  .dial-archive-stage-workcell-slot.is-dossier {
     top: 75%;
     left: 3%;
     width: 29vw;
   }
 
-  .dial-archive-stage-workcell.is-production {
+  .dial-archive-stage-workcell-slot.is-production {
     top: 75%;
     left: 35.5%;
   }
 
-  .dial-archive-stage-workcell.is-edit {
+  .dial-archive-stage-workcell-slot.is-edit {
     top: 75%;
     left: 68%;
   }
@@ -246,6 +257,27 @@
 
   .dial-archive-stage-workcell__action {
     display: none;
+  }
+
+  .dial-archive-stage-workcell.is-dossier .dial-archive-stage-workcell__hit-target {
+    top: 6%;
+    right: 20%;
+    bottom: 28%;
+    left: 8%;
+  }
+
+  .dial-archive-stage-workcell.is-production .dial-archive-stage-workcell__hit-target {
+    top: 6%;
+    right: 5%;
+    bottom: 16%;
+    left: 24%;
+  }
+
+  .dial-archive-stage-workcell.is-edit .dial-archive-stage-workcell__hit-target {
+    top: 6%;
+    right: 8%;
+    bottom: 16%;
+    left: 12%;
   }
 
   .dial-archive-stage-canvas__ghost-word {

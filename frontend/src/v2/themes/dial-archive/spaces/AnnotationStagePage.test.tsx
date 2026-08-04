@@ -71,14 +71,16 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
     checkedAssetIds: [],
     channels: [],
     operation: null,
-    initialWorkcell: null,
-    initialLane: null,
+    activeWorkcell: null,
+    activeEditChannel: "tags",
+    activeProductionLane: "tags",
     message: null,
     selectAsset: vi.fn(),
     stepAsset: vi.fn(),
     toggleAssetChecked: vi.fn(),
     openWorkcell: vi.fn(),
     closeWorkcell: vi.fn(),
+    selectEditChannel: vi.fn(),
     returnToSpace: vi.fn(),
     openArchive: vi.fn(),
     ...overrides,
@@ -267,6 +269,65 @@ describe("dial archive annotation stage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "打开标注编辑工作间" }));
     expect(content.openWorkcell).toHaveBeenCalledWith("edit");
+  });
+
+  test("expands the edit workcell around the persistent current material", () => {
+    const content = stageContent({ activeWorkcell: "edit" });
+    renderStage(content);
+
+    expect(screen.getByRole("region", { name: "标注编辑工作间" })).not.toBeNull();
+    expect(screen.getByRole("group", { name: "素材 asset-1.png 查看器" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "标注编辑" })).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /DSC\s*描述/u }));
+    expect(content.selectEditChannel).toHaveBeenCalledWith("description");
+
+    fireEvent.click(screen.getByRole("button", { name: "切换到自动生产工作间" }));
+    expect(content.openWorkcell).toHaveBeenCalledWith("production");
+
+    fireEvent.click(screen.getByRole("button", { name: "返回素材施工场总览" }));
+    expect(content.closeWorkcell).toHaveBeenCalledOnce();
+  });
+
+  test("keeps the same workcell plane mounted while it returns to the overview", () => {
+    mockMatchMedia(false);
+    const onNavigateSpace = vi.fn();
+    const onReturnHome = vi.fn();
+    const { container, rerender } = render(
+      <DialArchiveSpacePage
+        space={getHomeSpace("annotation")}
+        content={stageContent({ activeWorkcell: "edit" })}
+        onNavigateSpace={onNavigateSpace}
+        onReturnHome={onReturnHome}
+      />,
+    );
+    const plane = container.querySelector(".dial-archive-workcell-viewport__plane");
+
+    rerender(
+      <DialArchiveSpacePage
+        space={getHomeSpace("annotation")}
+        content={stageContent({ activeWorkcell: null })}
+        onNavigateSpace={onNavigateSpace}
+        onReturnHome={onReturnHome}
+      />,
+    );
+
+    expect(container.querySelector(".dial-archive-stage")?.className).toContain(
+      "is-workcell-closing",
+    );
+    expect(container.querySelector(".dial-archive-workcell-viewport__plane")).toBe(plane);
+  });
+
+  test("closes an active workcell with Escape without treating it as asset navigation", () => {
+    const content = stageContent({ activeWorkcell: "edit" });
+    renderStage(content);
+
+    fireEvent.keyDown(screen.getByRole("region", { name: "标注编辑工作间" }), {
+      key: "Escape",
+    });
+
+    expect(content.closeWorkcell).toHaveBeenCalledOnce();
+    expect(content.stepAsset).not.toHaveBeenCalled();
   });
 
   test("shows the live operation reading on the production card", () => {

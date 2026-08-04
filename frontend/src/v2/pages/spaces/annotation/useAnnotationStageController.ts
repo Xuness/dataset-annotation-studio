@@ -29,11 +29,13 @@ interface UseAnnotationStageControllerOptions {
   projectId: string;
   requestedAssetId: string | null;
   requestedOperationId: string | null;
-  initialWorkcell: AnnotationWorkcellId | null;
-  initialLane: AnnotationLaneId | null;
+  activeWorkcell: AnnotationWorkcellId | null;
+  requestedEditChannel: AnnotationLaneId | null;
+  requestedProductionLane: AnnotationLaneId | null;
   onAssetIdChange(assetId: string | null): void;
   onOpenWorkcell(workcell: AnnotationWorkcellId): void;
   onCloseWorkcell(): void;
+  onEditChannelChange(channel: AnnotationLaneId): void;
   onReturnToSpace(): void;
   onOpenArchive(): void;
 }
@@ -46,11 +48,13 @@ export function useAnnotationStageController({
   projectId,
   requestedAssetId,
   requestedOperationId,
-  initialWorkcell,
-  initialLane,
+  activeWorkcell,
+  requestedEditChannel,
+  requestedProductionLane,
   onAssetIdChange,
   onOpenWorkcell,
   onCloseWorkcell,
+  onEditChannelChange,
   onReturnToSpace,
   onOpenArchive,
 }: UseAnnotationStageControllerOptions): AnnotationStageContent {
@@ -190,14 +194,16 @@ export function useAnnotationStageController({
     checkedAssetIds,
     channels,
     operation,
-    initialWorkcell,
-    initialLane,
+    activeWorkcell,
+    activeEditChannel: requestedEditChannel ?? "tags",
+    activeProductionLane: requestedProductionLane ?? "tags",
     message,
     selectAsset,
     stepAsset,
     toggleAssetChecked: toggleCheckedAsset,
     openWorkcell: onOpenWorkcell,
     closeWorkcell: onCloseWorkcell,
+    selectEditChannel: onEditChannelChange,
     returnToSpace: onReturnToSpace,
     openArchive: onOpenArchive,
   };
@@ -230,14 +236,16 @@ export function createNoContextAnnotationStage({
     checkedAssetIds: [],
     channels: [],
     operation: null,
-    initialWorkcell: null,
-    initialLane: null,
+    activeWorkcell: null,
+    activeEditChannel: "tags",
+    activeProductionLane: "tags",
     message: null,
     selectAsset: () => {},
     stepAsset: () => {},
     toggleAssetChecked: () => {},
     openWorkcell: () => {},
     closeWorkcell: () => {},
+    selectEditChannel: () => {},
     returnToSpace: onReturnToSpace,
     openArchive: onOpenArchive,
   };

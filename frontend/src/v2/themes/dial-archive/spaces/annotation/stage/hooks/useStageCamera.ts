@@ -112,6 +112,14 @@ export function useStageCamera(rootRef: RefObject<HTMLDivElement | null>, reduce
     event.currentTarget.classList.remove("is-camera-dragging");
   }, []);
 
+  const cancel = useCallback(() => {
+    const pointer = pointerRef.current;
+    const root = rootRef.current;
+    pointerRef.current = null;
+    if (pointer && root?.hasPointerCapture?.(pointer.id)) root.releasePointerCapture?.(pointer.id);
+    root?.classList.remove("is-camera-dragging");
+  }, [rootRef]);
+
   const reset = useCallback(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -138,6 +146,7 @@ export function useStageCamera(rootRef: RefObject<HTMLDivElement | null>, reduce
     onPointerMove,
     onPointerUp: endPointer,
     onPointerCancel: endPointer,
+    cancel,
     reset,
   };
 }

@@ -6,6 +6,7 @@ import {
   createStageRingTicks,
   createStageRegistrationField,
   createAnnotationStageStyle,
+  createStageWorkcellPlaneStyle,
   formatStageByteSize,
   formatStageIndex,
   resolveFilmstripTrackOffset,
@@ -86,6 +87,9 @@ describe("annotation stage layout", () => {
     expect(style["--dial-archive-stage-workcell-preview-duration"]).toBe(
       `${ANNOTATION_STAGE_LAYOUT.motion.workcellPreviewDurationMs}ms`,
     );
+    expect(style["--dial-archive-stage-workcell-open-duration"]).toBe(
+      `${ANNOTATION_STAGE_LAYOUT.motion.workcellOpenDurationMs}ms`,
+    );
   });
 
   test("keeps every overview workcell on an explicit three-dimensional plane", () => {
@@ -95,6 +99,22 @@ describe("annotation stage layout", () => {
     expect(planes.every((plane) => plane.translateZ < 0)).toBe(true);
     expect(planes.every((plane) => plane.width > plane.height)).toBe(true);
     expect(planes.every((plane) => plane.idleSeconds > 0)).toBe(true);
+    expect(planes.every((plane) => Object.values(plane.hitSlop).every((value) => value > 0))).toBe(
+      true,
+    );
+  });
+
+  test("projects each workcell portal and expanded shell from one plane", () => {
+    const style = createStageWorkcellPlaneStyle("edit");
+    const plane = ANNOTATION_STAGE_LAYOUT.workcells.planes.edit;
+    expect(style["--dial-archive-workcell-left"]).toBe(`${plane.leftPercent}%`);
+    expect(style["--dial-archive-workcell-top"]).toBe(`${plane.topPercent}%`);
+    expect(style["--dial-archive-workcell-z"]).toBe(`${plane.translateZ}px`);
+    expect(style["--dial-archive-workcell-width"]).toBe(`${plane.width}px`);
+    expect(style["--dial-archive-workcell-hit-top"]).toBe(`${plane.hitSlop.top}px`);
+    expect(style["--dial-archive-workcell-hit-right"]).toBe(`${plane.hitSlop.right}px`);
+    expect(style["--dial-archive-workcell-hit-bottom"]).toBe(`${plane.hitSlop.bottom}px`);
+    expect(style["--dial-archive-workcell-hit-left"]).toBe(`${plane.hitSlop.left}px`);
   });
 
   test("keeps a visible film cell fixed and only minimally reveals an obscured cell", () => {
