@@ -9,3 +9,4 @@ export type JobSummary = ApiOutput<"JobSummary">;
 export type JobAttempt = ApiOutput<"JobAttempt">;
 export type JobItemDetail = ApiOutput<"JobItemDetail">;
 export type JobDetail = ApiOutput<"JobDetail">;
+export type AssetRelatedJob = ApiOutput<"AssetRelatedJob">;

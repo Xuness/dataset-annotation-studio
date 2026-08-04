@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ConfirmInteraction } from "../../../../application/interaction";
 import { useAnnotationEditorController } from "../../../../application/annotations/useAnnotationEditorController";
 import { useTagEditorController } from "../../../../application/tags/useTagEditorController";
+import { useTranslationComparisonController } from "../../../../application/translations/useTranslationComparisonController";
 import {
   DEFAULT_TOKENIZATION_PROFILE_ID,
   TOKENIZATION_PROFILE_IDS,
@@ -206,6 +207,39 @@ export function useAnnotationEditController({
     () => projectTokenMetrics(editor.descriptionTokenCounts.data),
     [editor.descriptionTokenCounts.data],
   );
+  const comparison = useTranslationComparisonController({
+    translation: editor.translationState.data,
+    editing: editor.translationEditing,
+    editContent: editor.content,
+    editorTags: editor.tagDraft,
+    editorTagsDirty: editor.tagsDirty,
+    dictionaryPreview: editor.dictionaryPreview.data,
+    dictionaryPreviewLoading: editor.dictionaryPreview.isResolving,
+    dictionaryPreviewError: editor.dictionaryPreview.error,
+    tokenProfileId,
+  });
+  const comparisonParts = useMemo(() => {
+    const translation = editor.translationState.data;
+    if (!translation) return [];
+    if (comparison.model.previewAligned && editor.dictionaryPreview.data) {
+      return editor.dictionaryPreview.data.entries.map((entry, index) => ({
+        id: comparison.model.persistedTagParts[index]?.id ?? `tag-preview:${index}`,
+        kind: "tag" as const,
+        sourceText: entry.requested_tag,
+        translatedText: entry.translation ?? entry.requested_tag,
+        category: entry.category ?? comparison.model.tags[index]?.category ?? null,
+        confidence: comparison.model.tags[index]?.confidence ?? null,
+      }));
+    }
+    return translation.alignment_parts.map((part) => ({
+      id: part.id,
+      kind: part.kind === "tag" ? ("tag" as const) : ("segment" as const),
+      sourceText: part.source_text,
+      translatedText: part.translated_text,
+      category: part.category ?? null,
+      confidence: part.confidence ?? null,
+    }));
+  }, [comparison.model, editor.dictionaryPreview.data, editor.translationState.data]);
 
   const document = editor.document.data;
   const availability = document?.availability_status ?? "missing";
@@ -319,6 +353,41 @@ export function useAnnotationEditController({
       beginEditing: () => editor.setTranslationEditing(true),
       refreshDictionary: editor.retryLocalDictionaryRefresh,
     },
+    translationComparison: {
+      aligned: comparison.model.aligned,
+      sourceMode: comparison.model.isTags
+        ? "tags"
+        : comparison.model.canRenderDescription
+          ? "segments"
+          : "plain",
+      sourceText: comparison.model.isTags
+        ? comparison.model.tags.map((tag) => tag.name).join(", ")
+        : comparison.model.sourceContent,
+      translatedText: editor.translationEditing
+        ? editor.content
+        : comparison.model.translatedContent,
+      parts: comparisonParts,
+      activeIds: [...comparison.activeIds],
+      pinned: comparison.pinnedIds.length > 0,
+      dictionaryState:
+        editor.translationProducerKind !== "local_dictionary"
+          ? "idle"
+          : editor.dictionaryPreview.isResolving
+            ? "loading"
+            : editor.dictionaryPreview.error
+              ? "error"
+              : editor.dictionaryPreview.data
+                ? "ready"
+                : "idle",
+      dictionaryMessage: editor.dictionaryPreview.error
+        ? describeError(editor.dictionaryPreview.error, "本地词典预览失败。")
+        : editor.dictionaryPreview.data
+          ? `${editor.dictionaryPreview.data.entries.length} 项已解析，${editor.dictionaryPreview.data.unmatched_count} 项回退原文。`
+          : null,
+      setHover: comparison.setHover,
+      pin: comparison.pinIds,
+      clearPin: comparison.clearPinned,
+    },
     history: {
       open: editor.showHistory,
       status: !editor.showHistory
@@ -348,6 +417,8 @@ export function useAnnotationEditController({
           : "保存当前通道",
     canSave: Boolean(assetId && editor.dirty && !editor.writePending),
     canDiscard: editor.dirty && !editor.writePending,
+    canDelete: Boolean(assetId && editor.document.data?.exists && !editor.writePending),
+    deletePending: editor.deletePending,
     actionError: editor.actionError,
     setText: editor.setContent,
     selectChannel,
@@ -356,6 +427,7 @@ export function useAnnotationEditController({
     discard: async () => {
       await editor.discardChanges();
     },
+    deleteCurrent: editor.deleteContent,
   };
 
   return {

@@ -17,6 +17,7 @@ from dataset_studio.modules.jobs.execution_repository import JobExecutionReposit
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
 from dataset_studio.modules.jobs.models import (
     ActiveJobsOverview,
+    AssetRelatedJob,
     ExecutionBackend,
     ExistingTranslationPolicy,
     JobCreateRequest,
@@ -365,6 +366,16 @@ class JobService:
         if job is None:
             raise JobNotFoundError(f"找不到任务：{job_id}")
         return job
+
+    def list_for_asset(
+        self,
+        project_id: str,
+        asset_id: str,
+        *,
+        limit: int = 100,
+    ) -> list[AssetRelatedJob]:
+        paths, _ = self._workspaces.get(project_id)
+        return JobQueryRepository(paths.database).list_for_asset(asset_id, limit=limit)
 
     def stop(self, project_id: str, job_id: str, *, include_items: bool = True) -> JobDetail:
         paths, _ = self._workspaces.get(project_id)

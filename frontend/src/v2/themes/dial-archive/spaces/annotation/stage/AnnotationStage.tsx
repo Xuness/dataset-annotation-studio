@@ -64,6 +64,18 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
     } else if (event.key === "ArrowLeft") {
       event.preventDefault();
       navigation.stepAsset(-1);
+    } else if (event.key === "PageDown") {
+      event.preventDefault();
+      navigation.stepAsset(10);
+    } else if (event.key === "PageUp") {
+      event.preventDefault();
+      navigation.stepAsset(-10);
+    } else if (event.key === "Home" && content.sequence.assets[0]) {
+      event.preventDefault();
+      navigation.selectAsset(content.sequence.assets[0].id);
+    } else if (event.key === "End" && content.sequence.assets.at(-1)) {
+      event.preventDefault();
+      navigation.selectAsset(content.sequence.assets.at(-1)!.id);
     } else if (
       event.target === event.currentTarget &&
       event.key === "Enter" &&
@@ -227,11 +239,16 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
             channels={content.channels}
             operation={content.operation}
             edit={content.edit}
+            editSection={content.activeEditSection}
+            projectContext={content.projectContext}
+            requestPreview={content.requestPreview}
+            batch={content.batch}
             production={content.production}
             dossier={content.dossier}
             confirmation={content.confirmation}
             onClose={content.closeWorkcell}
             onSwitch={content.openWorkcell}
+            onSelectEditSection={content.selectEditSection}
             onResolveConfirmation={content.resolveConfirmation}
           />
         </div>
@@ -244,6 +261,7 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
 
       <AnnotationFilmstrip
         sequence={content.sequence}
+        scope={content.scope}
         currentIndex={navigation.visualIndex}
         checkedAssetIds={content.checkedAssetIds}
         onSelectAsset={navigation.selectAsset}

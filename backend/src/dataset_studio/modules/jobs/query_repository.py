@@ -7,6 +7,7 @@ from pathlib import Path
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.jobs.execution_snapshot import load_execution_snapshot
 from dataset_studio.modules.jobs.models import (
+    AssetRelatedJob,
     ExecutionBackend,
     JobAttempt,
     JobDetail,
@@ -87,6 +88,64 @@ class JobQueryRepository:
                 else []
             )
             return JobDetail(**summary.model_dump(), items=items)
+        finally:
+            connection.close()
+
+    def list_for_asset(self, asset_id: str, *, limit: int = 100) -> list[AssetRelatedJob]:
+        connection = connect(self._database_path)
+        try:
+            rows = connection.execute(
+                """
+                SELECT jobs.*,
+                       job_items.id AS related_item_id,
+                       job_items.status AS related_item_status,
+                       job_items.last_error AS related_last_error,
+                       (
+                           SELECT COUNT(*)
+                           FROM job_attempts
+                           WHERE job_attempts.job_item_id = job_items.id
+                       ) AS related_attempt_count,
+                       CASE
+                           WHEN EXISTS (
+                               SELECT 1
+                               FROM annotation_document_revisions candidate
+                               WHERE candidate.source_job_item_id = job_items.id
+                                 AND candidate.is_candidate = 1
+                           ) THEN 'candidate'
+                           WHEN EXISTS (
+                               SELECT 1
+                               FROM annotation_document_revisions applied
+                               WHERE applied.source_job_item_id = job_items.id
+                                 AND applied.is_candidate = 0
+                           ) THEN 'applied'
+                           ELSE 'none'
+                       END AS related_result_disposition
+                FROM jobs
+                JOIN job_items ON job_items.job_id = jobs.id
+                WHERE job_items.asset_id = ?
+                ORDER BY jobs.created_at DESC
+                LIMIT ?
+                """,
+                (asset_id, limit),
+            ).fetchall()
+            counts_by_job = self._counts_for_jobs(connection, [str(row["id"]) for row in rows])
+            return [
+                AssetRelatedJob(
+                    job=self._summary(
+                        connection,
+                        row,
+                        counts=counts_by_job.get(str(row["id"]), {}),
+                    ),
+                    item_id=str(row["related_item_id"]),
+                    item_status=str(row["related_item_status"]),
+                    attempt_count=int(row["related_attempt_count"]),
+                    last_error=(
+                        str(row["related_last_error"]) if row["related_last_error"] else None
+                    ),
+                    result_disposition=str(row["related_result_disposition"]),
+                )
+                for row in rows
+            ]
         finally:
             connection.close()
 

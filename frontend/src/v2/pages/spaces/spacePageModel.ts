@@ -146,6 +146,10 @@ export const ANNOTATION_WORKCELL_IDS = ["edit", "production", "dossier"] as cons
 
 export type AnnotationWorkcellId = (typeof ANNOTATION_WORKCELL_IDS)[number];
 
+export const ANNOTATION_EDIT_SECTION_IDS = ["annotation", "context", "preview", "batch"] as const;
+
+export type AnnotationEditSectionId = (typeof ANNOTATION_EDIT_SECTION_IDS)[number];
+
 export interface AnnotationStageAsset {
   id: string;
   filename: string;
@@ -168,6 +172,27 @@ export interface AnnotationStageSequence {
   hasMore: boolean;
   loadError: string | null;
   loadMore(): void;
+}
+
+export type AnnotationStageFilterId = "all" | "missing" | "stale" | "invalid" | "failed";
+
+export interface AnnotationStageFilterOption {
+  id: AnnotationStageFilterId;
+  label: string;
+  code: string;
+}
+
+export interface AnnotationStageScope {
+  search: string;
+  filter: AnnotationStageFilterId;
+  filters: readonly AnnotationStageFilterOption[];
+  selectingAll: boolean;
+  actionError: string | null;
+  setSearch(value: string): void;
+  setFilter(filter: AnnotationStageFilterId): void;
+  toggleRangeTo(assetId: string): void;
+  clearChecked(): void;
+  selectAllFiltered(): Promise<void>;
 }
 
 export interface AnnotationEditChannelOption {
@@ -280,6 +305,30 @@ export interface AnnotationEditTranslationSurface {
   refreshDictionary(): Promise<void>;
 }
 
+export interface AnnotationEditTranslationPart {
+  id: string;
+  kind: "segment" | "tag";
+  sourceText: string;
+  translatedText: string;
+  category: string | null;
+  confidence: number | null;
+}
+
+export interface AnnotationEditTranslationComparison {
+  aligned: boolean;
+  sourceMode: "plain" | "segments" | "tags";
+  sourceText: string;
+  translatedText: string;
+  parts: readonly AnnotationEditTranslationPart[];
+  activeIds: readonly string[];
+  pinned: boolean;
+  dictionaryState: "idle" | "loading" | "ready" | "error";
+  dictionaryMessage: string | null;
+  setHover(id: string | null): void;
+  pin(ids: readonly string[]): void;
+  clearPin(): void;
+}
+
 export interface AnnotationEditHistoryEntry {
   id: string;
   sourceLabel: string;
@@ -320,6 +369,7 @@ export interface AnnotationEditContent {
   tokenMetricsPending: boolean;
   tags: AnnotationEditTagSurface;
   translation: AnnotationEditTranslationSurface;
+  translationComparison: AnnotationEditTranslationComparison;
   history: AnnotationEditHistory;
   dirty: boolean;
   tagsDirty: boolean;
@@ -327,12 +377,140 @@ export interface AnnotationEditContent {
   saveLabel: string;
   canSave: boolean;
   canDiscard: boolean;
+  canDelete: boolean;
+  deletePending: boolean;
   actionError: string | null;
   setText(value: string): void;
   selectChannel(channel: AnnotationEditChannelId): Promise<void>;
   selectTokenProfile(profileId: string): void;
   save(): Promise<void>;
   discard(): Promise<void>;
+  deleteCurrent(): Promise<void>;
+}
+
+export interface AnnotationProjectContextPresetOption {
+  id: string;
+  name: string;
+  systemPrompt: string;
+}
+
+export interface AnnotationProjectMetadataField {
+  id: string;
+  selected: boolean;
+}
+
+export interface AnnotationProjectContextContent {
+  status: "loading" | "ready" | "error";
+  message: string | null;
+  systemPresetId: string;
+  systemPresets: readonly AnnotationProjectContextPresetOption[];
+  selectedSystemPrompt: string;
+  userPrompt: string;
+  useTagsAsContext: boolean;
+  metadataStatus: "no-object" | "loading" | "missing" | "ready" | "error";
+  metadataPath: string | null;
+  metadataFields: readonly AnnotationProjectMetadataField[];
+  metadataRaw: string | null;
+  dirty: boolean;
+  writePending: boolean;
+  canSave: boolean;
+  actionError: string | null;
+  setSystemPreset(id: string): void;
+  setUserPrompt(value: string): void;
+  setUseTagsAsContext(value: boolean): void;
+  toggleMetadataField(field: string): void;
+  save(): Promise<void>;
+  discard(): void;
+}
+
+export interface AnnotationRequestPreviewContent {
+  status: "no-object" | "loading" | "ready" | "error";
+  message: string | null;
+  basedOnSavedContext: boolean;
+  configurationIssue: string | null;
+  systemPresetName: string | null;
+  systemPrompt: string;
+  userPrompt: string;
+  finalUserPrompt: string;
+  metadataLines: readonly string[];
+  tagContextStatus: "disabled" | "ready" | "unavailable";
+  tagCount: number;
+  tagLine: string | null;
+}
+
+export type AnnotationBatchTagMode = "add" | "remove" | "replace";
+export type AnnotationBatchInsertPosition = "start" | "end" | "index" | "before" | "after";
+
+export interface AnnotationBatchPreviewItem {
+  id: string;
+  filename: string;
+  relativePath: string;
+  before: string;
+  after: string;
+  changed: boolean;
+  positionSkipped: boolean;
+}
+
+export interface AnnotationBatchTagContent {
+  mode: AnnotationBatchTagMode;
+  addDraft: string;
+  removeDraft: string;
+  sourceDraft: string;
+  replacementDraft: string;
+  insertPosition: AnnotationBatchInsertPosition;
+  insertIndex: string;
+  insertAnchor: string;
+  modeDescription: string;
+  requestError: string | null;
+  notice: string | null;
+  busy: boolean;
+  canPreview: boolean;
+  canExecute: boolean;
+  preview: {
+    requestedCount: number;
+    changedCount: number;
+    unchangedCount: number;
+    positionSkippedCount: number;
+    items: readonly AnnotationBatchPreviewItem[];
+  } | null;
+  setMode(mode: AnnotationBatchTagMode): void;
+  setAddDraft(value: string): void;
+  setRemoveDraft(value: string): void;
+  setSourceDraft(value: string): void;
+  setReplacementDraft(value: string): void;
+  setInsertPosition(position: AnnotationBatchInsertPosition): void;
+  setInsertIndex(value: string): void;
+  setInsertAnchor(value: string): void;
+  previewChanges(): Promise<void>;
+  executeChanges(): Promise<void>;
+}
+
+export interface AnnotationBatchDeleteOption {
+  id: string;
+  label: string;
+  activeCount: number;
+  staleCount: number;
+  selected: boolean;
+  disabled: boolean;
+}
+
+export interface AnnotationBatchDeleteContent {
+  status: "idle" | "loading" | "ready" | "error";
+  options: readonly AnnotationBatchDeleteOption[];
+  selectedCount: number;
+  busy: boolean;
+  actionError: string | null;
+  notice: string | null;
+  toggle(id: string): void;
+  toggleAll(): void;
+  execute(): Promise<void>;
+}
+
+export interface AnnotationBatchContent {
+  rangeCount: number;
+  effectiveAssetIds: readonly string[];
+  tags: AnnotationBatchTagContent;
+  deletion: AnnotationBatchDeleteContent;
 }
 
 export interface AnnotationDossierDocument {
@@ -416,6 +594,25 @@ export interface AnnotationDossierProvenance {
   responseJson: string;
 }
 
+export interface AnnotationDossierJob {
+  id: string;
+  itemId: string;
+  kind: string;
+  kindLabel: string;
+  jobStatus: string;
+  jobStatusLabel: string;
+  itemStatus: string;
+  itemStatusLabel: string;
+  resultDisposition: string;
+  executionProfile: string;
+  model: string;
+  outputChannel: string;
+  attemptCount: number;
+  createdAt: string;
+  updatedAt: string;
+  error: string | null;
+}
+
 export interface AnnotationDossierContent {
   status: "inactive" | "no-object" | "loading" | "ready" | "error";
   message: string | null;
@@ -424,6 +621,14 @@ export interface AnnotationDossierContent {
   revisions: readonly AnnotationDossierRevision[];
   translations: readonly AnnotationDossierTranslation[];
   provenance: AnnotationDossierProvenance | null;
+  provenanceLoading: boolean;
+  provenanceIssue: string | null;
+  jobs: readonly AnnotationDossierJob[];
+  jobsLoading: boolean;
+  jobsIssue: string | null;
+  openJob(jobId: string): void;
+  openArchive(): void;
+  openQuality(): void;
 }
 
 export type AnnotationProductionBackendId = "provider" | "local_tagger" | "local_dictionary";
@@ -563,6 +768,7 @@ export interface AnnotationStageContent {
   status: "no-context" | "loading" | "ready" | "error";
   project: AnnotationProjectContext | null;
   sequence: AnnotationStageSequence;
+  scope: AnnotationStageScope;
   currentAsset: AnnotationStageAsset | null;
   currentIndex: number;
   checkedAssetIds: readonly string[];
@@ -570,7 +776,11 @@ export interface AnnotationStageContent {
   operation: AnnotationOperationSummary | null;
   activeWorkcell: AnnotationWorkcellId | null;
   activeEditChannel: AnnotationEditChannelId;
+  activeEditSection: AnnotationEditSectionId;
   edit: AnnotationEditContent | null;
+  projectContext: AnnotationProjectContextContent | null;
+  requestPreview: AnnotationRequestPreviewContent | null;
+  batch: AnnotationBatchContent | null;
   production: AnnotationProductionContent | null;
   dossier: AnnotationDossierContent | null;
   confirmation: AnnotationConfirmation | null;
@@ -578,6 +788,7 @@ export interface AnnotationStageContent {
   selectAsset(assetId: string): void;
   stepAsset(offset: number): void;
   toggleAssetChecked(assetId: string): void;
+  selectEditSection(section: AnnotationEditSectionId): void;
   openWorkcell(workcell: AnnotationWorkcellId): void;
   closeWorkcell(): void;
   selectEditChannel(channel: AnnotationEditChannelId): void;

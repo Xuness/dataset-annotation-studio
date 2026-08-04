@@ -180,6 +180,12 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
         assert trace.status_code == 200
         assert trace.json() is None
 
+        related_jobs = client.get(
+            f"/api/v1/workspaces/{project_id}/assets/{asset_id}/jobs"
+        )
+        assert related_jobs.status_code == 200
+        assert related_jobs.json() == []
+
         unconfigured_preview = client.get(
             f"/api/v1/workspaces/{project_id}/assets/{asset_id}/prompt-preview"
         )

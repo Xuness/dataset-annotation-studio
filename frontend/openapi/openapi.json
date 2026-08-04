@@ -2131,6 +2131,53 @@
         "title": "AssetListResponse",
         "type": "object"
       },
+      "AssetRelatedJob": {
+        "properties": {
+          "attempt_count": {
+            "default": 0,
+            "title": "Attempt Count",
+            "type": "integer"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_status": {
+            "$ref": "#/components/schemas/JobItemStatus"
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobSummary"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "result_disposition": {
+            "default": "none",
+            "enum": [
+              "none",
+              "applied",
+              "candidate"
+            ],
+            "title": "Result Disposition",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job",
+          "item_id",
+          "item_status"
+        ],
+        "title": "AssetRelatedJob",
+        "type": "object"
+      },
       "AssetSummary": {
         "properties": {
           "annotation_channels": {
@@ -13080,6 +13127,73 @@
           }
         },
         "summary": "Get Image",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/assets/{asset_id}/jobs": {
+      "get": {
+        "operationId": "list_asset_jobs_api_v1_workspaces__project_id__assets__asset_id__jobs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssetRelatedJob"
+                  },
+                  "title": "Response List Asset Jobs Api V1 Workspaces  Project Id  Assets  Asset Id  Jobs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Asset Jobs",
         "tags": [
           "assets"
         ]

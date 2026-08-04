@@ -3,11 +3,15 @@ import { useEffect, useRef } from "react";
 import {
   ANNOTATION_WORKCELL_IDS,
   type AnnotationConfirmation,
+  type AnnotationBatchContent,
   type AnnotationCoverageLane,
   type AnnotationDossierContent,
   type AnnotationEditContent,
+  type AnnotationEditSectionId,
   type AnnotationOperationSummary,
+  type AnnotationProjectContextContent,
   type AnnotationProductionContent,
+  type AnnotationRequestPreviewContent,
   type AnnotationStageAsset,
   type AnnotationWorkcellId,
 } from "../../../../../pages/spaces/spacePageModel";
@@ -29,11 +33,16 @@ interface AnnotationWorkcellViewportProps {
   channels: readonly AnnotationCoverageLane[];
   operation: AnnotationOperationSummary | null;
   edit: AnnotationEditContent | null;
+  editSection: AnnotationEditSectionId;
+  projectContext: AnnotationProjectContextContent | null;
+  requestPreview: AnnotationRequestPreviewContent | null;
+  batch: AnnotationBatchContent | null;
   production: AnnotationProductionContent | null;
   dossier: AnnotationDossierContent | null;
   confirmation: AnnotationConfirmation | null;
   onClose(): void;
   onSwitch(workcell: AnnotationWorkcellId): void;
+  onSelectEditSection(section: AnnotationEditSectionId): void;
   onResolveConfirmation(accepted: boolean): void;
 }
 
@@ -45,11 +54,16 @@ export function AnnotationWorkcellViewport({
   channels,
   operation,
   edit,
+  editSection,
+  projectContext,
+  requestPreview,
+  batch,
   production,
   dossier,
   confirmation,
   onClose,
   onSwitch,
+  onSelectEditSection,
   onResolveConfirmation,
 }: AnnotationWorkcellViewportProps) {
   const rootRef = useRef<HTMLElement>(null);
@@ -145,6 +159,11 @@ export function AnnotationWorkcellViewport({
               channels={channels}
               checkedCount={checkedCount}
               edit={edit}
+              section={editSection}
+              projectContext={projectContext}
+              requestPreview={requestPreview}
+              batch={batch}
+              onSelectSection={onSelectEditSection}
             />
           ) : workcell === "production" ? (
             <AnnotationProductionWorkcell production={production} />

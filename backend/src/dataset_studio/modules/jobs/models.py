@@ -164,6 +164,15 @@ class JobDetail(JobSummary):
     items: list[JobItemDetail] = Field(default_factory=list)
 
 
+class AssetRelatedJob(BaseModel):
+    job: JobSummary
+    item_id: str
+    item_status: JobItemStatus
+    attempt_count: int = 0
+    last_error: str | None = None
+    result_disposition: Literal["none", "applied", "candidate"] = "none"
+
+
 class ActiveJobsOverview(BaseModel):
     count: int
     project_count: int

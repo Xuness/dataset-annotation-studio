@@ -3,10 +3,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { getHomeSpace } from "../../../navigation/spaceRegistry";
 import type {
+  AnnotationBatchContent,
   AnnotationDossierContent,
   AnnotationEditContent,
+  AnnotationProjectContextContent,
   AnnotationProductionContent,
   AnnotationProductionOperation,
+  AnnotationRequestPreviewContent,
   AnnotationStageAsset,
   AnnotationStageContent,
 } from "../../../pages/spaces/spacePageModel";
@@ -153,6 +156,20 @@ function editContent(overrides: Partial<AnnotationEditContent> = {}): Annotation
       beginEditing: vi.fn(),
       refreshDictionary: vi.fn(),
     },
+    translationComparison: {
+      aligned: false,
+      sourceMode: "plain",
+      sourceText: "",
+      translatedText: "",
+      parts: [],
+      activeIds: [],
+      pinned: false,
+      dictionaryState: "idle",
+      dictionaryMessage: null,
+      setHover: vi.fn(),
+      pin: vi.fn(),
+      clearPin: vi.fn(),
+    },
     history: {
       open: false,
       status: "idle",
@@ -167,12 +184,15 @@ function editContent(overrides: Partial<AnnotationEditContent> = {}): Annotation
     saveLabel: "保存 Tags",
     canSave: false,
     canDiscard: false,
+    canDelete: true,
+    deletePending: false,
     actionError: null,
     setText: vi.fn(),
     selectChannel: vi.fn(),
     selectTokenProfile: vi.fn(),
     save: vi.fn(),
     discard: vi.fn(),
+    deleteCurrent: vi.fn(),
     ...overrides,
   };
 }
@@ -256,6 +276,129 @@ function productionContent(
     message: null,
     selectLane: vi.fn(),
     createNew: vi.fn(),
+    ...overrides,
+  };
+}
+
+function projectContextContent(
+  overrides: Partial<AnnotationProjectContextContent> = {},
+): AnnotationProjectContextContent {
+  return {
+    status: "ready",
+    message: null,
+    systemPresetId: "preset-1",
+    systemPresets: [{ id: "preset-1", name: "Dataset XML", systemPrompt: "Return XML." }],
+    selectedSystemPrompt: "Return XML.",
+    userPrompt: "Describe the current material.",
+    useTagsAsContext: true,
+    metadataStatus: "ready",
+    metadataPath: "metadata/asset-1.json",
+    metadataFields: [
+      { id: "artist", selected: true },
+      { id: "rating", selected: false },
+    ],
+    metadataRaw: '{\n  "artist": "sample"\n}',
+    dirty: false,
+    writePending: false,
+    canSave: false,
+    actionError: null,
+    setSystemPreset: vi.fn(),
+    setUserPrompt: vi.fn(),
+    setUseTagsAsContext: vi.fn(),
+    toggleMetadataField: vi.fn(),
+    save: vi.fn(),
+    discard: vi.fn(),
+    ...overrides,
+  };
+}
+
+function requestPreviewContent(
+  overrides: Partial<AnnotationRequestPreviewContent> = {},
+): AnnotationRequestPreviewContent {
+  return {
+    status: "ready",
+    message: null,
+    basedOnSavedContext: false,
+    configurationIssue: null,
+    systemPresetName: "Dataset XML",
+    systemPrompt: "Return XML.",
+    userPrompt: "Describe the current material.",
+    finalUserPrompt: 'Describe the current material.\n\nrating: "safe"\n\ntags: ["blue_hair"]',
+    metadataLines: ['rating: "safe"'],
+    tagContextStatus: "ready",
+    tagCount: 1,
+    tagLine: 'tags: ["blue_hair"]',
+    ...overrides,
+  };
+}
+
+function batchContent(overrides: Partial<AnnotationBatchContent> = {}): AnnotationBatchContent {
+  return {
+    rangeCount: 2,
+    effectiveAssetIds: ["asset-1", "asset-2"],
+    tags: {
+      mode: "add",
+      addDraft: "blue_hair",
+      removeDraft: "",
+      sourceDraft: "",
+      replacementDraft: "",
+      insertPosition: "end",
+      insertIndex: "1",
+      insertAnchor: "",
+      modeDescription: "添加到列表末尾；已存在项会跳过。",
+      requestError: null,
+      notice: null,
+      busy: false,
+      canPreview: true,
+      canExecute: true,
+      preview: {
+        requestedCount: 2,
+        changedCount: 1,
+        unchangedCount: 1,
+        positionSkippedCount: 0,
+        items: [
+          {
+            id: "asset-1",
+            filename: "asset-1.png",
+            relativePath: "images/asset-1.png",
+            before: "portrait",
+            after: "portrait, blue_hair",
+            changed: true,
+            positionSkipped: false,
+          },
+        ],
+      },
+      setMode: vi.fn(),
+      setAddDraft: vi.fn(),
+      setRemoveDraft: vi.fn(),
+      setSourceDraft: vi.fn(),
+      setReplacementDraft: vi.fn(),
+      setInsertPosition: vi.fn(),
+      setInsertIndex: vi.fn(),
+      setInsertAnchor: vi.fn(),
+      previewChanges: vi.fn(),
+      executeChanges: vi.fn(),
+    },
+    deletion: {
+      status: "ready",
+      options: [
+        {
+          id: "tags",
+          label: "Tags",
+          activeCount: 2,
+          staleCount: 0,
+          selected: true,
+          disabled: false,
+        },
+      ],
+      selectedCount: 1,
+      busy: false,
+      actionError: null,
+      notice: null,
+      toggle: vi.fn(),
+      toggleAll: vi.fn(),
+      execute: vi.fn(),
+    },
     ...overrides,
   };
 }
@@ -400,6 +543,33 @@ function dossierContent(
       requestJson: '{\n  "model": "gpt-test"\n}',
       responseJson: '{\n  "finish_reason": "stop"\n}',
     },
+    provenanceLoading: false,
+    provenanceIssue: null,
+    jobs: [
+      {
+        id: "job-001",
+        itemId: "job-item-001",
+        kind: "annotation",
+        kindLabel: "标注生产",
+        jobStatus: "completed",
+        jobStatusLabel: "生产完成",
+        itemStatus: "succeeded",
+        itemStatusLabel: "处理成功",
+        resultDisposition: "applied",
+        executionProfile: "primary",
+        model: "gpt-test",
+        outputChannel: "description",
+        attemptCount: 1,
+        createdAt: "2026-08-05T10:00:00Z",
+        updatedAt: "2026-08-05T10:03:00Z",
+        error: null,
+      },
+    ],
+    jobsLoading: false,
+    jobsIssue: null,
+    openJob: vi.fn(),
+    openArchive: vi.fn(),
+    openQuality: vi.fn(),
     ...overrides,
   };
 }
@@ -427,6 +597,18 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
       loadError: null,
       loadMore: vi.fn(),
     },
+    scope: {
+      search: "",
+      filter: "all",
+      filters: [{ id: "all", label: "全部素材", code: "ALL" }],
+      selectingAll: false,
+      actionError: null,
+      setSearch: vi.fn(),
+      setFilter: vi.fn(),
+      toggleRangeTo: vi.fn(),
+      clearChecked: vi.fn(),
+      selectAllFiltered: vi.fn(),
+    },
     currentAsset: assets[0],
     currentIndex: 0,
     checkedAssetIds: [],
@@ -434,7 +616,11 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
     operation: null,
     activeWorkcell: null,
     activeEditChannel: "tags",
+    activeEditSection: "annotation",
     edit: editContent(),
+    projectContext: null,
+    requestPreview: null,
+    batch: null,
     production: productionContent(),
     dossier: dossierContent(),
     confirmation: null,
@@ -442,6 +628,7 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
     selectAsset: vi.fn(),
     stepAsset: vi.fn(),
     toggleAssetChecked: vi.fn(),
+    selectEditSection: vi.fn(),
     openWorkcell: vi.fn(),
     closeWorkcell: vi.fn(),
     selectEditChannel: vi.fn(),
@@ -526,6 +713,25 @@ describe("dial archive annotation stage", () => {
 
     fireEvent.click(cell, { altKey: true });
     expect(content.toggleAssetChecked).toHaveBeenCalledWith("asset-2");
+
+    fireEvent.click(cell, { shiftKey: true });
+    expect(content.scope.toggleRangeTo).toHaveBeenCalledWith("asset-2");
+  });
+
+  test("filters and selects the material range from the filmstrip instrument", () => {
+    const content = stageContent();
+    renderStage(content);
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索素材" }), {
+      target: { value: "portrait" },
+    });
+    expect(content.scope.setSearch).toHaveBeenCalledWith("portrait");
+    fireEvent.change(screen.getByRole("combobox", { name: "筛选素材状态" }), {
+      target: { value: "all" },
+    });
+    expect(content.scope.setFilter).toHaveBeenCalledWith("all");
+    fireEvent.click(screen.getByRole("button", { name: "SELECT FILTER" }));
+    expect(content.scope.selectAllFiltered).toHaveBeenCalledOnce();
   });
 
   test("keeps the filmstrip viewport still when a visible material becomes current", () => {
@@ -654,6 +860,77 @@ describe("dial archive annotation stage", () => {
     expect(content.closeWorkcell).toHaveBeenCalledOnce();
   });
 
+  test("turns the 01-04 edit rail into semantic work surfaces", () => {
+    const content = stageContent({
+      activeWorkcell: "edit",
+      projectContext: projectContextContent(),
+      requestPreview: requestPreviewContent(),
+      batch: batchContent(),
+    });
+    renderStage(content);
+
+    fireEvent.click(screen.getByRole("button", { name: "02 项目上下文" }));
+    fireEvent.click(screen.getByRole("button", { name: "03 请求预览" }));
+    fireEvent.click(screen.getByRole("button", { name: "04 范围与批量" }));
+    expect(content.selectEditSection).toHaveBeenNthCalledWith(1, "context");
+    expect(content.selectEditSection).toHaveBeenNthCalledWith(2, "preview");
+    expect(content.selectEditSection).toHaveBeenNthCalledWith(3, "batch");
+  });
+
+  test("edits project prompt context and metadata without importing legacy presentation", () => {
+    const context = projectContextContent({ dirty: true, canSave: true });
+    renderStage(
+      stageContent({
+        activeWorkcell: "edit",
+        activeEditSection: "context",
+        projectContext: context,
+      }),
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("输入在当前项目中保持稳定的 User Prompt…"), {
+      target: { value: "A revised instruction." },
+    });
+    expect(context.setUserPrompt).toHaveBeenCalledWith("A revised instruction.");
+    fireEvent.click(screen.getByRole("button", { name: "rating" }));
+    expect(context.toggleMetadataField).toHaveBeenCalledWith("rating");
+    fireEvent.click(screen.getByRole("button", { name: "保存项目上下文" }));
+    expect(context.save).toHaveBeenCalledOnce();
+  });
+
+  test("shows the next final request as saved system, context and user evidence", () => {
+    renderStage(
+      stageContent({
+        activeWorkcell: "edit",
+        activeEditSection: "preview",
+        requestPreview: requestPreviewContent({ basedOnSavedContext: true }),
+      }),
+    );
+
+    expect(screen.getByRole("heading", { name: "最终请求预览" })).not.toBeNull();
+    expect(
+      screen.getByText("本页严格展示最后保存配置生成的真实下次请求。", { exact: false }),
+    ).not.toBeNull();
+    expect(screen.getByText('tags: ["blue_hair"]')).not.toBeNull();
+  });
+
+  test("requires a tag preview and explicit channel selection for batch writes", () => {
+    const batch = batchContent();
+    renderStage(
+      stageContent({
+        activeWorkcell: "edit",
+        activeEditSection: "batch",
+        batch,
+      }),
+    );
+
+    expect(screen.getByRole("heading", { name: "Tags 批量变更" })).not.toBeNull();
+    expect(screen.getByText("portrait, blue_hair")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "执行已预览变更" }));
+    expect(batch.tags.executeChanges).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: /删除 1 类标注/u }));
+    expect(batch.deletion.execute).toHaveBeenCalledOnce();
+  });
+
   test("builds a production route from the selected film range without another image screen", () => {
     const production = productionContent({ status: "configure" });
     const content = stageContent({
@@ -703,7 +980,8 @@ describe("dial archive annotation stage", () => {
   });
 
   test("opens a read-only object dossier from real evidence registers", () => {
-    renderStage(stageContent({ activeWorkcell: "dossier" }));
+    const dossier = dossierContent();
+    renderStage(stageContent({ activeWorkcell: "dossier", dossier }));
 
     expect(screen.getByRole("region", { name: "对象档案工作间" })).not.toBeNull();
     expect(screen.getByRole("complementary", { name: "当前对象证据台" })).not.toBeNull();
@@ -712,6 +990,31 @@ describe("dial archive annotation stage", () => {
     expect(screen.getByRole("heading", { name: "修订证据链" })).not.toBeNull();
     expect(screen.getByText("MATCHES CURRENT HEAD")).not.toBeNull();
     expect(screen.getByText("RAW METADATA // 展开原始记录")).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "关联生产任务" })).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "打开生产路由场 →" }));
+    expect(dossier.openJob).toHaveBeenCalledWith("job-001");
+    fireEvent.click(screen.getByRole("button", { name: /项目档案/u }));
+    expect(dossier.openArchive).toHaveBeenCalledOnce();
+  });
+
+  test("keeps the core dossier readable when optional registers fail", () => {
+    renderStage(
+      stageContent({
+        activeWorkcell: "dossier",
+        dossier: dossierContent({
+          jobs: [],
+          jobsIssue: "Not Found",
+          provenance: null,
+          provenanceIssue: "Trace unavailable",
+        }),
+      }),
+    );
+
+    expect(screen.getByRole("heading", { name: "对象档案" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "通道登记" })).not.toBeNull();
+    expect(screen.getByText(/关联任务暂时不可用/u)).not.toBeNull();
+    expect(screen.getByText(/生成溯源暂时不可用/u)).not.toBeNull();
+    expect(screen.queryByText("对象档案未能完整建立")).toBeNull();
   });
 
   test("keeps the same workcell plane mounted while it returns to the overview", () => {

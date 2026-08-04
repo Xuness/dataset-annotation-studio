@@ -2,6 +2,7 @@ import { apiRequest } from "../../shared/api/client";
 import type {
   ExistingTranslationPolicy,
   ExecutionBackend,
+  AssetRelatedJob,
   JobDetail,
   JobKind,
   JobSummary,
@@ -44,6 +45,15 @@ export function listJobs(
 export function getJob(projectId: string, jobId: string, itemLimit = 200): Promise<JobDetail> {
   const query = new URLSearchParams({ items: "exceptions", item_limit: String(itemLimit) });
   return apiRequest(`${jobsPath(projectId)}/${jobId}?${query}`);
+}
+
+export function listAssetJobs(
+  projectId: string,
+  assetId: string,
+  limit = 100,
+): Promise<AssetRelatedJob[]> {
+  const query = new URLSearchParams({ limit: String(limit) });
+  return apiRequest(`/api/v1/workspaces/${projectId}/assets/${assetId}/jobs?${query}`);
 }
 
 export function createJob(projectId: string, input: CreateJobInput): Promise<JobDetail> {

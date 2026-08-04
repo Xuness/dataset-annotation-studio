@@ -155,6 +155,20 @@ def _fail_item(
     return attempt_number
 
 
+def test_asset_related_jobs_preserve_job_and_item_identity(tmp_path: Path) -> None:
+    jobs, project_id, job, _database, _project = _single_item_job(tmp_path)
+    item = job.items[0]
+
+    records = jobs.list_for_asset(project_id, item.asset_id)
+
+    assert len(records) == 1
+    assert records[0].job.id == job.id
+    assert records[0].item_id == item.id
+    assert records[0].item_status == JobItemStatus.PENDING
+    assert records[0].attempt_count == 0
+    assert records[0].result_disposition == "none"
+
+
 def test_orphan_recovery_finishes_running_attempt(tmp_path: Path) -> None:
     _, _, job, database, _ = _single_item_job(tmp_path)
     execution = JobExecutionRepository(database)

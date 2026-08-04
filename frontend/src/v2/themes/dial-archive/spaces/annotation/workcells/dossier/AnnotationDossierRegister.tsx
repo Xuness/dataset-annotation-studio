@@ -86,8 +86,19 @@ export function AnnotationDossierRegister({ asset, dossier }: AnnotationDossierR
         <a href="#dossier-metadata">02 元数据</a>
         <a href="#dossier-revisions">03 修订链</a>
         <a href="#dossier-translations">04 翻译</a>
-        <a href="#dossier-provenance">05 溯源</a>
+        <a href="#dossier-jobs">05 关联任务</a>
+        <a href="#dossier-provenance">06 溯源</a>
       </nav>
+
+      <div className="dial-archive-dossier-register__crosslinks" aria-label="跨空间关联入口">
+        <span>CROSS-SPACE REGISTER</span>
+        <button type="button" onClick={dossier.openArchive}>
+          项目档案 / ARCHIVE
+        </button>
+        <button type="button" onClick={dossier.openQuality}>
+          质控审阅 / QUALITY
+        </button>
+      </div>
 
       <section className="dial-archive-dossier-section" id="dossier-channel-register">
         <DossierSectionHeading code="REG.01" title="通道登记" count={dossier.documents.length} />
@@ -250,13 +261,77 @@ export function AnnotationDossierRegister({ asset, dossier }: AnnotationDossierR
         )}
       </section>
 
+      <section className="dial-archive-dossier-section" id="dossier-jobs">
+        <DossierSectionHeading code="REG.05" title="关联生产任务" count={dossier.jobs.length} />
+        {dossier.jobsLoading ? (
+          <p className="dial-archive-dossier-empty">正在读取当前对象的关联生产任务。</p>
+        ) : dossier.jobsIssue ? (
+          <p className="dial-archive-dossier-empty is-error">
+            关联任务暂时不可用；对象档案的其他证据仍可正常查阅。
+            <small>ERROR // {dossier.jobsIssue}</small>
+          </p>
+        ) : dossier.jobs.length ? (
+          <ol className="dial-archive-dossier-jobs">
+            {dossier.jobs.map((job, index) => (
+              <li className={`is-${job.itemStatus}`} key={`${job.id}:${job.itemId}`}>
+                <span>{(index + 1).toString().padStart(2, "0")}</span>
+                <header>
+                  <small>
+                    {job.kind.toUpperCase()} / {job.outputChannel.toUpperCase()}
+                  </small>
+                  <b>{job.kindLabel}</b>
+                  <time dateTime={job.updatedAt}>{formatTimestamp(job.updatedAt)}</time>
+                </header>
+                <dl>
+                  <div>
+                    <dt>JOB</dt>
+                    <dd title={job.id}>{compactIdentity(job.id)}</dd>
+                  </div>
+                  <div>
+                    <dt>PROFILE</dt>
+                    <dd>{job.executionProfile}</dd>
+                  </div>
+                  <div>
+                    <dt>MODEL</dt>
+                    <dd>{job.model}</dd>
+                  </div>
+                  <div>
+                    <dt>ATTEMPT</dt>
+                    <dd>{job.attemptCount}</dd>
+                  </div>
+                </dl>
+                <div>
+                  <output>{job.itemStatusLabel}</output>
+                  <small>
+                    {job.jobStatusLabel} · {job.resultDisposition.toUpperCase()}
+                  </small>
+                </div>
+                <button type="button" onClick={() => dossier.openJob(job.id)}>
+                  打开生产路由场 →
+                </button>
+                {job.error ? <p>{job.error}</p> : null}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="dial-archive-dossier-empty">当前对象没有关联的自动生产任务。</p>
+        )}
+      </section>
+
       <section className="dial-archive-dossier-section" id="dossier-provenance">
         <DossierSectionHeading
-          code="REG.05"
+          code="REG.06"
           title="生成与请求溯源"
           count={dossier.provenance ? 1 : 0}
         />
-        {dossier.provenance ? (
+        {dossier.provenanceLoading ? (
+          <p className="dial-archive-dossier-empty">正在读取当前对象的生成与请求溯源。</p>
+        ) : dossier.provenanceIssue ? (
+          <p className="dial-archive-dossier-empty is-error">
+            生成溯源暂时不可用；已登记的通道、元数据与修订链不受影响。
+            <small>ERROR // {dossier.provenanceIssue}</small>
+          </p>
+        ) : dossier.provenance ? (
           <div className="dial-archive-dossier-provenance">
             <header className={dossier.provenance.current ? "is-current" : "is-stale"}>
               <span>TRACE LINK</span>

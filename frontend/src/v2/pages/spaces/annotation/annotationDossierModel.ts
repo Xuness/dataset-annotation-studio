@@ -2,12 +2,14 @@ import type {
   AnnotationBundle,
   AnnotationChannel,
   AnnotationRevision,
+  AssetRelatedJob,
   AssetAnnotationTrace,
   MetadataDocument,
   TranslationDocument,
 } from "../../../../shared/api/types";
 import type {
   AnnotationDossierDocument,
+  AnnotationDossierJob,
   AnnotationDossierMetadata,
   AnnotationDossierProvenance,
   AnnotationDossierRevision,
@@ -253,4 +255,47 @@ export function projectDossierProvenance(
     requestJson: stringifyDossierJson(trace.request) ?? "{}",
     responseJson: stringifyDossierJson(trace.response) ?? "{}",
   };
+}
+
+const JOB_STATUS_LABELS: Readonly<Record<string, string>> = {
+  queued: "等待执行",
+  running: "正在生产",
+  stopping: "正在停止",
+  stopped: "已经停止",
+  interrupted: "执行中断",
+  completed: "生产完成",
+  completed_with_errors: "完成但有异常",
+};
+
+const ITEM_STATUS_LABELS: Readonly<Record<string, string>> = {
+  pending: "等待处理",
+  running: "正在处理",
+  succeeded: "处理成功",
+  failed: "处理失败",
+  interrupted: "处理中断",
+  skipped: "已经跳过",
+  manually_accepted: "人工采纳",
+};
+
+export function projectDossierJobs(
+  records: readonly AssetRelatedJob[] | null | undefined,
+): AnnotationDossierJob[] {
+  return (records ?? []).map((record) => ({
+    id: record.job.id,
+    itemId: record.item_id,
+    kind: record.job.kind,
+    kindLabel: record.job.kind === "translation" ? "翻译生产" : "标注生产",
+    jobStatus: record.job.status,
+    jobStatusLabel: JOB_STATUS_LABELS[record.job.status] ?? record.job.status,
+    itemStatus: record.item_status,
+    itemStatusLabel: ITEM_STATUS_LABELS[record.item_status] ?? record.item_status,
+    resultDisposition: record.result_disposition,
+    executionProfile: record.job.execution_profile_name,
+    model: record.job.model,
+    outputChannel: record.job.output_channel,
+    attemptCount: record.attempt_count,
+    createdAt: record.job.created_at,
+    updatedAt: record.job.updated_at,
+    error: record.last_error ?? null,
+  }));
 }

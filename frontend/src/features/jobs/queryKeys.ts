@@ -8,4 +8,6 @@ export const jobKeys = {
     [...workspaceQueryKeys.scope(projectId, "jobs"), "detail", jobId, itemLimit] as const,
   detailPrefix: (projectId: string, jobId: string) =>
     [...workspaceQueryKeys.scope(projectId, "jobs"), "detail", jobId] as const,
+  asset: (projectId: string, assetId: string | null) =>
+    [...workspaceQueryKeys.scope(projectId, "jobs"), "asset", assetId] as const,
 };

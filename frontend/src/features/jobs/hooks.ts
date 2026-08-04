@@ -6,6 +6,7 @@ import {
   acceptJobItem,
   createJob,
   getJob,
+  listAssetJobs,
   listJobs,
   resumeJob,
   retryFailed,
@@ -69,6 +70,16 @@ export function useJob(projectId: string, jobId: string | null, itemLimit = 200)
     enabled: Boolean(jobId),
     refetchInterval: (query) =>
       query.state.data && isActive(query.state.data.status) ? 1000 : false,
+  });
+}
+
+export function useAssetJobs(projectId: string, assetId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: jobKeys.asset(projectId, assetId),
+    queryFn: () => listAssetJobs(projectId, assetId!),
+    enabled: Boolean(projectId && assetId && enabled),
+    refetchInterval: (query) =>
+      query.state.data?.some((record) => isActive(record.job.status)) ? 1000 : false,
   });
 }
 

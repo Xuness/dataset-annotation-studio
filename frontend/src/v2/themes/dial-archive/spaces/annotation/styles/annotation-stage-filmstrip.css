@@ -38,6 +38,85 @@
   bottom: 33px;
 }
 
+.dial-archive-stage-filmstrip__scope {
+  position: absolute;
+  z-index: 7;
+  top: 0;
+  left: max(calc(var(--dial-archive-stage-film-fade) + 10px), 88px);
+  display: flex;
+  height: 34px;
+  gap: 4px;
+  align-items: stretch;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 4px 5px 0 rgba(25, 25, 25, 0.04);
+}
+
+.dial-archive-stage-filmstrip__scope label {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  border-bottom: 1px solid rgba(25, 25, 25, 0.22);
+}
+
+.dial-archive-stage-filmstrip__scope label:first-child {
+  width: clamp(150px, 13vw, 230px);
+}
+
+.dial-archive-stage-filmstrip__scope label:nth-child(2) {
+  width: clamp(104px, 8vw, 140px);
+}
+
+.dial-archive-stage-filmstrip__scope span {
+  padding: 0 6px;
+  color: var(--dial-archive-stage-muted);
+  font: 700 7px var(--dial-archive-font-mono);
+  letter-spacing: 0.12em;
+}
+
+.dial-archive-stage-filmstrip__scope input,
+.dial-archive-stage-filmstrip__scope select {
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px;
+  border: 0;
+  border-left: 1px solid rgba(25, 25, 25, 0.14);
+  border-radius: 0;
+  color: var(--dial-archive-stage-ink);
+  font: 9px var(--dial-archive-font-display);
+  background: transparent;
+  outline: none;
+}
+
+.dial-archive-stage-filmstrip__scope input:focus,
+.dial-archive-stage-filmstrip__scope select:focus {
+  box-shadow: inset 0 -3px var(--dial-archive-yellow);
+}
+
+.dial-archive-stage-filmstrip__scope button {
+  min-width: 72px;
+  padding: 0 7px;
+  border: 0;
+  border-left: 1px solid rgba(25, 25, 25, 0.18);
+  color: var(--dial-archive-stage-ink);
+  font: 700 7px var(--dial-archive-font-mono);
+  letter-spacing: 0.08em;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dial-archive-stage-filmstrip__scope button:hover:not(:disabled),
+.dial-archive-stage-filmstrip__scope button:focus-visible:not(:disabled) {
+  outline: none;
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage-filmstrip__scope button:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
+}
+
 .dial-archive-stage-filmstrip__track {
   position: absolute;
   top: 22px;

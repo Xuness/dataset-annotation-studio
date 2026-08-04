@@ -28,6 +28,7 @@ import {
   usePreparationWorkbenchController,
 } from "../pages/spaces/preparation/usePreparationWorkbenchController";
 import type {
+  AnnotationEditSectionId,
   AnnotationLaneId,
   AnnotationEditChannelId,
   AnnotationWorkcellId,
@@ -35,6 +36,7 @@ import type {
   PreparationCapabilityId,
   SpacePageContent,
 } from "../pages/spaces/spacePageModel";
+import { ANNOTATION_EDIT_SECTION_IDS } from "../pages/spaces/spacePageModel";
 import { getFrontendTheme, resolveFrontendThemeId } from "../themes/themeRegistry";
 import type { ThemeSpacePageProps } from "../themes/themeTypes";
 import { buildFrontendHref, readInitialHomeSpaceId, readRouteIdentifier } from "./routeState";
@@ -278,6 +280,7 @@ interface AnnotationStageQuery {
   workcell: AnnotationWorkcellId | null;
   lane: AnnotationLaneId | null;
   channel: AnnotationEditChannelId | null;
+  editSection: AnnotationEditSectionId | null;
   operationId: string | null;
 }
 
@@ -285,11 +288,15 @@ function readAnnotationStageQuery(search: string): AnnotationStageQuery {
   const focus = readRouteIdentifier(search, "focus");
   const lane = readRouteIdentifier(search, "lane");
   const channel = readRouteIdentifier(search, "channel");
+  const panel = readRouteIdentifier(search, "panel");
   return {
     assetId: readRouteIdentifier(search, "asset"),
     workcell: isAnnotationWorkcellId(focus) ? focus : null,
     lane: isAnnotationLaneId(lane) ? lane : null,
     channel: isAnnotationEditChannelId(channel) ? channel : null,
+    editSection: ANNOTATION_EDIT_SECTION_IDS.includes(panel as AnnotationEditSectionId)
+      ? (panel as AnnotationEditSectionId)
+      : null,
     operationId: readRouteIdentifier(search, "operation"),
   };
 }
@@ -320,6 +327,7 @@ function LoadedAnnotationStageRoute({
         focus: next.workcell,
         lane: next.lane,
         channel: next.channel,
+        panel: next.editSection,
         operation: next.operationId,
       },
     });
@@ -330,11 +338,13 @@ function LoadedAnnotationStageRoute({
     requestedOperationId: query.operationId,
     activeWorkcell: query.workcell,
     requestedEditChannel: query.channel,
+    requestedEditSection: query.editSection,
     requestedProductionLane: query.lane,
     onAssetIdChange: (assetId) => navigate(stageHref({ assetId }), { replace: true }),
     onOpenWorkcell: (workcell) => navigate(stageHref({ workcell })),
     onCloseWorkcell: () => navigate(stageHref({ workcell: null })),
     onEditChannelChange: (channel) => navigate(stageHref({ workcell: "edit", channel })),
+    onEditSectionChange: (editSection) => navigate(stageHref({ workcell: "edit", editSection })),
     onProductionLaneChange: (lane) =>
       navigate(stageHref({ workcell: "production", lane, operationId: null }), { replace: true }),
     onProductionOperationChange: (operationId) =>
@@ -342,6 +352,14 @@ function LoadedAnnotationStageRoute({
     onReturnToSpace: () => navigate(buildFrontendHref(space.route, { themeId, projectId })),
     onOpenArchive: () =>
       navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId, projectId })),
+    onOpenQuality: () =>
+      navigate(
+        buildFrontendHref(getHomeSpace("quality").route, {
+          themeId,
+          projectId,
+          query: { asset: query.assetId },
+        }),
+      ),
   });
   return (
     <SpaceRouteView
@@ -410,6 +428,7 @@ function LegacyAnnotationRedirect({ focus }: LegacyAnnotationRedirectProps) {
           focus: focus ?? query.workcell,
           lane: query.lane,
           channel: query.channel,
+          panel: query.editSection,
           operation: query.operationId,
         },
       })}

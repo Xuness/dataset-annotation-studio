@@ -1,6 +1,9 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, type WheelEventHandler } from "react";
 
-import type { AnnotationStageSequence } from "../../../../../pages/spaces/spacePageModel";
+import type {
+  AnnotationStageScope,
+  AnnotationStageSequence,
+} from "../../../../../pages/spaces/spacePageModel";
 import {
   ANNOTATION_STAGE_FILM_STEP,
   ANNOTATION_STAGE_LAYOUT,
@@ -16,6 +19,7 @@ import {
 
 interface AnnotationFilmstripProps {
   sequence: AnnotationStageSequence;
+  scope: AnnotationStageScope;
   currentIndex: number;
   checkedAssetIds: readonly string[];
   onSelectAsset(assetId: string): void;
@@ -25,6 +29,7 @@ interface AnnotationFilmstripProps {
 
 export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
   sequence,
+  scope,
   currentIndex,
   checkedAssetIds,
   onSelectAsset,
@@ -152,6 +157,48 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
       <i className="dial-archive-stage-filmstrip__rail is-top" aria-hidden="true" />
       <i className="dial-archive-stage-filmstrip__rail is-bottom" aria-hidden="true" />
       <div
+        className="dial-archive-stage-filmstrip__scope"
+        role="search"
+        onWheel={(event) => event.stopPropagation()}
+      >
+        <label>
+          <span>FIND</span>
+          <input
+            type="search"
+            value={scope.search}
+            placeholder="文件名 / 相对路径"
+            aria-label="搜索素材"
+            onChange={(event) => scope.setSearch(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>STATE</span>
+          <select
+            value={scope.filter}
+            aria-label="筛选素材状态"
+            onChange={(event) =>
+              scope.setFilter(event.target.value as AnnotationStageScope["filter"])
+            }
+          >
+            {scope.filters.map((filter) => (
+              <option value={filter.id} key={filter.id}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          disabled={!totalCount || scope.selectingAll}
+          onClick={() => void scope.selectAllFiltered()}
+        >
+          {scope.selectingAll ? "READING" : "SELECT FILTER"}
+        </button>
+        <button type="button" disabled={!checkedAssetIds.length} onClick={scope.clearChecked}>
+          CLEAR
+        </button>
+      </div>
+      <div
         className="dial-archive-stage-filmstrip__track"
         style={{ transform: `translateX(${trackOffset}px)` }}
       >
@@ -168,7 +215,8 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
               aria-label={`查看素材 ${asset.filename}`}
               aria-current={current || undefined}
               onClick={(event) => {
-                if (event.altKey) onToggleAssetChecked(asset.id);
+                if (event.shiftKey) scope.toggleRangeTo(asset.id);
+                else if (event.altKey) onToggleAssetChecked(asset.id);
                 else {
                   preserveTrackForIndexRef.current = index;
                   onSelectAsset(asset.id);
@@ -224,7 +272,12 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
             RETRY SEQUENCE →
           </button>
         ) : (
-          <span>{fetchingMore ? "LOADING SEQUENCE…" : "ALT + CLICK // TOGGLE RANGE"}</span>
+          <span>
+            {scope.actionError ??
+              (fetchingMore
+                ? "LOADING SEQUENCE…"
+                : "SHIFT + CLICK // EXTEND RANGE · ALT + CLICK // TOGGLE")}
+          </span>
         )}
       </footer>
     </nav>

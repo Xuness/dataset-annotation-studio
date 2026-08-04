@@ -1191,6 +1191,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/assets/{asset_id}/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Asset Jobs */
+        get: operations["list_asset_jobs_api_v1_workspaces__project_id__assets__asset_id__jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/assets/{asset_id}/metadata": {
         parameters: {
             query?: never;
@@ -2376,6 +2393,26 @@ export type components = {
             };
             /** Total */
             total: number;
+        };
+        /** AssetRelatedJob */
+        AssetRelatedJob: {
+            /**
+             * Attempt Count
+             * @default 0
+             */
+            attempt_count: number;
+            /** Item Id */
+            item_id: string;
+            item_status: components["schemas"]["JobItemStatus"];
+            job: components["schemas"]["JobSummary"];
+            /** Last Error */
+            last_error?: string | null;
+            /**
+             * Result Disposition
+             * @default none
+             * @enum {string}
+             */
+            result_disposition: "none" | "applied" | "candidate";
         };
         /** AssetSummary */
         AssetSummary: {
@@ -7384,6 +7421,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_asset_jobs_api_v1_workspaces__project_id__assets__asset_id__jobs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetRelatedJob"][];
                 };
             };
             /** @description Validation Error */

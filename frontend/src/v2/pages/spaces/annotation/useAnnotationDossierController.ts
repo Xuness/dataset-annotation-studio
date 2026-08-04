@@ -6,10 +6,12 @@ import {
   useAnnotationChannelHistory,
 } from "../../../../features/annotations/hooks";
 import { useTranslations } from "../../../../features/translations/hooks";
+import { useAssetJobs } from "../../../../features/jobs/hooks";
 import type { AnnotationDossierContent } from "../spacePageModel";
 import {
   projectDossierDocuments,
   projectDossierMetadata,
+  projectDossierJobs,
   projectDossierProvenance,
   projectDossierRevisions,
   projectDossierTranslations,
@@ -19,6 +21,9 @@ interface UseAnnotationDossierControllerOptions {
   projectId: string;
   assetId: string | null;
   enabled: boolean;
+  onOpenJob(jobId: string): void;
+  onOpenArchive(): void;
+  onOpenQuality(): void;
 }
 
 function describeError(reason: unknown, fallback: string): string {
@@ -29,12 +34,16 @@ export function useAnnotationDossierController({
   projectId,
   assetId,
   enabled,
+  onOpenJob,
+  onOpenArchive,
+  onOpenQuality,
 }: UseAnnotationDossierControllerOptions): AnnotationDossierContent {
   const active = Boolean(enabled && projectId && assetId);
   const bundle = useAnnotationBundle(projectId, assetId, active);
   const metadata = useAssetMetadata(projectId, assetId, active);
   const translations = useTranslations(projectId, assetId, active);
   const trace = useAnnotationTrace(projectId, assetId, active);
+  const jobs = useAssetJobs(projectId, assetId, active);
   const existingHistory = useAnnotationChannelHistory(
     projectId,
     assetId,
@@ -51,18 +60,17 @@ export function useAnnotationDossierController({
     active,
   );
 
-  const queries = [
+  const criticalQueries = [
     bundle,
     metadata,
     translations,
-    trace,
     existingHistory,
     tagsHistory,
     descriptionHistory,
   ] as const;
-  const loading = active && queries.some((query) => query.isPending);
-  const failed = active && queries.some((query) => query.isError);
-  const firstError = queries.find((query) => query.isError)?.error;
+  const loading = active && criticalQueries.some((query) => query.isPending);
+  const failed = active && criticalQueries.some((query) => query.isError);
+  const firstError = criticalQueries.find((query) => query.isError)?.error;
 
   const documents = useMemo(() => projectDossierDocuments(bundle.data), [bundle.data]);
   const metadataRecord = useMemo(() => projectDossierMetadata(metadata.data), [metadata.data]);
@@ -80,6 +88,7 @@ export function useAnnotationDossierController({
     [translations.data],
   );
   const provenance = useMemo(() => projectDossierProvenance(trace.data), [trace.data]);
+  const jobRecords = useMemo(() => projectDossierJobs(jobs.data), [jobs.data]);
 
   return {
     status: !enabled
@@ -97,5 +106,15 @@ export function useAnnotationDossierController({
     revisions,
     translations: translationRecords,
     provenance,
+    provenanceLoading: active && trace.isPending,
+    provenanceIssue: trace.isError
+      ? describeError(trace.error, "无法读取当前对象的生成溯源。")
+      : null,
+    jobs: jobRecords,
+    jobsLoading: active && jobs.isPending,
+    jobsIssue: jobs.isError ? describeError(jobs.error, "无法读取当前对象的关联任务。") : null,
+    openJob: onOpenJob,
+    openArchive: onOpenArchive,
+    openQuality: onOpenQuality,
   };
 }

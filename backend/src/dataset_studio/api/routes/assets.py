@@ -12,6 +12,7 @@ from dataset_studio.modules.assets.models import (
     AssetListResponse,
     MetadataDocument,
 )
+from dataset_studio.modules.jobs.models import AssetRelatedJob
 from dataset_studio.modules.jobs.traces import AssetAnnotationTrace
 from dataset_studio.modules.prompts.composer import RequestPromptPreview, preview_request_prompt
 
@@ -120,3 +121,13 @@ def get_prompt_preview(project_id: str, asset_id: str, container: Container):
 @router.get("/{asset_id}/annotation-trace", response_model=AssetAnnotationTrace | None)
 def get_annotation_trace(project_id: str, asset_id: str, container: Container):
     return container.annotation_traces.get(project_id, asset_id)
+
+
+@router.get("/{asset_id}/jobs", response_model=list[AssetRelatedJob])
+def list_asset_jobs(
+    project_id: str,
+    asset_id: str,
+    container: Container,
+    limit: int = Query(default=100, ge=1, le=500),
+):
+    return container.jobs.list_for_asset(project_id, asset_id, limit=limit)

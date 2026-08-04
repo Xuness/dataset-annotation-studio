@@ -50,11 +50,11 @@ export function useAssetFolders(projectId: string) {
   });
 }
 
-export function usePromptPreview(projectId: string, assetId: string | null) {
+export function usePromptPreview(projectId: string, assetId: string | null, enabled = true) {
   return useQuery({
     queryKey: promptPreviewKeys.detail(projectId, assetId),
     queryFn: () => getPromptPreview(projectId, assetId!),
-    enabled: Boolean(projectId && assetId),
+    enabled: Boolean(projectId && assetId && enabled),
   });
 }
 
