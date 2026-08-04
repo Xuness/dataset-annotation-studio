@@ -27,7 +27,8 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
   onToggleAssetChecked,
 }: AnnotationFilmstripProps) {
   const { filmstrip } = ANNOTATION_STAGE_LAYOUT;
-  const wheelLockRef = useRef(0);
+  const wheelIntentRef = useRef(0);
+  const wheelResetTimerRef = useRef(0);
   const { assets, loadedCount, totalCount, hasMore, fetchingMore, loadError, loadMore } = sequence;
 
   useEffect(() => {
@@ -42,6 +43,12 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
     loadMore,
     loadedCount,
   ]);
+  useEffect(
+    () => () => {
+      window.clearTimeout(wheelResetTimerRef.current);
+    },
+    [],
+  );
 
   const anchor = Math.max(currentIndex, 0);
   const windowStart = Math.max(0, anchor - filmstrip.windowRadius);
@@ -51,14 +58,29 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
   const handleWheel: WheelEventHandler<HTMLDivElement> = (event) => {
     const dominant = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
     if (dominant === 0) return;
-    const now = performance.now();
-    if (now - wheelLockRef.current < 90) return;
-    wheelLockRef.current = now;
-    onStepAsset(dominant > 0 ? 1 : -1);
+    event.preventDefault();
+    event.stopPropagation();
+    wheelIntentRef.current += dominant;
+    let steps = 0;
+    while (Math.abs(wheelIntentRef.current) >= filmstrip.wheelStepThreshold && steps < 6) {
+      const direction = wheelIntentRef.current > 0 ? 1 : -1;
+      onStepAsset(direction);
+      wheelIntentRef.current -= direction * filmstrip.wheelStepThreshold;
+      steps += 1;
+    }
+    window.clearTimeout(wheelResetTimerRef.current);
+    wheelResetTimerRef.current = window.setTimeout(() => {
+      wheelIntentRef.current = 0;
+    }, filmstrip.wheelIntentResetMs);
   };
 
   return (
-    <nav className="dial-archive-stage-filmstrip" aria-label="素材胶片轨道" onWheel={handleWheel}>
+    <nav
+      className="dial-archive-stage-filmstrip"
+      aria-label="素材胶片轨道"
+      data-stage-camera-lock
+      onWheel={handleWheel}
+    >
       <i className="dial-archive-stage-filmstrip__rail is-top" aria-hidden="true" />
       <i className="dial-archive-stage-filmstrip__rail is-bottom" aria-hidden="true" />
       <div

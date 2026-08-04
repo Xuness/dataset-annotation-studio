@@ -6,7 +6,10 @@ import { AnnotationFilmstrip } from "./AnnotationFilmstrip";
 import { AnnotationSpecimen } from "./AnnotationSpecimen";
 import { AnnotationStageCanvas } from "./AnnotationStageCanvas";
 import { AnnotationWorkcellMap } from "./AnnotationWorkcellMap";
+import { useStageAssetNavigation } from "./hooks/useStageAssetNavigation";
+import { useStageCamera } from "./hooks/useStageCamera";
 import { useStageParallax } from "./hooks/useStageParallax";
+import { createAnnotationStageStyle } from "./model/annotationStageLayout";
 
 /**
  * 三级素材施工场：暗色星空画布（Z0）+ 展台与胶片轨道（Z1）+
@@ -21,6 +24,8 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const reducedMotion = usePrefersReducedMotion();
   useStageParallax(rootRef, reducedMotion);
+  const camera = useStageCamera(rootRef, reducedMotion);
+  const navigation = useStageAssetNavigation(content, reducedMotion);
 
   // 入场编舞只在首次装载数据时播放一次；走片与返回不得重播
   const enteredRef = useRef(false);
@@ -30,19 +35,30 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
   }, [content.status]);
 
   const handleKeyDown: KeyboardEventHandler<HTMLDivElement> = (event) => {
-    if (event.target !== event.currentTarget) return;
+    const editable =
+      event.target instanceof Element &&
+      Boolean(event.target.closest("input, textarea, select, [contenteditable='true']"));
+    if (editable) return;
     if (event.key === "ArrowRight") {
       event.preventDefault();
-      content.stepAsset(1);
+      navigation.stepAsset(1);
     } else if (event.key === "ArrowLeft") {
       event.preventDefault();
-      content.stepAsset(-1);
-    } else if (event.key === "Enter" && content.currentAsset) {
+      navigation.stepAsset(-1);
+    } else if (
+      event.target === event.currentTarget &&
+      event.key === "Enter" &&
+      navigation.visualAsset
+    ) {
       event.preventDefault();
       content.openWorkcell("edit");
-    } else if (event.key === " " && content.currentAsset) {
+    } else if (
+      event.target === event.currentTarget &&
+      event.key === " " &&
+      navigation.visualAsset
+    ) {
       event.preventDefault();
-      content.toggleAssetChecked(content.currentAsset.id);
+      content.toggleAssetChecked(navigation.visualAsset.id);
     }
   };
 
@@ -105,20 +121,30 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
   }
 
   const checkedSet = new Set(content.checkedAssetIds);
-  const currentChecked = content.currentAsset ? checkedSet.has(content.currentAsset.id) : false;
+  const currentChecked = navigation.visualAsset ? checkedSet.has(navigation.visualAsset.id) : false;
+  const walkClass = navigation.walk.active
+    ? navigation.walk.direction > 0
+      ? " is-walking-forward"
+      : " is-walking-backward"
+    : "";
 
   return (
     <div
-      className={`dial-archive-stage${entering && !reducedMotion ? " is-entering" : ""}`}
+      className={`dial-archive-stage${entering && !reducedMotion ? " is-entering" : ""}${walkClass}`}
       ref={rootRef}
       role="region"
       aria-label="素材施工场"
       tabIndex={0}
+      style={createAnnotationStageStyle()}
       onKeyDown={handleKeyDown}
+      onPointerDown={camera.onPointerDown}
+      onPointerMove={camera.onPointerMove}
+      onPointerUp={camera.onPointerUp}
+      onPointerCancel={camera.onPointerCancel}
     >
       <AnnotationStageCanvas evidenceAssets={content.sequence.assets} />
 
-      <header className="dial-archive-stage__masthead">
+      <header className="dial-archive-stage__masthead" data-stage-camera-lock>
         <button
           className="dial-archive-stage__return"
           type="button"
@@ -130,6 +156,10 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
           <em>STAGE // MATERIAL YARD</em>
           <b>素材施工场</b>
         </div>
+        <button className="dial-archive-stage__camera-reset" type="button" onClick={camera.reset}>
+          <span>CAMERA</span>
+          <b>RESET 0.0</b>
+        </button>
         <div className="dial-archive-stage__project">
           <span>{content.project?.name ?? "—"}</span>
           <small>
@@ -141,29 +171,32 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
 
       <div className="dial-archive-stage__floor">
         <AnnotationSpecimen
-          asset={content.currentAsset}
+          asset={navigation.visualAsset}
           checked={currentChecked}
+          reducedMotion={reducedMotion}
+          walk={navigation.walk}
           onOpenDefaultWorkcell={() => content.openWorkcell("edit")}
         />
         <AnnotationWorkcellMap
-          asset={content.currentAsset}
-          currentIndex={content.currentIndex}
+          asset={navigation.visualAsset}
+          currentIndex={navigation.visualIndex}
           totalCount={content.sequence.totalCount}
           checkedCount={content.checkedAssetIds.length}
           channels={content.channels}
           operation={content.operation}
           focusedWorkcell={content.initialWorkcell}
-          onStepAsset={content.stepAsset}
+          walk={navigation.walk}
+          onStepAsset={navigation.stepAsset}
           onOpenWorkcell={content.openWorkcell}
         />
       </div>
 
       <AnnotationFilmstrip
         sequence={content.sequence}
-        currentIndex={content.currentIndex}
+        currentIndex={navigation.visualIndex}
         checkedAssetIds={content.checkedAssetIds}
-        onSelectAsset={content.selectAsset}
-        onStepAsset={content.stepAsset}
+        onSelectAsset={navigation.selectAsset}
+        onStepAsset={navigation.stepAsset}
         onToggleAssetChecked={content.toggleAssetChecked}
       />
 

@@ -5,6 +5,7 @@ import {
   createStageArcPath,
   createStageRingTicks,
   createStageStarfield,
+  createAnnotationStageStyle,
   formatStageByteSize,
   formatStageIndex,
 } from "./annotationStageLayout";
@@ -48,5 +49,21 @@ describe("annotation stage layout", () => {
     expect(formatStageByteSize(512)).toBe("512 B");
     expect(formatStageByteSize(4_194_304)).toBe("4.00 MB");
     expect(formatStageByteSize(-1)).toBe("—");
+  });
+
+  test("projects shared geometry and motion facts into theme css variables", () => {
+    const style = createAnnotationStageStyle();
+    expect(style["--dial-archive-stage-ground-major"]).toBe(
+      `${ANNOTATION_STAGE_LAYOUT.ground.majorGrid}px`,
+    );
+    expect(style["--dial-archive-stage-film-step"]).toBe(
+      `${ANNOTATION_STAGE_LAYOUT.filmstrip.itemWidth + ANNOTATION_STAGE_LAYOUT.filmstrip.gap}px`,
+    );
+    expect(style["--dial-archive-stage-instrument-cx"]).toBe(
+      `${ANNOTATION_STAGE_LAYOUT.instrument.center.x}px`,
+    );
+    expect(style["--dial-archive-stage-walk-duration"]).toBe(
+      `${ANNOTATION_STAGE_LAYOUT.motion.assetWalkDurationMs}ms`,
+    );
   });
 });

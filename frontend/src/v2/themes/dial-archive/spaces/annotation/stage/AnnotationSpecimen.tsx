@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState, type KeyboardEventHandler } from "react";
 
 import type { AnnotationStageAsset } from "../../../../../pages/spaces/spacePageModel";
 import {
@@ -7,6 +7,8 @@ import {
   createStageRingTicks,
 } from "./model/annotationStageLayout";
 import { readAssetChannelStates } from "./model/annotationStagePresentation";
+import type { StageAssetWalk } from "./hooks/useStageAssetNavigation";
+import { useSpecimenViewport } from "./hooks/useSpecimenViewport";
 
 /**
  * 素材展台（Z1 主视觉）：真彩主图 + 仪器框架。
@@ -50,21 +52,63 @@ function InstrumentRing() {
 interface AnnotationSpecimenProps {
   asset: AnnotationStageAsset | null;
   checked: boolean;
+  reducedMotion: boolean;
+  walk: StageAssetWalk;
   onOpenDefaultWorkcell(): void;
 }
 
 export const AnnotationSpecimen = memo(function AnnotationSpecimen({
   asset,
   checked,
+  reducedMotion,
+  walk,
   onOpenDefaultWorkcell,
 }: AnnotationSpecimenProps) {
   const [failedAssetId, setFailedAssetId] = useState<string | null>(null);
-  useEffect(() => setFailedAssetId(null), [asset?.id]);
+  const openTimerRef = useRef(0);
+  const viewport = useSpecimenViewport({ asset, reducedMotion });
+  useEffect(() => {
+    setFailedAssetId(null);
+    window.clearTimeout(openTimerRef.current);
+  }, [asset?.id]);
+  useEffect(
+    () => () => {
+      window.clearTimeout(openTimerRef.current);
+    },
+    [],
+  );
   const failed = asset != null && failedAssetId === asset.id;
   const channelReadings = readAssetChannelStates(asset);
+  const walkDirection = walk.direction > 0 ? "forward" : "backward";
+
+  const openWithClickDelay = () => {
+    if (viewport.consumeSuppressedClick()) return;
+    window.clearTimeout(openTimerRef.current);
+    openTimerRef.current = window.setTimeout(
+      onOpenDefaultWorkcell,
+      ANNOTATION_STAGE_LAYOUT.viewport.openDelayMs,
+    );
+  };
+  const handleDoubleClick = () => {
+    window.clearTimeout(openTimerRef.current);
+    viewport.toggleActual();
+  };
+  const handleViewportKeyDown: KeyboardEventHandler<HTMLDivElement> = (event) => {
+    viewport.onKeyDown(event);
+    if (event.defaultPrevented) return;
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.stopPropagation();
+      onOpenDefaultWorkcell();
+    }
+  };
 
   return (
-    <section className="dial-archive-stage-specimen" aria-label="当前素材展台">
+    <section
+      className="dial-archive-stage-specimen"
+      aria-label="当前素材展台"
+      data-stage-camera-lock
+    >
       <InstrumentRing />
       <div className={`dial-archive-stage-specimen__plinth${checked ? " is-checked" : ""}`}>
         <span className="dial-archive-stage-specimen__corner is-tl" aria-hidden="true" />
@@ -73,19 +117,45 @@ export const AnnotationSpecimen = memo(function AnnotationSpecimen({
         <span className="dial-archive-stage-specimen__corner is-br" aria-hidden="true" />
         <span className="dial-archive-stage-specimen__measure" aria-hidden="true" />
         {asset && !failed ? (
-          <button
-            className="dial-archive-stage-specimen__frame"
-            type="button"
-            aria-label={`打开素材 ${asset.filename}`}
-            onClick={onOpenDefaultWorkcell}
+          <div
+            className={`dial-archive-stage-specimen__frame${walk.active ? ` is-walking-${walkDirection}` : ""}`}
+            ref={viewport.viewportRef}
+            role="group"
+            tabIndex={0}
+            aria-label={`素材 ${asset.filename} 查看器`}
+            onClick={openWithClickDelay}
+            onDoubleClick={handleDoubleClick}
+            onKeyDown={handleViewportKeyDown}
+            onPointerDown={viewport.onPointerDown}
+            onPointerMove={viewport.onPointerMove}
+            onPointerUp={viewport.onPointerUp}
+            onPointerCancel={viewport.onPointerCancel}
+            onWheel={viewport.onWheel}
           >
-            <img
-              src={asset.imageUrl}
-              alt={asset.filename}
-              draggable={false}
-              onError={() => setFailedAssetId(asset.id)}
-            />
-          </button>
+            {walk.active && walk.previousAsset ? (
+              <div
+                className="dial-archive-stage-specimen__walk-layer is-outgoing"
+                aria-hidden="true"
+                key={`outgoing-${walk.serial}`}
+              >
+                <img src={walk.previousAsset.imageUrl} alt="" draggable={false} />
+              </div>
+            ) : null}
+            <div
+              className="dial-archive-stage-specimen__walk-layer is-current"
+              key={`${asset.id}-${walk.serial}`}
+            >
+              <div className="dial-archive-stage-specimen__surface" ref={viewport.surfaceRef}>
+                <img
+                  ref={viewport.imageRef}
+                  src={asset.imageUrl}
+                  alt={asset.filename}
+                  draggable={false}
+                  onError={() => setFailedAssetId(asset.id)}
+                />
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="dial-archive-stage-specimen__frame is-empty" role="status">
             {asset && failed ? (
@@ -101,6 +171,38 @@ export const AnnotationSpecimen = memo(function AnnotationSpecimen({
             )}
           </div>
         )}
+        {asset && !failed ? (
+          <div
+            className="dial-archive-stage-specimen__viewport-tools"
+            role="group"
+            aria-label="图片观察工具"
+          >
+            <button type="button" onClick={() => viewport.fit()}>
+              FIT
+            </button>
+            <button type="button" onClick={() => viewport.actual()}>
+              1:1
+            </button>
+            <i aria-hidden="true" />
+            <button type="button" aria-label="缩小图片" onClick={viewport.zoomOut}>
+              −
+            </button>
+            <output ref={viewport.scaleReadoutRef} aria-label="图片缩放比例">
+              100%
+            </output>
+            <button type="button" aria-label="放大图片" onClick={viewport.zoomIn}>
+              +
+            </button>
+            <button
+              className="is-edit"
+              type="button"
+              aria-label="打开标注编辑工作间"
+              onClick={onOpenDefaultWorkcell}
+            >
+              EDIT ↗
+            </button>
+          </div>
+        ) : null}
         {checked ? (
           <span className="dial-archive-stage-specimen__range-tag" aria-hidden="true">
             IN RANGE

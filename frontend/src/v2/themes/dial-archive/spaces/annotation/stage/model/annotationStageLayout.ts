@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 /**
  * 素材施工场唯一的装饰几何事实源。
  *
@@ -39,6 +41,10 @@ export interface StageArcSegment {
 export const ANNOTATION_STAGE_LAYOUT = {
   /** 星空画布的设计取景框；SVG 以 slice 模式铺满视口 */
   frame: { width: 1920, height: 1080 },
+  composition: {
+    /** 展台中心、胶片当前项与地面聚光共享的视觉轴 */
+    axisPercent: 41,
+  },
   starfield: {
     seed: 20260804,
     farCount: 116,
@@ -51,6 +57,16 @@ export const ANNOTATION_STAGE_LAYOUT = {
     majorGrid: 132,
     minorGrid: 33,
     tiltDegrees: 55,
+  },
+  camera: {
+    maxOffsetX: 76,
+    maxOffsetY: 44,
+    dragThreshold: 4,
+    resetDurationMs: 320,
+    floorDepth: 1,
+    evidenceDepth: 0.46,
+    groundDepth: 0.28,
+    ghostDepth: 0.2,
   },
   evidence: [
     { id: "ev-a", leftPercent: 3.4, topPercent: 11, width: 196, rotateY: 16, code: "BG.01" },
@@ -70,6 +86,18 @@ export const ANNOTATION_STAGE_LAYOUT = {
       { startDegrees: 150, endDegrees: 208 },
     ] as readonly StageArcSegment[],
   },
+  viewport: {
+    fitInset: 18,
+    minScale: 0.04,
+    maxScale: 8,
+    maxFitScale: 1,
+    zoomStep: 0.16,
+    wheelZoomSensitivity: 0.00155,
+    dragThreshold: 4,
+    edgeOverscroll: 26,
+    settleDurationMs: 240,
+    openDelayMs: 190,
+  },
   filmstrip: {
     itemWidth: 148,
     itemHeight: 100,
@@ -78,6 +106,19 @@ export const ANNOTATION_STAGE_LAYOUT = {
     windowRadius: 16,
     /** 距离已装载末尾多少张时请求下一页 */
     loadMoreThreshold: 32,
+    wheelStepThreshold: 56,
+    wheelIntentResetMs: 140,
+  },
+  console: {
+    progressSlots: 6,
+  },
+  workcells: {
+    depthShift: 13,
+    depthScaleStep: 0.04,
+  },
+  motion: {
+    assetWalkDurationMs: 280,
+    filmstripDurationMs: 280,
   },
   /** 巨型序号的补零位数 */
   indexPadding: 4,
@@ -85,6 +126,36 @@ export const ANNOTATION_STAGE_LAYOUT = {
 
 export const ANNOTATION_STAGE_FILM_STEP =
   ANNOTATION_STAGE_LAYOUT.filmstrip.itemWidth + ANNOTATION_STAGE_LAYOUT.filmstrip.gap;
+
+export type AnnotationStageStyle = CSSProperties &
+  Record<`--dial-archive-stage-${string}`, string | number>;
+
+/**
+ * 将模型中的共享几何与关键动效节奏投影为 CSS 变量。
+ * TSX、SVG、手势控制器与样式表由此消费同一份事实，避免坐标镜像。
+ */
+export function createAnnotationStageStyle(): AnnotationStageStyle {
+  const { camera, composition, filmstrip, ground, instrument, motion, viewport } =
+    ANNOTATION_STAGE_LAYOUT;
+  return {
+    "--dial-archive-stage-axis-wide": `${composition.axisPercent}%`,
+    "--dial-archive-stage-ground-major": `${ground.majorGrid}px`,
+    "--dial-archive-stage-ground-minor": `${ground.minorGrid}px`,
+    "--dial-archive-stage-ground-tilt": `${ground.tiltDegrees}deg`,
+    "--dial-archive-stage-instrument-width": instrument.viewBox.width,
+    "--dial-archive-stage-instrument-height": instrument.viewBox.height,
+    "--dial-archive-stage-instrument-cx": `${instrument.center.x}px`,
+    "--dial-archive-stage-instrument-cy": `${instrument.center.y}px`,
+    "--dial-archive-stage-film-item-width": `${filmstrip.itemWidth}px`,
+    "--dial-archive-stage-film-item-height": `${filmstrip.itemHeight}px`,
+    "--dial-archive-stage-film-item-half": `${filmstrip.itemWidth / 2}px`,
+    "--dial-archive-stage-film-step": `${ANNOTATION_STAGE_FILM_STEP}px`,
+    "--dial-archive-stage-walk-duration": `${motion.assetWalkDurationMs}ms`,
+    "--dial-archive-stage-film-duration": `${motion.filmstripDurationMs}ms`,
+    "--dial-archive-stage-viewport-settle-duration": `${viewport.settleDurationMs}ms`,
+    "--dial-archive-stage-camera-reset-duration": `${camera.resetDurationMs}ms`,
+  };
+}
 
 /** 确定性伪随机（mulberry32）：星尘坐标必须可复现，不进入运行时随机 */
 function mulberry32(seed: number): () => number {

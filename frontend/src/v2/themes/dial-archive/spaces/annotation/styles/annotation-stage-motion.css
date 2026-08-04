@@ -118,6 +118,134 @@
   animation-delay: calc(430ms + var(--dial-archive-workcell-depth) * 95ms);
 }
 
+/* ── 走片编排：主图、序号与读数服从同一方向和可取消时长 ───────── */
+
+@keyframes dial-archive-stage-walk-in-forward {
+  from {
+    clip-path: inset(0 0 0 34%);
+    opacity: 0;
+    transform: translateX(6%);
+  }
+
+  to {
+    clip-path: inset(0);
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-stage-walk-out-forward {
+  to {
+    clip-path: inset(0 34% 0 0);
+    opacity: 0;
+    transform: translateX(-5%) scale(0.985);
+  }
+}
+
+@keyframes dial-archive-stage-walk-in-backward {
+  from {
+    clip-path: inset(0 34% 0 0);
+    opacity: 0;
+    transform: translateX(-6%);
+  }
+
+  to {
+    clip-path: inset(0);
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dial-archive-stage-walk-out-backward {
+  to {
+    clip-path: inset(0 0 0 34%);
+    opacity: 0;
+    transform: translateX(5%) scale(0.985);
+  }
+}
+
+@keyframes dial-archive-stage-readout-in-forward {
+  from {
+    clip-path: inset(0 0 100% 0);
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+@keyframes dial-archive-stage-readout-out-forward {
+  to {
+    clip-path: inset(100% 0 0 0);
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes dial-archive-stage-readout-in-backward {
+  from {
+    clip-path: inset(100% 0 0 0);
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+}
+
+@keyframes dial-archive-stage-readout-out-backward {
+  to {
+    clip-path: inset(0 0 100% 0);
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+.dial-archive-stage-specimen__frame.is-walking-forward
+  .dial-archive-stage-specimen__walk-layer.is-current {
+  animation: dial-archive-stage-walk-in-forward var(--dial-archive-stage-walk-duration)
+    var(--dial-archive-ease) both;
+}
+
+.dial-archive-stage-specimen__frame.is-walking-forward
+  .dial-archive-stage-specimen__walk-layer.is-outgoing {
+  animation: dial-archive-stage-walk-out-forward var(--dial-archive-stage-walk-duration)
+    var(--dial-archive-ease) both;
+}
+
+.dial-archive-stage-specimen__frame.is-walking-backward
+  .dial-archive-stage-specimen__walk-layer.is-current {
+  animation: dial-archive-stage-walk-in-backward var(--dial-archive-stage-walk-duration)
+    var(--dial-archive-ease) both;
+}
+
+.dial-archive-stage-specimen__frame.is-walking-backward
+  .dial-archive-stage-specimen__walk-layer.is-outgoing {
+  animation: dial-archive-stage-walk-out-backward var(--dial-archive-stage-walk-duration)
+    var(--dial-archive-ease) both;
+}
+
+.dial-archive-stage-console__readout.is-walking-forward
+  .dial-archive-stage-console__readout-layer.is-current,
+.dial-archive-stage-console__meta.is-walking-forward {
+  animation: dial-archive-stage-readout-in-forward var(--dial-archive-stage-walk-duration)
+    var(--dial-archive-ease) both;
+}
+
+.dial-archive-stage-console__readout.is-walking-forward
+  .dial-archive-stage-console__readout-layer.is-outgoing {
+  animation: dial-archive-stage-readout-out-forward var(--dial-archive-stage-walk-duration)
+    var(--dial-archive-ease) both;
+}
+
+.dial-archive-stage-console__readout.is-walking-backward
+  .dial-archive-stage-console__readout-layer.is-current,
+.dial-archive-stage-console__meta.is-walking-backward {
+  animation: dial-archive-stage-readout-in-backward var(--dial-archive-stage-walk-duration)
+    var(--dial-archive-ease) both;
+}
+
+.dial-archive-stage-console__readout.is-walking-backward
+  .dial-archive-stage-console__readout-layer.is-outgoing {
+  animation: dial-archive-stage-readout-out-backward var(--dial-archive-stage-walk-duration)
+    var(--dial-archive-ease) both;
+}
+
 /* ── 减少动态 ─────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

@@ -7,6 +7,12 @@
   height: 168px;
   margin-top: 4px;
   mask-image: linear-gradient(90deg, transparent 0, #000000 13%, #000000 87%, transparent 100%);
+  transform: translate3d(var(--dial-archive-stage-camera-x), var(--dial-archive-stage-camera-y), 0);
+  will-change: transform;
+}
+
+.dial-archive-stage.is-camera-resetting .dial-archive-stage-filmstrip {
+  transition: transform var(--dial-archive-stage-camera-reset-duration) var(--dial-archive-ease);
 }
 
 .dial-archive-stage-filmstrip__rail {
@@ -30,16 +36,16 @@
   top: 22px;
   bottom: 42px;
   left: var(--dial-archive-stage-axis);
-  margin-left: -74px;
-  transition: transform 260ms var(--dial-archive-ease);
+  margin-left: calc(var(--dial-archive-stage-film-item-half) * -1);
+  transition: transform var(--dial-archive-stage-film-duration) var(--dial-archive-ease);
   will-change: transform;
 }
 
 .dial-archive-stage-filmstrip__cell {
   position: absolute;
   top: 50%;
-  width: 148px;
-  height: 100px;
+  width: var(--dial-archive-stage-film-item-width);
+  height: var(--dial-archive-stage-film-item-height);
   padding: 0;
   border: 1px solid var(--dial-archive-stage-hairline);
   background: rgba(10, 14, 22, 0.7);

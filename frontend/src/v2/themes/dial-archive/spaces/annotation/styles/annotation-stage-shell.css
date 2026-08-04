@@ -13,9 +13,17 @@
   --dial-archive-stage-hairline: rgba(214, 226, 240, 0.14);
   --dial-archive-stage-hairline-strong: rgba(214, 226, 240, 0.32);
   --dial-archive-stage-panel: rgba(13, 18, 28, 0.88);
-  --dial-archive-stage-axis: 41%;
+  --dial-archive-stage-axis: var(--dial-archive-stage-axis-wide);
   --dial-archive-stage-px: 0;
   --dial-archive-stage-py: 0;
+  --dial-archive-stage-camera-x: 0px;
+  --dial-archive-stage-camera-y: 0px;
+  --dial-archive-stage-camera-evidence-x: 0px;
+  --dial-archive-stage-camera-evidence-y: 0px;
+  --dial-archive-stage-camera-ground-x: 0px;
+  --dial-archive-stage-camera-ground-y: 0px;
+  --dial-archive-stage-camera-ghost-x: 0px;
+  --dial-archive-stage-camera-ghost-y: 0px;
   color: var(--dial-archive-stage-ink);
   background: var(--dial-archive-stage-void);
 }
@@ -68,4 +76,9 @@
   border: 2px solid var(--dial-archive-yellow);
   content: "";
   pointer-events: none;
+}
+
+.dial-archive-stage.is-camera-dragging {
+  cursor: grabbing;
+  user-select: none;
 }

@@ -60,6 +60,33 @@
   letter-spacing: 0.3em;
 }
 
+.dial-archive-stage__camera-reset {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 7px 10px;
+  border: 1px solid var(--dial-archive-stage-hairline);
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  background: rgba(13, 18, 28, 0.62);
+  cursor: pointer;
+}
+
+.dial-archive-stage__camera-reset b {
+  color: var(--dial-archive-stage-ink);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.dial-archive-stage__camera-reset:hover,
+.dial-archive-stage__camera-reset:focus-visible {
+  border-color: var(--dial-archive-yellow);
+  color: var(--dial-archive-stage-ink);
+  outline: none;
+}
+
 .dial-archive-stage__project {
   display: flex;
   flex-direction: column;
@@ -96,4 +123,10 @@
   gap: clamp(30px, 3.6vw, 80px);
   min-height: 0;
   padding: clamp(10px, 1.6vh, 26px) clamp(34px, 4.4vw, 104px) 0;
+  transform: translate3d(var(--dial-archive-stage-camera-x), var(--dial-archive-stage-camera-y), 0);
+  will-change: transform;
+}
+
+.dial-archive-stage.is-camera-resetting .dial-archive-stage__floor {
+  transition: transform var(--dial-archive-stage-camera-reset-duration) var(--dial-archive-ease);
 }

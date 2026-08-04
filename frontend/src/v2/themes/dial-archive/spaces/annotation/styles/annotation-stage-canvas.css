@@ -97,12 +97,17 @@
     linear-gradient(rgba(214, 226, 240, 0.045) 1px, transparent 1px),
     linear-gradient(90deg, rgba(214, 226, 240, 0.045) 1px, transparent 1px);
   background-size:
-    132px 132px,
-    132px 132px,
-    33px 33px,
-    33px 33px;
+    var(--dial-archive-stage-ground-major) var(--dial-archive-stage-ground-major),
+    var(--dial-archive-stage-ground-major) var(--dial-archive-stage-ground-major),
+    var(--dial-archive-stage-ground-minor) var(--dial-archive-stage-ground-minor),
+    var(--dial-archive-stage-ground-minor) var(--dial-archive-stage-ground-minor);
   mask-image: linear-gradient(178deg, transparent 2%, #000000 30%, #000000 82%, transparent 100%);
-  transform: rotateX(55deg) translateY(calc(var(--dial-archive-stage-py) * 12px));
+  transform: translate3d(
+      var(--dial-archive-stage-camera-ground-x),
+      calc(var(--dial-archive-stage-camera-ground-y) + var(--dial-archive-stage-py) * 12px),
+      0
+    )
+    rotateX(var(--dial-archive-stage-ground-tilt));
   transform-origin: 50% 0;
   will-change: transform;
 }
@@ -122,6 +127,11 @@
   position: absolute;
   inset: 0;
   perspective: 900px;
+  transform: translate3d(
+    var(--dial-archive-stage-camera-evidence-x),
+    var(--dial-archive-stage-camera-evidence-y),
+    0
+  );
 }
 
 .dial-archive-stage-canvas__board {
@@ -167,8 +177,14 @@
   white-space: nowrap;
   -webkit-text-stroke: 1px rgba(214, 226, 240, 0.1);
   transform: translate(
-    calc(var(--dial-archive-stage-px) * 16px),
-    calc(var(--dial-archive-stage-py) * 8px)
+    calc(var(--dial-archive-stage-camera-ghost-x) + var(--dial-archive-stage-px) * 16px),
+    calc(var(--dial-archive-stage-camera-ghost-y) + var(--dial-archive-stage-py) * 8px)
   );
   will-change: transform;
+}
+
+.dial-archive-stage.is-camera-resetting .dial-archive-stage-canvas__ground,
+.dial-archive-stage.is-camera-resetting .dial-archive-stage-canvas__evidence,
+.dial-archive-stage.is-camera-resetting .dial-archive-stage-canvas__ghost-word {
+  transition: transform var(--dial-archive-stage-camera-reset-duration) var(--dial-archive-ease);
 }

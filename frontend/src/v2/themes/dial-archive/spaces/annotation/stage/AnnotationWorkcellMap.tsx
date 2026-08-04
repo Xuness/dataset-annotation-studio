@@ -7,7 +7,12 @@ import {
   type AnnotationStageAsset,
   type AnnotationWorkcellId,
 } from "../../../../../pages/spaces/spacePageModel";
-import { formatStageByteSize, formatStageIndex } from "./model/annotationStageLayout";
+import type { StageAssetWalk } from "./hooks/useStageAssetNavigation";
+import {
+  ANNOTATION_STAGE_LAYOUT,
+  formatStageByteSize,
+  formatStageIndex,
+} from "./model/annotationStageLayout";
 import {
   ANNOTATION_WORKCELL_PRESENTATION,
   describeWorkcellStatus,
@@ -27,6 +32,7 @@ interface AnnotationWorkcellMapProps {
   channels: readonly AnnotationCoverageLane[];
   operation: AnnotationOperationSummary | null;
   focusedWorkcell: AnnotationWorkcellId | null;
+  walk: StageAssetWalk;
   onStepAsset(offset: number): void;
   onOpenWorkcell(workcell: AnnotationWorkcellId): void;
 }
@@ -39,25 +45,45 @@ export const AnnotationWorkcellMap = memo(function AnnotationWorkcellMap({
   channels,
   operation,
   focusedWorkcell,
+  walk,
   onStepAsset,
   onOpenWorkcell,
 }: AnnotationWorkcellMapProps) {
   const channelReadings = readAssetChannelStates(asset);
-  const progressSlots = 6;
+  const progressSlots = ANNOTATION_STAGE_LAYOUT.console.progressSlots;
   const progressFilled =
     totalCount > 0 && currentIndex >= 0
       ? Math.min(progressSlots, Math.floor(((currentIndex + 1) / totalCount) * progressSlots) + 1)
       : 0;
 
   return (
-    <aside className="dial-archive-stage-console" aria-label="施工场控制台">
-      <header className="dial-archive-stage-console__readout">
-        <div className="dial-archive-stage-console__ordinal" aria-hidden="true">
-          {formatStageIndex(currentIndex)}
+    <aside className="dial-archive-stage-console" aria-label="施工场控制台" data-stage-camera-lock>
+      <header
+        className={`dial-archive-stage-console__readout${walk.active ? ` is-walking-${walk.direction > 0 ? "forward" : "backward"}` : ""}`}
+      >
+        {walk.active && walk.previousAsset ? (
+          <div
+            className="dial-archive-stage-console__readout-layer is-outgoing"
+            aria-hidden="true"
+            key={`previous-${walk.serial}`}
+          >
+            <div className="dial-archive-stage-console__ordinal">
+              {formatStageIndex(walk.previousIndex)}
+            </div>
+            <p className="dial-archive-stage-console__filename">{walk.previousAsset.filename}</p>
+          </div>
+        ) : null}
+        <div
+          className="dial-archive-stage-console__readout-layer is-current"
+          key={`${asset?.id ?? "empty"}-${walk.serial}`}
+        >
+          <div className="dial-archive-stage-console__ordinal" aria-hidden="true">
+            {formatStageIndex(currentIndex)}
+          </div>
+          <p className="dial-archive-stage-console__filename" title={asset?.filename}>
+            {asset?.filename ?? "NO MATERIAL LOADED"}
+          </p>
         </div>
-        <p className="dial-archive-stage-console__filename" title={asset?.filename}>
-          {asset?.filename ?? "NO MATERIAL LOADED"}
-        </p>
       </header>
 
       <div className="dial-archive-stage-console__pager" role="group" aria-label="素材序列导航">
@@ -88,7 +114,10 @@ export const AnnotationWorkcellMap = memo(function AnnotationWorkcellMap({
         ))}
       </div>
 
-      <dl className="dial-archive-stage-console__meta">
+      <dl
+        className={`dial-archive-stage-console__meta${walk.active ? ` is-walking-${walk.direction > 0 ? "forward" : "backward"}` : ""}`}
+        key={`${asset?.id ?? "empty"}-meta-${walk.serial}`}
+      >
         <dt>FORMAT</dt>
         <dd>{asset ? asset.suffix.replace(".", "").toUpperCase() : "—"}</dd>
         <dt>SIZE</dt>
@@ -120,7 +149,14 @@ export const AnnotationWorkcellMap = memo(function AnnotationWorkcellMap({
               className={`dial-archive-stage-workcell is-${workcell}${focused ? " is-focused" : ""}${status.live ? " is-live" : ""}`}
               type="button"
               aria-label={`${presentation.action} ${presentation.title}`}
-              style={{ "--dial-archive-workcell-depth": depth } as React.CSSProperties}
+              style={
+                {
+                  "--dial-archive-workcell-depth": depth,
+                  "--dial-archive-workcell-base-shift": `${depth * ANNOTATION_STAGE_LAYOUT.workcells.depthShift}px`,
+                  "--dial-archive-workcell-base-scale":
+                    1 - depth * ANNOTATION_STAGE_LAYOUT.workcells.depthScaleStep,
+                } as React.CSSProperties
+              }
               onClick={() => onOpenWorkcell(workcell)}
               key={workcell}
             >
