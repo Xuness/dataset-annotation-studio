@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { ConfirmationRequest, ConfirmInteraction } from "../../../../application/interaction";
 import { imageUrl, thumbnailUrl } from "../../../../features/assets/api";
 import { useInfiniteAssets } from "../../../../features/assets/hooks";
 import { useAnnotationOverview } from "../../../../features/annotations/hooks";
@@ -8,6 +9,7 @@ import { useWorkspace } from "../../../../features/workspaces/hooks";
 import { useWorkspaceSelectionStore } from "../../../../shared/store/workspaceSelectionStore";
 import type {
   AnnotationLaneId,
+  AnnotationEditChannelId,
   AnnotationStageContent,
   AnnotationWorkcellId,
 } from "../spacePageModel";
@@ -22,6 +24,7 @@ import {
   stepStageIndex,
   toAnnotationStageAsset,
 } from "./annotationStageModel";
+import { useAnnotationEditController } from "./useAnnotationEditController";
 
 const STAGE_PAGE_SIZE = 120;
 
@@ -30,14 +33,19 @@ interface UseAnnotationStageControllerOptions {
   requestedAssetId: string | null;
   requestedOperationId: string | null;
   activeWorkcell: AnnotationWorkcellId | null;
-  requestedEditChannel: AnnotationLaneId | null;
+  requestedEditChannel: AnnotationEditChannelId | null;
   requestedProductionLane: AnnotationLaneId | null;
   onAssetIdChange(assetId: string | null): void;
   onOpenWorkcell(workcell: AnnotationWorkcellId): void;
   onCloseWorkcell(): void;
-  onEditChannelChange(channel: AnnotationLaneId): void;
+  onEditChannelChange(channel: AnnotationEditChannelId): void;
   onReturnToSpace(): void;
   onOpenArchive(): void;
+}
+
+interface PendingConfirmation {
+  request: ConfirmationRequest;
+  resolve(accepted: boolean): void;
 }
 
 function describeError(reason: unknown, fallback: string): string {
@@ -58,6 +66,8 @@ export function useAnnotationStageController({
   onReturnToSpace,
   onOpenArchive,
 }: UseAnnotationStageControllerOptions): AnnotationStageContent {
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const confirmationRef = useRef<PendingConfirmation | null>(null);
   const workspace = useWorkspace(projectId);
   const assets = useInfiniteAssets(projectId, {}, STAGE_PAGE_SIZE);
   const overview = useAnnotationOverview(projectId);
@@ -66,6 +76,31 @@ export function useAnnotationStageController({
   const checkedAssetIds = useWorkspaceSelectionStore((state) => state.checkedAssetIds);
   const toggleCheckedAsset = useWorkspaceSelectionStore((state) => state.toggleCheckedAsset);
   const lastIndexRef = useRef(0);
+
+  const confirm = useCallback<ConfirmInteraction>((request) => {
+    confirmationRef.current?.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      const pending = { request, resolve };
+      confirmationRef.current = pending;
+      setPendingConfirmation(pending);
+    });
+  }, []);
+
+  const resolveConfirmation = useCallback((accepted: boolean) => {
+    const pending = confirmationRef.current;
+    if (!pending) return;
+    confirmationRef.current = null;
+    setPendingConfirmation(null);
+    pending.resolve(accepted);
+  }, []);
+
+  useEffect(
+    () => () => {
+      confirmationRef.current?.resolve(false);
+      confirmationRef.current = null;
+    },
+    [],
+  );
 
   const project = useMemo(() => toAnnotationProject(workspace.data), [workspace.data]);
   const pages = assets.data?.pages;
@@ -106,6 +141,34 @@ export function useAnnotationStageController({
   );
   if (focus.index >= 0) lastIndexRef.current = focus.index;
 
+  const editController = useAnnotationEditController({
+    projectId,
+    assetId: focus.asset?.id ?? null,
+    requestedChannel: requestedEditChannel,
+    confirm,
+    onChannelChange: onEditChannelChange,
+  });
+  const editContent = editController.content;
+  const discardEditImmediately = editController.discardImmediately;
+
+  const runWithEditGuard = useCallback(
+    async (action: () => void, title: string, message: string) => {
+      if (activeWorkcell === "edit" && editContent.dirty) {
+        const accepted = await confirm({
+          title,
+          message,
+          tone: "danger",
+          confirmLabel: "放弃并继续",
+          cancelLabel: "继续编辑",
+        });
+        if (!accepted) return;
+        discardEditImmediately();
+      }
+      action();
+    },
+    [activeWorkcell, confirm, discardEditImmediately, editContent.dirty],
+  );
+
   const channels = useMemo(() => projectAnnotationCoverage(overview.data), [overview.data]);
   const operation = useMemo(
     () =>
@@ -124,18 +187,64 @@ export function useAnnotationStageController({
 
   const selectAsset = useCallback(
     (assetId: string) => {
-      if (stageAssets.some((asset) => asset.id === assetId)) onAssetIdChange(assetId);
+      if (!stageAssets.some((asset) => asset.id === assetId) || assetId === focus.asset?.id) return;
+      void runWithEditGuard(
+        () => onAssetIdChange(assetId),
+        "切换编辑对象",
+        "当前标注有尚未保存的修改。确定放弃后切换素材吗？",
+      );
     },
-    [onAssetIdChange, stageAssets],
+    [focus.asset?.id, onAssetIdChange, runWithEditGuard, stageAssets],
   );
 
   const stepAsset = useCallback(
     (offset: number) => {
       const next = stepStageIndex(stageAssets, focus.index, offset);
-      if (next && next.id !== focus.asset?.id) onAssetIdChange(next.id);
+      if (!next || next.id === focus.asset?.id) return;
+      void runWithEditGuard(
+        () => onAssetIdChange(next.id),
+        "切换编辑对象",
+        "当前标注有尚未保存的修改。确定放弃后切换素材吗？",
+      );
     },
-    [focus.asset?.id, focus.index, onAssetIdChange, stageAssets],
+    [focus.asset?.id, focus.index, onAssetIdChange, runWithEditGuard, stageAssets],
   );
+
+  const openWorkcell = useCallback(
+    (workcell: AnnotationWorkcellId) => {
+      if (workcell === activeWorkcell) return;
+      void runWithEditGuard(
+        () => onOpenWorkcell(workcell),
+        "切换标注工作间",
+        "当前标注有尚未保存的修改。确定放弃后进入其他工作间吗？",
+      );
+    },
+    [activeWorkcell, onOpenWorkcell, runWithEditGuard],
+  );
+
+  const closeWorkcell = useCallback(() => {
+    void runWithEditGuard(
+      onCloseWorkcell,
+      "返回素材施工场",
+      "当前标注有尚未保存的修改。确定放弃后返回吗？",
+    );
+  }, [onCloseWorkcell, runWithEditGuard]);
+
+  const returnToSpace = useCallback(() => {
+    void runWithEditGuard(
+      onReturnToSpace,
+      "离开素材施工场",
+      "当前标注有尚未保存的修改。确定放弃后离开吗？",
+    );
+  }, [onReturnToSpace, runWithEditGuard]);
+
+  const openArchive = useCallback(() => {
+    void runWithEditGuard(
+      onOpenArchive,
+      "打开项目档案",
+      "当前标注有尚未保存的修改。确定放弃后离开吗？",
+    );
+  }, [onOpenArchive, runWithEditGuard]);
 
   const requestedAssetLoaded = !requestedAssetId || loadedAssetIds.includes(requestedAssetId);
   const resolvingRequestedAsset =
@@ -195,17 +304,28 @@ export function useAnnotationStageController({
     channels,
     operation,
     activeWorkcell,
-    activeEditChannel: requestedEditChannel ?? "tags",
+    activeEditChannel: editContent.channel,
     activeProductionLane: requestedProductionLane ?? "tags",
+    edit: editContent,
+    confirmation: pendingConfirmation
+      ? {
+          title: pendingConfirmation.request.title ?? "确认操作",
+          message: pendingConfirmation.request.message,
+          tone: pendingConfirmation.request.tone ?? "default",
+          confirmLabel: pendingConfirmation.request.confirmLabel ?? "确认",
+          cancelLabel: pendingConfirmation.request.cancelLabel ?? "取消",
+        }
+      : null,
     message,
     selectAsset,
     stepAsset,
     toggleAssetChecked: toggleCheckedAsset,
-    openWorkcell: onOpenWorkcell,
-    closeWorkcell: onCloseWorkcell,
-    selectEditChannel: onEditChannelChange,
-    returnToSpace: onReturnToSpace,
-    openArchive: onOpenArchive,
+    openWorkcell,
+    closeWorkcell,
+    selectEditChannel: (channel) => void editContent.selectChannel(channel),
+    resolveConfirmation,
+    returnToSpace,
+    openArchive,
   };
 }
 
@@ -239,6 +359,8 @@ export function createNoContextAnnotationStage({
     activeWorkcell: null,
     activeEditChannel: "tags",
     activeProductionLane: "tags",
+    edit: null,
+    confirmation: null,
     message: null,
     selectAsset: () => {},
     stepAsset: () => {},
@@ -246,6 +368,7 @@ export function createNoContextAnnotationStage({
     openWorkcell: () => {},
     closeWorkcell: () => {},
     selectEditChannel: () => {},
+    resolveConfirmation: () => {},
     returnToSpace: onReturnToSpace,
     openArchive: onOpenArchive,
   };

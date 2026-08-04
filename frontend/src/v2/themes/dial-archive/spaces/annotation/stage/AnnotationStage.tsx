@@ -226,11 +226,12 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
             checkedCount={content.checkedAssetIds.length}
             channels={content.channels}
             operation={content.operation}
-            activeEditChannel={content.activeEditChannel}
+            edit={content.edit}
             activeProductionLane={content.activeProductionLane}
+            confirmation={content.confirmation}
             onClose={content.closeWorkcell}
             onSwitch={content.openWorkcell}
-            onSelectEditChannel={content.selectEditChannel}
+            onResolveConfirmation={content.resolveConfirmation}
           />
         </div>
         <AnnotationStageReadout

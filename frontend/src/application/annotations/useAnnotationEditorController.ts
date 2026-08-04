@@ -323,8 +323,8 @@ export function useAnnotationEditorController({
     return tagsDirty ? "当前 Tags 修改尚未保存，确定丢弃后继续切换吗？" : fallback;
   }
 
-  async function changeMode(next: AnnotationChannel) {
-    if (next === mode) return;
+  async function changeMode(next: AnnotationChannel): Promise<boolean> {
+    if (next === mode) return true;
     if (
       !(await confirmDiscard(
         "切换标注通道",
@@ -333,68 +333,94 @@ export function useAnnotationEditorController({
           : "当前通道有尚未保存的修改。确定放弃后切换吗？",
       ))
     ) {
-      return;
+      return false;
     }
     resetDraft();
     setMode(next);
+    return true;
   }
 
-  async function changeLanguage(next: string) {
-    if (next === language) return;
+  async function changeLanguage(next: string): Promise<boolean> {
+    if (next === language) return true;
     if (
       !(await confirmDiscard(
         "切换译文语言",
         translationDiscardMessage("当前译文有尚未保存的修改。确定放弃后切换吗？"),
       ))
     ) {
-      return;
+      return false;
     }
     resetDraft();
     setLanguage(next);
+    return true;
   }
 
-  async function changeTranslationSource(next: TranslationSourceKind) {
-    if (next === translationSourceKind) return;
+  async function changeTranslationSource(next: TranslationSourceKind): Promise<boolean> {
+    if (next === translationSourceKind) return true;
     if (
       !(await confirmDiscard(
         "切换译文来源",
         translationDiscardMessage("当前译文有尚未保存的修改。确定放弃后切换吗？"),
       ))
     ) {
-      return;
+      return false;
     }
     resetDraft();
     setTranslationSourceKind(next);
+    return true;
   }
 
-  async function changeTranslationProducer(next: TranslationProducerKind) {
-    if (next === translationProducerKind) return;
+  async function changeTranslationProducer(next: TranslationProducerKind): Promise<boolean> {
+    if (next === translationProducerKind) return true;
     if (
       !(await confirmDiscard(
         "切换译文生成方式",
         translationDiscardMessage("当前译文有尚未保存的修改。确定放弃后切换吗？"),
       ))
     ) {
-      return;
+      return false;
     }
     resetDraft();
     setTranslationProducerKind(next);
     if (next === "local_dictionary") setTranslationSourceKind("tags");
+    return true;
   }
 
-  async function cancelTranslationEdit() {
+  function discardDraft() {
+    setContent(savedContent);
+    setTagDraft([...savedTagDraft]);
+    setTranslationEditing(false);
+    setActionErrorMessage(null);
+  }
+
+  async function discardChanges(): Promise<boolean> {
+    if (!dirty) return true;
+    const accepted = await confirm({
+      message: tagsDirty ? "丢弃当前尚未保存的 Tags 修改吗？" : "丢弃当前通道尚未保存的修改吗？",
+      title: "放弃当前修改",
+      tone: "danger",
+      confirmLabel: "丢弃修改",
+      cancelLabel: "继续编辑",
+    });
+    if (!accepted) return false;
+    discardDraft();
+    return true;
+  }
+
+  async function cancelTranslationEdit(): Promise<boolean> {
     if (!(await confirmDiscard("取消编辑译文", "当前译文有尚未保存的修改。确定放弃吗？"))) {
-      return;
+      return false;
     }
     const next = translationState.data?.content ?? "";
     setContent(next);
     setSavedContent(next);
     setTranslationEditing(false);
     setActionErrorMessage(null);
+    return true;
   }
 
-  async function cancelTagChanges() {
-    if (!tagsDirty) return;
+  async function cancelTagChanges(): Promise<boolean> {
+    if (!tagsDirty) return true;
     const accepted = await confirm({
       message: "丢弃当前尚未保存的 Tags 修改吗？",
       title: "放弃 Tags 修改",
@@ -402,9 +428,10 @@ export function useAnnotationEditorController({
       confirmLabel: "丢弃修改",
       cancelLabel: "继续编辑",
     });
-    if (!accepted) return;
+    if (!accepted) return false;
     setTagDraft([...savedTagDraft]);
     setActionErrorMessage(null);
+    return true;
   }
 
   async function saveTagDraft() {
@@ -572,6 +599,8 @@ export function useAnnotationEditorController({
     changeLanguage,
     changeTranslationSource,
     changeTranslationProducer,
+    discardDraft,
+    discardChanges,
     cancelTranslationEdit,
     cancelTagChanges,
     saveTagDraft,

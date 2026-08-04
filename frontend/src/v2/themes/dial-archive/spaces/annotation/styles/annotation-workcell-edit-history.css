@@ -1,0 +1,260 @@
+@keyframes dial-archive-edit-history-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(38px, 0, -30px) scale(0.985);
+    clip-path: inset(0 0 0 100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    clip-path: inset(0);
+  }
+}
+
+.dial-archive-edit-history {
+  position: absolute;
+  z-index: 12;
+  top: 8px;
+  right: 88px;
+  bottom: 9px;
+  display: grid;
+  width: min(78%, 640px);
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid rgba(25, 25, 25, 0.28);
+  color: var(--dial-archive-stage-ink);
+  background: rgba(255, 255, 255, 0.985);
+  box-shadow:
+    -16px 0 0 rgba(255, 255, 255, 0.75),
+    -17px 0 0 rgba(25, 25, 25, 0.12),
+    12px 14px 0 rgba(25, 25, 25, 0.07);
+  animation: dial-archive-edit-history-enter 360ms var(--dial-archive-ease-out) both;
+}
+
+.dial-archive-edit-history::before {
+  position: absolute;
+  top: -1px;
+  right: 52px;
+  width: 92px;
+  height: 7px;
+  background: var(--dial-archive-yellow);
+  content: "";
+}
+
+.dial-archive-edit-history > header {
+  display: flex;
+  min-height: 66px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px 10px 17px;
+  border-bottom: 1px solid rgba(25, 25, 25, 0.2);
+}
+
+.dial-archive-edit-history > header > div {
+  display: grid;
+}
+
+.dial-archive-edit-history > header span {
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 7px;
+  letter-spacing: 0.14em;
+}
+
+.dial-archive-edit-history > header h3 {
+  margin: 4px 0 0;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+}
+
+.dial-archive-edit-history > header > button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(25, 25, 25, 0.2);
+  color: var(--dial-archive-stage-ink);
+  font-size: 22px;
+  background: white;
+  cursor: pointer;
+}
+
+.dial-archive-edit-history > header > button:hover,
+.dial-archive-edit-history > header > button:focus-visible {
+  outline: none;
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-history__rail {
+  position: absolute;
+  z-index: 2;
+  top: 82px;
+  left: -17px;
+  display: grid;
+  gap: 7px;
+}
+
+.dial-archive-edit-history__rail i {
+  width: 17px;
+  height: 28px;
+  border: 1px solid rgba(25, 25, 25, 0.2);
+  border-right: 0;
+  background: white;
+}
+
+.dial-archive-edit-history__rail i:first-child {
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-history__list {
+  min-height: 0;
+  padding: 12px 13px 18px 16px;
+  overflow: auto;
+}
+
+.dial-archive-edit-history__list article {
+  position: relative;
+  display: grid;
+  margin-bottom: 10px;
+  grid-template-columns: minmax(0, 1fr) 116px;
+  border-top: 1px solid rgba(25, 25, 25, 0.22);
+  border-bottom: 1px solid rgba(25, 25, 25, 0.14);
+  background: rgba(247, 248, 246, 0.72);
+}
+
+.dial-archive-edit-history__list article::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: rgba(25, 25, 25, 0.24);
+  content: "";
+}
+
+.dial-archive-edit-history__list article.is-candidate::before {
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-history__list article.is-tombstone {
+  opacity: 0.54;
+}
+
+.dial-archive-edit-history__list article > header {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 9px 7px 11px;
+  border-bottom: 1px solid rgba(25, 25, 25, 0.12);
+}
+
+.dial-archive-edit-history__list article > header > span,
+.dial-archive-edit-history__list article > header time,
+.dial-archive-edit-history__list article > header em {
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 6.5px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+}
+
+.dial-archive-edit-history__list article > header > span {
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.dial-archive-edit-history__list article > header > div {
+  display: grid;
+  min-width: 0;
+}
+
+.dial-archive-edit-history__list article > header b {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-edit-history__list article > header time {
+  margin-top: 2px;
+}
+
+.dial-archive-edit-history__list article > header em {
+  padding: 3px 5px;
+  color: var(--dial-archive-stage-ink);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-history__list article > pre {
+  max-height: 120px;
+  min-height: 58px;
+  margin: 0;
+  padding: 10px 11px 12px 13px;
+  overflow: auto;
+  font-family: var(--dial-archive-font-mono);
+  font-size: 8px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.dial-archive-edit-history__list article > button {
+  display: grid;
+  align-content: end;
+  padding: 9px;
+  border: 0;
+  border-left: 1px solid rgba(25, 25, 25, 0.14);
+  color: var(--dial-archive-stage-ink);
+  text-align: left;
+  background: white;
+  cursor: pointer;
+}
+
+.dial-archive-edit-history__list article > button:hover:not(:disabled),
+.dial-archive-edit-history__list article > button:focus-visible:not(:disabled) {
+  outline: none;
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-history__list article > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.44;
+}
+
+.dial-archive-edit-history__list article > button span {
+  font-family: var(--dial-archive-font-mono);
+  font-size: 6px;
+  letter-spacing: 0.09em;
+}
+
+.dial-archive-edit-history__list article > button b {
+  margin-top: 3px;
+  font-size: 9px;
+}
+
+.dial-archive-edit-history__state {
+  display: grid;
+  min-height: 160px;
+  place-content: center;
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  text-align: center;
+}
+
+.dial-archive-edit-history__state b {
+  margin-top: 8px;
+  color: var(--dial-archive-stage-ink);
+  font-family: var(--dial-archive-font-display);
+  font-size: 16px;
+}
+
+.dial-archive-edit-history__state.is-error b {
+  color: #bd441d;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dial-archive-edit-history {
+    animation: none;
+  }
+}

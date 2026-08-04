@@ -36,6 +36,15 @@ export const ANNOTATION_LANE_IDS = ["tags", "description", "translation"] as con
 
 export type AnnotationLaneId = (typeof ANNOTATION_LANE_IDS)[number];
 
+export const ANNOTATION_EDIT_CHANNEL_IDS = [
+  "existing_annotation",
+  "tags",
+  "description",
+  "translation",
+] as const;
+
+export type AnnotationEditChannelId = (typeof ANNOTATION_EDIT_CHANNEL_IDS)[number];
+
 export interface AnnotationProjectContext {
   id: string;
   name: string;
@@ -161,6 +170,179 @@ export interface AnnotationStageSequence {
   loadMore(): void;
 }
 
+export interface AnnotationEditChannelOption {
+  id: AnnotationEditChannelId;
+  code: string;
+  title: string;
+  shortTitle: string;
+  state: "missing" | "usable" | "stale" | "invalid" | "reviewed";
+  stateLabel: string;
+  enabled: boolean;
+}
+
+export interface AnnotationEditDocumentReading {
+  displayName: string;
+  exists: boolean;
+  availability: "missing" | "usable" | "stale" | "invalid";
+  availabilityLabel: string;
+  reviewStatus: "unreviewed" | "reviewed" | null;
+  sourceLabel: string | null;
+  modifiedAt: string | null;
+  validationIssue: string | null;
+}
+
+export interface AnnotationEditTokenMetric {
+  id: string;
+  label: string;
+  shortLabel: string;
+  count: number;
+}
+
+export interface AnnotationEditTagItem {
+  key: string;
+  name: string;
+  category: string | null;
+  categoryLabel: string;
+  confidence: number | null;
+  origin: string;
+  highlighted: boolean;
+  armed: boolean;
+}
+
+export interface AnnotationEditTagGroup {
+  id: string;
+  category: string | null;
+  label: string;
+  tone: "accent" | "sage" | "warning" | "danger" | "neutral";
+  items: readonly AnnotationEditTagItem[];
+}
+
+export interface AnnotationEditTagSuggestion {
+  id: string;
+  name: string;
+  category: string | null;
+  categoryLabel: string;
+  translation: string | null;
+  translationPending: boolean;
+  exists: boolean;
+}
+
+export interface AnnotationEditVocabularyOption {
+  id: string;
+  label: string;
+  detail: string;
+}
+
+export interface AnnotationEditTagSurface {
+  groups: readonly AnnotationEditTagGroup[];
+  count: number;
+  query: string;
+  statusMessage: string;
+  vocabularyId: string;
+  vocabularies: readonly AnnotationEditVocabularyOption[];
+  suggestions: readonly AnnotationEditTagSuggestion[];
+  suggestionsOpen: boolean;
+  suggestionsPending: boolean;
+  suggestionsError: string | null;
+  activeSuggestion: number;
+  setQuery(value: string): void;
+  setSuggestionsOpen(open: boolean): void;
+  setActiveSuggestion(index: number): void;
+  setVocabulary(id: string): void;
+  addQuery(value?: string): void;
+  addSuggestion(index: number): void;
+  removeTag(key: string): void;
+  handleEmptyBackspace(): void;
+}
+
+export interface AnnotationEditTranslationSurface {
+  language: string;
+  languageOptions: readonly string[];
+  sourceKind: "description" | "tags";
+  producerKind: "llm" | "local_dictionary";
+  sourceContent: string;
+  sourceExists: boolean;
+  status: string;
+  statusLabel: string;
+  alignmentStatus: string;
+  issue: string | null;
+  qualityIssues: readonly string[];
+  readOnly: boolean;
+  editing: boolean;
+  canEdit: boolean;
+  canRefreshDictionary: boolean;
+  dictionaryOverrideCount: number;
+  dictionaryUnmatchedCount: number;
+  setLanguage(language: string): void;
+  setSourceKind(source: "description" | "tags"): void;
+  setProducerKind(producer: "llm" | "local_dictionary"): void;
+  beginEditing(): void;
+  refreshDictionary(): Promise<void>;
+}
+
+export interface AnnotationEditHistoryEntry {
+  id: string;
+  sourceLabel: string;
+  createdAt: string;
+  preview: string;
+  candidate: boolean;
+  tombstone: boolean;
+  restorable: boolean;
+}
+
+export interface AnnotationEditHistory {
+  open: boolean;
+  status: "idle" | "loading" | "ready" | "error";
+  message: string | null;
+  entries: readonly AnnotationEditHistoryEntry[];
+  toggle(): void;
+  restore(revisionId: string): void;
+}
+
+export interface AnnotationEditTokenProfileOption {
+  id: string;
+  label: string;
+}
+
+export interface AnnotationEditContent {
+  status: "no-object" | "loading" | "ready" | "error";
+  message: string | null;
+  channel: AnnotationEditChannelId;
+  channels: readonly AnnotationEditChannelOption[];
+  document: AnnotationEditDocumentReading;
+  text: string;
+  textPlaceholder: string;
+  characterCount: number;
+  lineCount: number;
+  tokenProfileId: string;
+  tokenProfiles: readonly AnnotationEditTokenProfileOption[];
+  tokenMetrics: readonly AnnotationEditTokenMetric[];
+  tokenMetricsPending: boolean;
+  tags: AnnotationEditTagSurface;
+  translation: AnnotationEditTranslationSurface;
+  history: AnnotationEditHistory;
+  dirty: boolean;
+  tagsDirty: boolean;
+  writePending: boolean;
+  saveLabel: string;
+  canSave: boolean;
+  canDiscard: boolean;
+  actionError: string | null;
+  setText(value: string): void;
+  selectChannel(channel: AnnotationEditChannelId): Promise<void>;
+  selectTokenProfile(profileId: string): void;
+  save(): Promise<void>;
+  discard(): Promise<void>;
+}
+
+export interface AnnotationConfirmation {
+  title: string;
+  message: string;
+  tone: "default" | "danger";
+  confirmLabel: string;
+  cancelLabel: string;
+}
+
 export interface AnnotationStageContent {
   kind: "annotation-stage";
   status: "no-context" | "loading" | "ready" | "error";
@@ -172,15 +354,18 @@ export interface AnnotationStageContent {
   channels: readonly AnnotationCoverageLane[];
   operation: AnnotationOperationSummary | null;
   activeWorkcell: AnnotationWorkcellId | null;
-  activeEditChannel: AnnotationLaneId;
+  activeEditChannel: AnnotationEditChannelId;
   activeProductionLane: AnnotationLaneId;
+  edit: AnnotationEditContent | null;
+  confirmation: AnnotationConfirmation | null;
   message: string | null;
   selectAsset(assetId: string): void;
   stepAsset(offset: number): void;
   toggleAssetChecked(assetId: string): void;
   openWorkcell(workcell: AnnotationWorkcellId): void;
   closeWorkcell(): void;
-  selectEditChannel(channel: AnnotationLaneId): void;
+  selectEditChannel(channel: AnnotationEditChannelId): void;
+  resolveConfirmation(accepted: boolean): void;
   returnToSpace(): void;
   openArchive(): void;
 }

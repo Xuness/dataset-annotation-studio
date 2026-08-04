@@ -8,7 +8,10 @@ import {
   type HomeSpaceId,
 } from "../navigation/spaceRegistry";
 import { useArchiveSpaceController } from "../pages/spaces/archive/useArchiveSpaceController";
-import { isAnnotationLaneId } from "../pages/spaces/annotation/annotationSpaceModel";
+import {
+  isAnnotationEditChannelId,
+  isAnnotationLaneId,
+} from "../pages/spaces/annotation/annotationSpaceModel";
 import { isAnnotationWorkcellId } from "../pages/spaces/annotation/annotationStageModel";
 import { useAnnotationSpaceController } from "../pages/spaces/annotation/useAnnotationSpaceController";
 import {
@@ -26,6 +29,7 @@ import {
 } from "../pages/spaces/preparation/usePreparationWorkbenchController";
 import type {
   AnnotationLaneId,
+  AnnotationEditChannelId,
   AnnotationWorkcellId,
   PreparationCanvasNodeId,
   PreparationCapabilityId,
@@ -273,7 +277,7 @@ interface AnnotationStageQuery {
   assetId: string | null;
   workcell: AnnotationWorkcellId | null;
   lane: AnnotationLaneId | null;
-  channel: AnnotationLaneId | null;
+  channel: AnnotationEditChannelId | null;
   operationId: string | null;
 }
 
@@ -285,7 +289,7 @@ function readAnnotationStageQuery(search: string): AnnotationStageQuery {
     assetId: readRouteIdentifier(search, "asset"),
     workcell: isAnnotationWorkcellId(focus) ? focus : null,
     lane: isAnnotationLaneId(lane) ? lane : null,
-    channel: isAnnotationLaneId(channel) ? channel : null,
+    channel: isAnnotationEditChannelId(channel) ? channel : null,
     operationId: readRouteIdentifier(search, "operation"),
   };
 }

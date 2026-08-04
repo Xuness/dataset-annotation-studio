@@ -31,6 +31,8 @@ export function isAnnotationLaneId(value: unknown): value is AnnotationLaneId {
   return ANNOTATION_LANE_IDS.includes(value as AnnotationLaneId);
 }
 
+export { isAnnotationEditChannelId } from "./annotationEditModel";
+
 export function toAnnotationProject(
   workspace: WorkspaceSummary | undefined,
 ): AnnotationProjectContext | null {

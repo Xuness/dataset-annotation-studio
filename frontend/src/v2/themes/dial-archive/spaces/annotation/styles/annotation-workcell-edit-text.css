@@ -1,0 +1,185 @@
+.dial-archive-edit-text {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.dial-archive-edit-text > header {
+  display: flex;
+  min-height: 42px;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: end;
+  padding: 7px 10px 8px 12px;
+  border-top: 1px solid rgba(25, 25, 25, 0.22);
+  border-bottom: 1px solid rgba(25, 25, 25, 0.16);
+}
+
+.dial-archive-edit-text > header > div:first-child {
+  display: grid;
+}
+
+.dial-archive-edit-text > header span {
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 7px;
+  letter-spacing: 0.13em;
+}
+
+.dial-archive-edit-text > header b {
+  margin-top: 3px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.dial-archive-edit-text > header > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.dial-archive-edit-text > header > div:last-child span {
+  padding: 3px 5px;
+  color: var(--dial-archive-stage-ink);
+  background: var(--dial-archive-stage-paper-low);
+}
+
+.dial-archive-edit-text__plane {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  grid-template-columns: 46px minmax(0, 1fr);
+  overflow: hidden;
+  border-bottom: 1px solid rgba(25, 25, 25, 0.2);
+  background: white;
+}
+
+.dial-archive-edit-text__plane::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 54px;
+  height: 5px;
+  background: var(--dial-archive-yellow);
+  content: "";
+  pointer-events: none;
+}
+
+.dial-archive-edit-text__ruler {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  left: 46px;
+  display: grid;
+  height: 8px;
+  grid-template-columns: repeat(16, 1fr);
+  pointer-events: none;
+}
+
+.dial-archive-edit-text__ruler i {
+  border-left: 1px solid rgba(25, 25, 25, 0.16);
+}
+
+.dial-archive-edit-text__ruler i:nth-child(4n + 1) {
+  height: 8px;
+  border-left-color: rgba(25, 25, 25, 0.38);
+}
+
+.dial-archive-edit-text__plane > aside {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid rgba(25, 25, 25, 0.14);
+  background: rgba(242, 243, 241, 0.78);
+}
+
+.dial-archive-edit-text__plane ol {
+  margin: 0;
+  padding: 19px 0 22px;
+  list-style: none;
+  will-change: transform;
+}
+
+.dial-archive-edit-text__plane li {
+  height: 23px;
+  padding-right: 9px;
+  color: rgba(25, 25, 25, 0.38);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 8px;
+  line-height: 23px;
+  text-align: right;
+}
+
+.dial-archive-edit-text textarea {
+  min-width: 0;
+  min-height: 0;
+  padding: 19px 20px 28px;
+  resize: none;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  color: var(--dial-archive-stage-ink);
+  font-family: var(--dial-archive-font-body);
+  font-size: 14px;
+  font-weight: 480;
+  line-height: 23px;
+  letter-spacing: 0.02em;
+  background: transparent;
+  caret-color: var(--dial-archive-stage-ink);
+  tab-size: 2;
+}
+
+.dial-archive-edit-text textarea::selection {
+  color: var(--dial-archive-stage-ink);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-text textarea::placeholder {
+  color: rgba(25, 25, 25, 0.34);
+}
+
+.dial-archive-edit-text textarea:focus {
+  box-shadow: inset 4px 0 var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-text textarea:read-only {
+  color: rgba(25, 25, 25, 0.68);
+  cursor: default;
+}
+
+.dial-archive-edit-text__readonly {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  padding: 4px 7px;
+  color: white;
+  font-family: var(--dial-archive-font-mono);
+  font-size: 7px;
+  letter-spacing: 0.14em;
+  background: var(--dial-archive-stage-ink);
+}
+
+@media (max-height: 860px) {
+  .dial-archive-edit-text > header {
+    min-height: 32px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .dial-archive-edit-text > header b {
+    font-size: 11px;
+  }
+
+  .dial-archive-edit-text textarea {
+    padding-top: 13px;
+  }
+
+  .dial-archive-edit-text__plane ol {
+    padding-top: 13px;
+  }
+}

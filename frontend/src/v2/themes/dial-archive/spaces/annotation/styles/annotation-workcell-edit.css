@@ -1,10 +1,29 @@
-/* ── EDIT 四级工作间：图片持续在左，通道仪器平面从右后方展开 ── */
+/* EDIT 工作间壳层：图片对象持续留在左侧，右侧是无卡片边界的仪器工作面。 */
+
+.dial-archive-stage.is-workcell-edit {
+  --dial-archive-edit-split: 45%;
+}
 
 .dial-archive-edit-workcell {
   position: absolute;
   inset: 0;
   min-width: 0;
   min-height: 0;
+}
+
+.dial-archive-edit-workcell.is-empty {
+  display: grid;
+  place-content: center;
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  text-align: center;
+}
+
+.dial-archive-edit-workcell.is-empty b {
+  margin-top: 10px;
+  color: var(--dial-archive-stage-ink);
+  font-family: var(--dial-archive-font-display);
+  font-size: 22px;
 }
 
 .dial-archive-edit-workcell__ghost {
@@ -18,8 +37,8 @@
   font-weight: 850;
   letter-spacing: -0.07em;
   line-height: 0.82;
-  opacity: 0.48;
-  -webkit-text-stroke: 1px rgba(25, 25, 25, 0.12);
+  opacity: 0.43;
+  -webkit-text-stroke: 1px rgba(25, 25, 25, 0.11);
   pointer-events: none;
 }
 
@@ -34,34 +53,40 @@
   border-top: 1px solid rgba(25, 25, 25, 0.22);
   border-bottom: 1px solid rgba(25, 25, 25, 0.16);
   color: var(--dial-archive-stage-muted);
-  background: rgba(255, 255, 255, 0.44);
-  opacity: 0.68;
+  background: rgba(255, 255, 255, 0.42);
+  opacity: 0.72;
+}
+
+.dial-archive-edit-workcell__object > span,
+.dial-archive-edit-workcell__object dt,
+.dial-archive-edit-workcell__object dd,
+.dial-archive-edit-workcell__object > small {
+  font-family: var(--dial-archive-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
 }
 
 .dial-archive-edit-workcell__object > span {
-  font-family: var(--dial-archive-font-mono);
-  font-size: 8px;
   letter-spacing: 0.19em;
 }
 
-.dial-archive-edit-workcell__object > b {
+.dial-archive-edit-workcell__object > b,
+.dial-archive-edit-workcell__object > small,
+.dial-archive-edit-workcell__object dd {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-edit-workcell__object > b {
   margin-top: 8px;
   color: var(--dial-archive-stage-ink);
   font-size: 13px;
   letter-spacing: 0.06em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .dial-archive-edit-workcell__object > small {
-  overflow: hidden;
   margin-top: 4px;
-  font-family: var(--dial-archive-font-mono);
-  font-size: 8px;
-  letter-spacing: 0.08em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .dial-archive-edit-workcell__object dl {
@@ -79,31 +104,54 @@
 .dial-archive-edit-workcell__object dt,
 .dial-archive-edit-workcell__object dd {
   margin: 0;
-  font-family: var(--dial-archive-font-mono);
-  font-size: 7.5px;
-  letter-spacing: 0.1em;
 }
 
 .dial-archive-edit-workcell__object dd {
-  overflow: hidden;
   margin-top: 4px;
   color: var(--dial-archive-stage-ink);
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 700;
 }
 
 .dial-archive-edit-workcell__console {
   position: absolute;
   z-index: 2;
-  inset: 0 0 0 51.5%;
+  inset: 0 0 0 var(--dial-archive-edit-split);
   display: grid;
   min-width: 0;
   min-height: 0;
   grid-template-rows: auto auto minmax(0, 1fr);
-  align-content: stretch;
-  padding-left: clamp(18px, 2vw, 36px);
+  padding-left: clamp(18px, 1.8vw, 34px);
   border-left: 1px solid rgba(25, 25, 25, 0.2);
+}
+
+/*
+ * EDIT 使用独立的空间配比：分界向左收拢，同时放大真彩展台。
+ * 展台尺寸和编辑面尺寸必须彼此独立，避免为了扩大右侧而把图片一并压小。
+ */
+@media (min-width: 1081px) and (orientation: landscape) {
+  .dial-archive-stage.is-workcell-edit.has-workcell:not(.is-workcell-closing)
+    .dial-archive-stage-specimen {
+    top: 58%;
+    box-sizing: border-box;
+    width: var(--dial-archive-edit-split);
+    padding-left: clamp(22px, 2vw, 38px);
+  }
+
+  .dial-archive-stage.is-workcell-edit.has-workcell:not(.is-workcell-closing)
+    .dial-archive-stage-specimen__assembly {
+    width: min(40vw, 800px);
+    height: clamp(380px, 56vh, 620px);
+  }
+
+  .dial-archive-stage.is-workcell-edit.has-workcell:not(.is-workcell-closing)
+    .dial-archive-stage-specimen__ring {
+    width: min(43vw, 850px);
+  }
+
+  .dial-archive-stage.is-workcell-edit.has-workcell:not(.is-workcell-closing)
+    .dial-archive-stage-specimen__baseline {
+    width: min(39vw, 760px);
+  }
 }
 
 .dial-archive-edit-workcell__console::before {
@@ -114,8 +162,8 @@
   width: 4px;
   background: linear-gradient(
     180deg,
-    var(--dial-archive-yellow) 0 19%,
-    transparent 19% 72%,
+    var(--dial-archive-yellow) 0 18%,
+    transparent 18% 72%,
     var(--dial-archive-stage-ink) 72% 100%
   );
   content: "";
@@ -129,8 +177,8 @@
     "kicker state"
     "title state";
   align-items: end;
-  padding: 4px 0 14px;
-  border-bottom: 1px solid rgba(25, 25, 25, 0.22);
+  padding: 4px 0 13px;
+  border-bottom: 1px solid rgba(25, 25, 25, 0.23);
 }
 
 .dial-archive-edit-workcell__heading > span {
@@ -145,7 +193,7 @@
   grid-area: title;
   margin: 4px 0 0;
   font-size: clamp(20px, 1.7vw, 30px);
-  font-weight: 690;
+  font-weight: 700;
   letter-spacing: 0.18em;
 }
 
@@ -154,36 +202,45 @@
   align-self: stretch;
   display: grid;
   place-items: center;
-  min-width: 108px;
+  min-width: 132px;
   padding: 0 12px;
   color: var(--dial-archive-stage-paper);
   font-family: var(--dial-archive-font-mono);
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.14em;
   background: var(--dial-archive-stage-ink);
   box-shadow: inset 0 -4px var(--dial-archive-yellow);
 }
 
+.dial-archive-edit-workcell__heading output.is-invalid,
+.dial-archive-edit-workcell__heading output.is-stale {
+  box-shadow: inset 0 -4px #ff8b39;
+}
+
 .dial-archive-edit-workcell__channels {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-bottom: 1px solid rgba(25, 25, 25, 0.2);
 }
 
 .dial-archive-edit-workcell__channels button {
   position: relative;
   display: grid;
+  min-width: 0;
   min-height: 58px;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "code state"
+    "title state";
   align-items: center;
-  gap: 9px;
-  padding: 9px 11px;
+  gap: 1px 8px;
+  padding: 9px 10px;
   border: 0;
   border-right: 1px solid rgba(25, 25, 25, 0.15);
   color: var(--dial-archive-stage-muted);
   text-align: left;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.78);
   cursor: pointer;
 }
 
@@ -191,16 +248,23 @@
   border-right: 0;
 }
 
-.dial-archive-edit-workcell__channels button:hover,
-.dial-archive-edit-workcell__channels button:focus-visible {
+.dial-archive-edit-workcell__channels button:hover:not(:disabled),
+.dial-archive-edit-workcell__channels button:focus-visible:not(:disabled) {
   color: var(--dial-archive-stage-ink);
   background: var(--dial-archive-stage-paper-low);
   outline: none;
+  box-shadow: inset 0 -3px var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-workcell__channels button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .dial-archive-edit-workcell__channels button.is-active {
   color: var(--dial-archive-stage-ink);
   background: var(--dial-archive-yellow);
+  opacity: 1;
 }
 
 .dial-archive-edit-workcell__channels button.is-active::after {
@@ -213,198 +277,408 @@
   content: "";
 }
 
-.dial-archive-edit-workcell__channels span,
-.dial-archive-edit-workcell__channels em {
-  font-family: var(--dial-archive-font-mono);
-  font-size: 8px;
-  font-style: normal;
-  letter-spacing: 0.1em;
+.dial-archive-edit-workcell__channels span {
+  grid-area: code;
 }
 
 .dial-archive-edit-workcell__channels b {
+  grid-area: title;
+  overflow: hidden;
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-edit-workcell__channels em {
+  grid-area: state;
+  overflow: hidden;
+  font-style: normal;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-edit-workcell__channels span,
+.dial-archive-edit-workcell__channels em {
+  font-family: var(--dial-archive-font-mono);
+  font-size: 7px;
   letter-spacing: 0.08em;
 }
 
-.dial-archive-edit-workcell__sheet {
+.dial-archive-edit-workcell__workspace {
   position: relative;
+  display: grid;
   min-width: 0;
   min-height: 0;
-  padding: clamp(17px, 2vh, 26px) clamp(17px, 1.6vw, 30px) 15px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 16px 88px 10px 0;
   overflow: hidden;
-  background:
-    linear-gradient(rgba(25, 25, 25, 0.032) 1px, transparent 1px) 0 0 / 100% 38px,
-    rgba(249, 250, 248, 0.97);
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
+  background: rgba(255, 255, 255, 0.74);
 }
 
-.dial-archive-edit-workcell__sheet-register {
+.dial-archive-edit-workcell__workspace::before {
   position: absolute;
-  top: 0;
+  z-index: 0;
   right: 0;
-  width: 88px;
+  bottom: -0.13em;
+  color: transparent;
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(74px, 8vw, 142px);
+  font-weight: 850;
+  letter-spacing: -0.06em;
+  content: "ANNOTATE";
+  opacity: 0.28;
+  -webkit-text-stroke: 1px rgba(25, 25, 25, 0.12);
+  pointer-events: none;
+}
+
+.dial-archive-edit-workcell__register {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 88px;
+  width: clamp(62px, 6vw, 108px);
   height: 7px;
   background: var(--dial-archive-yellow);
 }
 
-.dial-archive-edit-workcell__sheet > header {
+.dial-archive-edit-workcell__document-head {
   position: relative;
-  z-index: 1;
-  max-width: 76%;
-}
-
-.dial-archive-edit-workcell__sheet > header span {
-  color: var(--dial-archive-stage-muted);
-  font-family: var(--dial-archive-font-mono);
-  font-size: 8px;
-  letter-spacing: 0.18em;
-}
-
-.dial-archive-edit-workcell__sheet > header h3 {
-  margin: 7px 0 4px;
-  font-size: clamp(18px, 1.5vw, 27px);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.dial-archive-edit-workcell__sheet > header p {
-  margin: 0;
-  color: var(--dial-archive-stage-muted);
-  font-size: 11px;
-  line-height: 1.55;
-}
-
-.dial-archive-edit-workcell__readings {
-  position: absolute;
   z-index: 2;
-  top: 22px;
-  right: 20px;
   display: grid;
-  width: 28%;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 38%);
+  gap: 18px;
+  align-items: end;
+  min-height: 78px;
+  padding: 2px 12px 12px 1px;
+  border-bottom: 1px solid rgba(25, 25, 25, 0.2);
+}
+
+.dial-archive-edit-workcell__document-head > div > span,
+.dial-archive-edit-workcell__document-head dt,
+.dial-archive-edit-workcell__document-head dd {
+  font-family: var(--dial-archive-font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.12em;
+}
+
+.dial-archive-edit-workcell__document-head > div > span,
+.dial-archive-edit-workcell__document-head dt {
+  color: var(--dial-archive-stage-muted);
+}
+
+.dial-archive-edit-workcell__document-head h3 {
+  overflow: hidden;
+  margin: 5px 0 0;
+  font-size: clamp(17px, 1.35vw, 24px);
+  font-weight: 720;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-edit-workcell__document-head p {
+  overflow: hidden;
+  margin: 4px 0 0;
+  color: var(--dial-archive-stage-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-edit-workcell__document-head dl {
+  display: grid;
   margin: 0;
   border-top: 1px solid rgba(25, 25, 25, 0.2);
 }
 
-.dial-archive-edit-workcell__readings > div {
+.dial-archive-edit-workcell__document-head dl > div {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 12px;
-  padding: 7px 0;
-  border-bottom: 1px solid rgba(25, 25, 25, 0.13);
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(25, 25, 25, 0.12);
 }
 
-.dial-archive-edit-workcell__readings dt,
-.dial-archive-edit-workcell__readings dd {
+.dial-archive-edit-workcell__document-head dt,
+.dial-archive-edit-workcell__document-head dd {
   margin: 0;
-  font-family: var(--dial-archive-font-mono);
-  font-size: 7.5px;
-  letter-spacing: 0.08em;
 }
 
-.dial-archive-edit-workcell__readings dt {
-  color: var(--dial-archive-stage-muted);
+.dial-archive-edit-workcell__document-head dd {
+  color: var(--dial-archive-stage-ink);
+  font-weight: 720;
 }
 
-.dial-archive-edit-workcell__readings dd {
-  font-weight: 700;
+.dial-archive-edit-workcell__surface {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 12px 10px 0;
+  overflow: hidden;
 }
 
-.dial-archive-edit-workcell__module {
-  position: absolute;
-  z-index: 1;
-  right: clamp(17px, 1.6vw, 30px);
-  bottom: 46px;
-  left: clamp(17px, 1.6vw, 30px);
+.dial-archive-edit-workcell__state {
   display: grid;
-  min-height: 42%;
-  align-content: center;
-  padding: 22px 26px;
-  border: 1px solid rgba(25, 25, 25, 0.2);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 8px 9px 0 rgba(25, 25, 25, 0.045);
-}
-
-.dial-archive-edit-workcell__module::before {
-  position: absolute;
-  top: -1px;
-  bottom: -1px;
-  left: -1px;
-  width: 5px;
-  background: var(--dial-archive-yellow);
-  content: "";
-}
-
-.dial-archive-edit-workcell__module > span {
+  height: 100%;
+  place-content: center;
+  border-left: 5px solid var(--dial-archive-yellow);
   color: var(--dial-archive-stage-muted);
   font-family: var(--dial-archive-font-mono);
-  font-size: 8px;
-  letter-spacing: 0.17em;
+  text-align: center;
+  background: rgba(245, 246, 244, 0.72);
 }
 
-.dial-archive-edit-workcell__module > b {
+.dial-archive-edit-workcell__state b {
   margin-top: 10px;
-  font-size: clamp(16px, 1.25vw, 23px);
-  font-weight: 680;
-  letter-spacing: 0.08em;
+  color: var(--dial-archive-stage-ink);
+  font-family: var(--dial-archive-font-display);
+  font-size: 19px;
 }
 
-.dial-archive-edit-workcell__module > p {
-  max-width: 460px;
-  margin: 7px 0 0;
+.dial-archive-edit-workcell__state.is-loading i {
+  width: 96px;
+  height: 3px;
+  margin: 16px auto 0;
+  background: linear-gradient(90deg, var(--dial-archive-yellow) 50%, rgba(25, 25, 25, 0.12) 50%) 0
+    0 / 18px 100%;
+  animation: dial-archive-edit-loading 560ms steps(6) infinite;
+}
+
+.dial-archive-edit-workcell__state.is-error {
+  border-left-color: #f06a32;
+}
+
+@keyframes dial-archive-edit-loading {
+  to {
+    background-position: 18px 0;
+  }
+}
+
+.dial-archive-edit-workcell__footer {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  min-height: 35px;
+  padding: 7px 12px 0 0;
+  border-top: 1px solid rgba(25, 25, 25, 0.2);
+}
+
+.dial-archive-edit-workcell__footer > div {
+  display: flex;
+  min-width: 0;
+  gap: 13px;
+  align-items: center;
+  overflow: hidden;
+}
+
+.dial-archive-edit-workcell__footer span,
+.dial-archive-edit-workcell__footer strong,
+.dial-archive-edit-workcell__footer label {
+  overflow: hidden;
   color: var(--dial-archive-stage-muted);
-  font-size: 10.5px;
-  line-height: 1.65;
+  font-family: var(--dial-archive-font-mono);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.dial-archive-edit-workcell__module > div {
-  position: absolute;
-  top: 50%;
-  right: 24px;
+.dial-archive-edit-workcell__footer strong {
+  color: #bd441d;
+}
+
+.dial-archive-edit-workcell__footer label {
   display: flex;
   gap: 7px;
-  transform: translateY(-50%);
+  align-items: center;
 }
 
-.dial-archive-edit-workcell__module > div i {
-  width: 8px;
-  height: 42px;
-  border: 1px solid rgba(25, 25, 25, 0.26);
+.dial-archive-edit-workcell__footer select {
+  min-width: 74px;
+  padding: 3px 19px 3px 5px;
+  border: 1px solid rgba(25, 25, 25, 0.18);
+  border-radius: 0;
+  color: var(--dial-archive-stage-ink);
+  font: inherit;
+  background: white;
 }
 
-.dial-archive-edit-workcell__module > div i:last-child {
-  border-color: var(--dial-archive-stage-ink);
-  background: var(--dial-archive-yellow);
-}
-
-.dial-archive-edit-workcell__sheet > footer {
+.dial-archive-edit-workcell__commit {
   position: absolute;
-  right: 20px;
-  bottom: 14px;
-  left: 20px;
-  display: flex;
-  justify-content: space-between;
+  z-index: 8;
+  top: 16px;
+  right: 0;
+  bottom: 10px;
+  display: grid;
+  width: 78px;
+  grid-template-rows: auto 68px 68px minmax(96px, 1fr);
+  border-left: 1px solid rgba(25, 25, 25, 0.22);
+  background: rgba(245, 246, 244, 0.92);
+}
+
+.dial-archive-edit-workcell__commit > span {
+  padding: 9px 7px;
   color: var(--dial-archive-stage-muted);
   font-family: var(--dial-archive-font-mono);
-  font-size: 7.5px;
-  letter-spacing: 0.11em;
+  font-size: 6.5px;
+  letter-spacing: 0.12em;
+  writing-mode: vertical-rl;
+}
+
+.dial-archive-edit-workcell__commit button {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 8px 7px;
+  border: 0;
+  border-top: 1px solid rgba(25, 25, 25, 0.18);
+  color: var(--dial-archive-stage-ink);
+  text-align: left;
+  background: white;
+  cursor: pointer;
+}
+
+.dial-archive-edit-workcell__commit button:hover:not(:disabled),
+.dial-archive-edit-workcell__commit button:focus-visible:not(:disabled) {
+  outline: none;
+  background: var(--dial-archive-stage-paper-low);
+  box-shadow: inset 4px 0 var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-workcell__commit button:disabled {
+  cursor: not-allowed;
+  opacity: 0.36;
+}
+
+.dial-archive-edit-workcell__commit button small {
+  font-family: var(--dial-archive-font-mono);
+  font-size: 6.5px;
+  letter-spacing: 0.12em;
+}
+
+.dial-archive-edit-workcell__commit button b {
+  font-size: 10px;
+  font-weight: 720;
+  line-height: 1.3;
+}
+
+.dial-archive-edit-workcell__commit button.is-primary {
+  align-content: end;
+  color: var(--dial-archive-stage-ink);
+  background: var(--dial-archive-yellow);
+  box-shadow: inset 0 -6px var(--dial-archive-stage-ink);
+}
+
+.dial-archive-edit-workcell__commit.is-dirty::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 9px;
+  height: 9px;
+  background: var(--dial-archive-yellow);
+  content: "";
+  box-shadow: -3px 3px 0 white;
 }
 
 @media (max-width: 1500px), (max-height: 860px) {
-  .dial-archive-edit-workcell__console {
-    left: 49%;
+  .dial-archive-stage.is-workcell-edit {
+    --dial-archive-edit-split: 43%;
   }
 
   .dial-archive-edit-workcell__object {
     display: none;
   }
 
-  .dial-archive-edit-workcell__sheet > header p {
+  .dial-archive-edit-workcell__document-head {
+    min-height: 50px;
+    grid-template-columns: minmax(0, 1fr);
+    padding-bottom: 7px;
+  }
+
+  .dial-archive-edit-workcell__document-head p,
+  .dial-archive-edit-workcell__document-head dl {
     display: none;
   }
 
-  .dial-archive-edit-workcell__module {
-    min-height: 39%;
+  .dial-archive-edit-workcell__heading {
+    padding-bottom: 8px;
+  }
+
+  .dial-archive-edit-workcell__heading h2 {
+    font-size: 21px;
+  }
+
+  .dial-archive-edit-workcell__channels button {
+    min-height: 46px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .dial-archive-edit-workcell__workspace {
+    padding-top: 8px;
+    padding-bottom: 5px;
+  }
+
+  .dial-archive-edit-workcell__register {
+    top: 0;
+  }
+
+  .dial-archive-edit-workcell__surface {
+    padding-top: 7px;
+    padding-bottom: 6px;
+  }
+
+  .dial-archive-edit-workcell__footer {
+    min-height: 28px;
+    padding-top: 4px;
+  }
+
+  .dial-archive-edit-workcell__commit {
+    top: 8px;
+    bottom: 5px;
+    grid-template-rows: auto 58px 58px minmax(78px, 1fr);
+  }
+}
+
+@media (min-width: 1081px) and (max-width: 1500px) and (orientation: landscape) {
+  .dial-archive-stage.is-workcell-edit {
+    --dial-archive-edit-split: 42%;
+  }
+
+  .dial-archive-stage.is-workcell-edit.has-workcell:not(.is-workcell-closing)
+    .dial-archive-stage-specimen {
+    box-sizing: border-box;
+    padding-left: clamp(20px, 2.2vw, 32px);
+  }
+
+  .dial-archive-stage.is-workcell-edit.has-workcell:not(.is-workcell-closing)
+    .dial-archive-stage-specimen__assembly {
+    width: min(36.5vw, 760px);
+  }
+
+  .dial-archive-stage.is-workcell-edit.has-workcell:not(.is-workcell-closing)
+    .dial-archive-stage-specimen__ring {
+    width: min(40.5vw, 790px);
+  }
+}
+
+@media (min-width: 1081px) and (orientation: landscape) and (max-height: 860px) {
+  .dial-archive-stage.is-workcell-edit.has-workcell:not(.is-workcell-closing)
+    .dial-archive-stage-specimen {
+    top: 54%;
+  }
+
+  .dial-archive-stage.is-workcell-edit.has-workcell:not(.is-workcell-closing)
+    .dial-archive-stage-specimen__assembly {
+    height: clamp(320px, 50vh, 470px);
   }
 }
 
@@ -419,8 +693,8 @@
   }
 
   .dial-archive-edit-workcell__console {
-    inset: 47% 0 0;
-    min-height: 390px;
+    inset: 43% 0 0;
+    min-height: 430px;
     padding-left: 0;
     border-left: 0;
   }

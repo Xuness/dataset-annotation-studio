@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { getHomeSpace } from "../../../navigation/spaceRegistry";
 import type {
+  AnnotationEditContent,
   AnnotationStageAsset,
   AnnotationStageContent,
 } from "../../../pages/spaces/spacePageModel";
@@ -43,6 +44,136 @@ function stageAsset(id: string, index: number): AnnotationStageAsset {
   };
 }
 
+function editContent(overrides: Partial<AnnotationEditContent> = {}): AnnotationEditContent {
+  return {
+    status: "ready",
+    message: null,
+    channel: "tags",
+    channels: [
+      {
+        id: "existing_annotation",
+        code: "TXT.00",
+        title: "原有标注",
+        shortTitle: "原文",
+        state: "missing",
+        stateLabel: "尚未建立",
+        enabled: false,
+      },
+      {
+        id: "tags",
+        code: "TAG.01",
+        title: "标签",
+        shortTitle: "Tags",
+        state: "usable",
+        stateLabel: "当前可用",
+        enabled: true,
+      },
+      {
+        id: "description",
+        code: "DSC.02",
+        title: "描述",
+        shortTitle: "描述",
+        state: "missing",
+        stateLabel: "尚未建立",
+        enabled: true,
+      },
+      {
+        id: "translation",
+        code: "TRN.03",
+        title: "译文",
+        shortTitle: "译文",
+        state: "missing",
+        stateLabel: "尚未建立",
+        enabled: true,
+      },
+    ],
+    document: {
+      displayName: "Tags",
+      exists: true,
+      availability: "usable",
+      availabilityLabel: "当前可用",
+      reviewStatus: "unreviewed",
+      sourceLabel: "Tagger 生成",
+      modifiedAt: "2026-08-04T10:00:00Z",
+      validationIssue: null,
+    },
+    text: "",
+    textPlaceholder: "",
+    characterCount: 0,
+    lineCount: 1,
+    tokenProfileId: "krea2",
+    tokenProfiles: [{ id: "krea2", label: "Krea 2" }],
+    tokenMetrics: [],
+    tokenMetricsPending: false,
+    tags: {
+      groups: [],
+      count: 0,
+      query: "",
+      statusMessage: "",
+      vocabularyId: "auto",
+      vocabularies: [{ id: "auto", label: "跟随标注来源", detail: "" }],
+      suggestions: [],
+      suggestionsOpen: false,
+      suggestionsPending: false,
+      suggestionsError: null,
+      activeSuggestion: 0,
+      setQuery: vi.fn(),
+      setSuggestionsOpen: vi.fn(),
+      setActiveSuggestion: vi.fn(),
+      setVocabulary: vi.fn(),
+      addQuery: vi.fn(),
+      addSuggestion: vi.fn(),
+      removeTag: vi.fn(),
+      handleEmptyBackspace: vi.fn(),
+    },
+    translation: {
+      language: "zh-CN",
+      languageOptions: ["zh-CN"],
+      sourceKind: "description",
+      producerKind: "llm",
+      sourceContent: "",
+      sourceExists: false,
+      status: "missing",
+      statusLabel: "尚无译文",
+      alignmentStatus: "unavailable",
+      issue: null,
+      qualityIssues: [],
+      readOnly: false,
+      editing: false,
+      canEdit: false,
+      canRefreshDictionary: false,
+      dictionaryOverrideCount: 0,
+      dictionaryUnmatchedCount: 0,
+      setLanguage: vi.fn(),
+      setSourceKind: vi.fn(),
+      setProducerKind: vi.fn(),
+      beginEditing: vi.fn(),
+      refreshDictionary: vi.fn(),
+    },
+    history: {
+      open: false,
+      status: "idle",
+      message: null,
+      entries: [],
+      toggle: vi.fn(),
+      restore: vi.fn(),
+    },
+    dirty: false,
+    tagsDirty: false,
+    writePending: false,
+    saveLabel: "保存 Tags",
+    canSave: false,
+    canDiscard: false,
+    actionError: null,
+    setText: vi.fn(),
+    selectChannel: vi.fn(),
+    selectTokenProfile: vi.fn(),
+    save: vi.fn(),
+    discard: vi.fn(),
+    ...overrides,
+  };
+}
+
 function stageContent(overrides: Partial<AnnotationStageContent> = {}): AnnotationStageContent {
   const assets = [stageAsset("asset-1", 0), stageAsset("asset-2", 1), stageAsset("asset-3", 2)];
   return {
@@ -74,6 +205,8 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
     activeWorkcell: null,
     activeEditChannel: "tags",
     activeProductionLane: "tags",
+    edit: editContent(),
+    confirmation: null,
     message: null,
     selectAsset: vi.fn(),
     stepAsset: vi.fn(),
@@ -81,6 +214,7 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
     openWorkcell: vi.fn(),
     closeWorkcell: vi.fn(),
     selectEditChannel: vi.fn(),
+    resolveConfirmation: vi.fn(),
     returnToSpace: vi.fn(),
     openArchive: vi.fn(),
     ...overrides,
@@ -279,8 +413,8 @@ describe("dial archive annotation stage", () => {
     expect(screen.getByRole("group", { name: "素材 asset-1.png 查看器" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "标注编辑" })).not.toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /DSC\s*描述/u }));
-    expect(content.selectEditChannel).toHaveBeenCalledWith("description");
+    fireEvent.click(screen.getByRole("button", { name: /DSC\.02描述/u }));
+    expect(content.edit?.selectChannel).toHaveBeenCalledWith("description");
 
     fireEvent.click(screen.getByRole("button", { name: "切换到自动生产工作间" }));
     expect(content.openWorkcell).toHaveBeenCalledWith("production");

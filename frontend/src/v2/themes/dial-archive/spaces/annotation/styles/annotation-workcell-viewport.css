@@ -612,6 +612,90 @@
   opacity: 0;
 }
 
+.dial-archive-workcell-confirmation {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  align-items: center;
+  justify-items: end;
+  padding: 0 clamp(54px, 6vw, 112px);
+}
+
+.dial-archive-workcell-confirmation__scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(255, 255, 255, 0.88);
+  cursor: default;
+}
+
+.dial-archive-workcell-confirmation > section {
+  position: relative;
+  display: grid;
+  width: min(480px, calc(100% - 64px));
+  padding: 25px 28px 24px;
+  border: 1px solid rgba(25, 25, 25, 0.42);
+  background: white;
+  box-shadow:
+    12px 14px 0 rgba(25, 25, 25, 0.12),
+    inset 6px 0 var(--dial-archive-yellow);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+
+.dial-archive-workcell-confirmation.is-danger > section {
+  box-shadow:
+    12px 14px 0 rgba(25, 25, 25, 0.12),
+    inset 6px 0 #e85d2e;
+}
+
+.dial-archive-workcell-confirmation > section > span {
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 7px;
+  letter-spacing: 0.15em;
+}
+
+.dial-archive-workcell-confirmation h2 {
+  margin: 8px 0 0;
+  font-size: 24px;
+  letter-spacing: 0.08em;
+}
+
+.dial-archive-workcell-confirmation p {
+  margin: 10px 0 22px;
+  color: var(--dial-archive-stage-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.dial-archive-workcell-confirmation > section > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dial-archive-workcell-confirmation > section button {
+  min-height: 40px;
+  border: 1px solid rgba(25, 25, 25, 0.24);
+  color: var(--dial-archive-stage-ink);
+  font-size: 11px;
+  font-weight: 680;
+  background: white;
+  cursor: pointer;
+}
+
+.dial-archive-workcell-confirmation > section button:last-child {
+  border-color: var(--dial-archive-stage-ink);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-workcell-confirmation > section button:hover,
+.dial-archive-workcell-confirmation > section button:focus-visible {
+  outline: 2px solid var(--dial-archive-stage-ink);
+  outline-offset: 2px;
+}
+
 @media (max-width: 1500px) {
   .dial-archive-workcell-viewport__header {
     grid-template-columns: minmax(150px, 1fr) auto auto;

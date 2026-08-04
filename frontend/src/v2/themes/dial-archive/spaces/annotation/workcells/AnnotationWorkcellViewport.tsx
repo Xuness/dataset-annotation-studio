@@ -2,7 +2,9 @@ import { useEffect, useRef } from "react";
 
 import {
   ANNOTATION_WORKCELL_IDS,
+  type AnnotationConfirmation,
   type AnnotationCoverageLane,
+  type AnnotationEditContent,
   type AnnotationLaneId,
   type AnnotationOperationSummary,
   type AnnotationStageAsset,
@@ -23,11 +25,12 @@ interface AnnotationWorkcellViewportProps {
   checkedCount: number;
   channels: readonly AnnotationCoverageLane[];
   operation: AnnotationOperationSummary | null;
-  activeEditChannel: AnnotationLaneId;
+  edit: AnnotationEditContent | null;
   activeProductionLane: AnnotationLaneId;
+  confirmation: AnnotationConfirmation | null;
   onClose(): void;
   onSwitch(workcell: AnnotationWorkcellId): void;
-  onSelectEditChannel(channel: AnnotationLaneId): void;
+  onResolveConfirmation(accepted: boolean): void;
 }
 
 export function AnnotationWorkcellViewport({
@@ -37,11 +40,12 @@ export function AnnotationWorkcellViewport({
   checkedCount,
   channels,
   operation,
-  activeEditChannel,
+  edit,
   activeProductionLane,
+  confirmation,
   onClose,
   onSwitch,
-  onSelectEditChannel,
+  onResolveConfirmation,
 }: AnnotationWorkcellViewportProps) {
   const rootRef = useRef<HTMLElement>(null);
   const workcell = transition.displayedWorkcell;
@@ -135,9 +139,8 @@ export function AnnotationWorkcellViewport({
             <AnnotationEditWorkcell
               asset={asset}
               channels={channels}
-              activeChannel={activeEditChannel}
               checkedCount={checkedCount}
-              onSelectChannel={onSelectEditChannel}
+              edit={edit}
             />
           ) : (
             <div className="dial-archive-workcell-viewport__pending" role="status">
@@ -150,6 +153,36 @@ export function AnnotationWorkcellViewport({
             </div>
           )}
         </div>
+
+        {confirmation ? (
+          <div
+            className={`dial-archive-workcell-confirmation is-${confirmation.tone}`}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="annotation-workcell-confirmation-title"
+            aria-describedby="annotation-workcell-confirmation-message"
+          >
+            <button
+              className="dial-archive-workcell-confirmation__scrim"
+              type="button"
+              aria-label={confirmation.cancelLabel}
+              onClick={() => onResolveConfirmation(false)}
+            />
+            <section>
+              <span>INTERRUPT // UNSAVED OBJECT</span>
+              <h2 id="annotation-workcell-confirmation-title">{confirmation.title}</h2>
+              <p id="annotation-workcell-confirmation-message">{confirmation.message}</p>
+              <div>
+                <button type="button" onClick={() => onResolveConfirmation(false)}>
+                  {confirmation.cancelLabel}
+                </button>
+                <button type="button" onClick={() => onResolveConfirmation(true)} autoFocus>
+                  {confirmation.confirmLabel}
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
       </div>
     </section>
   );
