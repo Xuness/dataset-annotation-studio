@@ -13,6 +13,7 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useRouteSweepTransition } from "../hooks/useRouteSweepTransition";
 import "../styles/tokens.css";
 import { AnnotationSpaceContent } from "./annotation/AnnotationSpaceContent";
+import { AnnotationStage } from "./annotation/stage/AnnotationStage";
 import { ArchiveSpaceContent } from "./components/ArchiveSpaceContent";
 import { PendingSpaceContent } from "./components/PendingSpaceContent";
 import { RouteHandoff } from "./components/RouteHandoff";
@@ -24,6 +25,7 @@ import { PreparationWorkbench } from "./preparation/PreparationWorkbench";
 import "./styles/space.css";
 import "./styles/archive.css";
 import "./styles/annotation.css";
+import "./annotation/styles/annotation-stage.css";
 import "./styles/preparation.css";
 import "./styles/workbench.css";
 import "./styles/motion.css";
@@ -134,6 +136,17 @@ export function DialArchiveSpacePage(props: ThemeSpacePageProps) {
       >
         <SpaceChrome space={props.space} />
         <PreparationWorkbench content={props.content} />
+      </main>
+    );
+  }
+  if (props.content.kind === "annotation-stage") {
+    return (
+      <main
+        className="dial-archive-space dial-archive-space--stage"
+        aria-label="Dataset Annotation Studio 素材施工场"
+      >
+        <SpaceChrome space={props.space} />
+        <AnnotationStage content={props.content} />
       </main>
     );
   }

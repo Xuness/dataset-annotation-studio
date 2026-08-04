@@ -133,6 +133,55 @@ export interface AnnotationSpaceContent {
   openProduction(lane?: AnnotationLaneId, operationId?: string): void;
 }
 
+export const ANNOTATION_WORKCELL_IDS = ["edit", "production", "dossier"] as const;
+
+export type AnnotationWorkcellId = (typeof ANNOTATION_WORKCELL_IDS)[number];
+
+export interface AnnotationStageAsset {
+  id: string;
+  filename: string;
+  relativePath: string;
+  width: number;
+  height: number;
+  byteSize: number;
+  suffix: string;
+  imageUrl: string;
+  thumbnailUrl: string;
+  annotationStatus: string;
+  channelStatuses: Readonly<Record<string, string>>;
+}
+
+export interface AnnotationStageSequence {
+  assets: readonly AnnotationStageAsset[];
+  totalCount: number;
+  loadedCount: number;
+  fetchingMore: boolean;
+  hasMore: boolean;
+  loadMore(): void;
+}
+
+export interface AnnotationStageContent {
+  kind: "annotation-stage";
+  status: "no-context" | "loading" | "ready" | "error";
+  project: AnnotationProjectContext | null;
+  sequence: AnnotationStageSequence;
+  currentAsset: AnnotationStageAsset | null;
+  currentIndex: number;
+  checkedAssetIds: readonly string[];
+  channels: readonly AnnotationCoverageLane[];
+  operation: AnnotationOperationSummary | null;
+  initialWorkcell: AnnotationWorkcellId | null;
+  initialLane: AnnotationLaneId | null;
+  message: string | null;
+  selectAsset(assetId: string): void;
+  stepAsset(offset: number): void;
+  toggleAssetChecked(assetId: string): void;
+  openWorkcell(workcell: AnnotationWorkcellId): void;
+  closeWorkcell(): void;
+  returnToSpace(): void;
+  openArchive(): void;
+}
+
 export const PREPARATION_CAPABILITY_IDS = ["geometry", "encoding", "identity"] as const;
 
 export type PreparationCapabilityId = (typeof PREPARATION_CAPABILITY_IDS)[number];
@@ -279,6 +328,7 @@ export interface PreparationWorkbenchContent {
 export type SpacePageContent =
   | ArchiveSpaceContent
   | AnnotationSpaceContent
+  | AnnotationStageContent
   | PreparationSpaceContent
   | PreparationWorkbenchContent
   | PendingSpaceContent;

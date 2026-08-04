@@ -88,6 +88,29 @@ describe("new frontend routes", () => {
     });
   });
 
+  test("keeps the annotation stage as an explicit third-level route", async () => {
+    renderRoutes("/annotation/stage?theme=dial-archive");
+
+    expect(await screen.findByRole("heading", { name: "素材施工场等待项目源" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /返回标注生产空间/u }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/annotation?theme=dial-archive",
+      );
+    });
+  });
+
+  test("redirects the legacy annotation destinations into the stage with focus semantics", async () => {
+    renderRoutes("/annotation/production?theme=dial-archive&lane=tags");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/annotation/stage?theme=dial-archive&focus=production&lane=tags",
+      );
+    });
+  });
+
   test("preserves project context from home into a selected space", async () => {
     renderRoutes("/?theme=dial-archive&s=2&project=project-42");
 
