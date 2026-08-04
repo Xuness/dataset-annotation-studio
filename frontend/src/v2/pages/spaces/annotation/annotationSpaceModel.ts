@@ -141,7 +141,15 @@ export function toAnnotationOperation(job: JobSummary): AnnotationOperationSumma
 
 export function selectAnnotationOperation(
   jobs: readonly JobSummary[],
+  requestedOperationId: string | null = null,
+  requestedOperation: JobSummary | null = null,
 ): AnnotationOperationSummary | null {
+  if (requestedOperationId) {
+    const exact =
+      (requestedOperation?.id === requestedOperationId ? requestedOperation : null) ??
+      jobs.find((candidate) => candidate.id === requestedOperationId);
+    return exact ? toAnnotationOperation(exact) : null;
+  }
   const job =
     jobs.find((candidate) => ACTIVE_JOB_STATUSES.has(candidate.status)) ??
     jobs.find((candidate) => ATTENTION_JOB_STATUSES.has(candidate.status)) ??

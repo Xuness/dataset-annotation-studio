@@ -4,6 +4,7 @@ import type { AnnotationStageAsset } from "../spacePageModel";
 import {
   isAnnotationWorkcellId,
   resolveStageFocus,
+  shouldContinueStageAssetSearch,
   stepStageIndex,
   toAnnotationStageAsset,
 } from "./annotationStageModel";
@@ -66,11 +67,28 @@ describe("annotation stage model", () => {
     expect(focus.index).toBe(1);
   });
 
-  test("holds the previous position instead of resetting when the id is not loaded", () => {
+  test("keeps an unloaded requested id unresolved instead of showing the wrong asset", () => {
     const assets = [stageAsset("a"), stageAsset("b"), stageAsset("c")];
     const focus = resolveStageFocus(assets, "missing", 2);
-    expect(focus.asset?.id).toBe("c");
-    expect(focus.index).toBe(2);
+    expect(focus.asset).toBe(null);
+    expect(focus.index).toBe(-1);
+  });
+
+  test("continues deep-link pagination only while the target can still be resolved", () => {
+    const base = {
+      requestedAssetId: "target",
+      loadedAssetIds: ["a", "b"],
+      hasMore: true,
+      fetchingMore: false,
+      loadFailed: false,
+    };
+    expect(shouldContinueStageAssetSearch(base)).toBe(true);
+    expect(shouldContinueStageAssetSearch({ ...base, loadedAssetIds: ["a", "target"] })).toBe(
+      false,
+    );
+    expect(shouldContinueStageAssetSearch({ ...base, fetchingMore: true })).toBe(false);
+    expect(shouldContinueStageAssetSearch({ ...base, loadFailed: true })).toBe(false);
+    expect(shouldContinueStageAssetSearch({ ...base, hasMore: false })).toBe(false);
   });
 
   test("clamps the held position to the loaded window", () => {

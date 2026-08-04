@@ -35,8 +35,8 @@ interface ResolvedStageFocus {
 }
 
 /**
- * 当前对象以稳定 asset ID 为身份。请求的 ID 不在已装载序列中时保持
- * 此前的索引位置（序列窗口滚动后的最近可见项），绝不悄悄回退到第一张。
+ * 当前对象以稳定 asset ID 为身份。显式请求的 ID 不在已装载序列中时
+ * 保持未解析状态，由控制器继续装载分页；绝不让 URL 与实际素材错位。
  */
 export function resolveStageFocus(
   assets: readonly AnnotationStageAsset[],
@@ -47,9 +47,30 @@ export function resolveStageFocus(
   if (requestedAssetId) {
     const index = assets.findIndex((asset) => asset.id === requestedAssetId);
     if (index >= 0) return { asset: assets[index], index };
+    return { asset: null, index: -1 };
   }
   const fallback = Math.min(Math.max(previousIndex, 0), assets.length - 1);
   return { asset: assets[fallback], index: fallback };
+}
+
+interface StageAssetSearchState {
+  requestedAssetId: string | null;
+  loadedAssetIds: readonly string[];
+  hasMore: boolean;
+  fetchingMore: boolean;
+  loadFailed: boolean;
+}
+
+/** 深链接只在目标尚未装载且分页仍健康时继续向后解析。 */
+export function shouldContinueStageAssetSearch({
+  requestedAssetId,
+  loadedAssetIds,
+  hasMore,
+  fetchingMore,
+  loadFailed,
+}: StageAssetSearchState): boolean {
+  if (!requestedAssetId || !hasMore || fetchingMore || loadFailed) return false;
+  return !loadedAssetIds.includes(requestedAssetId);
 }
 
 export function stepStageIndex(

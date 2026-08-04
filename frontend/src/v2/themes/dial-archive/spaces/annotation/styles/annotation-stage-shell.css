@@ -1,0 +1,71 @@
+/*
+ * 素材施工场（三级）私有样式。
+ * 暗色星空画布是三级与四级共享的空间底座：Z0 画布（虚空/星尘/透视地面/
+ * 证据看板）、Z1 施工层（展台/胶片轨道）、Z2 控制台读数。
+ * 星尘与仪器几何来自 annotationStageLayout.ts，此处只负责表现。
+ */
+
+.dial-archive-space--stage {
+  --dial-archive-stage-void: #06080d;
+  --dial-archive-stage-void-high: #0d1420;
+  --dial-archive-stage-ink: #e9edf4;
+  --dial-archive-stage-muted: #8b95a6;
+  --dial-archive-stage-hairline: rgba(214, 226, 240, 0.14);
+  --dial-archive-stage-hairline-strong: rgba(214, 226, 240, 0.32);
+  --dial-archive-stage-panel: rgba(13, 18, 28, 0.88);
+  --dial-archive-stage-axis: 41%;
+  --dial-archive-stage-px: 0;
+  --dial-archive-stage-py: 0;
+  color: var(--dial-archive-stage-ink);
+  background: var(--dial-archive-stage-void);
+}
+
+/* ── 暗色 chrome 变体（仅施工场持有，不改动 space.css） ───────────── */
+
+.dial-archive-space--stage .dial-archive-space-chrome {
+  border-bottom-color: var(--dial-archive-stage-hairline);
+  background: rgba(6, 8, 13, 0.92);
+}
+
+.dial-archive-space--stage .dial-archive-space-chrome__brand span {
+  color: var(--dial-archive-stage-ink);
+}
+
+.dial-archive-space--stage .dial-archive-space-chrome__brand i {
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-space--stage .dial-archive-space-chrome__system {
+  color: var(--dial-archive-stage-muted);
+}
+
+.dial-archive-space--stage .dial-archive-chrome__window-controls button {
+  color: var(--dial-archive-stage-muted);
+}
+
+.dial-archive-space--stage .dial-archive-chrome__window-controls button:hover,
+.dial-archive-space--stage .dial-archive-chrome__window-controls button:focus-visible {
+  color: var(--dial-archive-stage-ink);
+  background: rgba(214, 226, 240, 0.08);
+}
+
+/* ── 施工场根 ─────────────────────────────────────────────── */
+
+.dial-archive-stage {
+  position: absolute;
+  inset: var(--dial-archive-space-chrome-h) 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+  font-family: var(--dial-archive-font-ui);
+  outline: none;
+}
+
+.dial-archive-stage:focus-visible::after {
+  position: absolute;
+  inset: 3px;
+  border: 2px solid var(--dial-archive-yellow);
+  content: "";
+  pointer-events: none;
+}

@@ -133,4 +133,15 @@ describe("annotation space projections", () => {
       active: true,
     });
   });
+
+  test("keeps an explicitly requested production record instead of replacing it with the active job", () => {
+    const requested = job({ id: "requested", status: "completed" });
+    const selected = selectAnnotationOperation(
+      [job({ id: "active", status: "running" })],
+      requested.id,
+      requested,
+    );
+
+    expect(selected).toMatchObject({ id: "requested", status: "completed", active: false });
+  });
 });

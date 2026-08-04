@@ -1,0 +1,130 @@
+/* ── 入场编舞：地面亮起 → 展台落位 → 轨道显影 → 卡片发牌 ── */
+
+@keyframes dial-archive-stage-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dial-archive-stage-rise {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+}
+
+@keyframes dial-archive-stage-settle {
+  from {
+    opacity: 0;
+    transform: translateY(34px) scale(0.985);
+  }
+}
+
+@keyframes dial-archive-stage-track-reveal {
+  from {
+    clip-path: inset(0 50% 0 50%);
+    opacity: 0;
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
+
+@keyframes dial-archive-stage-card-deal {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--dial-archive-workcell-shift) + 48px))
+      scale(var(--dial-archive-workcell-scale));
+  }
+}
+
+@keyframes dial-archive-stage-ring-wake {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -52%) rotate(-14deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -52%) rotate(0deg);
+  }
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__void,
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__flare {
+  animation: dial-archive-stage-fade 700ms ease-out backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__horizon {
+  animation: dial-archive-stage-fade 900ms ease-out 90ms backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__stars {
+  animation: dial-archive-stage-fade 1100ms ease-out 160ms backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__ghost-word {
+  animation: dial-archive-stage-rise 950ms var(--dial-archive-ease) 200ms backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__board {
+  animation: dial-archive-stage-fade 850ms ease-out 320ms backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage__masthead {
+  animation: dial-archive-stage-fade 620ms ease-out 60ms backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-specimen__plinth,
+.dial-archive-stage.is-entering .dial-archive-stage-specimen__baseline {
+  animation: dial-archive-stage-settle 720ms var(--dial-archive-ease) 180ms backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-specimen__ring {
+  animation: dial-archive-stage-ring-wake 1150ms var(--dial-archive-ease) 260ms backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-filmstrip {
+  animation: dial-archive-stage-track-reveal 640ms var(--dial-archive-ease) 330ms backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-console__readout,
+.dial-archive-stage.is-entering .dial-archive-stage-console__pager,
+.dial-archive-stage.is-entering .dial-archive-stage-console__progress,
+.dial-archive-stage.is-entering .dial-archive-stage-console__meta {
+  animation: dial-archive-stage-rise 660ms var(--dial-archive-ease) backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-console__readout {
+  animation-delay: 240ms;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-console__pager {
+  animation-delay: 310ms;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-console__progress {
+  animation-delay: 350ms;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-console__meta {
+  animation-delay: 390ms;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-workcell {
+  animation: dial-archive-stage-card-deal 640ms var(--dial-archive-ease) backwards;
+  animation-delay: calc(430ms + var(--dial-archive-workcell-depth) * 95ms);
+}
+
+/* ── 减少动态 ─────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .dial-archive-stage *,
+  .dial-archive-stage *::before,
+  .dial-archive-stage *::after {
+    animation: none !important;
+    transition-duration: 1ms !important;
+  }
+}

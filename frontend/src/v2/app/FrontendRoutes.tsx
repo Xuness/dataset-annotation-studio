@@ -323,6 +323,7 @@ function LoadedAnnotationStageRoute({
   const content = useAnnotationStageController({
     projectId,
     requestedAssetId: query.assetId,
+    requestedOperationId: query.operationId,
     initialWorkcell: query.workcell,
     initialLane: query.lane ?? query.channel,
     onAssetIdChange: (assetId) => navigate(stageHref({ assetId }), { replace: true }),

@@ -157,6 +157,7 @@ export interface AnnotationStageSequence {
   loadedCount: number;
   fetchingMore: boolean;
   hasMore: boolean;
+  loadError: string | null;
   loadMore(): void;
 }
 

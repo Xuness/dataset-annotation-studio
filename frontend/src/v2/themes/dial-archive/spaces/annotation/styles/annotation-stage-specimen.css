@@ -1,0 +1,280 @@
+/* ── 展台 ─────────────────────────────────────────────────── */
+
+.dial-archive-stage-specimen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dial-archive-stage-specimen__ring {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: 50%;
+  width: min(150%, 1040px);
+  height: auto;
+  aspect-ratio: 1080 / 760;
+  fill: none;
+  overflow: visible;
+  pointer-events: none;
+  stroke: var(--dial-archive-stage-hairline);
+  transform: translate(-50%, -52%);
+}
+
+.dial-archive-stage-specimen__ring-rotor line {
+  stroke-width: 1;
+}
+
+.dial-archive-stage-specimen__ring-rotor line.is-major {
+  stroke: var(--dial-archive-stage-hairline-strong);
+}
+
+@keyframes dial-archive-stage-ring-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dial-archive-stage-specimen__ring-rotor {
+  animation: dial-archive-stage-ring-spin 340s linear infinite;
+  transform-origin: 540px 380px;
+}
+
+.dial-archive-stage-specimen__ring-arc {
+  stroke: rgba(214, 226, 240, 0.4);
+  stroke-width: 2.5;
+}
+
+.dial-archive-stage-specimen__plinth {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(100%, 920px);
+  height: clamp(360px, 54vh, 620px);
+  padding: 16px;
+  background: rgba(9, 12, 19, 0.72);
+  box-shadow:
+    0 42px 80px -32px rgba(0, 0, 0, 0.78),
+    0 0 0 1px var(--dial-archive-stage-hairline);
+}
+
+/* 测量边距：letterbox 空余本身是仪器的一部分 */
+.dial-archive-stage-specimen__plinth::before {
+  position: absolute;
+  inset: 16px;
+  background:
+    linear-gradient(rgba(214, 226, 240, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(214, 226, 240, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  content: "";
+  pointer-events: none;
+}
+
+.dial-archive-stage-specimen__corner {
+  position: absolute;
+  z-index: 3;
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
+}
+
+.dial-archive-stage-specimen__corner.is-tl {
+  top: 7px;
+  left: 7px;
+  border-top: 2px solid var(--dial-archive-stage-ink);
+  border-left: 2px solid var(--dial-archive-stage-ink);
+}
+
+.dial-archive-stage-specimen__corner.is-tr {
+  top: 7px;
+  right: 7px;
+  border-top: 2px solid var(--dial-archive-stage-ink);
+  border-right: 2px solid var(--dial-archive-stage-ink);
+}
+
+.dial-archive-stage-specimen__corner.is-bl {
+  bottom: 7px;
+  left: 7px;
+  border-bottom: 2px solid var(--dial-archive-stage-ink);
+  border-left: 2px solid var(--dial-archive-stage-ink);
+}
+
+.dial-archive-stage-specimen__corner.is-br {
+  right: 7px;
+  bottom: 7px;
+  border-right: 2px solid var(--dial-archive-stage-ink);
+  border-bottom: 2px solid var(--dial-archive-stage-ink);
+}
+
+.dial-archive-stage-specimen__measure {
+  position: absolute;
+  z-index: 3;
+  top: -9px;
+  right: 9%;
+  width: 128px;
+  height: 4px;
+  background: var(--dial-archive-yellow);
+  pointer-events: none;
+}
+
+.dial-archive-stage-specimen__measure::after {
+  position: absolute;
+  top: -7px;
+  left: -13px;
+  width: 1px;
+  height: 18px;
+  background: var(--dial-archive-stage-hairline-strong);
+  content: "";
+}
+
+.dial-archive-stage-specimen__frame {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dial-archive-stage-specimen__frame:focus-visible {
+  outline: 2px solid var(--dial-archive-yellow);
+  outline-offset: 6px;
+}
+
+/* 主图保持真实颜色与比例：不加滤镜、不裁切 */
+.dial-archive-stage-specimen__frame img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  box-shadow: 0 18px 52px -18px rgba(0, 0, 0, 0.9);
+}
+
+.dial-archive-stage-specimen__frame.is-empty {
+  flex-direction: column;
+  gap: 12px;
+  color: var(--dial-archive-stage-muted);
+  cursor: default;
+}
+
+.dial-archive-stage-specimen__frame.is-empty b {
+  font-family: var(--dial-archive-font-display);
+  font-size: 26px;
+  font-stretch: 116%;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.dial-archive-stage-specimen__frame.is-empty span {
+  font-family: var(--dial-archive-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+/* 当前对象进入批量范围时的黄色咬合标记（范围语义，非选中语义） */
+.dial-archive-stage-specimen__range-tag {
+  position: absolute;
+  z-index: 4;
+  top: -1px;
+  left: -1px;
+  padding: 5px 11px 5px 9px;
+  color: var(--dial-archive-carbon);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  background: var(--dial-archive-yellow);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+}
+
+.dial-archive-stage-specimen__baseline {
+  display: flex;
+  width: min(100%, 920px);
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 15px;
+}
+
+.dial-archive-stage-specimen__baseline-rule {
+  position: relative;
+  display: block;
+  height: 1px;
+  background: var(--dial-archive-stage-hairline-strong);
+}
+
+.dial-archive-stage-specimen__baseline-rule::before,
+.dial-archive-stage-specimen__baseline-rule::after {
+  position: absolute;
+  top: -3px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--dial-archive-stage-hairline-strong);
+  background: var(--dial-archive-stage-void);
+  content: "";
+  transform: rotate(45deg);
+}
+
+.dial-archive-stage-specimen__baseline-rule::before {
+  left: 0;
+}
+
+.dial-archive-stage-specimen__baseline-rule::after {
+  right: 0;
+}
+
+.dial-archive-stage-specimen__readings {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 22px;
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+}
+
+.dial-archive-stage-specimen__path {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-stage-specimen__channels {
+  display: flex;
+  flex: none;
+  gap: 13px;
+}
+
+.dial-archive-stage-specimen__channels em,
+.dial-archive-stage-console__channels em {
+  font-style: normal;
+}
+
+.dial-archive-stage-specimen__channels em.is-valid,
+.dial-archive-stage-console__channels em.is-valid {
+  color: var(--dial-archive-stage-ink);
+}
+
+.dial-archive-stage-specimen__channels em.is-stale,
+.dial-archive-stage-console__channels em.is-stale {
+  color: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage-specimen__channels em.is-invalid,
+.dial-archive-stage-console__channels em.is-invalid {
+  color: var(--dial-archive-alert);
+}

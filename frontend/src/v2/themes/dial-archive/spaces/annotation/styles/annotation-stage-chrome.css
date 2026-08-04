@@ -1,0 +1,99 @@
+/* ── 顶栏 ─────────────────────────────────────────────────── */
+
+.dial-archive-stage__masthead {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  height: 62px;
+  padding: 0 clamp(28px, 3vw, 56px);
+  border-bottom: 1px solid var(--dial-archive-stage-hairline);
+  background: linear-gradient(180deg, rgba(6, 8, 13, 0.72), transparent);
+}
+
+.dial-archive-stage__return {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  border: 0;
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  background: transparent;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+
+.dial-archive-stage__return:hover,
+.dial-archive-stage__return:focus-visible {
+  color: var(--dial-archive-stage-ink);
+  outline: none;
+}
+
+.dial-archive-stage__return:focus-visible {
+  outline: 2px solid var(--dial-archive-yellow);
+  outline-offset: 3px;
+}
+
+.dial-archive-stage__title {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.dial-archive-stage__title em {
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.22em;
+}
+
+.dial-archive-stage__title b {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+}
+
+.dial-archive-stage__project {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.dial-archive-stage__project span {
+  overflow: hidden;
+  max-width: 300px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-stage__project small {
+  color: var(--dial-archive-stage-muted);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+}
+
+/* ── 施工层网格 ───────────────────────────────────────────── */
+
+.dial-archive-stage__floor {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 27vw, 470px);
+  align-items: center;
+  gap: clamp(30px, 3.6vw, 80px);
+  min-height: 0;
+  padding: clamp(10px, 1.6vh, 26px) clamp(34px, 4.4vw, 104px) 0;
+}

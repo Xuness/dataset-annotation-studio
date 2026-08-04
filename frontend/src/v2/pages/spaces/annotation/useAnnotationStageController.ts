@@ -1,9 +1,9 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { imageUrl, thumbnailUrl } from "../../../../features/assets/api";
 import { useInfiniteAssets } from "../../../../features/assets/hooks";
 import { useAnnotationOverview } from "../../../../features/annotations/hooks";
-import { useJobHistory } from "../../../../features/jobs/hooks";
+import { useJob, useJobHistory } from "../../../../features/jobs/hooks";
 import { useWorkspace } from "../../../../features/workspaces/hooks";
 import { useWorkspaceSelectionStore } from "../../../../shared/store/workspaceSelectionStore";
 import type {
@@ -16,13 +16,19 @@ import {
   selectAnnotationOperation,
   toAnnotationProject,
 } from "./annotationSpaceModel";
-import { resolveStageFocus, stepStageIndex, toAnnotationStageAsset } from "./annotationStageModel";
+import {
+  resolveStageFocus,
+  shouldContinueStageAssetSearch,
+  stepStageIndex,
+  toAnnotationStageAsset,
+} from "./annotationStageModel";
 
 const STAGE_PAGE_SIZE = 120;
 
 interface UseAnnotationStageControllerOptions {
   projectId: string;
   requestedAssetId: string | null;
+  requestedOperationId: string | null;
   initialWorkcell: AnnotationWorkcellId | null;
   initialLane: AnnotationLaneId | null;
   onAssetIdChange(assetId: string | null): void;
@@ -39,6 +45,7 @@ function describeError(reason: unknown, fallback: string): string {
 export function useAnnotationStageController({
   projectId,
   requestedAssetId,
+  requestedOperationId,
   initialWorkcell,
   initialLane,
   onAssetIdChange,
@@ -51,6 +58,7 @@ export function useAnnotationStageController({
   const assets = useInfiniteAssets(projectId, {}, STAGE_PAGE_SIZE);
   const overview = useAnnotationOverview(projectId);
   const jobs = useJobHistory(projectId, 20);
+  const requestedJob = useJob(projectId, requestedOperationId, 1);
   const checkedAssetIds = useWorkspaceSelectionStore((state) => state.checkedAssetIds);
   const toggleCheckedAsset = useWorkspaceSelectionStore((state) => state.toggleCheckedAsset);
   const lastIndexRef = useRef(0);
@@ -71,6 +79,22 @@ export function useAnnotationStageController({
     [pages, projectId],
   );
   const totalCount = pages?.[0]?.total ?? 0;
+  const loadedAssetIds = useMemo(() => stageAssets.map((asset) => asset.id), [stageAssets]);
+  const pageLoadError = assets.isFetchNextPageError
+    ? describeError(assets.error, "无法继续读取素材序列。")
+    : null;
+  const continueAssetSearch = shouldContinueStageAssetSearch({
+    requestedAssetId,
+    loadedAssetIds,
+    hasMore: Boolean(assets.hasNextPage),
+    fetchingMore: assets.isFetchingNextPage,
+    loadFailed: Boolean(pageLoadError),
+  });
+
+  const fetchNextPage = assets.fetchNextPage;
+  useEffect(() => {
+    if (continueAssetSearch) void fetchNextPage();
+  }, [continueAssetSearch, fetchNextPage]);
 
   const focus = useMemo(
     () => resolveStageFocus(stageAssets, requestedAssetId, lastIndexRef.current),
@@ -80,14 +104,19 @@ export function useAnnotationStageController({
 
   const channels = useMemo(() => projectAnnotationCoverage(overview.data), [overview.data]);
   const operation = useMemo(
-    () => selectAnnotationOperation(jobs.data?.pages.flat() ?? []),
-    [jobs.data?.pages],
+    () =>
+      selectAnnotationOperation(
+        jobs.data?.pages.flat() ?? [],
+        requestedOperationId,
+        requestedJob.data ?? null,
+      ),
+    [jobs.data?.pages, requestedJob.data, requestedOperationId],
   );
 
-  const fetchNextPage = assets.fetchNextPage;
   const loadMore = useCallback(() => {
+    if (!assets.hasNextPage || assets.isFetchingNextPage) return;
     void fetchNextPage();
-  }, [fetchNextPage]);
+  }, [assets.hasNextPage, assets.isFetchingNextPage, fetchNextPage]);
 
   const selectAsset = useCallback(
     (assetId: string) => {
@@ -104,19 +133,44 @@ export function useAnnotationStageController({
     [focus.asset?.id, focus.index, onAssetIdChange, stageAssets],
   );
 
-  const corePending = workspace.isPending || assets.isPending || overview.isPending;
-  const coreFailed = workspace.isError || assets.isError || overview.isError;
+  const requestedAssetLoaded = !requestedAssetId || loadedAssetIds.includes(requestedAssetId);
+  const resolvingRequestedAsset =
+    Boolean(requestedAssetId) &&
+    !requestedAssetLoaded &&
+    !pageLoadError &&
+    (assets.isPending || assets.isFetchingNextPage || continueAssetSearch);
+  const requestedAssetMissing =
+    Boolean(requestedAssetId) &&
+    !requestedAssetLoaded &&
+    !resolvingRequestedAsset &&
+    !pageLoadError;
+  const corePending =
+    workspace.isPending || assets.isPending || overview.isPending || resolvingRequestedAsset;
+  const coreFailed =
+    workspace.isError ||
+    (assets.isError && !assets.data) ||
+    overview.isError ||
+    requestedAssetMissing ||
+    (Boolean(requestedAssetId) && !requestedAssetLoaded && Boolean(pageLoadError));
   const message = workspace.isError
     ? describeError(workspace.error, "无法读取当前项目。")
-    : assets.isError
+    : assets.isError && !assets.data
       ? describeError(assets.error, "无法读取素材序列。")
       : overview.isError
         ? describeError(overview.error, "无法读取标注生产概览。")
         : !corePending && !project
           ? "当前项目上下文已经失效，请返回项目档案重新装载。"
-          : jobs.isError
-            ? describeError(jobs.error, "无法读取最近的生产任务。")
-            : null;
+          : requestedAssetMissing
+            ? "指定素材已经不在当前项目中，请返回标注生产空间重新选择。"
+            : requestedAssetId && !requestedAssetLoaded && pageLoadError
+              ? pageLoadError
+              : requestedOperationId && !operation && requestedJob.isError
+                ? describeError(requestedJob.error, "无法读取指定生产任务。")
+                : pageLoadError
+                  ? pageLoadError
+                  : jobs.isError && !requestedOperationId
+                    ? describeError(jobs.error, "无法读取最近的生产任务。")
+                    : null;
 
   return {
     kind: "annotation-stage",
@@ -128,6 +182,7 @@ export function useAnnotationStageController({
       loadedCount: stageAssets.length,
       fetchingMore: assets.isFetchingNextPage,
       hasMore: Boolean(assets.hasNextPage),
+      loadError: pageLoadError,
       loadMore,
     },
     currentAsset: focus.asset,
@@ -167,6 +222,7 @@ export function createNoContextAnnotationStage({
       loadedCount: 0,
       fetchingMore: false,
       hasMore: false,
+      loadError: null,
       loadMore: () => {},
     },
     currentAsset: null,

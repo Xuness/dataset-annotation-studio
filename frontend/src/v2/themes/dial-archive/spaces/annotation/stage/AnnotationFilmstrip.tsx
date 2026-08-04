@@ -28,12 +28,20 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
 }: AnnotationFilmstripProps) {
   const { filmstrip } = ANNOTATION_STAGE_LAYOUT;
   const wheelLockRef = useRef(0);
-  const { assets, loadedCount, totalCount, hasMore, fetchingMore, loadMore } = sequence;
+  const { assets, loadedCount, totalCount, hasMore, fetchingMore, loadError, loadMore } = sequence;
 
   useEffect(() => {
-    if (!hasMore || fetchingMore) return;
+    if (!hasMore || fetchingMore || loadError) return;
     if (loadedCount - currentIndex <= filmstrip.loadMoreThreshold) loadMore();
-  }, [currentIndex, fetchingMore, filmstrip.loadMoreThreshold, hasMore, loadMore, loadedCount]);
+  }, [
+    currentIndex,
+    fetchingMore,
+    filmstrip.loadMoreThreshold,
+    hasMore,
+    loadError,
+    loadMore,
+    loadedCount,
+  ]);
 
   const anchor = Math.max(currentIndex, 0);
   const windowStart = Math.max(0, anchor - filmstrip.windowRadius);
@@ -85,12 +93,18 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
           );
         })}
       </div>
-      <footer className="dial-archive-stage-filmstrip__foot" aria-hidden="true">
+      <footer className="dial-archive-stage-filmstrip__foot">
         <span>
           {checkedAssetIds.length > 0 ? `${checkedAssetIds.length} SELECTED / ` : ""}
           {totalCount} MATERIAL
         </span>
-        <span>{fetchingMore ? "LOADING SEQUENCE…" : "ALT + CLICK // TOGGLE RANGE"}</span>
+        {loadError && hasMore ? (
+          <button type="button" onClick={loadMore}>
+            RETRY SEQUENCE →
+          </button>
+        ) : (
+          <span>{fetchingMore ? "LOADING SEQUENCE…" : "ALT + CLICK // TOGGLE RANGE"}</span>
+        )}
       </footer>
     </nav>
   );

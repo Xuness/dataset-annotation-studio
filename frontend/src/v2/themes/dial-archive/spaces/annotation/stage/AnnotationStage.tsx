@@ -78,6 +78,7 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
   }
 
   if (content.status === "error") {
+    const canRetrySequence = Boolean(content.sequence.loadError && content.sequence.hasMore);
     return (
       <section className="dial-archive-stage-state is-error" role="alert">
         <div aria-hidden="true">// ATTENTION</div>
@@ -85,9 +86,16 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
         <h1>素材施工场无法装载</h1>
         <p>{content.message ?? "当前项目上下文不可用。"}</p>
         <div>
-          <button type="button" onClick={content.openArchive}>
-            返回项目档案
-          </button>
+          {canRetrySequence ? (
+            <button type="button" onClick={content.sequence.loadMore}>
+              <b>重试素材序列</b>
+              <em>RETRY SEQUENCE →</em>
+            </button>
+          ) : (
+            <button type="button" onClick={content.openArchive}>
+              返回项目档案
+            </button>
+          )}
           <button type="button" onClick={content.returnToSpace}>
             返回标注生产空间
           </button>

@@ -1,0 +1,57 @@
+/* ── 响应式 ───────────────────────────────────────────────── */
+
+@media (max-width: 1500px) {
+  .dial-archive-stage__floor {
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 27vw, 400px);
+  }
+
+  .dial-archive-stage-console__ordinal {
+    font-size: clamp(72px, 8vw, 110px);
+  }
+}
+
+@media (max-height: 860px) {
+  .dial-archive-stage-specimen__plinth {
+    height: clamp(290px, 46vh, 480px);
+  }
+
+  .dial-archive-stage-console {
+    gap: 12px;
+  }
+
+  .dial-archive-stage-console__ordinal {
+    font-size: clamp(64px, 7vw, 96px);
+  }
+}
+
+@media (max-width: 1180px), (orientation: portrait) {
+  .dial-archive-stage__floor {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  .dial-archive-stage {
+    --dial-archive-stage-axis: 50%;
+  }
+
+  .dial-archive-stage-console {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 14px 26px;
+    padding-bottom: 12px;
+  }
+
+  .dial-archive-stage-console__ordinal {
+    font-size: clamp(56px, 9vw, 84px);
+  }
+
+  .dial-archive-stage-canvas__ghost-word {
+    font-size: clamp(120px, 24vw, 220px);
+  }
+
+  .dial-archive-stage__project span {
+    max-width: 170px;
+  }
+}

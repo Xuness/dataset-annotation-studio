@@ -63,6 +63,7 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
       loadedCount: 3,
       fetchingMore: false,
       hasMore: false,
+      loadError: null,
       loadMore: vi.fn(),
     },
     currentAsset: assets[0],
@@ -211,5 +212,23 @@ describe("dial archive annotation stage", () => {
     fireEvent.error(screen.getByAltText("asset-1.png"));
     expect(screen.getByText("IMAGE UNAVAILABLE")).not.toBeNull();
     expect(screen.getAllByText("images/asset-1.png").length).toBeGreaterThanOrEqual(1);
+  });
+
+  test("offers an explicit retry instead of looping after sequence pagination fails", () => {
+    const loadMore = vi.fn();
+    renderStage(
+      stageContent({
+        sequence: {
+          ...stageContent().sequence,
+          hasMore: true,
+          loadError: "下一页读取失败",
+          loadMore,
+        },
+        message: "下一页读取失败",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "RETRY SEQUENCE →" }));
+    expect(loadMore).toHaveBeenCalledOnce();
   });
 });
