@@ -161,6 +161,40 @@ describe("dial archive annotation stage", () => {
     expect(content.toggleAssetChecked).toHaveBeenCalledWith("asset-2");
   });
 
+  test("keeps the filmstrip viewport still when a visible material becomes current", () => {
+    const rect = (left: number, top: number, width: number, height: number) =>
+      ({
+        x: left,
+        y: top,
+        top,
+        right: left + width,
+        bottom: top + height,
+        left,
+        width,
+        height,
+        toJSON: () => ({}),
+      }) satisfies DOMRect;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this.classList.contains("dial-archive-stage-filmstrip")) return rect(0, 0, 1_000, 164);
+      const filmIndex = this.getAttribute("data-film-index");
+      if (filmIndex !== null) return rect(650 + Number(filmIndex) * 130, 24, 144, 96);
+      return rect(0, 0, 0, 0);
+    });
+
+    const { container } = renderStage(stageContent());
+    const track = container.querySelector<HTMLElement>(".dial-archive-stage-filmstrip__track");
+    expect(track?.style.transform).toBe("translateX(0px)");
+
+    fireEvent.click(screen.getByRole("button", { name: "查看素材 asset-3.png" }));
+
+    expect(track?.style.transform).toBe("translateX(0px)");
+    expect(screen.getByRole("button", { name: "查看素材 asset-3.png" }).className).toContain(
+      "is-current",
+    );
+  });
+
   test("marks ranged materials with the bite while the current one keeps its identity frame", () => {
     const content = stageContent({ checkedAssetIds: ["asset-2"] });
     renderStage(content);

@@ -3,19 +3,21 @@
 .dial-archive-stage__message {
   position: absolute;
   z-index: 30;
-  bottom: 190px;
-  left: clamp(34px, 4.4vw, 104px);
+  bottom: 186px;
+  left: clamp(30px, 3.6vw, 76px);
   display: flex;
   align-items: baseline;
   gap: 14px;
   max-width: 520px;
   padding: 12px 16px;
-  border-left: 3px solid var(--dial-archive-alert);
+  border: 1px solid rgba(25, 25, 25, 0.18);
+  border-left: 4px solid var(--dial-archive-alert);
   color: var(--dial-archive-alert);
   font-family: var(--dial-archive-font-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
-  background: rgba(10, 8, 6, 0.9);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 7px 8px 0 rgba(25, 25, 25, 0.05);
 }
 
 .dial-archive-stage__message p {
@@ -34,25 +36,36 @@
   align-items: flex-start;
   justify-content: center;
   padding: 0 clamp(60px, 9vw, 180px);
+  color: var(--dial-archive-stage-ink, #191919);
   background:
-    radial-gradient(1000px 500px at 74% 10%, rgba(52, 74, 110, 0.16), transparent 68%),
-    linear-gradient(178deg, #06080d 4%, #0d1420 60%, #080c14 100%);
+    linear-gradient(90deg, transparent 0 72%, rgba(25, 25, 25, 0.045) 72% 72.1%, transparent 72.1%),
+    linear-gradient(180deg, #ffffff, #f6f7f5);
+}
+
+.dial-archive-stage-state::after {
+  position: absolute;
+  top: 17%;
+  right: 8%;
+  width: clamp(42px, 4vw, 76px);
+  height: 34%;
+  background: var(--dial-archive-yellow);
+  content: "";
 }
 
 .dial-archive-stage-state > div:first-child {
-  color: transparent;
+  color: rgba(25, 25, 25, 0.02);
   font-family: var(--dial-archive-font-display);
   font-size: clamp(110px, 14vw, 230px);
   font-stretch: 120%;
   font-weight: 900;
   letter-spacing: -0.04em;
   line-height: 0.8;
-  -webkit-text-stroke: 1px rgba(214, 226, 240, 0.2);
+  -webkit-text-stroke: 1px rgba(25, 25, 25, 0.16);
 }
 
 .dial-archive-stage-state > span {
   margin-top: 30px;
-  color: var(--dial-archive-stage-muted);
+  color: var(--dial-archive-stage-muted, #6f716e);
   font-family: var(--dial-archive-font-mono);
   font-size: 11px;
   letter-spacing: 0.22em;
@@ -60,17 +73,17 @@
 
 .dial-archive-stage-state h1 {
   margin: 14px 0 0;
-  color: var(--dial-archive-stage-ink);
+  color: var(--dial-archive-stage-ink, #191919);
   font-size: clamp(30px, 3vw, 44px);
-  font-weight: 600;
+  font-weight: 650;
   letter-spacing: 0.1em;
 }
 
 .dial-archive-stage-state p {
   margin: 16px 0 0;
-  color: var(--dial-archive-stage-muted);
+  color: var(--dial-archive-stage-muted, #6f716e);
   font-size: 14px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   line-height: 1.8;
 }
 
@@ -86,12 +99,13 @@
   align-items: center;
   gap: 18px;
   padding: 16px 24px;
-  border: 0;
-  color: var(--dial-archive-carbon);
+  border: 1px solid var(--dial-archive-stage-ink, #191919);
+  color: var(--dial-archive-stage-ink, #191919);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 650;
   letter-spacing: 0.1em;
   background: var(--dial-archive-yellow);
+  box-shadow: 7px 8px 0 rgba(25, 25, 25, 0.08);
   cursor: pointer;
   transition: transform 180ms var(--dial-archive-ease);
 }
@@ -104,15 +118,15 @@
   font-family: var(--dial-archive-font-mono);
   font-size: 10px;
   font-style: normal;
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: 0.16em;
 }
 
 .dial-archive-stage-state > div:last-child button:last-child {
   padding: 8px 2px;
   border: 0;
-  border-bottom: 1px solid var(--dial-archive-stage-hairline-strong);
-  color: var(--dial-archive-stage-muted);
+  border-bottom: 1px solid rgba(25, 25, 25, 0.34);
+  color: var(--dial-archive-stage-muted, #6f716e);
   font-size: 13px;
   letter-spacing: 0.1em;
   background: transparent;
@@ -120,7 +134,7 @@
 }
 
 .dial-archive-stage-state > div:last-child button:last-child:hover {
-  color: var(--dial-archive-stage-ink);
+  color: var(--dial-archive-stage-ink, #191919);
 }
 
 .dial-archive-stage-state button:focus-visible {
@@ -139,13 +153,13 @@
 }
 
 .dial-archive-stage-state.is-loading i {
-  overflow: hidden;
   position: relative;
   display: block;
   width: 340px;
   height: 3px;
   margin-top: 36px;
-  background: rgba(214, 226, 240, 0.12);
+  overflow: hidden;
+  background: rgba(25, 25, 25, 0.12);
 }
 
 .dial-archive-stage-state.is-loading i::after {

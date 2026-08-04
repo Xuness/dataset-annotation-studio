@@ -1,4 +1,4 @@
-/* ── 入场编舞：地面亮起 → 展台落位 → 轨道显影 → 卡片发牌 ── */
+/* ── 入场编舞：纸面建立 → 结构线接入 → 工作间落位 → 标本舱锁定 ── */
 
 @keyframes dial-archive-stage-fade {
   from {
@@ -16,7 +16,7 @@
 @keyframes dial-archive-stage-settle {
   from {
     opacity: 0;
-    transform: translateY(34px) scale(0.985);
+    transform: translateY(34px);
   }
 }
 
@@ -35,34 +35,39 @@
 @keyframes dial-archive-stage-card-deal {
   from {
     opacity: 0;
-    transform: translateX(calc(var(--dial-archive-workcell-shift) + 48px))
-      scale(var(--dial-archive-workcell-scale));
+    translate: 42px 20px;
   }
 }
 
 @keyframes dial-archive-stage-ring-wake {
   from {
     opacity: 0;
-    transform: translate(-50%, -52%) rotate(-14deg);
+    transform: translate3d(-50%, -52%, -48px) rotateZ(-20deg);
   }
 
   to {
     opacity: 1;
-    transform: translate(-50%, -52%) rotate(0deg);
+    transform: translate3d(-50%, -52%, -48px) rotateZ(-7deg);
   }
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-canvas__void,
-.dial-archive-stage.is-entering .dial-archive-stage-canvas__flare {
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__paper,
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__crop {
   animation: dial-archive-stage-fade 700ms ease-out backwards;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-canvas__horizon {
-  animation: dial-archive-stage-fade 900ms ease-out 90ms backwards;
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__guides {
+  animation: dial-archive-stage-fade 960ms ease-out 90ms backwards;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-canvas__stars {
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__points {
   animation: dial-archive-stage-fade 1100ms ease-out 160ms backwards;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-canvas__points.is-flow {
+  animation:
+    dial-archive-stage-fade 1100ms ease-out 160ms backwards,
+    dial-archive-stage-registration-drift 54s linear 1.26s infinite alternate;
 }
 
 .dial-archive-stage.is-entering .dial-archive-stage-canvas__ghost-word {
@@ -77,7 +82,7 @@
   animation: dial-archive-stage-fade 620ms ease-out 60ms backwards;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-specimen__plinth,
+.dial-archive-stage.is-entering .dial-archive-stage-specimen__assembly,
 .dial-archive-stage.is-entering .dial-archive-stage-specimen__baseline {
   animation: dial-archive-stage-settle 720ms var(--dial-archive-ease) 180ms backwards;
 }
@@ -90,32 +95,38 @@
   animation: dial-archive-stage-track-reveal 640ms var(--dial-archive-ease) 330ms backwards;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-console__readout,
-.dial-archive-stage.is-entering .dial-archive-stage-console__pager,
-.dial-archive-stage.is-entering .dial-archive-stage-console__progress,
-.dial-archive-stage.is-entering .dial-archive-stage-console__meta {
+.dial-archive-stage.is-entering .dial-archive-stage-readout__eyebrow,
+.dial-archive-stage.is-entering .dial-archive-stage-readout__identity,
+.dial-archive-stage.is-entering .dial-archive-stage-readout__ledger {
   animation: dial-archive-stage-rise 660ms var(--dial-archive-ease) backwards;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-console__readout {
+.dial-archive-stage.is-entering .dial-archive-stage-readout__eyebrow {
   animation-delay: 240ms;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-console__pager {
+.dial-archive-stage.is-entering .dial-archive-stage-readout__identity {
   animation-delay: 310ms;
 }
 
-.dial-archive-stage.is-entering .dial-archive-stage-console__progress {
-  animation-delay: 350ms;
-}
-
-.dial-archive-stage.is-entering .dial-archive-stage-console__meta {
+.dial-archive-stage.is-entering .dial-archive-stage-readout__ledger {
   animation-delay: 390ms;
 }
 
 .dial-archive-stage.is-entering .dial-archive-stage-workcell {
   animation: dial-archive-stage-card-deal 640ms var(--dial-archive-ease) backwards;
-  animation-delay: calc(430ms + var(--dial-archive-workcell-depth) * 95ms);
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-workcell.is-dossier {
+  animation-delay: 360ms;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-workcell.is-production {
+  animation-delay: 450ms;
+}
+
+.dial-archive-stage.is-entering .dial-archive-stage-workcell.is-edit {
+  animation-delay: 540ms;
 }
 
 /* ── 走片编排：主图、序号与读数服从同一方向和可取消时长 ───────── */
@@ -220,28 +231,28 @@
     var(--dial-archive-ease) both;
 }
 
-.dial-archive-stage-console__readout.is-walking-forward
-  .dial-archive-stage-console__readout-layer.is-current,
-.dial-archive-stage-console__meta.is-walking-forward {
+.dial-archive-stage-readout__identity.is-walking-forward
+  .dial-archive-stage-readout__layer.is-current,
+.dial-archive-stage-readout__ledger.is-walking-forward {
   animation: dial-archive-stage-readout-in-forward var(--dial-archive-stage-walk-duration)
     var(--dial-archive-ease) both;
 }
 
-.dial-archive-stage-console__readout.is-walking-forward
-  .dial-archive-stage-console__readout-layer.is-outgoing {
+.dial-archive-stage-readout__identity.is-walking-forward
+  .dial-archive-stage-readout__layer.is-outgoing {
   animation: dial-archive-stage-readout-out-forward var(--dial-archive-stage-walk-duration)
     var(--dial-archive-ease) both;
 }
 
-.dial-archive-stage-console__readout.is-walking-backward
-  .dial-archive-stage-console__readout-layer.is-current,
-.dial-archive-stage-console__meta.is-walking-backward {
+.dial-archive-stage-readout__identity.is-walking-backward
+  .dial-archive-stage-readout__layer.is-current,
+.dial-archive-stage-readout__ledger.is-walking-backward {
   animation: dial-archive-stage-readout-in-backward var(--dial-archive-stage-walk-duration)
     var(--dial-archive-ease) both;
 }
 
-.dial-archive-stage-console__readout.is-walking-backward
-  .dial-archive-stage-console__readout-layer.is-outgoing {
+.dial-archive-stage-readout__identity.is-walking-backward
+  .dial-archive-stage-readout__layer.is-outgoing {
   animation: dial-archive-stage-readout-out-backward var(--dial-archive-stage-walk-duration)
     var(--dial-archive-ease) both;
 }

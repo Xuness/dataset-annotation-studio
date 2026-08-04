@@ -5,6 +5,7 @@ import { usePrefersReducedMotion } from "../../../hooks/usePrefersReducedMotion"
 import { AnnotationFilmstrip } from "./AnnotationFilmstrip";
 import { AnnotationSpecimen } from "./AnnotationSpecimen";
 import { AnnotationStageCanvas } from "./AnnotationStageCanvas";
+import { AnnotationStageReadout } from "./AnnotationStageReadout";
 import { AnnotationWorkcellMap } from "./AnnotationWorkcellMap";
 import { useStageAssetNavigation } from "./hooks/useStageAssetNavigation";
 import { useStageCamera } from "./hooks/useStageCamera";
@@ -12,8 +13,8 @@ import { useStageParallax } from "./hooks/useStageParallax";
 import { createAnnotationStageStyle } from "./model/annotationStageLayout";
 
 /**
- * 三级素材施工场：暗色星空画布（Z0）+ 展台与胶片轨道（Z1）+
- * 控制台读数（Z2）。四级工作间作为本空间之上的展开态，画布不卸载。
+ * 三级素材施工场：冷白编辑画布（Z0）+ 展台与胶片轨道（Z1）+
+ * 固定身份读数（Z2）。四级工作间作为本空间之上的展开态，画布不卸载。
  */
 
 interface AnnotationStageProps {
@@ -142,7 +143,11 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
       onPointerUp={camera.onPointerUp}
       onPointerCancel={camera.onPointerCancel}
     >
-      <AnnotationStageCanvas evidenceAssets={content.sequence.assets} />
+      <AnnotationStageCanvas
+        evidenceAssets={content.sequence.assets}
+        currentIndex={navigation.visualIndex}
+        checkedAssetIds={content.checkedAssetIds}
+      />
 
       <header className="dial-archive-stage__masthead" data-stage-camera-lock>
         <button
@@ -169,25 +174,29 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
         </div>
       </header>
 
-      <div className="dial-archive-stage__floor">
-        <AnnotationSpecimen
-          asset={navigation.visualAsset}
-          checked={currentChecked}
-          reducedMotion={reducedMotion}
-          walk={navigation.walk}
-          onOpenDefaultWorkcell={() => content.openWorkcell("edit")}
-        />
-        <AnnotationWorkcellMap
+      <div className="dial-archive-stage__scene">
+        <div className="dial-archive-stage__scene-camera">
+          <AnnotationWorkcellMap
+            asset={navigation.visualAsset}
+            totalCount={content.sequence.totalCount}
+            checkedCount={content.checkedAssetIds.length}
+            channels={content.channels}
+            operation={content.operation}
+            focusedWorkcell={content.initialWorkcell}
+            onOpenWorkcell={content.openWorkcell}
+          />
+          <AnnotationSpecimen
+            asset={navigation.visualAsset}
+            checked={currentChecked}
+            reducedMotion={reducedMotion}
+            walk={navigation.walk}
+            onOpenDefaultWorkcell={() => content.openWorkcell("edit")}
+          />
+        </div>
+        <AnnotationStageReadout
           asset={navigation.visualAsset}
           currentIndex={navigation.visualIndex}
-          totalCount={content.sequence.totalCount}
-          checkedCount={content.checkedAssetIds.length}
-          channels={content.channels}
-          operation={content.operation}
-          focusedWorkcell={content.initialWorkcell}
           walk={navigation.walk}
-          onStepAsset={navigation.stepAsset}
-          onOpenWorkcell={content.openWorkcell}
         />
       </div>
 

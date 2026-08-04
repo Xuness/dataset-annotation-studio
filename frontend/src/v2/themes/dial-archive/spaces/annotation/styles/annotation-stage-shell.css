@@ -1,18 +1,19 @@
 /*
  * 素材施工场（三级）私有样式。
- * 暗色星空画布是三级与四级共享的空间底座：Z0 画布（虚空/星尘/透视地面/
- * 证据看板）、Z1 施工层（展台/胶片轨道）、Z2 控制台读数。
- * 星尘与仪器几何来自 annotationStageLayout.ts，此处只负责表现。
+ * Z0 是冷白编辑式画布，Z1 是前台标本舱与后方工作间，Z2 是固定身份读数。
+ * 深色仅作为图片观察窗或局部身份块，不再承担整页背景。
  */
 
 .dial-archive-space--stage {
-  --dial-archive-stage-void: #06080d;
-  --dial-archive-stage-void-high: #0d1420;
-  --dial-archive-stage-ink: #e9edf4;
-  --dial-archive-stage-muted: #8b95a6;
-  --dial-archive-stage-hairline: rgba(214, 226, 240, 0.14);
-  --dial-archive-stage-hairline-strong: rgba(214, 226, 240, 0.32);
-  --dial-archive-stage-panel: rgba(13, 18, 28, 0.88);
+  --dial-archive-stage-paper: #ffffff;
+  --dial-archive-stage-paper-low: #f2f3f1;
+  --dial-archive-stage-paper-high: #fafbfa;
+  --dial-archive-stage-ink: #191919;
+  --dial-archive-stage-muted: #6f716e;
+  --dial-archive-stage-hairline: rgba(25, 25, 25, 0.13);
+  --dial-archive-stage-hairline-strong: rgba(25, 25, 25, 0.34);
+  --dial-archive-stage-panel: rgba(255, 255, 255, 0.94);
+  --dial-archive-stage-aperture: #111317;
   --dial-archive-stage-axis: var(--dial-archive-stage-axis-wide);
   --dial-archive-stage-px: 0;
   --dial-archive-stage-py: 0;
@@ -20,19 +21,19 @@
   --dial-archive-stage-camera-y: 0px;
   --dial-archive-stage-camera-evidence-x: 0px;
   --dial-archive-stage-camera-evidence-y: 0px;
-  --dial-archive-stage-camera-ground-x: 0px;
-  --dial-archive-stage-camera-ground-y: 0px;
   --dial-archive-stage-camera-ghost-x: 0px;
   --dial-archive-stage-camera-ghost-y: 0px;
   color: var(--dial-archive-stage-ink);
-  background: var(--dial-archive-stage-void);
+  background: var(--dial-archive-stage-paper);
+  -webkit-font-smoothing: auto;
+  text-rendering: auto;
 }
 
-/* ── 暗色 chrome 变体（仅施工场持有，不改动 space.css） ───────────── */
-
+/* 与其它空间共用冷白窗口框架，施工场只补足本页的边界语义。 */
 .dial-archive-space--stage .dial-archive-space-chrome {
   border-bottom-color: var(--dial-archive-stage-hairline);
-  background: rgba(6, 8, 13, 0.92);
+  color: var(--dial-archive-stage-ink);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .dial-archive-space--stage .dial-archive-space-chrome__brand span {
@@ -43,10 +44,7 @@
   background: var(--dial-archive-yellow);
 }
 
-.dial-archive-space--stage .dial-archive-space-chrome__system {
-  color: var(--dial-archive-stage-muted);
-}
-
+.dial-archive-space--stage .dial-archive-space-chrome__system,
 .dial-archive-space--stage .dial-archive-chrome__window-controls button {
   color: var(--dial-archive-stage-muted);
 }
@@ -54,10 +52,8 @@
 .dial-archive-space--stage .dial-archive-chrome__window-controls button:hover,
 .dial-archive-space--stage .dial-archive-chrome__window-controls button:focus-visible {
   color: var(--dial-archive-stage-ink);
-  background: rgba(214, 226, 240, 0.08);
+  background: rgba(25, 25, 25, 0.06);
 }
-
-/* ── 施工场根 ─────────────────────────────────────────────── */
 
 .dial-archive-stage {
   position: absolute;
@@ -67,11 +63,13 @@
   overflow: hidden;
   isolation: isolate;
   font-family: var(--dial-archive-font-ui);
+  background: var(--dial-archive-stage-paper);
   outline: none;
 }
 
 .dial-archive-stage:focus-visible::after {
   position: absolute;
+  z-index: 40;
   inset: 3px;
   border: 2px solid var(--dial-archive-yellow);
   content: "";

@@ -1,0 +1,137 @@
+/* ── Z2 当前素材身份读数：固定在清晰的观察者平面 ───────────── */
+
+.dial-archive-stage-readout {
+  position: absolute;
+  z-index: 8;
+  top: 4.5%;
+  right: clamp(30px, 3.6vw, 76px);
+  width: clamp(300px, 20vw, 380px);
+  min-width: 0;
+  color: var(--dial-archive-stage-ink);
+  pointer-events: none;
+}
+
+.dial-archive-stage-readout::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 74px;
+  height: 8px;
+  background: var(--dial-archive-yellow);
+  content: "";
+}
+
+.dial-archive-stage-readout__eyebrow {
+  display: block;
+  margin-bottom: 10px;
+  color: rgba(25, 25, 25, 0.5);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+}
+
+.dial-archive-stage-readout__identity {
+  position: relative;
+  min-height: clamp(84px, 7.5vw, 126px);
+}
+
+.dial-archive-stage-readout__layer {
+  position: relative;
+}
+
+.dial-archive-stage-readout__layer.is-outgoing {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+
+.dial-archive-stage-readout__layer.is-current {
+  z-index: 2;
+}
+
+.dial-archive-stage-readout__ordinal {
+  color: var(--dial-archive-stage-ink);
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(78px, 7.8vw, 132px);
+  font-stretch: 118%;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 0.78;
+}
+
+.dial-archive-stage-readout__layer p {
+  overflow: hidden;
+  margin: 11px 0 0;
+  color: rgba(25, 25, 25, 0.58);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-stage-readout__ledger {
+  display: grid;
+  grid-template-columns: 0.68fr 0.92fr 1.62fr;
+  gap: 0;
+  margin: 16px 0 0;
+  border-top: 1px solid var(--dial-archive-stage-hairline-strong);
+  border-bottom: 1px solid var(--dial-archive-stage-hairline);
+  font-family: var(--dial-archive-font-mono);
+}
+
+.dial-archive-stage-readout__ledger > div {
+  min-width: 0;
+  padding: 10px 11px 9px 0;
+  border-right: 1px solid var(--dial-archive-stage-hairline);
+}
+
+.dial-archive-stage-readout__ledger > div + div {
+  padding-left: 11px;
+}
+
+.dial-archive-stage-readout__ledger > div:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.dial-archive-stage-readout__ledger dt {
+  margin-bottom: 6px;
+  color: rgba(25, 25, 25, 0.44);
+  font-size: 8.5px;
+  letter-spacing: 0.15em;
+}
+
+.dial-archive-stage-readout__ledger dd {
+  overflow: hidden;
+  margin: 0;
+  color: var(--dial-archive-stage-ink);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-stage-readout__ledger .is-channels dd {
+  display: flex;
+  gap: 7px;
+}
+
+.dial-archive-stage-readout__ledger em {
+  font-style: normal;
+}
+
+.dial-archive-stage-readout__ledger em.is-stale {
+  box-shadow: inset 0 -2px var(--dial-archive-yellow);
+}
+
+.dial-archive-stage-readout__ledger em.is-invalid {
+  color: var(--dial-archive-alert);
+}
+
+.dial-archive-stage-readout__ledger em.is-missing {
+  color: var(--dial-archive-stage-muted);
+}

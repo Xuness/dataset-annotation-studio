@@ -1,189 +1,362 @@
-/* ── Z0 画布：虚空、星尘、地面、证据 ───────────────────────── */
+/* ── Z0 冷白编辑画布：登记点、折线标尺与远景证据 ───────────── */
 
 .dial-archive-stage-canvas {
   position: absolute;
   z-index: 0;
   inset: 0;
   overflow: hidden;
+  perspective: var(--dial-archive-stage-perspective);
+  perspective-origin: var(--dial-archive-stage-perspective-origin);
   pointer-events: none;
 }
 
-.dial-archive-stage-canvas__void {
+.dial-archive-stage-canvas__paper {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(1100px 520px at 72% 8%, rgba(52, 74, 110, 0.2), transparent 68%),
-    linear-gradient(
-      178deg,
-      var(--dial-archive-stage-void) 4%,
-      var(--dial-archive-stage-void-high) 56%,
-      #080c14 100%
-    );
+    linear-gradient(90deg, rgba(25, 25, 25, 0.025) 1px, transparent 1px) 8.2% 0 / 1px 100% no-repeat,
+    linear-gradient(180deg, #ffffff 0%, #fafbfa 58%, #f5f6f4 100%);
 }
 
-/* 克制的色温光晕：呼应世界观章节右上角的微弱色散 */
-.dial-archive-stage-canvas__flare {
+.dial-archive-stage-canvas__paper::before {
   position: absolute;
-  top: -12%;
-  right: -6%;
-  width: 46%;
-  height: 40%;
-  background:
-    radial-gradient(closest-side at 64% 38%, rgba(122, 96, 68, 0.13), transparent 74%),
-    radial-gradient(closest-side at 42% 60%, rgba(64, 92, 128, 0.12), transparent 78%);
-  filter: blur(6px);
+  top: 16%;
+  right: 16%;
+  width: 19%;
+  height: 1px;
+  background: rgba(25, 25, 25, 0.13);
+  box-shadow:
+    0 7px rgba(25, 25, 25, 0.035),
+    0 14px rgba(25, 25, 25, 0.035);
+  content: "";
 }
 
-.dial-archive-stage-canvas__stars {
+.dial-archive-stage-canvas__crop {
+  position: absolute;
+  border: 1px solid rgba(25, 25, 25, 0.06);
+  background: rgba(25, 25, 25, 0.018);
+}
+
+.dial-archive-stage-canvas__crop.is-left {
+  top: 27%;
+  left: -8%;
+  width: 31%;
+  height: 46%;
+  clip-path: polygon(0 0, 82% 0, 100% 18%, 100% 100%, 0 100%);
+}
+
+.dial-archive-stage-canvas__crop.is-right {
+  top: 20%;
+  right: 2.8%;
+  width: 5.2%;
+  height: 32%;
+  border-right: 0;
+  border-left-color: rgba(25, 25, 25, 0.12);
+  background: transparent;
+}
+
+.dial-archive-stage-canvas__crop.is-right::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 11px;
+  height: 38%;
+  background: var(--dial-archive-yellow);
+  content: "";
+}
+
+.dial-archive-stage-canvas__points {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   fill: var(--dial-archive-stage-ink);
+  mix-blend-mode: multiply;
   will-change: transform;
 }
 
-.dial-archive-stage-canvas__stars.is-far {
+.dial-archive-stage-canvas__points.is-ambient {
+  opacity: 0.34;
   transform: translate(
-    calc(var(--dial-archive-stage-px) * -5px),
-    calc(var(--dial-archive-stage-py) * -3px)
+    calc(var(--dial-archive-stage-px) * -3px),
+    calc(var(--dial-archive-stage-py) * -2px)
   );
 }
 
-.dial-archive-stage-canvas__stars.is-mid {
+.dial-archive-stage-canvas__points.is-measure {
+  opacity: 0.42;
+  transform: translate(
+    calc(var(--dial-archive-stage-px) * -7px),
+    calc(var(--dial-archive-stage-py) * -4px)
+  );
+}
+
+.dial-archive-stage-canvas__points.is-flow {
+  fill: rgba(25, 25, 25, 0.68);
+  opacity: 0.46;
   transform: translate(
     calc(var(--dial-archive-stage-px) * -11px),
     calc(var(--dial-archive-stage-py) * -7px)
   );
 }
 
-.dial-archive-stage-canvas__stars.is-band {
-  fill: #f4f7fc;
-  transform: translate(
-    calc(var(--dial-archive-stage-px) * -17px),
-    calc(var(--dial-archive-stage-py) * -10px)
-  );
-}
-
-/* 星尘缓慢漂移：流带沿素材流向缓移，语义是素材正在流经施工场 */
-@keyframes dial-archive-stage-band-drift {
+@keyframes dial-archive-stage-registration-drift {
   from {
     translate: 0 0;
   }
 
   to {
-    translate: -42px 0;
+    translate: -28px 7px;
   }
 }
 
-.dial-archive-stage-canvas__stars.is-band circle {
-  animation: dial-archive-stage-band-drift 90s linear infinite alternate;
+.dial-archive-stage-canvas__points.is-flow {
+  animation: dial-archive-stage-registration-drift 54s linear infinite alternate;
 }
 
-.dial-archive-stage-canvas__horizon {
+.dial-archive-stage-canvas__guides {
   position: absolute;
-  inset: 34% -8% -4%;
-  overflow: hidden;
-  perspective: 1150px;
-  perspective-origin: 50% 0%;
-}
-
-.dial-archive-stage-canvas__ground {
-  position: absolute;
-  inset: -8% -24%;
-  background:
-    linear-gradient(rgba(214, 226, 240, 0.085) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(214, 226, 240, 0.085) 1px, transparent 1px),
-    linear-gradient(rgba(214, 226, 240, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(214, 226, 240, 0.045) 1px, transparent 1px);
-  background-size:
-    var(--dial-archive-stage-ground-major) var(--dial-archive-stage-ground-major),
-    var(--dial-archive-stage-ground-major) var(--dial-archive-stage-ground-major),
-    var(--dial-archive-stage-ground-minor) var(--dial-archive-stage-ground-minor),
-    var(--dial-archive-stage-ground-minor) var(--dial-archive-stage-ground-minor);
-  mask-image: linear-gradient(178deg, transparent 2%, #000000 30%, #000000 82%, transparent 100%);
-  transform: translate3d(
-      var(--dial-archive-stage-camera-ground-x),
-      calc(var(--dial-archive-stage-camera-ground-y) + var(--dial-archive-stage-py) * 12px),
-      0
-    )
-    rotateX(var(--dial-archive-stage-ground-tilt));
-  transform-origin: 50% 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  overflow: visible;
+  transform: translate(
+    calc(var(--dial-archive-stage-px) * -9px),
+    calc(var(--dial-archive-stage-py) * -5px)
+  );
   will-change: transform;
 }
 
-/* 展台脚下的地面聚光，把悬浮物件"落"在空间里 */
-.dial-archive-stage-canvas__horizon::after {
-  position: absolute;
-  top: 26%;
-  left: calc(var(--dial-archive-stage-axis) - 24%);
-  width: 48%;
-  height: 44%;
-  background: radial-gradient(closest-side, rgba(96, 122, 160, 0.14), transparent 76%);
-  content: "";
+.dial-archive-stage-canvas__guides path {
+  vector-effect: non-scaling-stroke;
+}
+
+.dial-archive-stage-canvas__guides > path.is-hairline {
+  stroke: rgba(25, 25, 25, 0.13);
+  stroke-dasharray: 2 13 64 18;
+  stroke-width: 1;
+}
+
+.dial-archive-stage-canvas__guides > path.is-muted {
+  stroke: rgba(25, 25, 25, 0.22);
+  stroke-dasharray: 96 18 3 14;
+  stroke-width: 1;
+}
+
+.dial-archive-stage-canvas__guides > path.is-signal {
+  stroke: var(--dial-archive-yellow);
+  stroke-dasharray: 102 16 4 12;
+  stroke-width: 2;
+}
+
+@keyframes dial-archive-stage-guide-travel {
+  to {
+    stroke-dashoffset: -220;
+  }
+}
+
+.dial-archive-stage-canvas__guides > path.is-muted,
+.dial-archive-stage-canvas__guides > path.is-signal {
+  animation: dial-archive-stage-guide-travel 28s linear infinite;
+}
+
+.dial-archive-stage-canvas__guide-nodes {
+  fill: var(--dial-archive-stage-paper);
+  stroke: rgba(25, 25, 25, 0.42);
+  stroke-width: 1;
+}
+
+.dial-archive-stage-canvas__guide-nodes .is-signal {
+  fill: var(--dial-archive-yellow);
+  stroke: var(--dial-archive-stage-ink);
 }
 
 .dial-archive-stage-canvas__evidence {
   position: absolute;
   inset: 0;
-  perspective: 900px;
   transform: translate3d(
     var(--dial-archive-stage-camera-evidence-x),
     var(--dial-archive-stage-camera-evidence-y),
     0
   );
+  transform-style: preserve-3d;
 }
 
 .dial-archive-stage-canvas__board {
   position: absolute;
   margin: 0;
-  padding: 6px 6px 8px;
-  border: 1px solid var(--dial-archive-stage-hairline);
-  background: rgba(10, 14, 22, 0.66);
+  opacity: 0.48;
+  transform: translateZ(var(--dial-archive-evidence-z)) rotateY(var(--dial-archive-evidence-yaw))
+    rotateZ(var(--dial-archive-evidence-roll));
+  transform-origin: center;
+  transform-style: preserve-3d;
+}
+
+.dial-archive-stage-canvas__board-surface {
+  position: relative;
+  display: block;
+  padding: 5px 5px 23px;
+  overflow: hidden;
+  border-top: 1px solid rgba(25, 25, 25, 0.2);
+  border-left: 1px solid rgba(25, 25, 25, 0.2);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 8px 9px 0 rgba(25, 25, 25, 0.035);
+  animation: dial-archive-stage-evidence-drift var(--dial-archive-evidence-drift-duration)
+    ease-in-out var(--dial-archive-evidence-drift-delay) infinite alternate;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+
+.dial-archive-stage-canvas__board-surface::after {
+  position: absolute;
+  top: 5px;
+  bottom: 22px;
+  left: -18%;
+  width: 1px;
+  background: var(--dial-archive-yellow);
+  box-shadow: 3px 0 rgba(25, 25, 25, 0.18);
+  content: "";
+  animation: dial-archive-stage-evidence-scan 9s var(--dial-archive-ease) infinite;
+}
+
+.dial-archive-stage-canvas__board-register {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 13px;
+  height: 13px;
+  border-top: 2px solid var(--dial-archive-stage-ink);
+  border-left: 2px solid var(--dial-archive-stage-ink);
 }
 
 .dial-archive-stage-canvas__board img {
   display: block;
   width: 100%;
-  height: auto;
-  /* 灰色低饱和滤镜只作用于远景证据，绝不作用于展台主图 */
-  filter: grayscale(0.9) brightness(0.5) contrast(0.88);
-  opacity: 0.5;
+  aspect-ratio: 1.45;
+  object-fit: cover;
+  filter: grayscale(0.88) contrast(1.04) brightness(1.08);
+  opacity: 0.58;
+  transform: scale(1.045);
+  animation: dial-archive-stage-evidence-image 18s ease-in-out infinite alternate;
 }
 
 .dial-archive-stage-canvas__board figcaption {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  left: 6px;
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 6px;
-  color: var(--dial-archive-stage-muted);
+  color: rgba(25, 25, 25, 0.56);
   font-family: var(--dial-archive-font-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  opacity: 0.75;
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+}
+
+@keyframes dial-archive-stage-evidence-drift {
+  from {
+    translate: 0 0;
+  }
+
+  to {
+    translate: var(--dial-archive-evidence-drift-x) var(--dial-archive-evidence-drift-y);
+  }
+}
+
+@keyframes dial-archive-stage-evidence-image {
+  from {
+    transform: scale(1.045) translateX(-1.4%);
+  }
+
+  to {
+    transform: scale(1.1) translateX(1.4%);
+  }
+}
+
+@keyframes dial-archive-stage-evidence-scan {
+  0%,
+  18% {
+    translate: 0 0;
+    opacity: 0;
+  }
+
+  28%,
+  64% {
+    opacity: 0.72;
+  }
+
+  76%,
+  100% {
+    translate: 165px 0;
+    opacity: 0;
+  }
 }
 
 .dial-archive-stage-canvas__ghost-word {
   position: absolute;
-  bottom: 15%;
-  left: -1.5%;
-  color: transparent;
+  top: 12.5%;
+  left: 12%;
+  display: flex;
+  flex-direction: column;
+  color: rgba(25, 25, 25, 0.025);
   font-family: var(--dial-archive-font-display);
-  font-size: clamp(180px, 21vw, 360px);
+  font-size: clamp(142px, 18vw, 304px);
   font-stretch: 120%;
   font-weight: 900;
-  letter-spacing: -0.045em;
-  line-height: 0.8;
+  letter-spacing: -0.055em;
+  line-height: 0.72;
   white-space: nowrap;
-  -webkit-text-stroke: 1px rgba(214, 226, 240, 0.1);
+  -webkit-text-stroke: 1px rgba(25, 25, 25, 0.08);
   transform: translate(
-    calc(var(--dial-archive-stage-camera-ghost-x) + var(--dial-archive-stage-px) * 16px),
-    calc(var(--dial-archive-stage-camera-ghost-y) + var(--dial-archive-stage-py) * 8px)
+    calc(var(--dial-archive-stage-camera-ghost-x) + var(--dial-archive-stage-px) * 10px),
+    calc(var(--dial-archive-stage-camera-ghost-y) + var(--dial-archive-stage-py) * 5px)
   );
   will-change: transform;
 }
 
-.dial-archive-stage.is-camera-resetting .dial-archive-stage-canvas__ground,
+.dial-archive-stage-canvas__ghost-word small {
+  margin: 30px 0 0 4.5%;
+  color: rgba(25, 25, 25, 0.24);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 9px;
+  font-stretch: normal;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  -webkit-text-stroke: 0;
+}
+
+.dial-archive-stage-canvas__section-mark {
+  position: absolute;
+  top: 39%;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--dial-archive-stage-ink);
+  font-family: var(--dial-archive-font-mono);
+  transform: rotate(-90deg) translateX(-50%);
+  transform-origin: left top;
+}
+
+.dial-archive-stage-canvas__section-mark::before {
+  width: 58px;
+  height: 9px;
+  background: var(--dial-archive-yellow);
+  content: "";
+}
+
+.dial-archive-stage-canvas__section-mark b {
+  font-size: 12px;
+}
+
+.dial-archive-stage-canvas__section-mark span {
+  color: var(--dial-archive-stage-muted);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+}
+
 .dial-archive-stage.is-camera-resetting .dial-archive-stage-canvas__evidence,
 .dial-archive-stage.is-camera-resetting .dial-archive-stage-canvas__ghost-word {
   transition: transform var(--dial-archive-stage-camera-reset-duration) var(--dial-archive-ease);

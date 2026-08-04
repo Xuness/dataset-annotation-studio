@@ -110,104 +110,109 @@ export const AnnotationSpecimen = memo(function AnnotationSpecimen({
       data-stage-camera-lock
     >
       <InstrumentRing />
-      <div className={`dial-archive-stage-specimen__plinth${checked ? " is-checked" : ""}`}>
-        <span className="dial-archive-stage-specimen__corner is-tl" aria-hidden="true" />
-        <span className="dial-archive-stage-specimen__corner is-tr" aria-hidden="true" />
-        <span className="dial-archive-stage-specimen__corner is-bl" aria-hidden="true" />
-        <span className="dial-archive-stage-specimen__corner is-br" aria-hidden="true" />
-        <span className="dial-archive-stage-specimen__measure" aria-hidden="true" />
-        {asset && !failed ? (
-          <div
-            className={`dial-archive-stage-specimen__frame${walk.active ? ` is-walking-${walkDirection}` : ""}`}
-            ref={viewport.viewportRef}
-            role="group"
-            tabIndex={0}
-            aria-label={`素材 ${asset.filename} 查看器`}
-            onClick={openWithClickDelay}
-            onDoubleClick={handleDoubleClick}
-            onKeyDown={handleViewportKeyDown}
-            onPointerDown={viewport.onPointerDown}
-            onPointerMove={viewport.onPointerMove}
-            onPointerUp={viewport.onPointerUp}
-            onPointerCancel={viewport.onPointerCancel}
-            onWheel={viewport.onWheel}
-          >
-            {walk.active && walk.previousAsset ? (
-              <div
-                className="dial-archive-stage-specimen__walk-layer is-outgoing"
-                aria-hidden="true"
-                key={`outgoing-${walk.serial}`}
-              >
-                <img src={walk.previousAsset.imageUrl} alt="" draggable={false} />
-              </div>
-            ) : null}
+      <div className="dial-archive-stage-specimen__assembly">
+        <span className="dial-archive-stage-specimen__rear is-register" aria-hidden="true" />
+        <span className="dial-archive-stage-specimen__rear is-signal" aria-hidden="true" />
+        <div className={`dial-archive-stage-specimen__plinth${checked ? " is-checked" : ""}`}>
+          <span className="dial-archive-stage-specimen__corner is-tl" aria-hidden="true" />
+          <span className="dial-archive-stage-specimen__corner is-br" aria-hidden="true" />
+          <span className="dial-archive-stage-specimen__measure" aria-hidden="true" />
+          <span className="dial-archive-stage-specimen__index-rail" aria-hidden="true">
+            SPECIMEN // TRUE COLOR
+          </span>
+          {asset && !failed ? (
             <div
-              className="dial-archive-stage-specimen__walk-layer is-current"
-              key={`${asset.id}-${walk.serial}`}
+              className={`dial-archive-stage-specimen__frame${walk.active ? ` is-walking-${walkDirection}` : ""}`}
+              ref={viewport.viewportRef}
+              role="group"
+              tabIndex={0}
+              aria-label={`素材 ${asset.filename} 查看器`}
+              onClick={openWithClickDelay}
+              onDoubleClick={handleDoubleClick}
+              onKeyDown={handleViewportKeyDown}
+              onPointerDown={viewport.onPointerDown}
+              onPointerMove={viewport.onPointerMove}
+              onPointerUp={viewport.onPointerUp}
+              onPointerCancel={viewport.onPointerCancel}
+              onWheel={viewport.onWheel}
             >
-              <div className="dial-archive-stage-specimen__surface" ref={viewport.surfaceRef}>
-                <img
-                  ref={viewport.imageRef}
-                  src={asset.imageUrl}
-                  alt={asset.filename}
-                  draggable={false}
-                  onError={() => setFailedAssetId(asset.id)}
-                />
+              {walk.active && walk.previousAsset ? (
+                <div
+                  className="dial-archive-stage-specimen__walk-layer is-outgoing"
+                  aria-hidden="true"
+                  key={`outgoing-${walk.serial}`}
+                >
+                  <img src={walk.previousAsset.imageUrl} alt="" draggable={false} />
+                </div>
+              ) : null}
+              <div
+                className="dial-archive-stage-specimen__walk-layer is-current"
+                key={`${asset.id}-${walk.serial}`}
+              >
+                <div className="dial-archive-stage-specimen__surface" ref={viewport.surfaceRef}>
+                  <img
+                    ref={viewport.imageRef}
+                    src={asset.imageUrl}
+                    alt={asset.filename}
+                    draggable={false}
+                    onError={() => setFailedAssetId(asset.id)}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="dial-archive-stage-specimen__frame is-empty" role="status">
-            {asset && failed ? (
-              <>
-                <b>IMAGE UNAVAILABLE</b>
-                <span>{asset.relativePath}</span>
-              </>
-            ) : (
-              <>
-                <b>NO MATERIAL</b>
-                <span>当前序列没有可展示的素材</span>
-              </>
-            )}
-          </div>
-        )}
-        {asset && !failed ? (
-          <div
-            className="dial-archive-stage-specimen__viewport-tools"
-            role="group"
-            aria-label="图片观察工具"
-          >
-            <button type="button" onClick={() => viewport.fit()}>
-              FIT
-            </button>
-            <button type="button" onClick={() => viewport.actual()}>
-              1:1
-            </button>
-            <i aria-hidden="true" />
-            <button type="button" aria-label="缩小图片" onClick={viewport.zoomOut}>
-              −
-            </button>
-            <output ref={viewport.scaleReadoutRef} aria-label="图片缩放比例">
-              100%
-            </output>
-            <button type="button" aria-label="放大图片" onClick={viewport.zoomIn}>
-              +
-            </button>
-            <button
-              className="is-edit"
-              type="button"
-              aria-label="打开标注编辑工作间"
-              onClick={onOpenDefaultWorkcell}
+          ) : (
+            <div className="dial-archive-stage-specimen__frame is-empty" role="status">
+              {asset && failed ? (
+                <>
+                  <b>IMAGE UNAVAILABLE</b>
+                  <span>{asset.relativePath}</span>
+                </>
+              ) : (
+                <>
+                  <b>NO MATERIAL</b>
+                  <span>当前序列没有可展示的素材</span>
+                </>
+              )}
+            </div>
+          )}
+          {asset && !failed ? (
+            <div
+              className="dial-archive-stage-specimen__viewport-tools"
+              role="group"
+              aria-label="图片观察工具"
             >
-              EDIT ↗
-            </button>
-          </div>
-        ) : null}
-        {checked ? (
-          <span className="dial-archive-stage-specimen__range-tag" aria-hidden="true">
-            IN RANGE
-          </span>
-        ) : null}
+              <button type="button" onClick={() => viewport.fit()}>
+                FIT
+              </button>
+              <button type="button" onClick={() => viewport.actual()}>
+                1:1
+              </button>
+              <i aria-hidden="true" />
+              <button type="button" aria-label="缩小图片" onClick={viewport.zoomOut}>
+                −
+              </button>
+              <output ref={viewport.scaleReadoutRef} aria-label="图片缩放比例">
+                100%
+              </output>
+              <button type="button" aria-label="放大图片" onClick={viewport.zoomIn}>
+                +
+              </button>
+              <button
+                className="is-edit"
+                type="button"
+                aria-label="打开标注编辑工作间"
+                onClick={onOpenDefaultWorkcell}
+              >
+                EDIT ↗
+              </button>
+            </div>
+          ) : null}
+          {checked ? (
+            <span className="dial-archive-stage-specimen__range-tag" aria-hidden="true">
+              IN RANGE
+            </span>
+          ) : null}
+        </div>
       </div>
       <footer className="dial-archive-stage-specimen__baseline" aria-hidden="true">
         <i className="dial-archive-stage-specimen__baseline-rule" />

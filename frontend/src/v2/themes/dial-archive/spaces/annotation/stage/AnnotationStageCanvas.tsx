@@ -1,18 +1,22 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, type CSSProperties } from "react";
 
 import type { AnnotationStageAsset } from "../../../../../pages/spaces/spacePageModel";
-import { ANNOTATION_STAGE_LAYOUT, createStageStarfield } from "./model/annotationStageLayout";
+import {
+  ANNOTATION_STAGE_LAYOUT,
+  createStageRegistrationField,
+} from "./model/annotationStageLayout";
+import { selectStageEvidenceAssets } from "./model/annotationStagePresentation";
 
 /**
- * 施工场底座（Z0）：星空虚空、星尘视差层、透视网格地面与远景证据看板。
- * 纯装饰层，pointer-events 全部关闭；星尘坐标来自布局模型的确定性生成。
+ * 施工场底座（Z0）：冷白编辑纸面、登记点阵、结构导线与远景证据看板。
+ * 纯装饰层，pointer-events 全部关闭；点阵与构件几何来自布局模型。
  */
 
-function StarLayer({
-  stars,
+function RegistrationLayer({
+  points,
   className,
 }: {
-  stars: readonly { x: number; y: number; radius: number; opacity: number }[];
+  points: readonly { x: number; y: number; radius: number; opacity: number }[];
   className: string;
 }) {
   const { frame } = ANNOTATION_STAGE_LAYOUT;
@@ -23,8 +27,8 @@ function StarLayer({
       preserveAspectRatio="xMidYMid slice"
       aria-hidden="true"
     >
-      {stars.map((star, index) => (
-        <circle cx={star.x} cy={star.y} r={star.radius} opacity={star.opacity} key={index} />
+      {points.map((point, index) => (
+        <circle cx={point.x} cy={point.y} r={point.radius} opacity={point.opacity} key={index} />
       ))}
     </svg>
   );
@@ -32,50 +36,99 @@ function StarLayer({
 
 interface AnnotationStageCanvasProps {
   evidenceAssets: readonly AnnotationStageAsset[];
+  currentIndex: number;
+  checkedAssetIds: readonly string[];
 }
 
 export const AnnotationStageCanvas = memo(function AnnotationStageCanvas({
   evidenceAssets,
+  currentIndex,
+  checkedAssetIds,
 }: AnnotationStageCanvasProps) {
-  const starfield = useMemo(() => createStageStarfield(), []);
-  const { evidence } = ANNOTATION_STAGE_LAYOUT;
+  const registrationField = useMemo(() => createStageRegistrationField(), []);
+  const { evidence, registrationGuides } = ANNOTATION_STAGE_LAYOUT;
+  const visibleEvidence = selectStageEvidenceAssets(
+    evidenceAssets,
+    currentIndex,
+    checkedAssetIds,
+    evidence.length,
+  );
 
   return (
     <div className="dial-archive-stage-canvas" aria-hidden="true">
-      <div className="dial-archive-stage-canvas__void" />
-      <div className="dial-archive-stage-canvas__flare" />
-      <StarLayer stars={starfield.far} className="dial-archive-stage-canvas__stars is-far" />
-      <StarLayer stars={starfield.mid} className="dial-archive-stage-canvas__stars is-mid" />
-      <StarLayer stars={starfield.band} className="dial-archive-stage-canvas__stars is-band" />
-      <div className="dial-archive-stage-canvas__horizon">
-        <div className="dial-archive-stage-canvas__ground" />
-      </div>
+      <div className="dial-archive-stage-canvas__paper" />
+      <div className="dial-archive-stage-canvas__crop is-left" />
+      <div className="dial-archive-stage-canvas__crop is-right" />
+      <RegistrationLayer
+        points={registrationField.ambient}
+        className="dial-archive-stage-canvas__points is-ambient"
+      />
+      <RegistrationLayer
+        points={registrationField.measure}
+        className="dial-archive-stage-canvas__points is-measure"
+      />
+      <RegistrationLayer
+        points={registrationField.flow}
+        className="dial-archive-stage-canvas__points is-flow"
+      />
+      <svg
+        className="dial-archive-stage-canvas__guides"
+        viewBox={`0 0 ${ANNOTATION_STAGE_LAYOUT.frame.width} ${ANNOTATION_STAGE_LAYOUT.frame.height}`}
+        preserveAspectRatio="xMidYMid slice"
+      >
+        {registrationGuides.map((guide) => (
+          <path className={`is-${guide.tone}`} d={guide.path} key={guide.id} />
+        ))}
+        <g className="dial-archive-stage-canvas__guide-nodes">
+          <rect x="278" y="720" width="12" height="12" />
+          <rect className="is-signal" x="1518" y="196" width="14" height="14" />
+          <path d="M 1748 462 l 12 12 -12 12 -12 -12 Z" />
+        </g>
+      </svg>
       <div className="dial-archive-stage-canvas__evidence">
-        {evidenceAssets.slice(0, evidence.length).map((asset, index) => {
+        {visibleEvidence.map((asset, index) => {
           const slot = evidence[index];
           return (
             <figure
               className={`dial-archive-stage-canvas__board is-${slot.id}`}
-              style={{
-                left: `${slot.leftPercent}%`,
-                top: `${slot.topPercent}%`,
-                width: slot.width,
-                transform: `rotateY(${slot.rotateY}deg)`,
-              }}
+              style={
+                {
+                  left: `${slot.leftPercent}%`,
+                  top: `${slot.topPercent}%`,
+                  width: slot.width,
+                  "--dial-archive-evidence-yaw": `${slot.rotateY}deg`,
+                  "--dial-archive-evidence-roll": `${slot.rotateZ}deg`,
+                  "--dial-archive-evidence-z": `${slot.translateZ}px`,
+                  "--dial-archive-evidence-drift-x": `${slot.driftX}px`,
+                  "--dial-archive-evidence-drift-y": `${slot.driftY}px`,
+                  "--dial-archive-evidence-drift-duration": `${slot.driftSeconds}s`,
+                  "--dial-archive-evidence-drift-delay": `${slot.driftDelay}s`,
+                } as CSSProperties
+              }
               key={asset.id}
             >
-              <img src={asset.thumbnailUrl} alt="" draggable={false} loading="lazy" />
-              <figcaption>
-                <span>{slot.code}</span>
-                <small>
-                  {asset.width} × {asset.height}
-                </small>
-              </figcaption>
+              <span className="dial-archive-stage-canvas__board-surface">
+                <span className="dial-archive-stage-canvas__board-register" />
+                <img src={asset.thumbnailUrl} alt="" draggable={false} loading="lazy" />
+                <figcaption>
+                  <span>{slot.code}</span>
+                  <small>
+                    {asset.width} × {asset.height}
+                  </small>
+                </figcaption>
+              </span>
             </figure>
           );
         })}
       </div>
-      <div className="dial-archive-stage-canvas__ghost-word">MATERIAL</div>
+      <div className="dial-archive-stage-canvas__ghost-word">
+        <span>MATERIAL</span>
+        <small>SPECIMEN CONSTRUCTION FIELD // SPACE 03</small>
+      </div>
+      <div className="dial-archive-stage-canvas__section-mark">
+        <b>03</b>
+        <span>MATERIAL / WORKCELL ACCESS</span>
+      </div>
     </div>
   );
 });

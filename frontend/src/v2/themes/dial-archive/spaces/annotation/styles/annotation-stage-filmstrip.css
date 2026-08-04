@@ -1,12 +1,19 @@
-/* ── 胶片轨道 ─────────────────────────────────────────────── */
+/* ── 胶片轨道：白色施工序列，两端渐隐 ───────────────────── */
 
 .dial-archive-stage-filmstrip {
   position: relative;
-  z-index: 3;
+  z-index: 5;
   flex: none;
-  height: 168px;
-  margin-top: 4px;
-  mask-image: linear-gradient(90deg, transparent 0, #000000 13%, #000000 87%, transparent 100%);
+  height: 164px;
+  margin-top: 2px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), #ffffff 26%);
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    #000000 var(--dial-archive-stage-film-fade),
+    #000000 calc(100% - var(--dial-archive-stage-film-fade)),
+    transparent 100%
+  );
   transform: translate3d(var(--dial-archive-stage-camera-x), var(--dial-archive-stage-camera-y), 0);
   will-change: transform;
 }
@@ -20,7 +27,7 @@
   right: 0;
   left: 0;
   height: 1px;
-  background: var(--dial-archive-stage-hairline);
+  background: rgba(25, 25, 25, 0.18);
 }
 
 .dial-archive-stage-filmstrip__rail.is-top {
@@ -46,36 +53,48 @@
   top: 50%;
   width: var(--dial-archive-stage-film-item-width);
   height: var(--dial-archive-stage-film-item-height);
-  padding: 0;
-  border: 1px solid var(--dial-archive-stage-hairline);
-  background: rgba(10, 14, 22, 0.7);
+  padding: 4px;
+  overflow: visible;
+  border: 1px solid rgba(25, 25, 25, 0.18);
+  background: rgba(255, 255, 255, 0.92);
   cursor: pointer;
-  transform: translateY(-50%) scale(0.94);
+  transform: translateY(-50%);
   transition:
-    transform 240ms var(--dial-archive-ease),
+    transform 220ms var(--dial-archive-ease),
     border-color 160ms ease,
-    opacity 200ms ease;
+    box-shadow 220ms var(--dial-archive-ease);
+}
+
+.dial-archive-stage-filmstrip__cell::after {
+  position: absolute;
+  right: 7px;
+  bottom: -1px;
+  left: 7px;
+  height: 2px;
+  background: transparent;
+  content: "";
+  transition: background-color 160ms ease;
 }
 
 .dial-archive-stage-filmstrip__cell img {
-  position: absolute;
-  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.52;
-  transition: opacity 200ms ease;
+  opacity: 1;
 }
 
 .dial-archive-stage-filmstrip__cell:hover,
 .dial-archive-stage-filmstrip__cell:focus-visible {
-  border-color: var(--dial-archive-stage-hairline-strong);
+  border-color: var(--dial-archive-stage-ink);
+  box-shadow: 5px 6px 0 rgba(25, 25, 25, 0.08);
   outline: none;
+  transform: translateY(calc(-50% - 5px));
 }
 
 .dial-archive-stage-filmstrip__cell:hover img,
 .dial-archive-stage-filmstrip__cell:focus-visible img {
-  opacity: 0.86;
+  opacity: 1;
 }
 
 .dial-archive-stage-filmstrip__cell:focus-visible {
@@ -83,12 +102,17 @@
   outline-offset: 3px;
 }
 
-/* 当前对象：黑白身份框（放大、白框、全彩），与范围语义分离 */
+/* 当前对象：碳黑身份框；批量范围仍由黄色咬合标记单独表达。 */
 .dial-archive-stage-filmstrip__cell.is-current {
   z-index: 2;
   border: 2px solid var(--dial-archive-stage-ink);
-  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.9);
-  transform: translateY(-50%) scale(1.14);
+  box-shadow: 5px 6px 0 rgba(25, 25, 25, 0.1);
+  transform: translateY(calc(-50% - 7px));
+}
+
+.dial-archive-stage-filmstrip__cell.is-current::after {
+  height: 3px;
+  background: var(--dial-archive-yellow);
 }
 
 .dial-archive-stage-filmstrip__cell.is-current img {
@@ -112,9 +136,9 @@
   opacity: 1;
 }
 
-/* 批量范围：黄色咬合标记 */
 .dial-archive-stage-filmstrip__range-bite {
   position: absolute;
+  z-index: 2;
   top: -1px;
   right: -1px;
   width: 17px;
@@ -123,26 +147,109 @@
   clip-path: polygon(100% 0, 0 0, 100% 100%);
 }
 
+.dial-archive-stage-filmstrip__pager {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: clamp(30px, 3.6vw, 76px);
+  display: grid;
+  width: clamp(208px, 15vw, 272px);
+  height: 36px;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  border: 1px solid rgba(25, 25, 25, 0.28);
+  color: var(--dial-archive-stage-ink);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 5px 6px 0 rgba(25, 25, 25, 0.045);
+}
+
+.dial-archive-stage-filmstrip__pager button {
+  border: 0;
+  color: var(--dial-archive-stage-ink);
+  font-size: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dial-archive-stage-filmstrip__pager button:hover:not(:disabled),
+.dial-archive-stage-filmstrip__pager button:focus-visible {
+  color: var(--dial-archive-stage-ink);
+  background: var(--dial-archive-yellow);
+  outline: none;
+}
+
+.dial-archive-stage-filmstrip__pager button:focus-visible {
+  box-shadow: inset 0 -3px var(--dial-archive-stage-ink);
+}
+
+.dial-archive-stage-filmstrip__pager button:disabled {
+  color: rgba(25, 25, 25, 0.24);
+  cursor: default;
+}
+
+.dial-archive-stage-filmstrip__pager output {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-right: 1px solid var(--dial-archive-stage-hairline);
+  border-left: 1px solid var(--dial-archive-stage-hairline);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+}
+
+.dial-archive-stage-filmstrip__pager output em {
+  color: var(--dial-archive-stage-ink);
+  font-style: normal;
+  font-weight: 750;
+  box-shadow: inset 0 -3px var(--dial-archive-yellow);
+}
+
+.dial-archive-stage-filmstrip__pager output span {
+  color: var(--dial-archive-stage-muted);
+}
+
+.dial-archive-stage-filmstrip__progress {
+  position: absolute;
+  right: 0;
+  bottom: -8px;
+  left: 0;
+  display: flex;
+  gap: 5px;
+}
+
+.dial-archive-stage-filmstrip__progress i {
+  height: 2px;
+  flex: 1;
+  background: rgba(25, 25, 25, 0.12);
+}
+
+.dial-archive-stage-filmstrip__progress i.is-filled {
+  background: var(--dial-archive-yellow);
+}
+
 .dial-archive-stage-filmstrip__foot {
   position: absolute;
-  right: clamp(34px, 4.4vw, 104px);
+  right: clamp(30px, 3.6vw, 76px);
   bottom: 9px;
-  left: clamp(34px, 4.4vw, 104px);
+  left: clamp(30px, 3.6vw, 76px);
   display: flex;
   justify-content: space-between;
   color: var(--dial-archive-stage-muted);
   font-family: var(--dial-archive-font-mono);
   font-size: 9.5px;
-  letter-spacing: 0.16em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
 }
 
 .dial-archive-stage-filmstrip__foot button {
   padding: 0;
   border: 0;
-  color: var(--dial-archive-yellow);
+  color: var(--dial-archive-stage-ink);
   font: inherit;
   letter-spacing: inherit;
   background: transparent;
+  box-shadow: inset 0 -2px var(--dial-archive-yellow);
   cursor: pointer;
 }
 

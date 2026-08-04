@@ -30,8 +30,8 @@ function cameraLockedTarget(target: EventTarget | null): boolean {
 
 function setCameraVariables(root: HTMLElement, point: StageCameraPoint): void {
   const { camera } = ANNOTATION_STAGE_LAYOUT;
-  root.style.setProperty("--dial-archive-stage-camera-x", `${point.x * camera.floorDepth}px`);
-  root.style.setProperty("--dial-archive-stage-camera-y", `${point.y * camera.floorDepth}px`);
+  root.style.setProperty("--dial-archive-stage-camera-x", `${point.x * camera.sceneDepth}px`);
+  root.style.setProperty("--dial-archive-stage-camera-y", `${point.y * camera.sceneDepth}px`);
   root.style.setProperty(
     "--dial-archive-stage-camera-evidence-x",
     `${point.x * camera.evidenceDepth}px`,
@@ -39,14 +39,6 @@ function setCameraVariables(root: HTMLElement, point: StageCameraPoint): void {
   root.style.setProperty(
     "--dial-archive-stage-camera-evidence-y",
     `${point.y * camera.evidenceDepth}px`,
-  );
-  root.style.setProperty(
-    "--dial-archive-stage-camera-ground-x",
-    `${point.x * camera.groundDepth}px`,
-  );
-  root.style.setProperty(
-    "--dial-archive-stage-camera-ground-y",
-    `${point.y * camera.groundDepth}px`,
   );
   root.style.setProperty("--dial-archive-stage-camera-ghost-x", `${point.x * camera.ghostDepth}px`);
   root.style.setProperty("--dial-archive-stage-camera-ghost-y", `${point.y * camera.ghostDepth}px`);

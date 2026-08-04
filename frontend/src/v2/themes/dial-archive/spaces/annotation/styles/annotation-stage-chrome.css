@@ -1,23 +1,36 @@
-/* ── 顶栏 ─────────────────────────────────────────────────── */
+/* ── 三级页内部标尺带 ─────────────────────────────────────── */
 
 .dial-archive-stage__masthead {
   position: relative;
-  z-index: 4;
-  display: flex;
+  z-index: 12;
+  display: grid;
   flex: none;
   align-items: center;
-  justify-content: space-between;
-  gap: 30px;
-  height: 62px;
+  height: 60px;
+  grid-template-columns: minmax(190px, auto) minmax(220px, 1fr) auto minmax(220px, auto);
+  gap: clamp(18px, 2.2vw, 42px);
   padding: 0 clamp(28px, 3vw, 56px);
   border-bottom: 1px solid var(--dial-archive-stage-hairline);
-  background: linear-gradient(180deg, rgba(6, 8, 13, 0.72), transparent);
+  color: var(--dial-archive-stage-ink);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.dial-archive-stage__masthead::after {
+  position: absolute;
+  bottom: -1px;
+  left: var(--dial-archive-stage-axis);
+  width: 64px;
+  height: 3px;
+  background: var(--dial-archive-yellow);
+  content: "";
+  transform: translateX(-50%);
 }
 
 .dial-archive-stage__return {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: max-content;
   padding: 9px 4px;
   border: 0;
   color: var(--dial-archive-stage-muted);
@@ -26,13 +39,16 @@
   letter-spacing: 0.18em;
   background: transparent;
   cursor: pointer;
-  transition: color 140ms ease;
+  transition:
+    color 140ms ease,
+    transform 180ms var(--dial-archive-ease);
 }
 
 .dial-archive-stage__return:hover,
 .dial-archive-stage__return:focus-visible {
   color: var(--dial-archive-stage-ink);
   outline: none;
+  transform: translateX(-4px);
 }
 
 .dial-archive-stage__return:focus-visible {
@@ -42,6 +58,7 @@
 
 .dial-archive-stage__title {
   display: flex;
+  min-width: 0;
   align-items: baseline;
   gap: 16px;
 }
@@ -52,12 +69,14 @@
   font-size: 10px;
   font-style: normal;
   letter-spacing: 0.22em;
+  white-space: nowrap;
 }
 
 .dial-archive-stage__title b {
   font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.3em;
+  font-weight: 650;
+  letter-spacing: 0.28em;
+  white-space: nowrap;
 }
 
 .dial-archive-stage__camera-reset {
@@ -70,25 +89,29 @@
   font-family: var(--dial-archive-font-mono);
   font-size: 9px;
   letter-spacing: 0.16em;
-  background: rgba(13, 18, 28, 0.62);
+  background: var(--dial-archive-stage-paper);
   cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 180ms ease;
 }
 
 .dial-archive-stage__camera-reset b {
   color: var(--dial-archive-stage-ink);
   font-size: 9px;
-  font-weight: 600;
+  font-weight: 650;
 }
 
 .dial-archive-stage__camera-reset:hover,
 .dial-archive-stage__camera-reset:focus-visible {
-  border-color: var(--dial-archive-yellow);
-  color: var(--dial-archive-stage-ink);
+  border-color: var(--dial-archive-stage-ink);
+  box-shadow: inset 0 -3px var(--dial-archive-yellow);
   outline: none;
 }
 
 .dial-archive-stage__project {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   align-items: flex-end;
   gap: 3px;
@@ -98,7 +121,7 @@
   overflow: hidden;
   max-width: 300px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 650;
   letter-spacing: 0.08em;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -108,25 +131,30 @@
   color: var(--dial-archive-stage-muted);
   font-family: var(--dial-archive-font-mono);
   font-size: 9px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
 }
 
-/* ── 施工层网格 ───────────────────────────────────────────── */
+/* ── 三维施工场：固定读数 + 可平移场景镜头 ────────────────── */
 
-.dial-archive-stage__floor {
+.dial-archive-stage__scene {
   position: relative;
   z-index: 2;
-  display: grid;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr) clamp(360px, 27vw, 470px);
-  align-items: center;
-  gap: clamp(30px, 3.6vw, 80px);
   min-height: 0;
-  padding: clamp(10px, 1.6vh, 26px) clamp(34px, 4.4vw, 104px) 0;
+  perspective: var(--dial-archive-stage-perspective);
+  perspective-origin: var(--dial-archive-stage-perspective-origin);
+  transform-style: preserve-3d;
+}
+
+.dial-archive-stage__scene-camera {
+  position: absolute;
+  inset: 0;
   transform: translate3d(var(--dial-archive-stage-camera-x), var(--dial-archive-stage-camera-y), 0);
+  transform-style: preserve-3d;
   will-change: transform;
 }
 
-.dial-archive-stage.is-camera-resetting .dial-archive-stage__floor {
+.dial-archive-stage.is-camera-resetting .dial-archive-stage__scene-camera {
   transition: transform var(--dial-archive-stage-camera-reset-duration) var(--dial-archive-ease);
 }

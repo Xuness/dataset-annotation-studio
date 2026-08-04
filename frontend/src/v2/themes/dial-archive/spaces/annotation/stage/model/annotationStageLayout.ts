@@ -3,25 +3,31 @@ import type { CSSProperties } from "react";
 /**
  * 素材施工场唯一的装饰几何事实源。
  *
- * 星尘坐标、仪器弧环、远景证据看板与胶片轨道步距都集中在这里；
+ * 登记点阵、结构导线、仪器弧环、远景证据看板与胶片轨道步距都集中在这里；
  * SVG、TSX 和 CSS 变量只允许消费该模型派生的数据，不得各自镜像坐标。
  * 展台、控制台等单一消费者的框架布局仍由 CSS 网格负责。
  */
 
-export interface StageStar {
+export interface StageRegistrationPoint {
   x: number;
   y: number;
   radius: number;
   opacity: number;
 }
 
-export interface StageStarfield {
-  /** 远景稀疏星层 */
-  far: readonly StageStar[];
-  /** 中景星层 */
-  mid: readonly StageStar[];
-  /** 沿素材流向加密的水平流带 */
-  band: readonly StageStar[];
+export interface StageRegistrationField {
+  /** 纸面环境中的稀疏定位点 */
+  ambient: readonly StageRegistrationPoint[];
+  /** 靠近主要构件的测量点 */
+  measure: readonly StageRegistrationPoint[];
+  /** 沿素材流向聚集的登记点流 */
+  flow: readonly StageRegistrationPoint[];
+}
+
+export interface StageRegistrationGuide {
+  id: string;
+  tone: "hairline" | "muted" | "signal";
+  path: string;
 }
 
 export interface StageEvidenceSlot {
@@ -30,7 +36,28 @@ export interface StageEvidenceSlot {
   topPercent: number;
   width: number;
   rotateY: number;
+  rotateZ: number;
+  translateZ: number;
+  driftX: number;
+  driftY: number;
+  driftSeconds: number;
+  driftDelay: number;
   code: string;
+}
+
+export interface StageWorkcellPlane {
+  leftPercent: number;
+  topPercent: number;
+  width: number;
+  height: number;
+  translateZ: number;
+  rotateX: number;
+  rotateY: number;
+  rotateZ: number;
+  idleX: number;
+  idleY: number;
+  idleSeconds: number;
+  idleDelay: number;
 }
 
 export interface StageArcSegment {
@@ -39,51 +66,116 @@ export interface StageArcSegment {
 }
 
 export const ANNOTATION_STAGE_LAYOUT = {
-  /** 星空画布的设计取景框；SVG 以 slice 模式铺满视口 */
+  /** 编辑式画布的设计取景框；SVG 以 slice 模式铺满视口 */
   frame: { width: 1920, height: 1080 },
   composition: {
-    /** 展台中心、胶片当前项与地面聚光共享的视觉轴 */
-    axisPercent: 41,
+    /** 展台中心、胶片当前项与素材流带共享的视觉轴 */
+    axisPercent: 39.5,
   },
-  starfield: {
+  scene: {
+    perspective: 1760,
+    perspectiveOriginX: 45,
+    perspectiveOriginY: 48,
+    specimenZ: 88,
+  },
+  registrationField: {
     seed: 20260804,
-    farCount: 116,
-    midCount: 52,
-    bandCount: 84,
-    band: { centerY: 512, spread: 130 },
+    ambientCount: 58,
+    measureCount: 42,
+    flowCount: 92,
+    flow: {
+      centerY: 548,
+      spread: 84,
+      waveAmplitude: 42,
+      waveCycles: 1.12,
+    },
   },
-  ground: {
-    /** 展台下方透视地面的网格间距（平面空间） */
-    majorGrid: 132,
-    minorGrid: 33,
-    tiltDegrees: 55,
-  },
+  registrationGuides: [
+    {
+      id: "guide-primary",
+      tone: "hairline",
+      path: "M -120 728 H 286 L 338 676 H 706 L 754 628 H 1018",
+    },
+    {
+      id: "guide-upper",
+      tone: "muted",
+      path: "M 1052 148 H 1474 L 1534 208 H 2040",
+    },
+    {
+      id: "guide-lower",
+      tone: "hairline",
+      path: "M 44 958 H 326 L 378 906 H 746",
+    },
+    {
+      id: "guide-signal",
+      tone: "signal",
+      path: "M 1574 468 H 1762 L 1800 506 H 1948",
+    },
+  ] as readonly StageRegistrationGuide[],
   camera: {
     maxOffsetX: 76,
     maxOffsetY: 44,
     dragThreshold: 4,
     resetDurationMs: 320,
-    floorDepth: 1,
+    sceneDepth: 1,
     evidenceDepth: 0.46,
-    groundDepth: 0.28,
     ghostDepth: 0.2,
   },
   evidence: [
-    { id: "ev-a", leftPercent: 3.4, topPercent: 11, width: 196, rotateY: 16, code: "BG.01" },
-    { id: "ev-b", leftPercent: 9.2, topPercent: 55, width: 150, rotateY: 9, code: "BG.02" },
-    { id: "ev-c", leftPercent: 60.5, topPercent: 5.5, width: 172, rotateY: -13, code: "BG.03" },
+    {
+      id: "ev-a",
+      leftPercent: 3.2,
+      topPercent: 60,
+      width: 158,
+      rotateY: 7,
+      rotateZ: -1.2,
+      translateZ: -360,
+      driftX: 10,
+      driftY: -6,
+      driftSeconds: 24,
+      driftDelay: -3,
+      code: "REF.01",
+    },
+    {
+      id: "ev-b",
+      leftPercent: 56.5,
+      topPercent: 7,
+      width: 148,
+      rotateY: -4,
+      rotateZ: 0.7,
+      translateZ: -430,
+      driftX: -8,
+      driftY: 5,
+      driftSeconds: 28,
+      driftDelay: -11,
+      code: "REF.02",
+    },
+    {
+      id: "ev-c",
+      leftPercent: 88.2,
+      topPercent: 55,
+      width: 138,
+      rotateY: -7,
+      rotateZ: -0.6,
+      translateZ: -390,
+      driftX: -12,
+      driftY: -4,
+      driftSeconds: 26,
+      driftDelay: -7,
+      code: "REF.03",
+    },
   ] as readonly StageEvidenceSlot[],
   instrument: {
     /** 展台仪器 SVG 的私有取景框，弧环围绕其中心 */
     viewBox: { width: 1080, height: 760 },
     center: { x: 540, y: 380 },
-    ringRadius: 384,
-    tickCount: 72,
-    majorEvery: 6,
+    ringRadius: 354,
+    tickCount: 64,
+    majorEvery: 8,
     tickLength: 9,
     arcs: [
-      { startDegrees: -24, endDegrees: 78 },
-      { startDegrees: 150, endDegrees: 208 },
+      { startDegrees: -18, endDegrees: 58 },
+      { startDegrees: 156, endDegrees: 218 },
     ] as readonly StageArcSegment[],
   },
   viewport: {
@@ -102,6 +194,8 @@ export const ANNOTATION_STAGE_LAYOUT = {
     itemWidth: 148,
     itemHeight: 100,
     gap: 14,
+    /** 与轨道两端 CSS 渐隐保持一致；当前项越界时只补位到这里。 */
+    edgeFadePercent: 11,
     /** 当前项前后各渲染多少张（窗口化渲染） */
     windowRadius: 16,
     /** 距离已装载末尾多少张时请求下一页 */
@@ -113,12 +207,56 @@ export const ANNOTATION_STAGE_LAYOUT = {
     progressSlots: 6,
   },
   workcells: {
-    depthShift: 13,
-    depthScaleStep: 0.04,
+    previewLift: 96,
+    planes: {
+      edit: {
+        leftPercent: 71.5,
+        topPercent: 61,
+        width: 386,
+        height: 152,
+        translateZ: -142,
+        rotateX: 0,
+        rotateY: -5,
+        rotateZ: -0.35,
+        idleX: -5,
+        idleY: -7,
+        idleSeconds: 10.5,
+        idleDelay: -2.4,
+      },
+      production: {
+        leftPercent: 72.5,
+        topPercent: 34,
+        width: 348,
+        height: 136,
+        translateZ: -292,
+        rotateX: -0.5,
+        rotateY: -7,
+        rotateZ: 0.55,
+        idleX: 7,
+        idleY: -5,
+        idleSeconds: 13,
+        idleDelay: -7.2,
+      },
+      dossier: {
+        leftPercent: -3,
+        topPercent: 7,
+        width: 310,
+        height: 148,
+        translateZ: -226,
+        rotateX: 0.5,
+        rotateY: 5,
+        rotateZ: -0.55,
+        idleX: 5,
+        idleY: 6,
+        idleSeconds: 11.5,
+        idleDelay: -5.5,
+      },
+    } satisfies Readonly<Record<"edit" | "production" | "dossier", StageWorkcellPlane>>,
   },
   motion: {
     assetWalkDurationMs: 280,
     filmstripDurationMs: 280,
+    workcellPreviewDurationMs: 260,
   },
   /** 巨型序号的补零位数 */
   indexPadding: 4,
@@ -135,13 +273,14 @@ export type AnnotationStageStyle = CSSProperties &
  * TSX、SVG、手势控制器与样式表由此消费同一份事实，避免坐标镜像。
  */
 export function createAnnotationStageStyle(): AnnotationStageStyle {
-  const { camera, composition, filmstrip, ground, instrument, motion, viewport } =
+  const { camera, composition, filmstrip, instrument, motion, scene, viewport } =
     ANNOTATION_STAGE_LAYOUT;
   return {
     "--dial-archive-stage-axis-wide": `${composition.axisPercent}%`,
-    "--dial-archive-stage-ground-major": `${ground.majorGrid}px`,
-    "--dial-archive-stage-ground-minor": `${ground.minorGrid}px`,
-    "--dial-archive-stage-ground-tilt": `${ground.tiltDegrees}deg`,
+    "--dial-archive-stage-axis-span": `${composition.axisPercent * 2}%`,
+    "--dial-archive-stage-perspective": `${scene.perspective}px`,
+    "--dial-archive-stage-perspective-origin": `${scene.perspectiveOriginX}% ${scene.perspectiveOriginY}%`,
+    "--dial-archive-stage-specimen-z": `${scene.specimenZ}px`,
     "--dial-archive-stage-instrument-width": instrument.viewBox.width,
     "--dial-archive-stage-instrument-height": instrument.viewBox.height,
     "--dial-archive-stage-instrument-cx": `${instrument.center.x}px`,
@@ -150,8 +289,10 @@ export function createAnnotationStageStyle(): AnnotationStageStyle {
     "--dial-archive-stage-film-item-height": `${filmstrip.itemHeight}px`,
     "--dial-archive-stage-film-item-half": `${filmstrip.itemWidth / 2}px`,
     "--dial-archive-stage-film-step": `${ANNOTATION_STAGE_FILM_STEP}px`,
+    "--dial-archive-stage-film-fade": `${filmstrip.edgeFadePercent}%`,
     "--dial-archive-stage-walk-duration": `${motion.assetWalkDurationMs}ms`,
     "--dial-archive-stage-film-duration": `${motion.filmstripDurationMs}ms`,
+    "--dial-archive-stage-workcell-preview-duration": `${motion.workcellPreviewDurationMs}ms`,
     "--dial-archive-stage-viewport-settle-duration": `${viewport.settleDurationMs}ms`,
     "--dial-archive-stage-camera-reset-duration": `${camera.resetDurationMs}ms`,
   };
@@ -169,17 +310,17 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-function createStars(
+function createRegistrationPoints(
   random: () => number,
   count: number,
   project: (a: number, b: number) => { x: number; y: number },
   radiusRange: readonly [number, number],
   opacityRange: readonly [number, number],
-): StageStar[] {
-  const stars: StageStar[] = [];
+): StageRegistrationPoint[] {
+  const points: StageRegistrationPoint[] = [];
   for (let index = 0; index < count; index += 1) {
     const point = project(random(), random());
-    stars.push({
+    points.push({
       x: Math.round(point.x * 10) / 10,
       y: Math.round(point.y * 10) / 10,
       radius:
@@ -188,22 +329,48 @@ function createStars(
         Math.round((opacityRange[0] + random() * (opacityRange[1] - opacityRange[0])) * 100) / 100,
     });
   }
-  return stars;
+  return points;
 }
 
-export function createStageStarfield(): StageStarfield {
-  const { frame, starfield } = ANNOTATION_STAGE_LAYOUT;
-  const random = mulberry32(starfield.seed);
+export function createStageRegistrationField(): StageRegistrationField {
+  const { frame, registrationField } = ANNOTATION_STAGE_LAYOUT;
+  const random = mulberry32(registrationField.seed);
   const fullFrame = (a: number, b: number) => ({ x: a * frame.width, y: b * frame.height });
-  const bandFrame = (a: number, b: number) => ({
-    x: a * frame.width,
-    // 两个均匀样本求和近似三角分布，向流带中心聚拢
-    y: starfield.band.centerY + (a + b - 1) * starfield.band.spread,
-  });
+  const flowFrame = (a: number, b: number) => {
+    const x = a * frame.width;
+    const wave = Math.sin((a * registrationField.flow.waveCycles + 0.12) * Math.PI * 2);
+    const envelope = 0.42 + Math.sin(a * Math.PI) * 0.58;
+    return {
+      x,
+      // 登记点沿素材流向聚散，保留起伏但不把纸面误读为星空。
+      y:
+        registrationField.flow.centerY +
+        wave * registrationField.flow.waveAmplitude +
+        (a + b - 1) * registrationField.flow.spread * envelope,
+    };
+  };
   return {
-    far: createStars(random, starfield.farCount, fullFrame, [0.5, 1.3], [0.14, 0.5]),
-    mid: createStars(random, starfield.midCount, fullFrame, [0.9, 2.1], [0.24, 0.66]),
-    band: createStars(random, starfield.bandCount, bandFrame, [0.4, 1.5], [0.2, 0.62]),
+    ambient: createRegistrationPoints(
+      random,
+      registrationField.ambientCount,
+      fullFrame,
+      [0.45, 1.05],
+      [0.12, 0.32],
+    ),
+    measure: createRegistrationPoints(
+      random,
+      registrationField.measureCount,
+      fullFrame,
+      [0.7, 1.45],
+      [0.18, 0.42],
+    ),
+    flow: createRegistrationPoints(
+      random,
+      registrationField.flowCount,
+      flowFrame,
+      [0.45, 1.2],
+      [0.16, 0.44],
+    ),
   };
 }
 
@@ -263,4 +430,39 @@ export function formatStageByteSize(byteSize: number): string {
   if (byteSize < 1024) return `${byteSize} B`;
   if (byteSize < 1024 * 1024) return `${(byteSize / 1024).toFixed(1)} KB`;
   return `${(byteSize / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+export interface FilmstripVisibilityInput {
+  currentOffset: number;
+  viewportLeft: number;
+  viewportWidth: number;
+  cellLeft: number;
+  cellRight: number;
+}
+
+/**
+ * 让当前胶片保持在原位置；只有越过两端渐隐安全区时才做最短补位。
+ * 返回值仍是轨道的 translateX 像素值，调用者无需维护第二套坐标。
+ */
+export function resolveFilmstripTrackOffset({
+  currentOffset,
+  viewportLeft,
+  viewportWidth,
+  cellLeft,
+  cellRight,
+}: FilmstripVisibilityInput): number {
+  if (
+    ![currentOffset, viewportLeft, viewportWidth, cellLeft, cellRight].every(Number.isFinite) ||
+    viewportWidth <= 0 ||
+    cellRight <= cellLeft
+  ) {
+    return currentOffset;
+  }
+
+  const edgeInset = (viewportWidth * ANNOTATION_STAGE_LAYOUT.filmstrip.edgeFadePercent) / 100;
+  const safeLeft = viewportLeft + edgeInset;
+  const safeRight = viewportLeft + viewportWidth - edgeInset;
+  if (cellLeft < safeLeft) return currentOffset + (safeLeft - cellLeft);
+  if (cellRight > safeRight) return currentOffset - (cellRight - safeRight);
+  return currentOffset;
 }
