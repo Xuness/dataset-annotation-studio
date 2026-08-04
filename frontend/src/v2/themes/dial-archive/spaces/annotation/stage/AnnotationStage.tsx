@@ -227,7 +227,7 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
             channels={content.channels}
             operation={content.operation}
             edit={content.edit}
-            activeProductionLane={content.activeProductionLane}
+            production={content.production}
             confirmation={content.confirmation}
             onClose={content.closeWorkcell}
             onSwitch={content.openWorkcell}

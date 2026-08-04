@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { getHomeSpace } from "../../../navigation/spaceRegistry";
 import type {
   AnnotationEditContent,
+  AnnotationProductionContent,
+  AnnotationProductionOperation,
   AnnotationStageAsset,
   AnnotationStageContent,
 } from "../../../pages/spaces/spacePageModel";
@@ -174,6 +176,135 @@ function editContent(overrides: Partial<AnnotationEditContent> = {}): Annotation
   };
 }
 
+function productionContent(
+  overrides: Partial<AnnotationProductionContent> = {},
+): AnnotationProductionContent {
+  return {
+    status: "inactive",
+    lane: "tags",
+    lanes: [
+      {
+        id: "tags",
+        code: "TAG.01",
+        title: "标签生产",
+        summary: "本地视觉模型生成结构化标签修订",
+        coveragePercent: 67,
+        usableAssetCount: 2,
+        missingAssetCount: 1,
+        state: "attention",
+      },
+      {
+        id: "description",
+        code: "DSC.02",
+        title: "描述生产",
+        summary: "视觉语言模型生成逐图语义描述",
+        coveragePercent: 33,
+        usableAssetCount: 1,
+        missingAssetCount: 2,
+        state: "attention",
+      },
+      {
+        id: "translation",
+        code: "TRN.03",
+        title: "译文生产",
+        summary: "基于描述或标签生成目标语言译文",
+        coveragePercent: 0,
+        usableAssetCount: 0,
+        missingAssetCount: 3,
+        state: "inactive",
+      },
+    ],
+    configuration: {
+      scope: "all",
+      scopeCount: 3,
+      totalCount: 3,
+      selectedCount: 1,
+      backend: "local_tagger",
+      backendOptions: [{ id: "local_tagger", label: "本地打标器" }],
+      providerProfileId: "",
+      providerProfileOptions: [],
+      modelId: "",
+      modelOptions: [],
+      taggerProfileId: "tagger-1",
+      taggerProfileOptions: [{ id: "tagger-1", label: "WD Tagger" }],
+      promptPresetId: "",
+      promptPresetOptions: [],
+      targetLanguage: "zh-CN",
+      targetLanguageOptions: [{ id: "zh-CN", label: "简体中文" }],
+      translationSource: "description",
+      translationPolicy: "skip",
+      snapshot: [
+        { id: "scope", label: "任务范围", value: "全项目", detail: "3 MATERIAL" },
+        { id: "route", label: "生产线路", value: "TAGS", detail: "LOCAL TAGGER" },
+      ],
+      blockers: [],
+      ready: true,
+      pending: false,
+      setScope: vi.fn(),
+      setBackend: vi.fn(),
+      setProviderProfile: vi.fn(),
+      setModel: vi.fn(),
+      setTaggerProfile: vi.fn(),
+      setPromptPreset: vi.fn(),
+      setTargetLanguage: vi.fn(),
+      setTranslationSource: vi.fn(),
+      setTranslationPolicy: vi.fn(),
+      create: vi.fn(),
+    },
+    operation: null,
+    message: null,
+    selectLane: vi.fn(),
+    createNew: vi.fn(),
+    ...overrides,
+  };
+}
+
+function productionOperation(
+  overrides: Partial<AnnotationProductionOperation> = {},
+): AnnotationProductionOperation {
+  return {
+    id: "job-1",
+    lane: "description",
+    status: "running",
+    statusLabel: "正在生产",
+    tone: "active",
+    progressPercent: 64,
+    total: 100,
+    pending: 35,
+    running: 1,
+    succeeded: 63,
+    failed: 1,
+    skipped: 0,
+    candidates: 0,
+    manuallyAccepted: 0,
+    executionProfile: "Codex-Xuness",
+    model: "gpt-5.6-sol",
+    outputChannel: "description",
+    scopeLabel: "全项目",
+    createdAt: "2026-08-05T10:00:00Z",
+    updatedAt: "2026-08-05T10:03:00Z",
+    snapshot: [
+      { id: "route", label: "输出线路", value: "DESCRIPTION REVISION" },
+      { id: "model", label: "固定模型", value: "gpt-5.6-sol" },
+    ],
+    exceptions: [],
+    exceptionCount: 0,
+    loadingMore: false,
+    canLoadMore: false,
+    canStop: true,
+    stopping: false,
+    canResume: false,
+    canRetry: false,
+    actionPending: false,
+    stop: vi.fn(),
+    resume: vi.fn(),
+    retry: vi.fn(),
+    accept: vi.fn(),
+    loadMore: vi.fn(),
+    ...overrides,
+  };
+}
+
 function stageContent(overrides: Partial<AnnotationStageContent> = {}): AnnotationStageContent {
   const assets = [stageAsset("asset-1", 0), stageAsset("asset-2", 1), stageAsset("asset-3", 2)];
   return {
@@ -204,8 +335,8 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
     operation: null,
     activeWorkcell: null,
     activeEditChannel: "tags",
-    activeProductionLane: "tags",
     edit: editContent(),
+    production: productionContent(),
     confirmation: null,
     message: null,
     selectAsset: vi.fn(),
@@ -421,6 +552,54 @@ describe("dial archive annotation stage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "返回素材施工场总览" }));
     expect(content.closeWorkcell).toHaveBeenCalledOnce();
+  });
+
+  test("builds a production route from the selected film range without another image screen", () => {
+    const production = productionContent({ status: "configure" });
+    const content = stageContent({
+      activeWorkcell: "production",
+      checkedAssetIds: ["asset-2"],
+      production,
+    });
+    renderStage(content);
+
+    expect(screen.getByRole("region", { name: "自动生产工作间" })).not.toBeNull();
+    expect(screen.getByRole("region", { name: "可拖动的生产路由画布" })).not.toBeNull();
+    expect(screen.getByRole("region", { name: "生产线路" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "标签生产线路" })).not.toBeNull();
+    expect(screen.getByText("RANGE EVIDENCE")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "关闭生产执行检查器" }));
+    expect(screen.queryByRole("heading", { name: "标签生产线路" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /INSPECT TAGS/u }));
+    expect(screen.getByRole("heading", { name: "标签生产线路" })).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: /描述生产/u }));
+    expect(production.selectLane).toHaveBeenCalledWith("description");
+
+    fireEvent.click(screen.getByRole("button", { name: /建立并启动生产任务/u }));
+    expect(production.configuration.create).toHaveBeenCalledOnce();
+  });
+
+  test("keeps a running operation on the same route topology", () => {
+    const operation = productionOperation();
+    renderStage(
+      stageContent({
+        activeWorkcell: "production",
+        production: productionContent({
+          status: "operation",
+          lane: "description",
+          operation,
+        }),
+      }),
+    );
+
+    expect(screen.getAllByText("正在生产").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("64")).not.toBeNull();
+    expect(screen.getByText("NO DIVERGENCE")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /停止任务/u }));
+    expect(operation.stop).toHaveBeenCalledOnce();
   });
 
   test("keeps the same workcell plane mounted while it returns to the overview", () => {

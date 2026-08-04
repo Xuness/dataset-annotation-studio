@@ -25,6 +25,7 @@ import {
   toAnnotationStageAsset,
 } from "./annotationStageModel";
 import { useAnnotationEditController } from "./useAnnotationEditController";
+import { useAnnotationProductionController } from "./useAnnotationProductionController";
 
 const STAGE_PAGE_SIZE = 120;
 
@@ -39,6 +40,8 @@ interface UseAnnotationStageControllerOptions {
   onOpenWorkcell(workcell: AnnotationWorkcellId): void;
   onCloseWorkcell(): void;
   onEditChannelChange(channel: AnnotationEditChannelId): void;
+  onProductionLaneChange(lane: AnnotationLaneId): void;
+  onProductionOperationChange(operationId: string | null): void;
   onReturnToSpace(): void;
   onOpenArchive(): void;
 }
@@ -63,6 +66,8 @@ export function useAnnotationStageController({
   onOpenWorkcell,
   onCloseWorkcell,
   onEditChannelChange,
+  onProductionLaneChange,
+  onProductionOperationChange,
   onReturnToSpace,
   onOpenArchive,
 }: UseAnnotationStageControllerOptions): AnnotationStageContent {
@@ -179,6 +184,17 @@ export function useAnnotationStageController({
       ),
     [jobs.data?.pages, requestedJob.data, requestedOperationId],
   );
+  const production = useAnnotationProductionController({
+    projectId,
+    workspace: workspace.data ?? null,
+    checkedAssetIds,
+    channels,
+    requestedLane: requestedProductionLane,
+    requestedOperationId,
+    enabled: activeWorkcell === "production",
+    onLaneChange: onProductionLaneChange,
+    onOperationChange: onProductionOperationChange,
+  });
 
   const loadMore = useCallback(() => {
     if (!assets.hasNextPage || assets.isFetchingNextPage) return;
@@ -305,8 +321,8 @@ export function useAnnotationStageController({
     operation,
     activeWorkcell,
     activeEditChannel: editContent.channel,
-    activeProductionLane: requestedProductionLane ?? "tags",
     edit: editContent,
+    production,
     confirmation: pendingConfirmation
       ? {
           title: pendingConfirmation.request.title ?? "确认操作",
@@ -358,8 +374,8 @@ export function createNoContextAnnotationStage({
     operation: null,
     activeWorkcell: null,
     activeEditChannel: "tags",
-    activeProductionLane: "tags",
     edit: null,
+    production: null,
     confirmation: null,
     message: null,
     selectAsset: () => {},

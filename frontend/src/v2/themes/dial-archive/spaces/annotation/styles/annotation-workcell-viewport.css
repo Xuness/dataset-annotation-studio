@@ -476,6 +476,7 @@
 
 .dial-archive-stage-specimen {
   transition:
+    opacity 340ms ease,
     top var(--dial-archive-stage-workcell-close-duration)
       var(--dial-archive-stage-workcell-close-ease),
     width var(--dial-archive-stage-workcell-close-duration)

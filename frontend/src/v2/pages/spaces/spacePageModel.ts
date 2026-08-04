@@ -335,6 +335,130 @@ export interface AnnotationEditContent {
   discard(): Promise<void>;
 }
 
+export type AnnotationProductionBackendId = "provider" | "local_tagger" | "local_dictionary";
+
+export interface AnnotationProductionOption {
+  id: string;
+  label: string;
+  detail?: string;
+  disabled?: boolean;
+}
+
+export interface AnnotationProductionLaneReading {
+  id: AnnotationLaneId;
+  code: string;
+  title: string;
+  summary: string;
+  coveragePercent: number;
+  usableAssetCount: number;
+  missingAssetCount: number;
+  state: "ready" | "attention" | "inactive" | "running" | "complete";
+}
+
+export interface AnnotationProductionSnapshotField {
+  id: string;
+  label: string;
+  value: string;
+  detail?: string;
+  tone?: "default" | "attention" | "signal";
+}
+
+export interface AnnotationProductionConfiguration {
+  scope: "all" | "selected";
+  scopeCount: number;
+  totalCount: number;
+  selectedCount: number;
+  backend: AnnotationProductionBackendId;
+  backendOptions: readonly AnnotationProductionOption[];
+  providerProfileId: string;
+  providerProfileOptions: readonly AnnotationProductionOption[];
+  modelId: string;
+  modelOptions: readonly AnnotationProductionOption[];
+  taggerProfileId: string;
+  taggerProfileOptions: readonly AnnotationProductionOption[];
+  promptPresetId: string;
+  promptPresetOptions: readonly AnnotationProductionOption[];
+  targetLanguage: string;
+  targetLanguageOptions: readonly AnnotationProductionOption[];
+  translationSource: "description" | "tags";
+  translationPolicy: "skip" | "stale" | "overwrite";
+  snapshot: readonly AnnotationProductionSnapshotField[];
+  blockers: readonly string[];
+  ready: boolean;
+  pending: boolean;
+  setScope(scope: "all" | "selected"): void;
+  setBackend(backend: AnnotationProductionBackendId): void;
+  setProviderProfile(profileId: string): void;
+  setModel(modelId: string): void;
+  setTaggerProfile(profileId: string): void;
+  setPromptPreset(presetId: string): void;
+  setTargetLanguage(language: string): void;
+  setTranslationSource(source: "description" | "tags"): void;
+  setTranslationPolicy(policy: "skip" | "stale" | "overwrite"): void;
+  create(): Promise<void>;
+}
+
+export interface AnnotationProductionException {
+  id: string;
+  assetId: string;
+  relativePath: string;
+  status: string;
+  attemptCount: number;
+  message: string;
+  diagnostic: string | null;
+  candidate: boolean;
+  canAccept: boolean;
+}
+
+export interface AnnotationProductionOperation {
+  id: string;
+  lane: AnnotationLaneId;
+  status: string;
+  statusLabel: string;
+  tone: "active" | "success" | "attention" | "idle";
+  progressPercent: number;
+  total: number;
+  pending: number;
+  running: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  candidates: number;
+  manuallyAccepted: number;
+  executionProfile: string;
+  model: string;
+  outputChannel: string;
+  scopeLabel: string;
+  createdAt: string;
+  updatedAt: string;
+  snapshot: readonly AnnotationProductionSnapshotField[];
+  exceptions: readonly AnnotationProductionException[];
+  exceptionCount: number;
+  loadingMore: boolean;
+  canLoadMore: boolean;
+  canStop: boolean;
+  stopping: boolean;
+  canResume: boolean;
+  canRetry: boolean;
+  actionPending: boolean;
+  stop(): Promise<void>;
+  resume(): Promise<void>;
+  retry(): Promise<void>;
+  accept(exceptionId: string): Promise<void>;
+  loadMore(): void;
+}
+
+export interface AnnotationProductionContent {
+  status: "inactive" | "loading" | "configure" | "operation" | "error";
+  lane: AnnotationLaneId;
+  lanes: readonly AnnotationProductionLaneReading[];
+  configuration: AnnotationProductionConfiguration;
+  operation: AnnotationProductionOperation | null;
+  message: string | null;
+  selectLane(lane: AnnotationLaneId): void;
+  createNew(): void;
+}
+
 export interface AnnotationConfirmation {
   title: string;
   message: string;
@@ -355,8 +479,8 @@ export interface AnnotationStageContent {
   operation: AnnotationOperationSummary | null;
   activeWorkcell: AnnotationWorkcellId | null;
   activeEditChannel: AnnotationEditChannelId;
-  activeProductionLane: AnnotationLaneId;
   edit: AnnotationEditContent | null;
+  production: AnnotationProductionContent | null;
   confirmation: AnnotationConfirmation | null;
   message: string | null;
   selectAsset(assetId: string): void;

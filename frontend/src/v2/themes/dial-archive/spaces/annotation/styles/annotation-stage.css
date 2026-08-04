@@ -10,6 +10,10 @@
 @import "./annotation-workcell-edit-tags.css";
 @import "./annotation-workcell-edit-translation.css";
 @import "./annotation-workcell-edit-history.css";
+@import "./annotation-workcell-production.css";
+@import "./annotation-workcell-production-config.css";
+@import "./annotation-workcell-production-operation.css";
+@import "./annotation-workcell-production-responsive.css";
 @import "./annotation-stage-filmstrip.css";
 @import "./annotation-stage-state.css";
 @import "./annotation-stage-motion.css";

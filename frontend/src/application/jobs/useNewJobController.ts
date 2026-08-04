@@ -20,9 +20,10 @@ import { actionError } from "../interaction";
 
 interface UseNewJobControllerOptions {
   projectId: string;
-  workspace: WorkspaceSummary;
+  workspace: WorkspaceSummary | null;
   checkedAssetIds: readonly string[];
   onCreated: (job: JobDetail) => void;
+  enabled?: boolean;
 }
 
 export function useNewJobController({
@@ -30,12 +31,13 @@ export function useNewJobController({
   workspace,
   checkedAssetIds,
   onCreated,
+  enabled = true,
 }: UseNewJobControllerOptions) {
-  const systemPresets = useSystemPresets();
-  const translationPromptPresets = useTranslationPromptPresets();
-  const providerProfiles = useProviderProfiles();
-  const taggerLibrary = useTaggerLibrary();
-  const tagDictionaryLibrary = useTagDictionaryLibrary();
+  const systemPresets = useSystemPresets(enabled);
+  const translationPromptPresets = useTranslationPromptPresets(enabled);
+  const providerProfiles = useProviderProfiles(enabled);
+  const taggerLibrary = useTaggerLibrary(enabled);
+  const tagDictionaryLibrary = useTagDictionaryLibrary(enabled);
   const actions = useJobActions(projectId);
   const [kind, setKind] = useState<JobKind>("annotation");
   const [annotationBackend, setAnnotationBackend] = useState<ExecutionBackend>("provider");
@@ -113,15 +115,17 @@ export function useNewJobController({
   }, [targetLanguage, translationBackend, translationSourceKind]);
 
   const configuredSystemPreset = systemPresets.data?.find(
-    (preset) => preset.id === workspace.settings.system_preset_id,
+    (preset) => preset.id === workspace?.settings.system_preset_id,
   );
-  const promptConfigurationIssue = !workspace.settings.system_preset_id
-    ? "尚未在素材页选择 System Prompt 预设"
-    : systemPresets.isError
-      ? "无法读取项目关联的 System Prompt 预设"
-      : systemPresets.isSuccess && !configuredSystemPreset
-        ? "项目关联的 System Prompt 预设已不存在"
-        : null;
+  const promptConfigurationIssue = !workspace
+    ? "当前项目上下文不可用"
+    : !workspace.settings.system_preset_id
+      ? "尚未在素材页选择 System Prompt 预设"
+      : systemPresets.isError
+        ? "无法读取项目关联的 System Prompt 预设"
+        : systemPresets.isSuccess && !configuredSystemPreset
+          ? "项目关联的 System Prompt 预设已不存在"
+          : null;
   const configuredTranslationPrompt = translationPromptPresets.data?.find(
     (preset) => preset.id === translationPromptPresetId,
   );
@@ -142,6 +146,7 @@ export function useNewJobController({
       )),
   );
   const ready = Boolean(
+    workspace &&
     (executionBackend === "local_tagger"
       ? selectedTaggerProfile
       : executionBackend === "local_dictionary"
@@ -153,6 +158,7 @@ export function useNewJobController({
   const createJob = useCallback(async () => {
     setError(null);
     try {
+      if (!workspace) throw new Error("当前项目上下文不可用。");
       const providerExecution = executionBackend === "provider";
       const taggerExecution = executionBackend === "local_tagger";
       const job = await actions.create.mutateAsync({
@@ -187,6 +193,7 @@ export function useNewJobController({
     translationPolicy,
     translationPromptPresetId,
     translationSourceKind,
+    workspace,
   ]);
 
   return {

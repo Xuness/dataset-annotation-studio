@@ -5,8 +5,8 @@ import {
   type AnnotationConfirmation,
   type AnnotationCoverageLane,
   type AnnotationEditContent,
-  type AnnotationLaneId,
   type AnnotationOperationSummary,
+  type AnnotationProductionContent,
   type AnnotationStageAsset,
   type AnnotationWorkcellId,
 } from "../../../../../pages/spaces/spacePageModel";
@@ -17,6 +17,7 @@ import {
   describeWorkcellStatus,
 } from "../stage/model/annotationStagePresentation";
 import { AnnotationEditWorkcell } from "./edit/AnnotationEditWorkcell";
+import { AnnotationProductionWorkcell } from "./production/AnnotationProductionWorkcell";
 
 interface AnnotationWorkcellViewportProps {
   transition: WorkcellTransitionState;
@@ -26,7 +27,7 @@ interface AnnotationWorkcellViewportProps {
   channels: readonly AnnotationCoverageLane[];
   operation: AnnotationOperationSummary | null;
   edit: AnnotationEditContent | null;
-  activeProductionLane: AnnotationLaneId;
+  production: AnnotationProductionContent | null;
   confirmation: AnnotationConfirmation | null;
   onClose(): void;
   onSwitch(workcell: AnnotationWorkcellId): void;
@@ -41,7 +42,7 @@ export function AnnotationWorkcellViewport({
   channels,
   operation,
   edit,
-  activeProductionLane,
+  production,
   confirmation,
   onClose,
   onSwitch,
@@ -64,7 +65,6 @@ export function AnnotationWorkcellViewport({
     channels,
     operation,
   );
-  const pendingLane = workcell === "production" ? activeProductionLane.toUpperCase() : null;
 
   return (
     <section
@@ -142,11 +142,11 @@ export function AnnotationWorkcellViewport({
               checkedCount={checkedCount}
               edit={edit}
             />
+          ) : workcell === "production" ? (
+            <AnnotationProductionWorkcell production={production} />
           ) : (
             <div className="dial-archive-workcell-viewport__pending" role="status">
-              <span>
-                {presentation.code} // STRUCTURE RESERVED{pendingLane ? ` // ${pendingLane}` : ""}
-              </span>
+              <span>{presentation.code} // STRUCTURE RESERVED</span>
               <h2>{presentation.title}工作间</h2>
               <p>{presentation.description}</p>
               <b>本轮保留空间入口与切换关系，功能构图将在对应工作间设计时接入。</b>

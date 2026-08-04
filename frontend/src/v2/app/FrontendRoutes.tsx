@@ -335,6 +335,10 @@ function LoadedAnnotationStageRoute({
     onOpenWorkcell: (workcell) => navigate(stageHref({ workcell })),
     onCloseWorkcell: () => navigate(stageHref({ workcell: null })),
     onEditChannelChange: (channel) => navigate(stageHref({ workcell: "edit", channel })),
+    onProductionLaneChange: (lane) =>
+      navigate(stageHref({ workcell: "production", lane, operationId: null }), { replace: true }),
+    onProductionOperationChange: (operationId) =>
+      navigate(stageHref({ workcell: "production", operationId })),
     onReturnToSpace: () => navigate(buildFrontendHref(space.route, { themeId, projectId })),
     onOpenArchive: () =>
       navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId, projectId })),

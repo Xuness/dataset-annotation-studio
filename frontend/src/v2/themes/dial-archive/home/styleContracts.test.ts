@@ -105,6 +105,10 @@ describe("dial archive source contracts", () => {
       "utf8",
     );
     const motionSource = readFileSync(
+      resolve(process.cwd(), "src/v2/themes/dial-archive/spaces/hooks/useSpatialCanvasMotion.ts"),
+      "utf8",
+    );
+    const preparationMotionSource = readFileSync(
       resolve(
         process.cwd(),
         "src/v2/themes/dial-archive/spaces/preparation/hooks/usePreparationCanvasMotion.ts",
@@ -117,6 +121,7 @@ describe("dial archive source contracts", () => {
     expect(workbenchStyles).not.toMatch(/font-size:\s*[789](?:\.\d+)?px;/u);
     expect(workbenchStyles).toMatch(/-webkit-font-smoothing:\s*auto;/u);
     expect(workbenchStyles).toMatch(/text-rendering:\s*auto;/u);
+    expect(preparationMotionSource).toMatch(/useSpatialCanvasMotion/u);
     expect(motionSource).toMatch(/scene\.style\.setProperty\("zoom", String\(scale\)\);/u);
     expect(motionSource).not.toMatch(/surface\.style\.transform\s*=\s*`[^`]*scale\(/u);
   });
