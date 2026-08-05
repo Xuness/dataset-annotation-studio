@@ -206,8 +206,8 @@ export const ANNOTATION_STAGE_LAYOUT = {
         idleDelay: 0,
       },
       dossier: {
-        leftPercent: 9,
-        topPercent: 22,
+        leftPercent: 6,
+        topPercent: 58,
         width: 268,
         height: 110,
         hitSlop: { top: 24, right: 112, bottom: 40, left: 24 },

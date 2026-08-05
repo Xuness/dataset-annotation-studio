@@ -1,0 +1,549 @@
+/*
+ * Legibility contract for Space 03.
+ *
+ * Decorative registration marks may stay below 10px. Any copy that carries
+ * identity, status, data, navigation, or an action uses this shared scale.
+ * This file is imported last so feature styles can keep their geometry while
+ * the stage enforces one readable typographic floor.
+ */
+
+.dial-archive-stage {
+  --dial-archive-annotation-type-meta: 10px;
+  --dial-archive-annotation-type-label: 11px;
+  --dial-archive-annotation-type-body: 12px;
+  --dial-archive-stage-film-pager-width: 150px;
+  --dial-archive-stage-film-range-width: 108px;
+}
+
+/* The image is the visual subject. A paper-gray calibration bed keeps empty
+ * space quiet; black remains a narrow structural accent instead of a backdrop. */
+.dial-archive-stage-specimen__frame {
+  border-color: rgba(25, 25, 25, 0.42);
+  background:
+    linear-gradient(rgba(25, 25, 25, 0.035) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, rgba(25, 25, 25, 0.035) 1px, transparent 1px) 0 0 / 48px 48px,
+    #eceeea;
+  box-shadow:
+    0 24px 60px rgba(25, 25, 25, 0.12),
+    12px 14px 0 rgba(25, 25, 25, 0.08),
+    inset 0 0 0 7px rgba(255, 255, 255, 0.54);
+}
+
+.dial-archive-stage-specimen__frame::after {
+  border-color: rgba(25, 25, 25, 0.16);
+}
+
+.dial-archive-stage-specimen__frame.is-empty {
+  color: var(--dial-archive-stage-muted);
+}
+
+/* Overview chrome and the single-object ledger. */
+.dial-archive-stage__return,
+.dial-archive-stage__camera-reset,
+.dial-archive-stage__title em,
+.dial-archive-stage__project small,
+.dial-archive-stage__workcell-switcher span,
+.dial-archive-stage__workcell-switcher b,
+.dial-archive-stage-canvas__section-mark span,
+.dial-archive-stage-readout__eyebrow,
+.dial-archive-stage-readout__identity small,
+.dial-archive-stage-readout dt,
+.dial-archive-stage-context-dock__trigger span,
+.dial-archive-stage-context-dock__panel > section > header span,
+.dial-archive-stage-context-dock__panel > section > nav button span,
+.dial-archive-stage-context-dock__scope label > span,
+.dial-archive-stage-context-dock__scope dt,
+.dial-archive-stage-context-dock__panel > footer {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-stage-readout dd,
+.dial-archive-stage-readout dd em,
+.dial-archive-stage-specimen__range-tag,
+.dial-archive-stage-specimen__viewport-tools button,
+.dial-archive-stage-specimen__viewport-tools output,
+.dial-archive-stage-context-dock__scope dd {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-stage__camera-reset span,
+.dial-archive-stage-specimen__index-rail {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-stage-workcell__kicker,
+.dial-archive-stage-workcell__status,
+.dial-archive-stage-workcell__action,
+.dial-archive-stage-filmstrip__range span,
+.dial-archive-stage-filmstrip__range em,
+.dial-archive-stage-filmstrip__foot,
+.dial-archive-stage-filmstrip__pager output span {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+/* Neighbour cells are scaled to 88%; 12px keeps their visible index above 10px. */
+.dial-archive-stage-filmstrip__cell-index {
+  min-width: 24px;
+  font-size: var(--dial-archive-annotation-type-body);
+}
+
+.dial-archive-stage-canvas__board figcaption span,
+.dial-archive-stage-canvas__board figcaption small {
+  font-size: var(--dial-archive-annotation-type-body);
+}
+
+/* A fixed clipping viewport prevents film cells from passing under the range
+ * register or pager while preserving the full-width stage axis for the track. */
+.dial-archive-stage-filmstrip__track-viewport {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  overflow: hidden;
+  clip-path: inset(
+    0
+      calc(
+        var(--dial-archive-stage-page-gutter) + var(--dial-archive-stage-film-pager-width) + 12px
+      )
+      0
+      calc(
+        var(--dial-archive-stage-page-gutter) + var(--dial-archive-stage-film-range-width) + 12px
+      )
+  );
+}
+
+.dial-archive-stage-filmstrip__range,
+.dial-archive-stage-filmstrip__pager {
+  z-index: 5;
+}
+
+/* Edit workcell: document chrome and actions must read as UI, not decoration. */
+.dial-archive-edit-workcell__heading > span,
+.dial-archive-edit-workcell__heading output,
+.dial-archive-edit-workcell__channels button span,
+.dial-archive-edit-workcell__channels button em,
+.dial-archive-edit-workcell__document-head span,
+.dial-archive-edit-workcell__document-head p,
+.dial-archive-edit-workcell__document-head dt,
+.dial-archive-edit-workcell__footer span,
+.dial-archive-edit-workcell__footer strong,
+.dial-archive-edit-workcell__footer label > span,
+.dial-archive-edit-workcell__state span,
+.dial-archive-workcell-confirmation > section > span {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-edit-workcell__channels button b,
+.dial-archive-edit-workcell__document-head dd,
+.dial-archive-edit-workcell__footer-actions button,
+.dial-archive-workcell-confirmation > section button {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-edit-text > header span,
+.dial-archive-edit-text__plane > aside > ol > li,
+.dial-archive-edit-text__metrics span {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-edit-text__ruler i {
+  color: rgba(25, 25, 25, 0.58);
+}
+
+.dial-archive-edit-text__plane > aside > ol > li {
+  color: rgba(25, 25, 25, 0.62);
+}
+
+.dial-archive-edit-tags__input-row label > span,
+.dial-archive-edit-tags__input-row > button span,
+.dial-archive-edit-tags__suggestions em,
+.dial-archive-edit-tags__suggestions small,
+.dial-archive-edit-tags__suggestions p,
+.dial-archive-edit-tags__groups > section > header span,
+.dial-archive-edit-tags__groups > section > header em,
+.dial-archive-edit-tags__groups > section > div > span > small,
+.dial-archive-edit-tags__empty span,
+.dial-archive-edit-tags > footer {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-edit-tags__input-row select,
+.dial-archive-edit-tags__groups > section > div > span > b {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-edit-tags__groups > section > header b {
+  font-size: var(--dial-archive-annotation-type-body);
+}
+
+.dial-archive-edit-tags__groups {
+  padding-bottom: 24px;
+  scroll-padding-bottom: 24px;
+}
+
+.dial-archive-edit-tags > footer {
+  min-height: 32px;
+  line-height: 1.35;
+}
+
+.dial-archive-edit-translation__controls > div span,
+.dial-archive-edit-translation__controls label span,
+.dial-archive-edit-translation__source > header span,
+.dial-archive-edit-translation__source > header em,
+.dial-archive-edit-translation__target > header span,
+.dial-archive-edit-translation__target > header em,
+.dial-archive-edit-translation__axis span,
+.dial-archive-edit-translation > footer,
+.dial-archive-edit-translation > footer button {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-edit-translation__controls select,
+.dial-archive-edit-translation__aligned.is-tag span {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-edit-translation > footer {
+  min-height: 34px;
+  line-height: 1.4;
+}
+
+.dial-archive-edit-translation > footer strong {
+  letter-spacing: 0.02em;
+}
+
+.dial-archive-edit-history > header span,
+.dial-archive-edit-history__list article > header em,
+.dial-archive-edit-history__list article > pre,
+.dial-archive-edit-history__list article > button span {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-edit-history__list article > button b {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-edit-workcell__section-band span,
+.dial-archive-edit-workcell__section-band b,
+.dial-archive-edit-workcell__sections span,
+.dial-archive-batch-surface small,
+.dial-archive-context-surface__evidence header b,
+.dial-archive-context-surface__evidence p,
+.dial-archive-request-preview dd,
+.dial-archive-request-preview__notice,
+.dial-archive-request-preview__warning,
+.dial-archive-request-preview > footer b,
+.dial-archive-batch-surface__delete > p {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-edit-workcell__sections button,
+.dial-archive-batch-surface__preview-list article b,
+.dial-archive-batch-surface__delete-list b {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+/* Production keeps the Space 02 layout while restoring the missing second
+ * navigation line and reserving scroll room above its fixed footer. */
+.dial-archive-production-input-nav {
+  min-height: 50px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+.dial-archive-production-input-nav button {
+  display: grid;
+  min-height: 49px;
+  align-content: center;
+  gap: 3px;
+  padding: 6px 10px 10px;
+  color: rgba(25, 25, 25, 0.68);
+  text-align: left;
+}
+
+.dial-archive-production-input-nav span {
+  font-size: var(--dial-archive-annotation-type-meta);
+  letter-spacing: 0.12em;
+}
+
+.dial-archive-production-input-nav b {
+  display: block;
+  overflow: hidden;
+  font-size: var(--dial-archive-annotation-type-label);
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-production-workcell__console-body.dial-archive-preparation-inspector__body {
+  padding-bottom: 72px;
+  scroll-padding-bottom: 72px;
+}
+
+.dial-archive-production-workcell .dial-archive-preparation-node__code {
+  min-height: 42px;
+  overflow: visible;
+  line-height: 1.08;
+}
+
+.dial-archive-stage.has-workcell
+  .dial-archive-stage__workcell-switcher
+  button:not(.is-active)
+  :is(span, b) {
+  color: rgba(25, 25, 25, 0.62);
+}
+
+/* Once a node opens its inspector, keep the active route and COMMIT terminal as
+ * the two readable subjects. Cropped inactive cards otherwise look like broken
+ * content at compact viewports; closing the inspector restores the full map. */
+.dial-archive-production-source,
+.dial-archive-production-lane {
+  transition:
+    opacity 180ms ease,
+    visibility 0s linear;
+}
+
+.dial-archive-production-workcell.has-inspector .dial-archive-production-source,
+.dial-archive-production-workcell.has-inspector .dial-archive-production-lane:not(.is-active) {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition-delay: 0s, 180ms;
+}
+
+.dial-archive-production-console__handoff span,
+.dial-archive-production-console__handoff b,
+.dial-archive-production-commit__overview > span,
+.dial-archive-production-commit__overview > b,
+.dial-archive-production-commit__sequence :is(span, b),
+.dial-archive-production-commit__readings dt,
+.dial-archive-production-snapshot > summary :is(span, b),
+.dial-archive-production-snapshot :is(dt, small),
+.dial-archive-production-ready > span,
+.dial-archive-production-launch > span,
+.dial-archive-context-surface__register > summary span,
+.dial-archive-context-surface__raw-register > summary span,
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages summary b {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-production-commit__readings dd,
+.dial-archive-production-snapshot dd,
+.dial-archive-production-ready > b,
+.dial-archive-context-surface__register > summary b,
+.dial-archive-context-surface__raw-register > summary b,
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages summary span,
+.dial-archive-request-preview.is-inspector dd,
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__notice,
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__warning,
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages code {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-production-commit__readings dt {
+  color: rgba(25, 25, 25, 0.62);
+}
+
+.dial-archive-production-snapshot dd {
+  overflow: visible;
+  line-height: 1.35;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.dial-archive-context-surface__register > pre,
+.dial-archive-context-surface__raw-register > pre,
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages pre {
+  font-size: var(--dial-archive-annotation-type-label);
+  line-height: 1.65;
+}
+
+/* CONTEXT and REQUEST are operational reading surfaces, not microcopy panels.
+ * Keep the complete context edit loop visible at 768px while preserving the
+ * evidence registers below it as optional scroll content. */
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config {
+  gap: 5px;
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > header > span,
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > header > em,
+.dial-archive-context-surface.is-inspector label > span,
+.dial-archive-context-surface.is-inspector
+  .dial-archive-context-surface__config
+  > footer
+  > :is(span, strong),
+.dial-archive-request-preview.is-inspector > header > div > span,
+.dial-archive-request-preview.is-inspector > header dt,
+.dial-archive-request-preview.is-inspector > footer > span {
+  font-size: var(--dial-archive-annotation-type-meta);
+  line-height: 1.35;
+}
+
+.dial-archive-context-surface.is-inspector textarea {
+  height: 58px;
+  min-height: 58px;
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__toggle {
+  padding: 6px 9px;
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__toggle small {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > footer {
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 0.9fr);
+  align-items: center;
+  gap: 8px;
+  padding-top: 7px;
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > footer div {
+  grid-template-columns: minmax(64px, 0.72fr) minmax(112px, 1.28fr);
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > footer button {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+/* The reused Space 02 node entrance already provides the reveal. Avoid a
+ * second parent animation that moves the same node on workcell open. */
+.dial-archive-workcell-viewport.is-production.is-opening
+  .dial-archive-production-routes__main
+  .is-route-bed,
+.dial-archive-workcell-viewport.is-production.is-opening .dial-archive-production-lane {
+  animation: none;
+}
+
+/* Dossier: reserve the persistent film dock and expose stable identity data. */
+.dial-archive-stage .dial-archive-dossier-register {
+  bottom: 0;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__foot {
+  margin: 0;
+}
+
+.dial-archive-dossier-evidence__head span,
+.dial-archive-dossier-evidence__head small,
+.dial-archive-dossier-evidence__facts dt,
+.dial-archive-dossier-evidence__continuity span,
+.dial-archive-dossier-evidence__seal span,
+.dial-archive-dossier-evidence__seal b,
+.dial-archive-dossier-register__title > div > span,
+.dial-archive-dossier-register__title dt,
+.dial-archive-dossier-section__head span,
+.dial-archive-dossier-register__foot span,
+.dial-archive-dossier-register__crosslinks span {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-dossier-evidence__facts dd,
+.dial-archive-dossier-register__title dd,
+.dial-archive-dossier-register__crosslinks button,
+.dial-archive-dossier-jobs button,
+.dial-archive-dossier-register__foot b {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-dossier-evidence__facts dt,
+.dial-archive-dossier-register__title dt,
+.dial-archive-dossier-register
+  :is(
+    .dial-archive-dossier-channels,
+    .dial-archive-dossier-timeline,
+    .dial-archive-dossier-translations,
+    .dial-archive-dossier-jobs,
+    .dial-archive-dossier-provenance,
+    .dial-archive-dossier-metadata,
+    .dial-archive-dossier-raw
+  )
+  dt {
+  color: rgba(25, 25, 25, 0.58);
+}
+
+.dial-archive-dossier-evidence__facts > div:first-child {
+  grid-column: 1 / -1;
+}
+
+.dial-archive-dossier-evidence__facts > div:first-child dd {
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.dial-archive-dossier-register__rail button span {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-dossier-register__rail button b {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-dossier-metadata__identity > span,
+.dial-archive-dossier-translations > li > div:nth-child(2) > span,
+.dial-archive-dossier-translations > li > div:nth-child(2) > small {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-dossier-metadata__identity > b {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-dossier-translations > li > div:nth-child(2) > span,
+.dial-archive-dossier-translations > li > div:nth-child(2) > small,
+.dial-archive-dossier-jobs > li > span {
+  color: rgba(25, 25, 25, 0.62);
+}
+
+.dial-archive-dossier-register
+  :is(
+    .dial-archive-dossier-channels,
+    .dial-archive-dossier-timeline,
+    .dial-archive-dossier-translations,
+    .dial-archive-dossier-jobs,
+    .dial-archive-dossier-provenance,
+    .dial-archive-dossier-metadata,
+    .dial-archive-dossier-raw
+  )
+  :is(span, small, time, summary, dt, output) {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-dossier-register
+  :is(
+    .dial-archive-dossier-channels,
+    .dial-archive-dossier-timeline,
+    .dial-archive-dossier-translations,
+    .dial-archive-dossier-jobs,
+    .dial-archive-dossier-provenance,
+    .dial-archive-dossier-metadata,
+    .dial-archive-dossier-raw
+  )
+  :is(dd, pre) {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+@media (max-width: 1540px) {
+  .dial-archive-stage {
+    --dial-archive-stage-film-pager-width: 132px;
+    --dial-archive-stage-film-range-width: 92px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dial-archive-production-source,
+  .dial-archive-production-lane,
+  .dial-archive-production-inspector-view,
+  .dial-archive-workcell-viewport__header,
+  .dial-archive-workcell-viewport__body,
+  .dial-archive-dossier-evidence,
+  .dial-archive-dossier-register__title,
+  .dial-archive-dossier-register__rail,
+  .dial-archive-dossier-section {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+}

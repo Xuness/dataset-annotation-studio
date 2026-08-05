@@ -112,7 +112,7 @@ export function AnnotationProjectContextSurface({
           {context.actionError || context.message ? (
             <strong>{context.actionError ?? context.message}</strong>
           ) : (
-            <span>CTRL+S // COMMIT PROJECT CONTEXT</span>
+            <span>CTRL+S // SAVE</span>
           )}
           <div>
             <button

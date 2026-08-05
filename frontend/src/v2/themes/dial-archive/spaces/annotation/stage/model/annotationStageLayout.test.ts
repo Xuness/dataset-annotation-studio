@@ -117,6 +117,12 @@ describe("annotation stage layout", () => {
     expect(style["--dial-archive-workcell-hit-left"]).toBe(`${plane.hitSlop.left}px`);
   });
 
+  test("keeps the dossier portal below the object ledger on wide stages", () => {
+    const dossier = ANNOTATION_STAGE_LAYOUT.workcells.planes.dossier;
+    expect(dossier.leftPercent).toBeLessThan(10);
+    expect(dossier.topPercent).toBeGreaterThan(50);
+  });
+
   test("keeps a visible film cell fixed and only minimally reveals an obscured cell", () => {
     const visible = resolveFilmstripTrackOffset({
       currentOffset: -324,

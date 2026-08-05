@@ -1626,10 +1626,14 @@
   }
 }
 
-.dial-archive-workcell-viewport.is-opening .dial-archive-workcell-viewport__plane,
-.dial-archive-workcell-viewport.is-switching .dial-archive-workcell-viewport__plane {
+.dial-archive-workcell-viewport.is-opening .dial-archive-workcell-viewport__plane {
   animation: dial-archive-workcell-open-reconstructed
     var(--dial-archive-stage-workcell-open-duration) cubic-bezier(0.22, 0.72, 0.24, 1) both;
+}
+
+.dial-archive-workcell-viewport.is-switching .dial-archive-workcell-viewport__plane {
+  animation: dial-archive-workcell-open-reconstructed
+    var(--dial-archive-stage-workcell-switch-duration) cubic-bezier(0.22, 0.72, 0.24, 1) both;
 }
 
 .dial-archive-workcell-viewport.is-closing .dial-archive-workcell-viewport__plane {

@@ -148,42 +148,59 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-evidence,
-  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-evidence {
-    animation: dial-archive-dossier-evidence-enter 720ms
-      var(--dial-archive-stage-workcell-open-ease) 120ms backwards;
+  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-evidence {
+    animation: dial-archive-dossier-evidence-enter 420ms
+      var(--dial-archive-stage-workcell-open-ease) 80ms backwards;
   }
 
-  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-register__title,
-  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-register__title {
-    animation: dial-archive-dossier-register-enter 660ms
-      var(--dial-archive-stage-workcell-open-ease) 180ms backwards;
+  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-register__title {
+    animation: dial-archive-dossier-register-enter 380ms
+      var(--dial-archive-stage-workcell-open-ease) 110ms backwards;
   }
 
-  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-register__rail,
-  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-register__rail {
-    animation: dial-archive-dossier-register-enter 620ms
-      var(--dial-archive-stage-workcell-open-ease) 250ms backwards;
+  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-register__rail {
+    animation: dial-archive-dossier-register-enter 340ms
+      var(--dial-archive-stage-workcell-open-ease) 150ms backwards;
   }
 
-  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-section,
-  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-section {
-    animation: dial-archive-dossier-section-enter 560ms var(--dial-archive-stage-workcell-open-ease)
-      backwards;
+  .dial-archive-workcell-viewport.is-dossier.is-opening .dial-archive-dossier-section {
+    animation: dial-archive-dossier-section-enter 320ms var(--dial-archive-stage-workcell-open-ease)
+      160ms backwards;
   }
 
   .dial-archive-workcell-viewport.is-dossier.is-opening
-    .dial-archive-dossier-section:nth-of-type(1),
-  .dial-archive-workcell-viewport.is-dossier.is-switching
     .dial-archive-dossier-section:nth-of-type(1) {
-    animation-delay: 310ms;
+    animation-delay: 180ms;
   }
 
   .dial-archive-workcell-viewport.is-dossier.is-opening
-    .dial-archive-dossier-section:nth-of-type(2),
+    .dial-archive-dossier-section:nth-of-type(2) {
+    animation-delay: 220ms;
+  }
+
+  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-evidence {
+    animation: dial-archive-dossier-evidence-enter 260ms
+      var(--dial-archive-stage-workcell-open-ease) backwards;
+  }
+
+  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-register__title {
+    animation: dial-archive-dossier-register-enter 240ms
+      var(--dial-archive-stage-workcell-open-ease) 20ms backwards;
+  }
+
+  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-register__rail {
+    animation: dial-archive-dossier-register-enter 220ms
+      var(--dial-archive-stage-workcell-open-ease) 40ms backwards;
+  }
+
+  .dial-archive-workcell-viewport.is-dossier.is-switching .dial-archive-dossier-section {
+    animation: dial-archive-dossier-section-enter 200ms var(--dial-archive-stage-workcell-open-ease)
+      60ms backwards;
+  }
+
   .dial-archive-workcell-viewport.is-dossier.is-switching
     .dial-archive-dossier-section:nth-of-type(2) {
-    animation-delay: 365ms;
+    animation-delay: 90ms;
   }
 }
 

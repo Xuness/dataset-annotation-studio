@@ -99,11 +99,19 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
     const currentCell = viewport?.querySelector<HTMLElement>(`[data-film-index="${currentIndex}"]`);
     if (!viewport || !currentCell) return;
     const viewportRect = viewport.getBoundingClientRect();
+    const rangeRect = viewport
+      .querySelector<HTMLElement>(".dial-archive-stage-filmstrip__range")
+      ?.getBoundingClientRect();
+    const pagerRect = viewport
+      .querySelector<HTMLElement>(".dial-archive-stage-filmstrip__pager")
+      ?.getBoundingClientRect();
+    const safeLeft = Math.max(viewportRect.left, (rangeRect?.right ?? viewportRect.left) + 12);
+    const safeRight = Math.min(viewportRect.right, (pagerRect?.left ?? viewportRect.right) - 12);
     const cellRect = currentCell.getBoundingClientRect();
     const nextOffset = resolveFilmstripTrackOffset({
       currentOffset: trackOffsetRef.current,
-      viewportLeft: viewportRect.left,
-      viewportWidth: viewportRect.width,
+      viewportLeft: safeLeft,
+      viewportWidth: Math.max(0, safeRight - safeLeft),
       cellLeft: cellRect.left,
       cellRight: cellRect.right,
     });
@@ -161,42 +169,44 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
         <b>{scope.filters.find((filter) => filter.id === scope.filter)?.code ?? "ALL"}</b>
         <em>{checkedAssetIds.length ? `${checkedAssetIds.length} RANGE` : "CURRENT"}</em>
       </div>
-      <div
-        className="dial-archive-stage-filmstrip__track"
-        style={{ transform: `translateX(${trackOffset}px)` }}
-      >
-        {assets.slice(windowStart, windowEnd).map((asset, offset) => {
-          const index = windowStart + offset;
-          const current = index === currentIndex;
-          const inRange = checked.has(asset.id);
-          return (
-            <button
-              className={`dial-archive-stage-filmstrip__cell${current ? " is-current" : ""}${inRange ? " is-ranged" : ""}`}
-              type="button"
-              data-film-index={index}
-              style={{ left: index * ANNOTATION_STAGE_FILM_STEP }}
-              aria-label={`查看素材 ${asset.filename}`}
-              aria-current={current || undefined}
-              onClick={(event) => {
-                if (event.shiftKey) scope.toggleRangeTo(asset.id);
-                else if (event.altKey) onToggleAssetChecked(asset.id);
-                else {
-                  preserveTrackForIndexRef.current = index;
-                  onSelectAsset(asset.id);
-                }
-              }}
-              key={asset.id}
-            >
-              <img src={asset.thumbnailUrl} alt="" draggable={false} loading="lazy" />
-              <span className="dial-archive-stage-filmstrip__cell-index" aria-hidden="true">
-                {index + 1}
-              </span>
-              {inRange ? (
-                <span className="dial-archive-stage-filmstrip__range-bite" aria-hidden="true" />
-              ) : null}
-            </button>
-          );
-        })}
+      <div className="dial-archive-stage-filmstrip__track-viewport">
+        <div
+          className="dial-archive-stage-filmstrip__track"
+          style={{ transform: `translateX(${trackOffset}px)` }}
+        >
+          {assets.slice(windowStart, windowEnd).map((asset, offset) => {
+            const index = windowStart + offset;
+            const current = index === currentIndex;
+            const inRange = checked.has(asset.id);
+            return (
+              <button
+                className={`dial-archive-stage-filmstrip__cell${current ? " is-current" : ""}${inRange ? " is-ranged" : ""}`}
+                type="button"
+                data-film-index={index}
+                style={{ left: index * ANNOTATION_STAGE_FILM_STEP }}
+                aria-label={`查看素材 ${asset.filename}`}
+                aria-current={current || undefined}
+                onClick={(event) => {
+                  if (event.shiftKey) scope.toggleRangeTo(asset.id);
+                  else if (event.altKey) onToggleAssetChecked(asset.id);
+                  else {
+                    preserveTrackForIndexRef.current = index;
+                    onSelectAsset(asset.id);
+                  }
+                }}
+                key={asset.id}
+              >
+                <img src={asset.thumbnailUrl} alt="" draggable={false} loading="lazy" />
+                <span className="dial-archive-stage-filmstrip__cell-index" aria-hidden="true">
+                  {index + 1}
+                </span>
+                {inRange ? (
+                  <span className="dial-archive-stage-filmstrip__range-bite" aria-hidden="true" />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="dial-archive-stage-filmstrip__pager" role="group" aria-label="素材序列导航">
         <button

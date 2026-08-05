@@ -385,18 +385,18 @@
 }
 
 .dial-archive-workcell-viewport.is-opening .dial-archive-workcell-viewport__body {
-  animation: dial-archive-workcell-content-enter 540ms var(--dial-archive-stage-workcell-open-ease)
-    140ms backwards;
+  animation: dial-archive-workcell-content-enter 450ms var(--dial-archive-stage-workcell-open-ease)
+    120ms backwards;
 }
 
 .dial-archive-workcell-viewport.is-switching .dial-archive-workcell-viewport__header {
-  animation: dial-archive-workcell-content-enter 360ms var(--dial-archive-stage-workcell-open-ease)
-    80ms backwards;
+  animation: dial-archive-workcell-content-enter 240ms var(--dial-archive-stage-workcell-open-ease)
+    30ms backwards;
 }
 
 .dial-archive-workcell-viewport.is-switching .dial-archive-workcell-viewport__body {
-  animation: dial-archive-workcell-content-enter 420ms var(--dial-archive-stage-workcell-open-ease)
-    110ms backwards;
+  animation: dial-archive-workcell-content-enter 280ms var(--dial-archive-stage-workcell-open-ease)
+    20ms backwards;
 }
 
 .dial-archive-workcell-viewport.is-closing .dial-archive-workcell-viewport__header,
