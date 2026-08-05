@@ -49,8 +49,18 @@ describe("annotation stage visual contracts", () => {
 
   test("reserves stable reading space for film, dossier, and production inspectors", () => {
     const legibility = style("annotation-stage-legibility.css");
+    const translation = style("annotation-workcell-edit-translation.css");
 
     expect(legibility).toMatch(/\.dial-archive-stage-filmstrip__track-viewport\s*\{/u);
+    expect(legibility).toMatch(
+      /\.dial-archive-stage\[data-workcell="edit"\]\s*\{[^}]*--dial-archive-stage-edit-film-height:\s*clamp\(112px,\s*9vh,\s*128px\);/su,
+    );
+    expect(legibility).toMatch(
+      /:is\(\s*\.dial-archive-stage-filmstrip__track,\s*\.dial-archive-stage-filmstrip__rail,\s*\.dial-archive-stage-filmstrip__progress\s*\)\s*\{[^}]*display:\s*block;/su,
+    );
+    expect(translation).toMatch(
+      /\.dial-archive-edit-translation__aligned\.is-segment\s*\{[^}]*white-space:\s*pre-wrap;/su,
+    );
     expect(legibility).toMatch(
       /\.dial-archive-stage\s+\.dial-archive-dossier-register\s*\{[^}]*bottom:\s*0;/su,
     );

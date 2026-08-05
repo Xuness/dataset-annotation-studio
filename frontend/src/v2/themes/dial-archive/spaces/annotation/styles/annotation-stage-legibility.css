@@ -116,6 +116,89 @@
   z-index: 5;
 }
 
+/* The edit workcell keeps the overview's material sequence within reach.
+ * Other workcells retain the compact text-only dock because they operate on a
+ * route or dossier rather than stepping through one document at a time. */
+.dial-archive-stage[data-workcell="edit"] {
+  --dial-archive-stage-edit-film-height: clamp(112px, 9vh, 128px);
+  --dial-archive-stage-film-h: var(--dial-archive-stage-edit-film-height);
+  grid-template-rows:
+    var(--dial-archive-stage-header-h) minmax(0, 1fr)
+    var(--dial-archive-stage-edit-film-height);
+}
+
+.dial-archive-stage[data-workcell="edit"] > .dial-archive-stage-filmstrip {
+  display: block;
+  height: var(--dial-archive-stage-edit-film-height);
+}
+
+.dial-archive-stage[data-workcell="edit"]
+  > .dial-archive-stage-filmstrip
+  :is(
+    .dial-archive-stage-filmstrip__track,
+    .dial-archive-stage-filmstrip__rail,
+    .dial-archive-stage-filmstrip__progress
+  ) {
+  display: block;
+}
+
+.dial-archive-stage[data-workcell="edit"]
+  > .dial-archive-stage-filmstrip
+  .dial-archive-stage-filmstrip__progress {
+  display: flex;
+}
+
+.dial-archive-stage[data-workcell="edit"] > .dial-archive-stage-filmstrip::before,
+.dial-archive-stage[data-workcell="edit"] > .dial-archive-stage-filmstrip::after {
+  display: block;
+}
+
+.dial-archive-stage[data-workcell="edit"]
+  > .dial-archive-stage-filmstrip
+  .dial-archive-stage-filmstrip__range {
+  top: 17px;
+  left: var(--dial-archive-stage-page-gutter);
+  display: grid;
+  width: var(--dial-archive-stage-film-range-width);
+  height: 72px;
+  align-content: center;
+  padding-right: 16px;
+  border-right: 1px solid rgba(25, 25, 25, 0.2);
+}
+
+.dial-archive-stage[data-workcell="edit"]
+  > .dial-archive-stage-filmstrip
+  .dial-archive-stage-filmstrip__range
+  b {
+  font-size: 18px;
+}
+
+.dial-archive-stage[data-workcell="edit"]
+  > .dial-archive-stage-filmstrip
+  .dial-archive-stage-filmstrip__pager {
+  top: 17px;
+  right: var(--dial-archive-stage-page-gutter);
+  width: var(--dial-archive-stage-film-pager-width);
+  height: 72px;
+  grid-template-rows: 1fr 12px;
+}
+
+.dial-archive-stage[data-workcell="edit"]
+  > .dial-archive-stage-filmstrip
+  .dial-archive-stage-filmstrip__foot {
+  right: var(--dial-archive-stage-page-gutter);
+  bottom: 5px;
+  left: var(--dial-archive-stage-page-gutter);
+  opacity: 1;
+}
+
+.dial-archive-stage[data-workcell="edit"]
+  > .dial-archive-stage-filmstrip
+  .dial-archive-stage-filmstrip__foot
+  span:last-child {
+  display: inline;
+}
+
 /* Edit workcell: document chrome and actions must read as UI, not decoration. */
 .dial-archive-edit-workcell__heading > span,
 .dial-archive-edit-workcell__heading output,

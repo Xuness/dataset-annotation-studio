@@ -162,6 +162,9 @@
   font-family: var(--dial-archive-font-body);
   font-size: 13px;
   line-height: 1.75;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .dial-archive-edit-translation__aligned span {

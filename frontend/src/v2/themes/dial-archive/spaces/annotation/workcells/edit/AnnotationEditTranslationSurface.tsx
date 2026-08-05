@@ -5,6 +5,10 @@ import type {
   AnnotationEditTranslationPart,
 } from "../../../../../../pages/spaces/spacePageModel";
 import { AnnotationEditTextSurface } from "./AnnotationEditTextSurface";
+import {
+  useAlignedTranslationScroll,
+  type TranslationAlignmentSide,
+} from "./useAlignedTranslationScroll";
 
 interface AnnotationEditTranslationSurfaceProps {
   edit: AnnotationEditContent;
@@ -16,6 +20,7 @@ interface AlignedReadingProps {
   activeIds: ReadonlySet<string>;
   onHover(id: string | null): void;
   onPin(ids: readonly string[]): void;
+  onActivateSide(side: TranslationAlignmentSide): void;
 }
 
 function plainCopy(event: ClipboardEvent<HTMLElement>) {
@@ -41,10 +46,20 @@ function selectedAlignmentIds(root: HTMLElement): string[] {
     .filter(Boolean);
 }
 
-function AlignedReading({ parts, side, activeIds, onHover, onPin }: AlignedReadingProps) {
+function AlignedReading({
+  parts,
+  side,
+  activeIds,
+  onHover,
+  onPin,
+  onActivateSide,
+}: AlignedReadingProps) {
   const handleMouseUp = (event: MouseEvent<HTMLDivElement>) => {
     const ids = selectedAlignmentIds(event.currentTarget);
-    if (ids.length) onPin(ids);
+    if (ids.length) {
+      onActivateSide(side);
+      onPin(ids);
+    }
   };
   return (
     <div
@@ -58,11 +73,20 @@ function AlignedReading({ parts, side, activeIds, onHover, onPin }: AlignedReadi
           data-alignment-id={part.id}
           data-category={part.category ?? undefined}
           tabIndex={0}
-          onMouseEnter={() => onHover(part.id)}
+          onMouseEnter={() => {
+            onActivateSide(side);
+            onHover(part.id);
+          }}
           onMouseLeave={() => onHover(null)}
-          onFocus={() => onHover(part.id)}
+          onFocus={() => {
+            onActivateSide(side);
+            onHover(part.id);
+          }}
           onBlur={() => onHover(null)}
-          onClick={() => onPin([part.id])}
+          onClick={() => {
+            onActivateSide(side);
+            onPin([part.id]);
+          }}
           key={part.id}
         >
           {side === "source" ? part.sourceText : part.translatedText || "∅"}
@@ -80,6 +104,23 @@ export function AnnotationEditTranslationSurface({ edit }: AnnotationEditTransla
   const synchronizingRef = useRef(false);
   const activeIds = useMemo(() => new Set(comparison.activeIds), [comparison.activeIds]);
   const targetReadOnly = translation.readOnly || !translation.editing;
+  const alignmentLayoutKey = useMemo(
+    () =>
+      comparison.parts
+        .map(
+          (part) =>
+            `${part.id}:${part.sourceText.length}:${part.translatedText.length}:${part.kind}`,
+        )
+        .join("\u0000"),
+    [comparison.parts],
+  );
+  const activateAlignmentSide = useAlignedTranslationScroll({
+    sourceRootRef: sourceRef,
+    targetRootRef: targetRef,
+    alignmentIds: comparison.activeIds,
+    layoutKey: alignmentLayoutKey,
+    enabled: comparison.aligned && comparison.sourceMode === "segments" && !translation.editing,
+  });
 
   useEffect(() => {
     const source = sourceRef.current?.querySelector<HTMLElement>(
@@ -88,7 +129,9 @@ export function AnnotationEditTranslationSurface({ edit }: AnnotationEditTransla
     const target = targetRef.current?.querySelector<HTMLElement>(
       ":scope > .dial-archive-edit-translation__aligned, :scope > pre",
     );
-    if (!source || !target || translation.editing) return;
+    if (!source || !target || translation.editing || comparison.sourceMode === "segments") {
+      return;
+    }
     const synchronize = (from: HTMLElement, to: HTMLElement) => {
       if (synchronizingRef.current) return;
       const fromRange = from.scrollHeight - from.clientHeight;
@@ -108,7 +151,7 @@ export function AnnotationEditTranslationSurface({ edit }: AnnotationEditTransla
       source.removeEventListener("scroll", fromSource);
       target.removeEventListener("scroll", fromTarget);
     };
-  }, [comparison.parts, translation.editing]);
+  }, [comparison.parts, comparison.sourceMode, translation.editing]);
 
   return (
     <section className="dial-archive-edit-translation" aria-label="翻译对照工作面">
@@ -173,6 +216,7 @@ export function AnnotationEditTranslationSurface({ edit }: AnnotationEditTransla
               activeIds={activeIds}
               onHover={comparison.setHover}
               onPin={comparison.pin}
+              onActivateSide={activateAlignmentSide}
             />
           ) : (
             <pre onCopy={plainCopy}>
@@ -210,6 +254,7 @@ export function AnnotationEditTranslationSurface({ edit }: AnnotationEditTransla
                 activeIds={activeIds}
                 onHover={comparison.setHover}
                 onPin={comparison.pin}
+                onActivateSide={activateAlignmentSide}
               />
             </>
           ) : (
