@@ -1,5 +1,6 @@
 import type {
   AnnotationDossierContent,
+  AnnotationDossierSectionId,
   AnnotationStageAsset,
 } from "../../../../../../pages/spaces/spacePageModel";
 import { AnnotationDossierEvidence } from "./AnnotationDossierEvidence";
@@ -8,9 +9,16 @@ import { AnnotationDossierRegister } from "./AnnotationDossierRegister";
 interface AnnotationDossierWorkcellProps {
   asset: AnnotationStageAsset | null;
   dossier: AnnotationDossierContent | null;
+  section: AnnotationDossierSectionId;
+  onSelectSection(section: AnnotationDossierSectionId): void;
 }
 
-export function AnnotationDossierWorkcell({ asset, dossier }: AnnotationDossierWorkcellProps) {
+export function AnnotationDossierWorkcell({
+  asset,
+  dossier,
+  section,
+  onSelectSection,
+}: AnnotationDossierWorkcellProps) {
   if (!dossier || dossier.status === "inactive") {
     return (
       <div className="dial-archive-dossier-state" role="status">
@@ -54,7 +62,12 @@ export function AnnotationDossierWorkcell({ asset, dossier }: AnnotationDossierW
       <i className="dial-archive-dossier-workcell__yellow-field" aria-hidden="true" />
       <i className="dial-archive-dossier-workcell__measure" aria-hidden="true" />
       <AnnotationDossierEvidence asset={asset} dossier={dossier} />
-      <AnnotationDossierRegister asset={asset} dossier={dossier} />
+      <AnnotationDossierRegister
+        asset={asset}
+        dossier={dossier}
+        section={section}
+        onSelectSection={onSelectSection}
+      />
     </div>
   );
 }

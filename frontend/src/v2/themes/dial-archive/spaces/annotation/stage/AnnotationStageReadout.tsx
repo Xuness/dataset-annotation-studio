@@ -51,6 +51,7 @@ export const AnnotationStageReadout = memo(function AnnotationStageReadout({
             {formatStageIndex(currentIndex)}
           </div>
           <p title={asset?.filename}>{asset?.filename ?? "NO MATERIAL LOADED"}</p>
+          <small title={asset?.relativePath}>{asset?.relativePath ?? "NO SOURCE PATH"}</small>
         </div>
       </header>
 
@@ -60,7 +61,11 @@ export const AnnotationStageReadout = memo(function AnnotationStageReadout({
           <dd>{asset ? asset.suffix.replace(".", "").toUpperCase() : "—"}</dd>
         </div>
         <div>
-          <dt>SIZE</dt>
+          <dt>RESOLUTION</dt>
+          <dd>{asset ? `${asset.width} × ${asset.height}` : "—"}</dd>
+        </div>
+        <div>
+          <dt>FILE SIZE</dt>
           <dd>{asset ? formatStageByteSize(asset.byteSize) : "—"}</dd>
         </div>
         <div className="is-channels">

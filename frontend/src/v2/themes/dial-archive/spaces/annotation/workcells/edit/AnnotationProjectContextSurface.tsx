@@ -2,9 +2,13 @@ import type { AnnotationProjectContextContent } from "../../../../../../pages/sp
 
 interface AnnotationProjectContextSurfaceProps {
   context: AnnotationProjectContextContent;
+  compact?: boolean;
 }
 
-export function AnnotationProjectContextSurface({ context }: AnnotationProjectContextSurfaceProps) {
+export function AnnotationProjectContextSurface({
+  context,
+  compact = false,
+}: AnnotationProjectContextSurfaceProps) {
   if (context.status === "loading") {
     return (
       <div className="dial-archive-edit-workcell__state is-loading">
@@ -15,8 +19,49 @@ export function AnnotationProjectContextSurface({ context }: AnnotationProjectCo
     );
   }
 
+  const selectedPresetName =
+    context.systemPresets.find((preset) => preset.id === context.systemPresetId)?.name ?? "未选择";
+  const metadataEvidence =
+    context.metadataStatus === "loading" ? (
+      <p>正在读取当前素材元数据…</p>
+    ) : context.metadataStatus === "missing" ? (
+      <p>当前素材没有同名 JSON；它仍可正常参与标注。</p>
+    ) : context.metadataStatus === "error" ? (
+      <p>{context.message ?? "元数据读取失败。"}</p>
+    ) : context.metadataStatus === "no-object" ? (
+      <p>选择素材后配置 JSON 上下文字段。</p>
+    ) : (
+      <>
+        <div className="dial-archive-context-surface__fields">
+          {context.metadataFields.map((field) => (
+            <button
+              className={field.selected ? "is-selected" : undefined}
+              type="button"
+              disabled={context.writePending}
+              onClick={() => context.toggleMetadataField(field.id)}
+              key={field.id}
+            >
+              <i aria-hidden="true" />
+              {field.id}
+            </button>
+          ))}
+        </div>
+        {compact ? (
+          <details className="dial-archive-context-surface__raw-register">
+            <summary>
+              <span>RAW OBJECT EVIDENCE</span>
+              <b>{context.metadataFields.length.toString().padStart(2, "0")} FIELDS</b>
+            </summary>
+            <pre>{context.metadataRaw}</pre>
+          </details>
+        ) : (
+          <pre>{context.metadataRaw}</pre>
+        )}
+      </>
+    );
+
   return (
-    <div className="dial-archive-context-surface">
+    <div className={`dial-archive-context-surface${compact ? " is-inspector" : ""}`}>
       <section className="dial-archive-context-surface__config">
         <header>
           <span>PROJECT INSTRUCTION // WRITABLE</span>
@@ -90,49 +135,41 @@ export function AnnotationProjectContextSurface({ context }: AnnotationProjectCo
       </section>
 
       <aside className="dial-archive-context-surface__evidence">
-        <article>
-          <header>
-            <span>SYSTEM / SELECTED PRESET</span>
-            <b>
-              {context.systemPresets.find((preset) => preset.id === context.systemPresetId)?.name ??
-                "未选择"}
-            </b>
-          </header>
-          <pre>{context.selectedSystemPrompt || "选择预设后在这里核对 System Prompt。"}</pre>
-        </article>
-        <article className="is-metadata">
-          <header>
-            <span>OBJECT JSON / CONTEXT FIELDS</span>
-            <b>{context.metadataPath ?? "NO JSON"}</b>
-          </header>
-          {context.metadataStatus === "loading" ? (
-            <p>正在读取当前素材元数据…</p>
-          ) : context.metadataStatus === "missing" ? (
-            <p>当前素材没有同名 JSON；它仍可正常参与标注。</p>
-          ) : context.metadataStatus === "error" ? (
-            <p>{context.message ?? "元数据读取失败。"}</p>
-          ) : context.metadataStatus === "no-object" ? (
-            <p>选择素材后配置 JSON 上下文字段。</p>
-          ) : (
-            <>
-              <div className="dial-archive-context-surface__fields">
-                {context.metadataFields.map((field) => (
-                  <button
-                    className={field.selected ? "is-selected" : undefined}
-                    type="button"
-                    disabled={context.writePending}
-                    onClick={() => context.toggleMetadataField(field.id)}
-                    key={field.id}
-                  >
-                    <i aria-hidden="true" />
-                    {field.id}
-                  </button>
-                ))}
-              </div>
-              <pre>{context.metadataRaw}</pre>
-            </>
-          )}
-        </article>
+        {compact ? (
+          <>
+            <details className="dial-archive-context-surface__register">
+              <summary>
+                <span>SYS.01 // SYSTEM PRESET</span>
+                <b>{selectedPresetName}</b>
+              </summary>
+              <pre>{context.selectedSystemPrompt || "选择预设后在这里核对 System Prompt。"}</pre>
+            </details>
+            <details className="dial-archive-context-surface__register is-metadata" open>
+              <summary>
+                <span>OBJ.02 // CONTEXT FIELDS</span>
+                <b>{context.metadataPath ?? "NO JSON"}</b>
+              </summary>
+              {metadataEvidence}
+            </details>
+          </>
+        ) : (
+          <>
+            <article>
+              <header>
+                <span>SYSTEM / SELECTED PRESET</span>
+                <b>{selectedPresetName}</b>
+              </header>
+              <pre>{context.selectedSystemPrompt || "选择预设后在这里核对 System Prompt。"}</pre>
+            </article>
+            <article className="is-metadata">
+              <header>
+                <span>OBJECT JSON / CONTEXT FIELDS</span>
+                <b>{context.metadataPath ?? "NO JSON"}</b>
+              </header>
+              {metadataEvidence}
+            </article>
+          </>
+        )}
       </aside>
     </div>
   );

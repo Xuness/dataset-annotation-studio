@@ -146,9 +146,16 @@ export const ANNOTATION_WORKCELL_IDS = ["edit", "production", "dossier"] as cons
 
 export type AnnotationWorkcellId = (typeof ANNOTATION_WORKCELL_IDS)[number];
 
-export const ANNOTATION_EDIT_SECTION_IDS = ["annotation", "context", "preview", "batch"] as const;
+export const ANNOTATION_DOSSIER_SECTION_IDS = [
+  "channels",
+  "metadata",
+  "revisions",
+  "translations",
+  "jobs",
+  "provenance",
+] as const;
 
-export type AnnotationEditSectionId = (typeof ANNOTATION_EDIT_SECTION_IDS)[number];
+export type AnnotationDossierSectionId = (typeof ANNOTATION_DOSSIER_SECTION_IDS)[number];
 
 export interface AnnotationStageAsset {
   id: string;
@@ -746,6 +753,7 @@ export interface AnnotationProductionOperation {
 
 export interface AnnotationProductionContent {
   status: "inactive" | "loading" | "configure" | "operation" | "error";
+  entryIntent: "overview" | "lane" | "operation";
   lane: AnnotationLaneId;
   lanes: readonly AnnotationProductionLaneReading[];
   configuration: AnnotationProductionConfiguration;
@@ -763,6 +771,31 @@ export interface AnnotationConfirmation {
   cancelLabel: string;
 }
 
+/**
+ * Stage data is grouped by the surface that owns it. The shell keeps the
+ * specimen, sequence and project identity alive while routes only switch the
+ * active workcell model.
+ */
+export interface AnnotationStageOverviewContent {
+  batch: AnnotationBatchContent | null;
+}
+
+export interface AnnotationEditWorkcellContent {
+  channel: AnnotationEditChannelId;
+  editor: AnnotationEditContent | null;
+}
+
+export interface AnnotationProductionWorkcellContent {
+  production: AnnotationProductionContent | null;
+  projectContext: AnnotationProjectContextContent | null;
+  requestPreview: AnnotationRequestPreviewContent | null;
+}
+
+export interface AnnotationDossierWorkcellContent {
+  section: AnnotationDossierSectionId;
+  dossier: AnnotationDossierContent | null;
+}
+
 export interface AnnotationStageContent {
   kind: "annotation-stage";
   status: "no-context" | "loading" | "ready" | "error";
@@ -775,20 +808,16 @@ export interface AnnotationStageContent {
   channels: readonly AnnotationCoverageLane[];
   operation: AnnotationOperationSummary | null;
   activeWorkcell: AnnotationWorkcellId | null;
-  activeEditChannel: AnnotationEditChannelId;
-  activeEditSection: AnnotationEditSectionId;
-  edit: AnnotationEditContent | null;
-  projectContext: AnnotationProjectContextContent | null;
-  requestPreview: AnnotationRequestPreviewContent | null;
-  batch: AnnotationBatchContent | null;
-  production: AnnotationProductionContent | null;
-  dossier: AnnotationDossierContent | null;
+  overview: AnnotationStageOverviewContent;
+  editWorkcell: AnnotationEditWorkcellContent;
+  productionWorkcell: AnnotationProductionWorkcellContent;
+  dossierWorkcell: AnnotationDossierWorkcellContent;
   confirmation: AnnotationConfirmation | null;
   message: string | null;
   selectAsset(assetId: string): void;
   stepAsset(offset: number): void;
   toggleAssetChecked(assetId: string): void;
-  selectEditSection(section: AnnotationEditSectionId): void;
+  selectDossierSection(section: AnnotationDossierSectionId): void;
   openWorkcell(workcell: AnnotationWorkcellId): void;
   closeWorkcell(): void;
   selectEditChannel(channel: AnnotationEditChannelId): void;

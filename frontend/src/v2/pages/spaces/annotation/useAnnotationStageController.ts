@@ -9,8 +9,8 @@ import { useWorkspace } from "../../../../features/workspaces/hooks";
 import { useWorkspaceSelectionStore } from "../../../../shared/store/workspaceSelectionStore";
 import type {
   AnnotationLaneId,
+  AnnotationDossierSectionId,
   AnnotationEditChannelId,
-  AnnotationEditSectionId,
   AnnotationStageFilterId,
   AnnotationStageContent,
   AnnotationWorkcellId,
@@ -40,13 +40,13 @@ interface UseAnnotationStageControllerOptions {
   requestedOperationId: string | null;
   activeWorkcell: AnnotationWorkcellId | null;
   requestedEditChannel: AnnotationEditChannelId | null;
-  requestedEditSection: AnnotationEditSectionId | null;
+  requestedDossierSection: AnnotationDossierSectionId | null;
   requestedProductionLane: AnnotationLaneId | null;
   onAssetIdChange(assetId: string | null): void;
   onOpenWorkcell(workcell: AnnotationWorkcellId): void;
   onCloseWorkcell(): void;
   onEditChannelChange(channel: AnnotationEditChannelId): void;
-  onEditSectionChange(section: AnnotationEditSectionId): void;
+  onDossierSectionChange(section: AnnotationDossierSectionId): void;
   onProductionLaneChange(lane: AnnotationLaneId): void;
   onProductionOperationChange(operationId: string | null): void;
   onReturnToSpace(): void;
@@ -69,13 +69,13 @@ export function useAnnotationStageController({
   requestedOperationId,
   activeWorkcell,
   requestedEditChannel,
-  requestedEditSection,
+  requestedDossierSection,
   requestedProductionLane,
   onAssetIdChange,
   onOpenWorkcell,
   onCloseWorkcell,
   onEditChannelChange,
-  onEditSectionChange,
+  onDossierSectionChange,
   onProductionLaneChange,
   onProductionOperationChange,
   onReturnToSpace,
@@ -182,20 +182,21 @@ export function useAnnotationStageController({
   const editContent = editController.content;
   const discardEditImmediately = editController.discardImmediately;
 
-  const activeEditSection = requestedEditSection ?? "annotation";
   const projectContextController = useAnnotationProjectContextController({
     projectId,
     workspace: workspace.data ?? null,
     assetId: focus.asset?.id ?? null,
-    enabled: activeWorkcell === "edit" && activeEditSection === "context",
-    previewEnabled: activeWorkcell === "edit" && activeEditSection === "preview",
+    enabled: activeWorkcell === "production",
+    previewEnabled: activeWorkcell === "production",
   });
   const projectContext = projectContextController.content;
   const discardContextImmediately = projectContextController.discardImmediately;
 
   const runWithDraftGuard = useCallback(
     async (action: () => void, title: string, message: string) => {
-      if (activeWorkcell === "edit" && (editContent.dirty || projectContext.dirty)) {
+      const hasUnsavedEdit = activeWorkcell === "edit" && editContent.dirty;
+      const hasUnsavedContext = activeWorkcell === "production" && projectContext.dirty;
+      if (hasUnsavedEdit || hasUnsavedContext) {
         const accepted = await confirm({
           title,
           message,
@@ -268,7 +269,7 @@ export function useAnnotationStageController({
   }, [editContent, effectiveBatchAssetIds, focus.asset]);
   const batch = useAnnotationBatchController({
     projectId,
-    open: activeWorkcell === "edit" && activeEditSection === "batch",
+    open: activeWorkcell === null,
     assetIds: effectiveBatchAssetIds,
     blockedTagDraft: Boolean(
       editContent.tagsDirty && focus.asset && effectiveBatchAssetIds.includes(focus.asset.id),
@@ -471,14 +472,20 @@ export function useAnnotationStageController({
     channels,
     operation,
     activeWorkcell,
-    activeEditChannel: editContent.channel,
-    activeEditSection,
-    edit: editContent,
-    projectContext,
-    requestPreview: projectContextController.preview,
-    batch,
-    production,
-    dossier,
+    overview: { batch },
+    editWorkcell: {
+      channel: editContent.channel,
+      editor: editContent,
+    },
+    productionWorkcell: {
+      production,
+      projectContext,
+      requestPreview: projectContextController.preview,
+    },
+    dossierWorkcell: {
+      section: requestedDossierSection ?? "channels",
+      dossier,
+    },
     confirmation: pendingConfirmation
       ? {
           title: pendingConfirmation.request.title ?? "确认操作",
@@ -492,7 +499,7 @@ export function useAnnotationStageController({
     selectAsset,
     stepAsset,
     toggleAssetChecked,
-    selectEditSection: onEditSectionChange,
+    selectDossierSection: onDossierSectionChange,
     openWorkcell,
     closeWorkcell,
     selectEditChannel: (channel) => void editContent.selectChannel(channel),
@@ -542,20 +549,20 @@ export function createNoContextAnnotationStage({
     channels: [],
     operation: null,
     activeWorkcell: null,
-    activeEditChannel: "tags",
-    activeEditSection: "annotation",
-    edit: null,
-    projectContext: null,
-    requestPreview: null,
-    batch: null,
-    production: null,
-    dossier: null,
+    overview: { batch: null },
+    editWorkcell: { channel: "tags", editor: null },
+    productionWorkcell: {
+      production: null,
+      projectContext: null,
+      requestPreview: null,
+    },
+    dossierWorkcell: { section: "channels", dossier: null },
     confirmation: null,
     message: null,
     selectAsset: () => {},
     stepAsset: () => {},
     toggleAssetChecked: () => {},
-    selectEditSection: () => {},
+    selectDossierSection: () => {},
     openWorkcell: () => {},
     closeWorkcell: () => {},
     selectEditChannel: () => {},

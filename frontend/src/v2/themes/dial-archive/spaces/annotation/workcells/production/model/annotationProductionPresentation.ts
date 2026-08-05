@@ -30,7 +30,7 @@ export const ANNOTATION_PRODUCTION_LANE_PRESENTATION = {
 
 export const ANNOTATION_PRODUCTION_PHASES = [
   { index: "01", label: "ROUTE" },
-  { index: "02", label: "SNAPSHOT" },
+  { index: "02", label: "INPUT" },
   { index: "03", label: "RUN" },
   { index: "04", label: "RESULT" },
 ] as const;

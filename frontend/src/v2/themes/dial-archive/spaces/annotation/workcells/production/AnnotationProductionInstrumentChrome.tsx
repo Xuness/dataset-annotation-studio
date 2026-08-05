@@ -6,7 +6,7 @@ import {
   ANNOTATION_PRODUCTION_PHASES,
 } from "./model/annotationProductionPresentation";
 
-type ProductionPhase = "route" | "snapshot" | "run" | "result";
+type ProductionPhase = "route" | "input" | "run" | "result";
 
 interface ProductionInstrumentHeaderProps {
   lane: AnnotationLaneId;
@@ -29,24 +29,18 @@ export function ProductionInstrumentHeader({
   const identity = ANNOTATION_PRODUCTION_LANE_PRESENTATION[lane];
 
   return (
-    <header className="dial-archive-production-instrument-header">
-      <div className="dial-archive-production-instrument-header__identity" aria-hidden="true">
-        <span>{identity.index}</span>
-        <b>{identity.code}</b>
-      </div>
+    <div className="dial-archive-production-instrument-header">
       <div className="dial-archive-production-instrument-header__heading">
-        <span>
-          {register} // {identity.englishTitle}
-        </span>
+        <span>{register} //</span>
+        <b>{identity.code}</b>
         <h2>{title}</h2>
         <p>{detail}</p>
       </div>
-      <div className="dial-archive-production-instrument-header__ticks" aria-hidden="true">
-        {Array.from({ length: 11 }, (_, index) => (
-          <i className={index % 5 === 0 ? "is-major" : undefined} key={index} />
-        ))}
+      <div className="dial-archive-production-instrument-header__identity" aria-hidden="true">
+        <span>{identity.index}</span>
+        <small>{identity.englishTitle}</small>
       </div>
-    </header>
+    </div>
   );
 }
 

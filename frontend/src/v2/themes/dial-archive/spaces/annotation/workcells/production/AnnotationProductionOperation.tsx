@@ -1,10 +1,4 @@
-import type { CSSProperties } from "react";
-
 import type { AnnotationProductionOperation as ProductionOperation } from "../../../../../../pages/spaces/spacePageModel";
-import {
-  ProductionInstrumentHeader,
-  ProductionPhaseRail,
-} from "./AnnotationProductionInstrumentChrome";
 
 interface AnnotationProductionOperationProps {
   operation: ProductionOperation;
@@ -23,6 +17,7 @@ function OperationActionBar({
     <div className="dial-archive-production-operation__actions">
       {operation.canStop ? (
         <button
+          className="dial-archive-preparation-inspector__primary"
           type="button"
           disabled={operation.stopping || operation.actionPending}
           onClick={() => void operation.stop()}
@@ -33,7 +28,7 @@ function OperationActionBar({
       ) : null}
       {operation.canResume ? (
         <button
-          className="is-primary"
+          className="is-primary dial-archive-preparation-inspector__primary"
           type="button"
           disabled={operation.actionPending}
           onClick={() => void operation.resume()}
@@ -44,6 +39,7 @@ function OperationActionBar({
       ) : null}
       {operation.canRetry ? (
         <button
+          className="dial-archive-preparation-inspector__primary"
           type="button"
           disabled={operation.actionPending}
           onClick={() => void operation.retry()}
@@ -53,7 +49,11 @@ function OperationActionBar({
         </button>
       ) : null}
       {!operation.canStop ? (
-        <button className="is-primary" type="button" onClick={onCreateNew}>
+        <button
+          className="is-primary dial-archive-preparation-inspector__primary"
+          type="button"
+          onClick={onCreateNew}
+        >
           <span>NEW ROUTE</span>
           <b>建立新生产任务</b>
         </button>
@@ -82,50 +82,49 @@ export function AnnotationProductionOperation({
       aria-label="生产任务执行记录"
       aria-live={operation.tone === "active" ? "polite" : "off"}
     >
-      <ProductionInstrumentHeader
-        lane={operation.lane}
-        register={`OPERATION REGISTER // ${operation.id}`}
-        title={operation.statusLabel}
-        detail={
-          <>
-            {operation.scopeLabel} · {operation.executionProfile} ·{" "}
-            {operation.model || "LOCAL PIPELINE"}
-          </>
-        }
-      />
-
-      <ProductionPhaseRail
-        active={operation.tone === "active" ? "run" : "result"}
-        label="任务阶段"
-      />
-
-      <div className="dial-archive-production-operation__progress">
-        <output>{operation.progressPercent.toString().padStart(2, "0")}</output>
-        <div>
-          <span>PERCENT COMPLETE</span>
-          <b>{operation.running ? `${operation.running} ITEM IN FLIGHT` : operation.statusLabel}</b>
+      <section className="dial-archive-preparation-inspector__operation">
+        <div className="dial-archive-production-operation__register">
+          <span>OPERATION</span>
+          <b>{operation.id}</b>
         </div>
-        <i
-          style={
-            {
-              "--dial-archive-production-progress": `${operation.progressPercent}%`,
-            } as CSSProperties
-          }
-        />
+
+        <dl className="dial-archive-production-operation__readout">
+          <div>
+            <dt>STATUS</dt>
+            <dd>{operation.statusLabel}</dd>
+          </div>
+          <div>
+            <dt>PASS</dt>
+            <dd>
+              <b>{operation.progressPercent}</b>%
+            </dd>
+          </div>
+          <div>
+            <dt>ROUTE</dt>
+            <dd>{operation.lane.toUpperCase()}</dd>
+          </div>
+          <div>
+            <dt>BACKEND</dt>
+            <dd>{operation.executionProfile}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <div className="dial-archive-production-operation__metrics dial-archive-preparation-inspector__metrics">
+        {metrics.map(([label, value]) => (
+          <span className={label === "FAILED" && value ? "is-warning" : undefined} key={label}>
+            {label}
+            <b>{value.toLocaleString()}</b>
+          </span>
+        ))}
       </div>
 
-      <dl className="dial-archive-production-operation__metrics">
-        {metrics.map(([label, value]) => (
-          <div className={label === "FAILED" && value ? "is-attention" : undefined} key={label}>
-            <dt>{label}</dt>
-            <dd>{value.toLocaleString()}</dd>
-          </div>
-        ))}
-      </dl>
-
       <div className="dial-archive-production-operation__ledger">
-        <div className="dial-archive-production-operation__snapshot">
-          <span>LOCKED EXECUTION SNAPSHOT</span>
+        <details className="dial-archive-production-operation__snapshot">
+          <summary>
+            <span>LOCKED EXECUTION SNAPSHOT</span>
+            <b>{operation.snapshot.length.toString().padStart(2, "0")} READINGS</b>
+          </summary>
           <dl>
             {operation.snapshot.map((field) => (
               <div key={field.id}>
@@ -135,7 +134,7 @@ export function AnnotationProductionOperation({
               </div>
             ))}
           </dl>
-        </div>
+        </details>
 
         <section className="dial-archive-production-exceptions" aria-label="异常分支">
           <header>
@@ -148,7 +147,9 @@ export function AnnotationProductionOperation({
             <div className="dial-archive-production-exceptions__list">
               {operation.exceptions.map((exception) => (
                 <article
-                  className={exception.candidate ? "is-candidate" : undefined}
+                  className={`dial-archive-preparation-inspector__preview-item${
+                    exception.candidate ? " is-candidate" : ""
+                  }`}
                   key={exception.id}
                 >
                   <header>

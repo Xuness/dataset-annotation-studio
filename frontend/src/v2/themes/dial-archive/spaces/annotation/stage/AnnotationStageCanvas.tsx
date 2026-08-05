@@ -79,11 +79,13 @@ export const AnnotationStageCanvas = memo(function AnnotationStageCanvas({
         {registrationGuides.map((guide) => (
           <path className={`is-${guide.tone}`} d={guide.path} key={guide.id} />
         ))}
-        <g className="dial-archive-stage-canvas__guide-nodes">
-          <rect x="278" y="720" width="12" height="12" />
-          <rect className="is-signal" x="1518" y="196" width="14" height="14" />
-          <path d="M 1748 462 l 12 12 -12 12 -12 -12 Z" />
-        </g>
+        <rect
+          className="dial-archive-stage-canvas__spine-node"
+          x="1362"
+          y="412"
+          width="16"
+          height="16"
+        />
       </svg>
       <div className="dial-archive-stage-canvas__evidence">
         {visibleEvidence.map((asset, index) => {

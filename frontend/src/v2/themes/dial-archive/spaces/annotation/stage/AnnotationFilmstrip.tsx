@@ -156,47 +156,10 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
     >
       <i className="dial-archive-stage-filmstrip__rail is-top" aria-hidden="true" />
       <i className="dial-archive-stage-filmstrip__rail is-bottom" aria-hidden="true" />
-      <div
-        className="dial-archive-stage-filmstrip__scope"
-        role="search"
-        onWheel={(event) => event.stopPropagation()}
-      >
-        <label>
-          <span>FIND</span>
-          <input
-            type="search"
-            value={scope.search}
-            placeholder="文件名 / 相对路径"
-            aria-label="搜索素材"
-            onChange={(event) => scope.setSearch(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>STATE</span>
-          <select
-            value={scope.filter}
-            aria-label="筛选素材状态"
-            onChange={(event) =>
-              scope.setFilter(event.target.value as AnnotationStageScope["filter"])
-            }
-          >
-            {scope.filters.map((filter) => (
-              <option value={filter.id} key={filter.id}>
-                {filter.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          disabled={!totalCount || scope.selectingAll}
-          onClick={() => void scope.selectAllFiltered()}
-        >
-          {scope.selectingAll ? "READING" : "SELECT FILTER"}
-        </button>
-        <button type="button" disabled={!checkedAssetIds.length} onClick={scope.clearChecked}>
-          CLEAR
-        </button>
+      <div className="dial-archive-stage-filmstrip__range" aria-hidden="true">
+        <span>SEQUENCE</span>
+        <b>{scope.filters.find((filter) => filter.id === scope.filter)?.code ?? "ALL"}</b>
+        <em>{checkedAssetIds.length ? `${checkedAssetIds.length} RANGE` : "CURRENT"}</em>
       </div>
       <div
         className="dial-archive-stage-filmstrip__track"

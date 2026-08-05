@@ -561,6 +561,95 @@ test("large page scenes use paint containment without changing shared animation 
   assert.match(workspaceMaterialStyles, /backdrop-filter\s+var\(--transition\)/);
 });
 
+test("annotation stage keeps the camera hit-passive and preserves the short dossier split", () => {
+  const stageStyles = readFileSync(
+    new URL(
+      "../src/v2/themes/dial-archive/spaces/annotation/styles/annotation-stage-reconstruction.css",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(stageStyles, /\.dial-archive-stage__scene-camera\s*\{[^}]*pointer-events:\s*none;/s);
+  assert.match(stageStyles, /\.dial-archive-stage-workcell-slot\s*\{[^}]*pointer-events:\s*auto;/s);
+  assert.match(
+    stageStyles,
+    /\.dial-archive-workcell-viewport__plane\s*\{[^}]*pointer-events:\s*auto;/s,
+  );
+  assert.match(
+    stageStyles,
+    /@media \(max-height:\s*820px\)[\s\S]*?data-workcell="dossier"[\s\S]*?top:\s*27%;[\s\S]*?height:\s*30%;/,
+  );
+});
+
+test("annotation production reuses the preparation workbench primitives and one scroll owner", () => {
+  const stageStyles = readFileSync(
+    new URL(
+      "../src/v2/themes/dial-archive/spaces/annotation/styles/annotation-stage-reconstruction.css",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const workcell = readFileSync(
+    new URL(
+      "../src/v2/themes/dial-archive/spaces/annotation/workcells/production/AnnotationProductionWorkcell.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const routeMap = readFileSync(
+    new URL(
+      "../src/v2/themes/dial-archive/spaces/annotation/workcells/production/AnnotationProductionRouteMap.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const configurationStyles = readFileSync(
+    new URL(
+      "../src/v2/themes/dial-archive/spaces/annotation/styles/annotation-workcell-production-config.css",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const operationStyles = readFileSync(
+    new URL(
+      "../src/v2/themes/dial-archive/spaces/annotation/styles/annotation-workcell-production-operation.css",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(workcell, /dial-archive-preparation-canvas/);
+  assert.match(workcell, /dial-archive-preparation-inspector/);
+  assert.match(workcell, /AnnotationProjectContextSurface context=\{projectContext\} compact/);
+  assert.match(
+    workcell,
+    /AnnotationRequestPreviewSurface preview=\{requestPreview\} asset=\{asset\} compact/,
+  );
+  assert.match(routeMap, /dial-archive-preparation-node/);
+  assert.match(routeMap, /--dial-archive-edge-order/);
+  assert.match(routeMap, /transformOrigin: `\$\{gauge\.cx\}px \$\{gauge\.cy\}px`/);
+  assert.match(
+    stageStyles,
+    /\.dial-archive-production-workcell__console-body\s*\{[^}]*overflow-y:\s*auto;/s,
+  );
+  assert.match(
+    stageStyles,
+    /\.dial-archive-stage\[data-workcell="production"\]\s*\{[^}]*--dial-archive-stage-header-h:\s*72px;/s,
+  );
+  assert.match(
+    stageStyles,
+    /\.dial-archive-stage\[data-workcell="production"\]\s*\{[^}]*--dial-archive-workbench-type-ui-micro:\s*10px;[^}]*--dial-archive-workbench-type-canvas-micro:\s*12px;/s,
+  );
+  assert.match(
+    stageStyles,
+    /\.dial-archive-production-input-surface \.dial-archive-context-surface\.is-inspector\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/s,
+  );
+  assert.match(stageStyles, /dial-archive-production-inspector-view-in 300ms/);
+  assert.doesNotMatch(configurationStyles, /overflow-y:\s*auto/);
+  assert.doesNotMatch(operationStyles, /overflow-y:\s*auto/);
+});
+
 test("tag editor follows the content region transparency setting", () => {
   const workspaceContentMaterialStyles = readFileSync(
     new URL("../Legacy/pages/workspace/styles/surface-materials.css", import.meta.url),

@@ -1,13 +1,29 @@
 import type {
   AnnotationDossierContent,
   AnnotationDossierReading,
+  AnnotationDossierSectionId,
   AnnotationStageAsset,
 } from "../../../../../../pages/spaces/spacePageModel";
 
 interface AnnotationDossierRegisterProps {
   asset: AnnotationStageAsset;
   dossier: AnnotationDossierContent;
+  section: AnnotationDossierSectionId;
+  onSelectSection(section: AnnotationDossierSectionId): void;
 }
+
+const DOSSIER_SECTIONS: ReadonlyArray<{
+  id: AnnotationDossierSectionId;
+  code: string;
+  title: string;
+}> = [
+  { id: "channels", code: "01", title: "通道登记" },
+  { id: "metadata", code: "02", title: "素材元数据" },
+  { id: "revisions", code: "03", title: "修订证据链" },
+  { id: "translations", code: "04", title: "翻译变体" },
+  { id: "jobs", code: "05", title: "关联生产任务" },
+  { id: "provenance", code: "06", title: "生成与请求溯源" },
+];
 
 function formatTimestamp(value: string | null): string {
   if (!value) return "未记录";
@@ -20,19 +36,19 @@ function compactIdentity(value: string | null, fallback = "—"): string {
   return value.length > 18 ? `${value.slice(0, 10)}…${value.slice(-6)}` : value;
 }
 
-function DossierSectionHeading({
-  code,
-  title,
-  count,
-}: {
-  code: string;
-  title: string;
-  count: number | string;
-}) {
+function sectionCount(section: AnnotationDossierSectionId, dossier: AnnotationDossierContent) {
+  if (section === "channels") return dossier.documents.length;
+  if (section === "metadata") return dossier.metadata.fields.length;
+  if (section === "revisions") return dossier.revisions.length;
+  if (section === "translations") return dossier.translations.length;
+  if (section === "jobs") return dossier.jobs.length;
+  return dossier.provenance ? 1 : 0;
+}
+
+function DossierSectionHeading({ code, count }: { code: string; count: number }) {
   return (
     <header className="dial-archive-dossier-section__head">
-      <span>{code}</span>
-      <h3>{title}</h3>
+      <span>REG.{code} / CURRENT PAGE</span>
       <b>{String(count).padStart(2, "0")}</b>
     </header>
   );
@@ -48,99 +64,56 @@ function ProvenanceReading({ reading }: { reading: AnnotationDossierReading }) {
   );
 }
 
-export function AnnotationDossierRegister({ asset, dossier }: AnnotationDossierRegisterProps) {
-  const metadataState = dossier.metadata.exists
-    ? `${dossier.metadata.fields.length} FIELD`
-    : "NO SIDECAR";
-
-  return (
-    <article className="dial-archive-dossier-register" aria-labelledby="dossier-register-title">
-      <div className="dial-archive-dossier-register__ghost" aria-hidden="true">
-        DOSSIER
-      </div>
-
-      <header className="dial-archive-dossier-register__title">
-        <div>
-          <span>RL-DAS / OBJECT EVIDENCE REGISTER</span>
-          <h2 id="dossier-register-title">对象档案</h2>
-        </div>
-        <b aria-hidden="true">03</b>
-        <dl>
-          <div>
-            <dt>OBJECT</dt>
-            <dd title={asset.id}>{compactIdentity(asset.id)}</dd>
-          </div>
-          <div>
-            <dt>CHANNEL HEADS</dt>
-            <dd>{dossier.documents.length.toString().padStart(2, "0")}</dd>
-          </div>
-          <div>
-            <dt>REVISION EVENTS</dt>
-            <dd>{dossier.revisions.length.toString().padStart(2, "0")}</dd>
-          </div>
-        </dl>
-      </header>
-
-      <nav className="dial-archive-dossier-register__rail" aria-label="对象档案章节">
-        <a href="#dossier-channel-register">01 通道登记</a>
-        <a href="#dossier-metadata">02 元数据</a>
-        <a href="#dossier-revisions">03 修订链</a>
-        <a href="#dossier-translations">04 翻译</a>
-        <a href="#dossier-jobs">05 关联任务</a>
-        <a href="#dossier-provenance">06 溯源</a>
-      </nav>
-
-      <div className="dial-archive-dossier-register__crosslinks" aria-label="跨空间关联入口">
-        <span>CROSS-SPACE REGISTER</span>
-        <button type="button" onClick={dossier.openArchive}>
-          项目档案 / ARCHIVE
-        </button>
-        <button type="button" onClick={dossier.openQuality}>
-          质控审阅 / QUALITY
-        </button>
-      </div>
-
-      <section className="dial-archive-dossier-section" id="dossier-channel-register">
-        <DossierSectionHeading code="REG.01" title="通道登记" count={dossier.documents.length} />
-        {dossier.documents.length ? (
-          <ol className="dial-archive-dossier-channels">
-            {dossier.documents.map((document) => (
-              <li className={`is-${document.availability}`} key={document.id}>
-                <span>{document.code}</span>
+function DossierSectionBody({
+  section,
+  dossier,
+}: {
+  section: AnnotationDossierSectionId;
+  dossier: AnnotationDossierContent;
+}) {
+  if (section === "channels") {
+    return dossier.documents.length ? (
+      <ol className="dial-archive-dossier-channels">
+        {dossier.documents.map((document) => (
+          <li className={`is-${document.availability}`} key={document.id}>
+            <span>{document.code}</span>
+            <div>
+              <b>{document.title}</b>
+              <small>
+                {document.source ?? "来源未记录"} · {formatTimestamp(document.updatedAt)}
+              </small>
+            </div>
+            <output>{document.statusLabel}</output>
+            <details>
+              <summary>TECHNICAL REGISTER</summary>
+              <dl>
                 <div>
-                  <b>{document.title}</b>
-                  <small>
-                    {document.source ?? "来源未记录"} · {formatTimestamp(document.updatedAt)}
-                  </small>
+                  <dt>HEAD</dt>
+                  <dd title={document.revisionId ?? undefined}>
+                    {compactIdentity(document.revisionId)}
+                  </dd>
                 </div>
-                <dl>
-                  <div>
-                    <dt>HEAD</dt>
-                    <dd title={document.revisionId ?? undefined}>
-                      {compactIdentity(document.revisionId)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>REVIEW</dt>
-                    <dd>{document.reviewStatus?.toUpperCase() ?? "OPEN"}</dd>
-                  </div>
-                </dl>
-                <output>{document.statusLabel}</output>
-                {document.validationMessage ? <p>{document.validationMessage}</p> : null}
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="dial-archive-dossier-empty">当前对象没有已登记的标注通道。</p>
-        )}
-      </section>
+                <div>
+                  <dt>REVIEW</dt>
+                  <dd>{document.reviewStatus?.toUpperCase() ?? "OPEN"}</dd>
+                </div>
+              </dl>
+              {document.validationMessage ? <p>{document.validationMessage}</p> : null}
+            </details>
+          </li>
+        ))}
+      </ol>
+    ) : (
+      <p className="dial-archive-dossier-empty">当前对象没有已登记的标注通道。</p>
+    );
+  }
 
-      <section className="dial-archive-dossier-section" id="dossier-metadata">
-        <DossierSectionHeading
-          code="REG.02"
-          title="素材元数据"
-          count={dossier.metadata.fields.length}
-        />
+  if (section === "metadata") {
+    const metadataState = dossier.metadata.exists
+      ? `${dossier.metadata.fields.length} FIELD`
+      : "NO SIDECAR";
+    return (
+      <>
         <div className="dial-archive-dossier-metadata__identity">
           <span>{metadataState}</span>
           <b title={dossier.metadata.path ?? undefined}>
@@ -170,203 +143,239 @@ export function AnnotationDossierRegister({ asset, dossier }: AnnotationDossierR
             <pre>{dossier.metadata.raw}</pre>
           </details>
         ) : null}
-      </section>
+      </>
+    );
+  }
 
-      <section className="dial-archive-dossier-section" id="dossier-revisions">
-        <DossierSectionHeading code="REG.03" title="修订证据链" count={dossier.revisions.length} />
-        {dossier.revisions.length ? (
-          <ol className="dial-archive-dossier-timeline">
-            {dossier.revisions.map((revision, index) => (
-              <li
-                className={`${revision.candidate ? "is-candidate" : ""}${revision.tombstone ? " is-tombstone" : ""}`}
-                key={`${revision.channel}:${revision.id}`}
-              >
-                <span>{(index + 1).toString().padStart(2, "0")}</span>
-                <header>
-                  <b>{revision.channelLabel}</b>
-                  <time dateTime={revision.createdAt}>{formatTimestamp(revision.createdAt)}</time>
-                </header>
-                <p>{revision.preview}</p>
-                <dl>
-                  <div>
-                    <dt>SOURCE</dt>
-                    <dd>{revision.source}</dd>
-                  </div>
-                  <div>
-                    <dt>REVISION</dt>
-                    <dd title={revision.id}>{compactIdentity(revision.id)}</dd>
-                  </div>
-                  <div>
-                    <dt>VALIDATION</dt>
-                    <dd>{revision.validationStatus.toUpperCase()}</dd>
-                  </div>
-                  {revision.jobItemId ? (
-                    <div>
-                      <dt>JOB ITEM</dt>
-                      <dd title={revision.jobItemId}>{compactIdentity(revision.jobItemId)}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="dial-archive-dossier-empty">当前对象尚未形成可追溯的修订链。</p>
-        )}
-      </section>
-
-      <section className="dial-archive-dossier-section" id="dossier-translations">
-        <DossierSectionHeading code="REG.04" title="翻译变体" count={dossier.translations.length} />
-        {dossier.translations.length ? (
-          <ol className="dial-archive-dossier-translations">
-            {dossier.translations.map((translation) => (
-              <li className={`is-${translation.status}`} key={translation.id}>
-                <div className="dial-archive-dossier-translations__language">
-                  <span>LANGUAGE</span>
-                  <b>{translation.language}</b>
-                </div>
-                <div>
-                  <span>
-                    {translation.sourceKind.toUpperCase()} →{" "}
-                    {translation.producerKind.toUpperCase()}
-                  </span>
-                  <b>{translation.model ?? translation.producer}</b>
-                  <small>{translation.provider ?? "本地执行"}</small>
-                </div>
-                <dl>
-                  <div>
-                    <dt>ALIGNMENT</dt>
-                    <dd>{translation.alignmentStatus.toUpperCase()}</dd>
-                  </div>
-                  <div>
-                    <dt>QUALITY</dt>
-                    <dd>{translation.qualityStatus.toUpperCase()}</dd>
-                  </div>
-                  <div>
-                    <dt>UPDATED</dt>
-                    <dd>{formatTimestamp(translation.updatedAt)}</dd>
-                  </div>
-                </dl>
-                <output>{translation.statusLabel}</output>
-                {translation.issue || translation.qualityIssues.length ? (
-                  <p>
-                    {[translation.issue, ...translation.qualityIssues].filter(Boolean).join(" · ")}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="dial-archive-dossier-empty">当前对象没有翻译变体记录。</p>
-        )}
-      </section>
-
-      <section className="dial-archive-dossier-section" id="dossier-jobs">
-        <DossierSectionHeading code="REG.05" title="关联生产任务" count={dossier.jobs.length} />
-        {dossier.jobsLoading ? (
-          <p className="dial-archive-dossier-empty">正在读取当前对象的关联生产任务。</p>
-        ) : dossier.jobsIssue ? (
-          <p className="dial-archive-dossier-empty is-error">
-            关联任务暂时不可用；对象档案的其他证据仍可正常查阅。
-            <small>ERROR // {dossier.jobsIssue}</small>
-          </p>
-        ) : dossier.jobs.length ? (
-          <ol className="dial-archive-dossier-jobs">
-            {dossier.jobs.map((job, index) => (
-              <li className={`is-${job.itemStatus}`} key={`${job.id}:${job.itemId}`}>
-                <span>{(index + 1).toString().padStart(2, "0")}</span>
-                <header>
-                  <small>
-                    {job.kind.toUpperCase()} / {job.outputChannel.toUpperCase()}
-                  </small>
-                  <b>{job.kindLabel}</b>
-                  <time dateTime={job.updatedAt}>{formatTimestamp(job.updatedAt)}</time>
-                </header>
-                <dl>
-                  <div>
-                    <dt>JOB</dt>
-                    <dd title={job.id}>{compactIdentity(job.id)}</dd>
-                  </div>
-                  <div>
-                    <dt>PROFILE</dt>
-                    <dd>{job.executionProfile}</dd>
-                  </div>
-                  <div>
-                    <dt>MODEL</dt>
-                    <dd>{job.model}</dd>
-                  </div>
-                  <div>
-                    <dt>ATTEMPT</dt>
-                    <dd>{job.attemptCount}</dd>
-                  </div>
-                </dl>
-                <div>
-                  <output>{job.itemStatusLabel}</output>
-                  <small>
-                    {job.jobStatusLabel} · {job.resultDisposition.toUpperCase()}
-                  </small>
-                </div>
-                <button type="button" onClick={() => dossier.openJob(job.id)}>
-                  打开生产路由场 →
-                </button>
-                {job.error ? <p>{job.error}</p> : null}
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="dial-archive-dossier-empty">当前对象没有关联的自动生产任务。</p>
-        )}
-      </section>
-
-      <section className="dial-archive-dossier-section" id="dossier-provenance">
-        <DossierSectionHeading
-          code="REG.06"
-          title="生成与请求溯源"
-          count={dossier.provenance ? 1 : 0}
-        />
-        {dossier.provenanceLoading ? (
-          <p className="dial-archive-dossier-empty">正在读取当前对象的生成与请求溯源。</p>
-        ) : dossier.provenanceIssue ? (
-          <p className="dial-archive-dossier-empty is-error">
-            生成溯源暂时不可用；已登记的通道、元数据与修订链不受影响。
-            <small>ERROR // {dossier.provenanceIssue}</small>
-          </p>
-        ) : dossier.provenance ? (
-          <div className="dial-archive-dossier-provenance">
-            <header className={dossier.provenance.current ? "is-current" : "is-stale"}>
-              <span>TRACE LINK</span>
-              <b>{dossier.provenance.source ?? "来源未命名"}</b>
-              <output>
-                {dossier.provenance.current ? "MATCHES CURRENT HEAD" : "HISTORICAL RESPONSE"}
-              </output>
+  if (section === "revisions") {
+    return dossier.revisions.length ? (
+      <ol className="dial-archive-dossier-timeline">
+        {dossier.revisions.map((revision, index) => (
+          <li
+            className={`${revision.candidate ? "is-candidate" : ""}${revision.tombstone ? " is-tombstone" : ""}`}
+            key={`${revision.channel}:${revision.id}`}
+          >
+            <span>{(index + 1).toString().padStart(2, "0")}</span>
+            <header>
+              <b>{revision.channelLabel}</b>
+              <time dateTime={revision.createdAt}>{formatTimestamp(revision.createdAt)}</time>
             </header>
-            <dl>
-              {dossier.provenance.readings.map((reading) => (
-                <ProvenanceReading reading={reading} key={reading.id} />
-              ))}
-            </dl>
-            <div className="dial-archive-dossier-provenance__raw">
-              <details className="dial-archive-dossier-raw">
-                <summary>REQUEST ENVELOPE // 请求证据</summary>
-                <pre>{dossier.provenance.requestJson}</pre>
-              </details>
-              <details className="dial-archive-dossier-raw">
-                <summary>RESPONSE ENVELOPE // 响应证据</summary>
-                <pre>{dossier.provenance.responseJson}</pre>
-              </details>
+            <p>{revision.preview}</p>
+            <details>
+              <summary>REVISION EVIDENCE</summary>
+              <dl>
+                <div>
+                  <dt>SOURCE</dt>
+                  <dd>{revision.source}</dd>
+                </div>
+                <div>
+                  <dt>REVISION</dt>
+                  <dd title={revision.id}>{compactIdentity(revision.id)}</dd>
+                </div>
+                <div>
+                  <dt>VALIDATION</dt>
+                  <dd>{revision.validationStatus.toUpperCase()}</dd>
+                </div>
+              </dl>
+            </details>
+          </li>
+        ))}
+      </ol>
+    ) : (
+      <p className="dial-archive-dossier-empty">当前对象尚未形成可追溯的修订链。</p>
+    );
+  }
+
+  if (section === "translations") {
+    return dossier.translations.length ? (
+      <ol className="dial-archive-dossier-translations">
+        {dossier.translations.map((translation) => (
+          <li className={`is-${translation.status}`} key={translation.id}>
+            <div className="dial-archive-dossier-translations__language">
+              <span>LANGUAGE</span>
+              <b>{translation.language}</b>
             </div>
+            <div>
+              <span>
+                {translation.sourceKind.toUpperCase()} → {translation.producerKind.toUpperCase()}
+              </span>
+              <b>{translation.model ?? translation.producer}</b>
+              <small>{formatTimestamp(translation.updatedAt)}</small>
+            </div>
+            <output>{translation.statusLabel}</output>
+            <details>
+              <summary>ALIGNMENT / QUALITY</summary>
+              <p>
+                {translation.alignmentStatus.toUpperCase()} ·{" "}
+                {translation.qualityStatus.toUpperCase()}
+              </p>
+              {translation.issue || translation.qualityIssues.length ? (
+                <p>
+                  {[translation.issue, ...translation.qualityIssues].filter(Boolean).join(" · ")}
+                </p>
+              ) : null}
+            </details>
+          </li>
+        ))}
+      </ol>
+    ) : (
+      <p className="dial-archive-dossier-empty">当前对象没有翻译变体记录。</p>
+    );
+  }
+
+  if (section === "jobs") {
+    if (dossier.jobsLoading) {
+      return <p className="dial-archive-dossier-empty">正在读取当前对象的关联生产任务。</p>;
+    }
+    if (dossier.jobsIssue) {
+      return (
+        <p className="dial-archive-dossier-empty is-error">
+          关联任务暂时不可用；对象档案的其他证据仍可正常查阅。
+          <small>ERROR // {dossier.jobsIssue}</small>
+        </p>
+      );
+    }
+    return dossier.jobs.length ? (
+      <ol className="dial-archive-dossier-jobs">
+        {dossier.jobs.map((job, index) => (
+          <li className={`is-${job.itemStatus}`} key={`${job.id}:${job.itemId}`}>
+            <span>{(index + 1).toString().padStart(2, "0")}</span>
+            <header>
+              <b>{job.kindLabel}</b>
+              <time dateTime={job.updatedAt}>{formatTimestamp(job.updatedAt)}</time>
+            </header>
+            <output>{job.itemStatusLabel}</output>
+            <button type="button" onClick={() => dossier.openJob(job.id)}>
+              打开生产路由场 →
+            </button>
+            <details>
+              <summary>JOB REGISTER</summary>
+              <dl>
+                <div>
+                  <dt>JOB</dt>
+                  <dd title={job.id}>{compactIdentity(job.id)}</dd>
+                </div>
+                <div>
+                  <dt>PROFILE</dt>
+                  <dd>{job.executionProfile}</dd>
+                </div>
+                <div>
+                  <dt>MODEL</dt>
+                  <dd>{job.model}</dd>
+                </div>
+              </dl>
+              {job.error ? <p>{job.error}</p> : null}
+            </details>
+          </li>
+        ))}
+      </ol>
+    ) : (
+      <p className="dial-archive-dossier-empty">当前对象没有关联的自动生产任务。</p>
+    );
+  }
+
+  if (dossier.provenanceLoading) {
+    return <p className="dial-archive-dossier-empty">正在读取当前对象的生成与请求溯源。</p>;
+  }
+  if (dossier.provenanceIssue) {
+    return (
+      <p className="dial-archive-dossier-empty is-error">
+        生成溯源暂时不可用；已登记的通道、元数据与修订链不受影响。
+        <small>ERROR // {dossier.provenanceIssue}</small>
+      </p>
+    );
+  }
+  return dossier.provenance ? (
+    <div className="dial-archive-dossier-provenance">
+      <header className={dossier.provenance.current ? "is-current" : "is-stale"}>
+        <span>TRACE LINK</span>
+        <b>{dossier.provenance.source ?? "来源未命名"}</b>
+        <output>
+          {dossier.provenance.current ? "MATCHES CURRENT HEAD" : "HISTORICAL RESPONSE"}
+        </output>
+      </header>
+      <dl>
+        {dossier.provenance.readings.map((reading) => (
+          <ProvenanceReading reading={reading} key={reading.id} />
+        ))}
+      </dl>
+      <div className="dial-archive-dossier-provenance__raw">
+        <details className="dial-archive-dossier-raw">
+          <summary>REQUEST ENVELOPE // 请求证据</summary>
+          <pre>{dossier.provenance.requestJson}</pre>
+        </details>
+        <details className="dial-archive-dossier-raw">
+          <summary>RESPONSE ENVELOPE // 响应证据</summary>
+          <pre>{dossier.provenance.responseJson}</pre>
+        </details>
+      </div>
+    </div>
+  ) : (
+    <p className="dial-archive-dossier-empty">
+      当前对象没有可关联的自动生产请求；手动记录不会伪造生成溯源。
+    </p>
+  );
+}
+
+export function AnnotationDossierRegister({
+  asset,
+  dossier,
+  section,
+  onSelectSection,
+}: AnnotationDossierRegisterProps) {
+  const active = DOSSIER_SECTIONS.find((item) => item.id === section) ?? DOSSIER_SECTIONS[0];
+  const count = sectionCount(active.id, dossier);
+
+  return (
+    <article className="dial-archive-dossier-register" aria-labelledby="dossier-register-title">
+      <header className="dial-archive-dossier-register__title">
+        <div>
+          <span>RL-DAS / OBJECT EVIDENCE REGISTER</span>
+          <h2 id="dossier-register-title">{active.title}</h2>
+        </div>
+        <b aria-hidden="true">{active.code}</b>
+        <dl>
+          <div>
+            <dt>OBJECT</dt>
+            <dd title={asset.id}>{compactIdentity(asset.id)}</dd>
           </div>
-        ) : (
-          <p className="dial-archive-dossier-empty">
-            当前对象没有可关联的自动生产请求；手动记录不会伪造生成溯源。
-          </p>
-        )}
+          <div>
+            <dt>REGISTER</dt>
+            <dd>{String(count).padStart(2, "0")}</dd>
+          </div>
+        </dl>
+      </header>
+
+      <nav className="dial-archive-dossier-register__rail" aria-label="对象档案章节">
+        {DOSSIER_SECTIONS.map((item) => (
+          <button
+            className={item.id === active.id ? "is-active" : undefined}
+            type="button"
+            aria-pressed={item.id === active.id}
+            onClick={() => onSelectSection(item.id)}
+            key={item.id}
+          >
+            <span>{item.code}</span>
+            <b>{item.title}</b>
+          </button>
+        ))}
+      </nav>
+
+      <section className={`dial-archive-dossier-section is-${active.id}`}>
+        <DossierSectionHeading code={active.code} count={count} />
+        <DossierSectionBody section={active.id} dossier={dossier} />
       </section>
 
       <footer className="dial-archive-dossier-register__foot">
-        <span>END OF OBJECT REGISTER</span>
+        <div className="dial-archive-dossier-register__crosslinks" aria-label="跨空间关联入口">
+          <button type="button" onClick={dossier.openArchive}>
+            项目档案 / ARCHIVE
+          </button>
+          <button type="button" onClick={dossier.openQuality}>
+            质控审阅 / QUALITY
+          </button>
+        </div>
         <b>{asset.relativePath}</b>
-        <i aria-hidden="true" />
       </footer>
     </article>
   );

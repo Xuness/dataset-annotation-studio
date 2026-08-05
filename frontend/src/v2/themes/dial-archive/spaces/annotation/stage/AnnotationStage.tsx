@@ -1,10 +1,14 @@
 import { useEffect, useRef, type KeyboardEventHandler } from "react";
 
-import type { AnnotationStageContent } from "../../../../../pages/spaces/spacePageModel";
+import {
+  ANNOTATION_WORKCELL_IDS,
+  type AnnotationStageContent,
+} from "../../../../../pages/spaces/spacePageModel";
 import { usePrefersReducedMotion } from "../../../hooks/usePrefersReducedMotion";
 import { AnnotationFilmstrip } from "./AnnotationFilmstrip";
 import { AnnotationSpecimen } from "./AnnotationSpecimen";
 import { AnnotationStageCanvas } from "./AnnotationStageCanvas";
+import { AnnotationStageContextDock } from "./AnnotationStageContextDock";
 import { AnnotationStageReadout } from "./AnnotationStageReadout";
 import { AnnotationWorkcellMap } from "./AnnotationWorkcellMap";
 import { AnnotationWorkcellViewport } from "../workcells/AnnotationWorkcellViewport";
@@ -13,6 +17,7 @@ import { useStageCamera } from "./hooks/useStageCamera";
 import { useStageParallax } from "./hooks/useStageParallax";
 import { useWorkcellTransition } from "./hooks/useWorkcellTransition";
 import { createAnnotationStageStyle } from "./model/annotationStageLayout";
+import { ANNOTATION_WORKCELL_PRESENTATION } from "./model/annotationStagePresentation";
 
 /**
  * 三级素材施工场：冷白编辑画布（Z0）+ 展台与胶片轨道（Z1）+
@@ -162,6 +167,12 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
   const workcellClass = displayedWorkcell
     ? ` has-workcell is-workcell-${displayedWorkcell} is-workcell-${workcellTransition.phase}`
     : "";
+  const productionOperation = content.productionWorkcell.production?.operation;
+  const productionPhase = productionOperation
+    ? productionOperation.tone === "active"
+      ? "running"
+      : "result"
+    : "configure";
 
   return (
     <div
@@ -170,6 +181,9 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
       role="region"
       aria-label="素材施工场"
       tabIndex={0}
+      data-workcell={displayedWorkcell ?? "overview"}
+      data-workcell-phase={workcellTransition.phase}
+      data-production-phase={displayedWorkcell === "production" ? productionPhase : undefined}
       style={createAnnotationStageStyle()}
       onKeyDown={handleKeyDown}
       onPointerDown={workcellVisible ? undefined : camera.onPointerDown}
@@ -190,20 +204,53 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
           onClick={workcellVisible ? content.closeWorkcell : content.returnToSpace}
         >
           <span aria-hidden="true">←</span>{" "}
-          {workcellVisible ? "RETURN // STAGE OVERVIEW" : "RETURN // SPACE 03"}
+          {displayedWorkcell === "production"
+            ? "返回素材施工场"
+            : workcellVisible
+              ? "RETURN // STAGE OVERVIEW"
+              : "RETURN // SPACE 03"}
         </button>
         <div className="dial-archive-stage__title">
           <em>
-            {workcellVisible
-              ? `WORKCELL // ${displayedWorkcell.toUpperCase()}`
-              : "STAGE // MATERIAL YARD"}
+            {displayedWorkcell === "production"
+              ? "03 / PRD"
+              : workcellVisible
+                ? `WORKCELL // ${displayedWorkcell.toUpperCase()}`
+                : "STAGE // MATERIAL YARD"}
           </em>
-          <b>{workcellVisible ? "标注工作间" : "素材施工场"}</b>
+          <b>
+            {displayedWorkcell === "production"
+              ? (productionOperation?.id ?? "NEW OPERATION")
+              : workcellVisible
+                ? ANNOTATION_WORKCELL_PRESENTATION[displayedWorkcell].title
+                : "素材施工场"}
+          </b>
         </div>
-        <button className="dial-archive-stage__camera-reset" type="button" onClick={camera.reset}>
-          <span>CAMERA</span>
-          <b>RESET 0.0</b>
-        </button>
+        {workcellVisible ? (
+          <nav className="dial-archive-stage__workcell-switcher" aria-label="切换工作间">
+            {ANNOTATION_WORKCELL_IDS.map((candidate) => {
+              const presentation = ANNOTATION_WORKCELL_PRESENTATION[candidate];
+              const active = candidate === displayedWorkcell;
+              return (
+                <button
+                  className={active ? "is-active" : undefined}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => content.openWorkcell(candidate)}
+                  key={candidate}
+                >
+                  <span>{presentation.code}</span>
+                  <b>{presentation.title}</b>
+                </button>
+              );
+            })}
+          </nav>
+        ) : (
+          <button className="dial-archive-stage__camera-reset" type="button" onClick={camera.reset}>
+            <span>CAMERA</span>
+            <b>RESET 0.0</b>
+          </button>
+        )}
         <div className="dial-archive-stage__project">
           <span>{content.project?.name ?? "—"}</span>
           <small>
@@ -234,21 +281,15 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
           <AnnotationWorkcellViewport
             transition={workcellTransition}
             asset={navigation.visualAsset}
-            totalCount={content.sequence.totalCount}
-            checkedCount={content.checkedAssetIds.length}
             channels={content.channels}
-            operation={content.operation}
-            edit={content.edit}
-            editSection={content.activeEditSection}
-            projectContext={content.projectContext}
-            requestPreview={content.requestPreview}
-            batch={content.batch}
-            production={content.production}
-            dossier={content.dossier}
+            edit={content.editWorkcell.editor}
+            projectContext={content.productionWorkcell.projectContext}
+            requestPreview={content.productionWorkcell.requestPreview}
+            production={content.productionWorkcell.production}
+            dossier={content.dossierWorkcell.dossier}
+            dossierSection={content.dossierWorkcell.section}
             confirmation={content.confirmation}
-            onClose={content.closeWorkcell}
-            onSwitch={content.openWorkcell}
-            onSelectEditSection={content.selectEditSection}
+            onSelectDossierSection={content.selectDossierSection}
             onResolveConfirmation={content.resolveConfirmation}
           />
         </div>
@@ -258,6 +299,16 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
           walk={navigation.walk}
         />
       </div>
+
+      {!workcellVisible ? (
+        <AnnotationStageContextDock
+          scope={content.scope}
+          batch={content.overview.batch}
+          totalCount={content.sequence.totalCount}
+          checkedCount={content.checkedAssetIds.length}
+          onOpenProduction={() => content.openWorkcell("production")}
+        />
+      ) : null}
 
       <AnnotationFilmstrip
         sequence={content.sequence}

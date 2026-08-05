@@ -71,11 +71,14 @@ export const AnnotationWorkcellMap = memo(function AnnotationWorkcellMap({
             >
               <span className="dial-archive-stage-workcell__hit-target" aria-hidden="true" />
               <span className="dial-archive-stage-workcell__plane">
-                <span className="dial-archive-stage-workcell__rear" aria-hidden="true" />
+                <span className="dial-archive-stage-workcell__connector" aria-hidden="true" />
                 <span className="dial-archive-stage-workcell__surface">
                   <span className="dial-archive-stage-workcell__edge" aria-hidden="true" />
                   <span className="dial-archive-stage-workcell__kicker">
-                    ACCESS VECTOR <i aria-hidden="true" /> {presentation.code}
+                    {presentation.code} <i aria-hidden="true" /> ACCESS
+                  </span>
+                  <span className="dial-archive-stage-workcell__ordinal" aria-hidden="true">
+                    {presentation.code.replace("WC.", "")}
                   </span>
                   <span className="dial-archive-stage-workcell__identity">
                     <b>{presentation.englishTitle}</b>
@@ -85,14 +88,8 @@ export const AnnotationWorkcellMap = memo(function AnnotationWorkcellMap({
                     {status.live ? <i aria-hidden="true" /> : null}
                     {status.label}
                   </span>
-                  <span className="dial-archive-stage-workcell__diagram" aria-hidden="true">
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                  </span>
                   <span className="dial-archive-stage-workcell__action" aria-hidden="true">
-                    {presentation.action} →
+                    ENTER →
                   </span>
                 </span>
               </span>

@@ -359,6 +359,7 @@ export function useAnnotationProductionController({
 
   return {
     status,
+    entryIntent: requestedOperationId ? "operation" : requestedLane ? "lane" : "overview",
     lane,
     lanes: createProductionLaneReadings(channels, operationJob),
     configuration: {

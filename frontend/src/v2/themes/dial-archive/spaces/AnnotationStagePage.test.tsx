@@ -202,6 +202,7 @@ function productionContent(
 ): AnnotationProductionContent {
   return {
     status: "inactive",
+    entryIntent: "overview",
     lane: "tags",
     lanes: [
       {
@@ -615,20 +616,20 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
     channels: [],
     operation: null,
     activeWorkcell: null,
-    activeEditChannel: "tags",
-    activeEditSection: "annotation",
-    edit: editContent(),
-    projectContext: null,
-    requestPreview: null,
-    batch: null,
-    production: productionContent(),
-    dossier: dossierContent(),
+    overview: { batch: null },
+    editWorkcell: { channel: "tags", editor: editContent() },
+    productionWorkcell: {
+      production: productionContent(),
+      projectContext: null,
+      requestPreview: null,
+    },
+    dossierWorkcell: { section: "channels", dossier: dossierContent() },
     confirmation: null,
     message: null,
     selectAsset: vi.fn(),
     stepAsset: vi.fn(),
     toggleAssetChecked: vi.fn(),
-    selectEditSection: vi.fn(),
+    selectDossierSection: vi.fn(),
     openWorkcell: vi.fn(),
     closeWorkcell: vi.fn(),
     selectEditChannel: vi.fn(),
@@ -722,15 +723,16 @@ describe("dial archive annotation stage", () => {
     const content = stageContent();
     renderStage(content);
 
-    fireEvent.change(screen.getByRole("searchbox", { name: "搜索素材" }), {
+    fireEvent.click(screen.getByRole("button", { name: /RANGE DOCK/u }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "FIND MATERIAL" }), {
       target: { value: "portrait" },
     });
     expect(content.scope.setSearch).toHaveBeenCalledWith("portrait");
-    fireEvent.change(screen.getByRole("combobox", { name: "筛选素材状态" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "OBJECT STATE" }), {
       target: { value: "all" },
     });
     expect(content.scope.setFilter).toHaveBeenCalledWith("all");
-    fireEvent.click(screen.getByRole("button", { name: "SELECT FILTER" }));
+    fireEvent.click(screen.getByRole("button", { name: "选择全部筛选结果" }));
     expect(content.scope.selectAllFiltered).toHaveBeenCalledOnce();
   });
 
@@ -851,42 +853,47 @@ describe("dial archive annotation stage", () => {
     expect(screen.getByRole("heading", { name: "标注编辑" })).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /DSC\.02描述/u }));
-    expect(content.edit?.selectChannel).toHaveBeenCalledWith("description");
+    expect(content.editWorkcell.editor?.selectChannel).toHaveBeenCalledWith("description");
 
-    fireEvent.click(screen.getByRole("button", { name: "切换到自动生产工作间" }));
+    fireEvent.click(screen.getByRole("button", { name: /WC\.02自动生产/u }));
     expect(content.openWorkcell).toHaveBeenCalledWith("production");
 
-    fireEvent.click(screen.getByRole("button", { name: "返回素材施工场总览" }));
+    fireEvent.click(screen.getByRole("button", { name: /RETURN.*STAGE OVERVIEW/u }));
     expect(content.closeWorkcell).toHaveBeenCalledOnce();
   });
 
-  test("turns the 01-04 edit rail into semantic work surfaces", () => {
-    const content = stageContent({
-      activeWorkcell: "edit",
-      projectContext: projectContextContent(),
-      requestPreview: requestPreviewContent(),
-      batch: batchContent(),
-    });
+  test("keeps the edit workcell focused on annotation documents", () => {
+    const content = stageContent({ activeWorkcell: "edit" });
     renderStage(content);
 
-    fireEvent.click(screen.getByRole("button", { name: "02 项目上下文" }));
-    fireEvent.click(screen.getByRole("button", { name: "03 请求预览" }));
-    fireEvent.click(screen.getByRole("button", { name: "04 范围与批量" }));
-    expect(content.selectEditSection).toHaveBeenNthCalledWith(1, "context");
-    expect(content.selectEditSection).toHaveBeenNthCalledWith(2, "preview");
-    expect(content.selectEditSection).toHaveBeenNthCalledWith(3, "batch");
+    expect(screen.getByRole("navigation", { name: "标注编辑通道" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: /项目上下文/u })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Tags 批量变更" })).toBeNull();
   });
 
-  test("edits project prompt context and metadata without importing legacy presentation", () => {
+  test("edits project prompt context from the production input stage", () => {
     const context = projectContextContent({ dirty: true, canSave: true });
     renderStage(
       stageContent({
-        activeWorkcell: "edit",
-        activeEditSection: "context",
-        projectContext: context,
+        activeWorkcell: "production",
+        productionWorkcell: {
+          production: productionContent({ status: "configure", entryIntent: "lane" }),
+          projectContext: context,
+          requestPreview: requestPreviewContent(),
+        },
       }),
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /CONTEXT项目上下文/u }));
+    const compactContext = document.querySelector(".dial-archive-context-surface.is-inspector");
+    expect(compactContext).not.toBeNull();
+    const contextRegisters =
+      compactContext?.querySelectorAll<HTMLDetailsElement>(
+        ".dial-archive-context-surface__evidence > .dial-archive-context-surface__register",
+      ) ?? [];
+    expect(contextRegisters).toHaveLength(2);
+    expect(contextRegisters[0]?.open).toBe(false);
+    expect(contextRegisters[1]?.open).toBe(true);
     fireEvent.change(screen.getByPlaceholderText("输入在当前项目中保持稳定的 User Prompt…"), {
       target: { value: "A revised instruction." },
     });
@@ -900,13 +907,26 @@ describe("dial archive annotation stage", () => {
   test("shows the next final request as saved system, context and user evidence", () => {
     renderStage(
       stageContent({
-        activeWorkcell: "edit",
-        activeEditSection: "preview",
-        requestPreview: requestPreviewContent({ basedOnSavedContext: true }),
+        activeWorkcell: "production",
+        productionWorkcell: {
+          production: productionContent({ status: "configure", entryIntent: "lane" }),
+          projectContext: projectContextContent(),
+          requestPreview: requestPreviewContent({ basedOnSavedContext: true }),
+        },
       }),
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /REQUEST请求预览/u }));
     expect(screen.getByRole("heading", { name: "最终请求预览" })).not.toBeNull();
+    const compactRequest = document.querySelector(".dial-archive-request-preview.is-inspector");
+    expect(compactRequest).not.toBeNull();
+    const requestRegisters = compactRequest?.querySelectorAll<HTMLDetailsElement>(
+      ".dial-archive-request-preview__messages > details",
+    );
+    expect(requestRegisters).toHaveLength(3);
+    expect(requestRegisters?.[0]?.open).toBe(false);
+    expect(requestRegisters?.[1]?.open).toBe(false);
+    expect(requestRegisters?.[2]?.open).toBe(true);
     expect(
       screen.getByText("本页严格展示最后保存配置生成的真实下次请求。", { exact: false }),
     ).not.toBeNull();
@@ -917,12 +937,12 @@ describe("dial archive annotation stage", () => {
     const batch = batchContent();
     renderStage(
       stageContent({
-        activeWorkcell: "edit",
-        activeEditSection: "batch",
-        batch,
+        overview: { batch },
       }),
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /RANGE DOCK/u }));
+    fireEvent.click(screen.getByRole("button", { name: /02批量施工/u }));
     expect(screen.getByRole("heading", { name: "Tags 批量变更" })).not.toBeNull();
     expect(screen.getByText("portrait, blue_hair")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "执行已预览变更" }));
@@ -936,7 +956,11 @@ describe("dial archive annotation stage", () => {
     const content = stageContent({
       activeWorkcell: "production",
       checkedAssetIds: ["asset-2"],
-      production,
+      productionWorkcell: {
+        production: { ...production, entryIntent: "lane" },
+        projectContext: projectContextContent(),
+        requestPreview: requestPreviewContent(),
+      },
     });
     renderStage(content);
 
@@ -945,14 +969,36 @@ describe("dial archive annotation stage", () => {
     expect(screen.getByRole("region", { name: "生产线路" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "标签生产线路" })).not.toBeNull();
     expect(screen.getByText("RANGE EVIDENCE")).not.toBeNull();
+    expect(
+      screen
+        .getByRole("complementary", { name: "生产执行检查器" })
+        .classList.contains("dial-archive-preparation-inspector"),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole("tab", { name: /标签生产/u })
+        .classList.contains("dial-archive-preparation-node"),
+    ).toBe(true);
+    expect(screen.queryByText("FROZEN EXECUTION SNAPSHOT")).toBeNull();
+    expect(screen.queryByRole("button", { name: /建立并启动生产任务/u })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "关闭生产执行检查器" }));
     expect(screen.queryByRole("heading", { name: "标签生产线路" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /INSPECT TAGS/u }));
+    fireEvent.click(screen.getByRole("button", { name: /打开生产执行检查器：TAGS/u }));
     expect(screen.getByRole("heading", { name: "标签生产线路" })).not.toBeNull();
 
     fireEvent.click(screen.getByRole("tab", { name: /描述生产/u }));
     expect(production.selectLane).toHaveBeenCalledWith("description");
+    expect(screen.getByRole("heading", { name: "描述生产线路" })).not.toBeNull();
+
+    const commit = screen.getByRole("button", { name: "打开合流写入检查器" });
+    fireEvent.click(commit);
+    expect(screen.getByRole("heading", { name: "合流写入" })).not.toBeNull();
+    expect(commit.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("冻结执行快照")).not.toBeNull();
+    expect(
+      (screen.getByText("FROZEN EXECUTION SNAPSHOT").closest("details") as HTMLDetailsElement).open,
+    ).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: /建立并启动生产任务/u }));
     expect(production.configuration.create).toHaveBeenCalledOnce();
@@ -963,11 +1009,16 @@ describe("dial archive annotation stage", () => {
     renderStage(
       stageContent({
         activeWorkcell: "production",
-        production: productionContent({
-          status: "operation",
-          lane: "description",
-          operation,
-        }),
+        productionWorkcell: {
+          production: productionContent({
+            status: "operation",
+            entryIntent: "operation",
+            lane: "description",
+            operation,
+          }),
+          projectContext: null,
+          requestPreview: null,
+        },
       }),
     );
 
@@ -981,18 +1032,23 @@ describe("dial archive annotation stage", () => {
 
   test("opens a read-only object dossier from real evidence registers", () => {
     const dossier = dossierContent();
-    renderStage(stageContent({ activeWorkcell: "dossier", dossier }));
+    const content = stageContent({
+      activeWorkcell: "dossier",
+      dossierWorkcell: { section: "channels", dossier },
+    });
+    renderStage(content);
 
+    expect(screen.getByRole("region", { name: "素材施工场" }).getAttribute("data-workcell")).toBe(
+      "dossier",
+    );
     expect(screen.getByRole("region", { name: "对象档案工作间" })).not.toBeNull();
     expect(screen.getByRole("complementary", { name: "当前对象证据台" })).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "对象档案" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "通道登记" })).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "修订证据链" })).not.toBeNull();
-    expect(screen.getByText("MATCHES CURRENT HEAD")).not.toBeNull();
-    expect(screen.getByText("RAW METADATA // 展开原始记录")).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "关联生产任务" })).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "打开生产路由场 →" }));
-    expect(dossier.openJob).toHaveBeenCalledWith("job-001");
+
+    fireEvent.click(screen.getByRole("button", { name: /02素材元数据/u }));
+    expect(content.selectDossierSection).toHaveBeenCalledWith("metadata");
+    fireEvent.click(screen.getByRole("button", { name: /06生成与请求溯源/u }));
+    expect(content.selectDossierSection).toHaveBeenCalledWith("provenance");
     fireEvent.click(screen.getByRole("button", { name: /项目档案/u }));
     expect(dossier.openArchive).toHaveBeenCalledOnce();
   });
@@ -1001,19 +1057,20 @@ describe("dial archive annotation stage", () => {
     renderStage(
       stageContent({
         activeWorkcell: "dossier",
-        dossier: dossierContent({
-          jobs: [],
-          jobsIssue: "Not Found",
-          provenance: null,
-          provenanceIssue: "Trace unavailable",
-        }),
+        dossierWorkcell: {
+          section: "jobs",
+          dossier: dossierContent({
+            jobs: [],
+            jobsIssue: "Not Found",
+            provenance: null,
+            provenanceIssue: "Trace unavailable",
+          }),
+        },
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "对象档案" })).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "通道登记" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "关联生产任务" })).not.toBeNull();
     expect(screen.getByText(/关联任务暂时不可用/u)).not.toBeNull();
-    expect(screen.getByText(/生成溯源暂时不可用/u)).not.toBeNull();
     expect(screen.queryByText("对象档案未能完整建立")).toBeNull();
   });
 

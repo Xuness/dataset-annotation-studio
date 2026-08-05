@@ -1,12 +1,7 @@
 import { memo, useEffect, useRef, useState, type KeyboardEventHandler } from "react";
 
 import type { AnnotationStageAsset } from "../../../../../pages/spaces/spacePageModel";
-import {
-  ANNOTATION_STAGE_LAYOUT,
-  createStageArcPath,
-  createStageRingTicks,
-} from "./model/annotationStageLayout";
-import { readAssetChannelStates } from "./model/annotationStagePresentation";
+import { ANNOTATION_STAGE_LAYOUT, createStageArcPath } from "./model/annotationStageLayout";
 import type { StageAssetWalk } from "./hooks/useStageAssetNavigation";
 import { useSpecimenViewport } from "./hooks/useSpecimenViewport";
 
@@ -16,8 +11,6 @@ import { useSpecimenViewport } from "./hooks/useSpecimenViewport";
  * 汇聚到当前对象上，几何全部来自布局模型。
  */
 
-const RING_TICKS = createStageRingTicks();
-
 function InstrumentRing() {
   const { instrument } = ANNOTATION_STAGE_LAYOUT;
   return (
@@ -26,18 +19,6 @@ function InstrumentRing() {
       viewBox={`0 0 ${instrument.viewBox.width} ${instrument.viewBox.height}`}
       aria-hidden="true"
     >
-      <g className="dial-archive-stage-specimen__ring-rotor">
-        {RING_TICKS.map((tick, index) => (
-          <line
-            className={tick.major ? "is-major" : undefined}
-            x1={tick.x1}
-            y1={tick.y1}
-            x2={tick.x2}
-            y2={tick.y2}
-            key={index}
-          />
-        ))}
-      </g>
       {instrument.arcs.map((arc, index) => (
         <path
           className="dial-archive-stage-specimen__ring-arc"
@@ -78,7 +59,6 @@ export const AnnotationSpecimen = memo(function AnnotationSpecimen({
     [],
   );
   const failed = asset != null && failedAssetId === asset.id;
-  const channelReadings = readAssetChannelStates(asset);
   const walkDirection = walk.direction > 0 ? "forward" : "backward";
 
   const openWithClickDelay = () => {
@@ -214,20 +194,6 @@ export const AnnotationSpecimen = memo(function AnnotationSpecimen({
           ) : null}
         </div>
       </div>
-      <footer className="dial-archive-stage-specimen__baseline" aria-hidden="true">
-        <i className="dial-archive-stage-specimen__baseline-rule" />
-        <div className="dial-archive-stage-specimen__readings">
-          <span className="dial-archive-stage-specimen__path">{asset?.relativePath ?? "—"}</span>
-          <span>{asset ? `${asset.width} × ${asset.height}` : "— × —"}</span>
-          <span className="dial-archive-stage-specimen__channels">
-            {channelReadings.map((reading) => (
-              <em className={`is-${reading.state}`} key={reading.lane}>
-                {reading.code}.{reading.stateCode}
-              </em>
-            ))}
-          </span>
-        </div>
-      </footer>
     </section>
   );
 });

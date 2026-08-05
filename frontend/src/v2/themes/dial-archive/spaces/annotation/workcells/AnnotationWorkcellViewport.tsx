@@ -1,26 +1,19 @@
 import { useEffect, useRef } from "react";
 
 import {
-  ANNOTATION_WORKCELL_IDS,
   type AnnotationConfirmation,
-  type AnnotationBatchContent,
   type AnnotationCoverageLane,
   type AnnotationDossierContent,
+  type AnnotationDossierSectionId,
   type AnnotationEditContent,
-  type AnnotationEditSectionId,
-  type AnnotationOperationSummary,
   type AnnotationProjectContextContent,
   type AnnotationProductionContent,
   type AnnotationRequestPreviewContent,
   type AnnotationStageAsset,
-  type AnnotationWorkcellId,
 } from "../../../../../pages/spaces/spacePageModel";
 import type { WorkcellTransitionState } from "../stage/hooks/useWorkcellTransition";
 import { createStageWorkcellPlaneStyle } from "../stage/model/annotationStageLayout";
-import {
-  ANNOTATION_WORKCELL_PRESENTATION,
-  describeWorkcellStatus,
-} from "../stage/model/annotationStagePresentation";
+import { ANNOTATION_WORKCELL_PRESENTATION } from "../stage/model/annotationStagePresentation";
 import { AnnotationEditWorkcell } from "./edit/AnnotationEditWorkcell";
 import { AnnotationDossierWorkcell } from "./dossier/AnnotationDossierWorkcell";
 import { AnnotationProductionWorkcell } from "./production/AnnotationProductionWorkcell";
@@ -28,42 +21,30 @@ import { AnnotationProductionWorkcell } from "./production/AnnotationProductionW
 interface AnnotationWorkcellViewportProps {
   transition: WorkcellTransitionState;
   asset: AnnotationStageAsset | null;
-  totalCount: number;
-  checkedCount: number;
   channels: readonly AnnotationCoverageLane[];
-  operation: AnnotationOperationSummary | null;
   edit: AnnotationEditContent | null;
-  editSection: AnnotationEditSectionId;
   projectContext: AnnotationProjectContextContent | null;
   requestPreview: AnnotationRequestPreviewContent | null;
-  batch: AnnotationBatchContent | null;
   production: AnnotationProductionContent | null;
   dossier: AnnotationDossierContent | null;
+  dossierSection: AnnotationDossierSectionId;
   confirmation: AnnotationConfirmation | null;
-  onClose(): void;
-  onSwitch(workcell: AnnotationWorkcellId): void;
-  onSelectEditSection(section: AnnotationEditSectionId): void;
+  onSelectDossierSection(section: AnnotationDossierSectionId): void;
   onResolveConfirmation(accepted: boolean): void;
 }
 
 export function AnnotationWorkcellViewport({
   transition,
   asset,
-  totalCount,
-  checkedCount,
   channels,
-  operation,
   edit,
-  editSection,
   projectContext,
   requestPreview,
-  batch,
   production,
   dossier,
+  dossierSection,
   confirmation,
-  onClose,
-  onSwitch,
-  onSelectEditSection,
+  onSelectDossierSection,
   onResolveConfirmation,
 }: AnnotationWorkcellViewportProps) {
   const rootRef = useRef<HTMLElement>(null);
@@ -75,14 +56,6 @@ export function AnnotationWorkcellViewport({
 
   if (!workcell) return null;
   const presentation = ANNOTATION_WORKCELL_PRESENTATION[workcell];
-  const status = describeWorkcellStatus(
-    workcell,
-    asset,
-    checkedCount,
-    totalCount,
-    channels,
-    operation,
-  );
 
   return (
     <section
@@ -109,66 +82,23 @@ export function AnnotationWorkcellViewport({
         <i className="dial-archive-workcell-viewport__rear is-register" aria-hidden="true" />
         <i className="dial-archive-workcell-viewport__rear is-signal" aria-hidden="true" />
 
-        <header className="dial-archive-workcell-viewport__header">
-          <div className="dial-archive-workcell-viewport__identity">
-            <span>ACCESS VECTOR // {presentation.code}</span>
-            <b>{presentation.englishTitle}</b>
-            <em>{presentation.title}</em>
-          </div>
-
-          <nav className="dial-archive-workcell-viewport__switcher" aria-label="切换工作间">
-            {ANNOTATION_WORKCELL_IDS.map((candidate) => {
-              const candidatePresentation = ANNOTATION_WORKCELL_PRESENTATION[candidate];
-              const active = candidate === workcell;
-              return (
-                <button
-                  className={active ? "is-active" : undefined}
-                  type="button"
-                  aria-label={`切换到${candidatePresentation.title}工作间`}
-                  aria-pressed={active}
-                  onClick={() => onSwitch(candidate)}
-                  key={candidate}
-                >
-                  <span>{candidatePresentation.code}</span>
-                  <b>{candidatePresentation.englishTitle}</b>
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="dial-archive-workcell-viewport__status">
-            {status.live ? <i aria-hidden="true" /> : null}
-            <span>{status.label}</span>
-          </div>
-          <button
-            className="dial-archive-workcell-viewport__close"
-            type="button"
-            aria-label="返回素材施工场总览"
-            onClick={onClose}
-          >
-            <span>RETURN</span>
-            <b>STAGE OVERVIEW</b>
-            <i aria-hidden="true">×</i>
-          </button>
-        </header>
-
         <div className="dial-archive-workcell-viewport__body">
           {workcell === "edit" ? (
-            <AnnotationEditWorkcell
+            <AnnotationEditWorkcell asset={asset} channels={channels} edit={edit} />
+          ) : workcell === "production" ? (
+            <AnnotationProductionWorkcell
               asset={asset}
-              channels={channels}
-              checkedCount={checkedCount}
-              edit={edit}
-              section={editSection}
+              production={production}
               projectContext={projectContext}
               requestPreview={requestPreview}
-              batch={batch}
-              onSelectSection={onSelectEditSection}
             />
-          ) : workcell === "production" ? (
-            <AnnotationProductionWorkcell production={production} />
           ) : (
-            <AnnotationDossierWorkcell asset={asset} dossier={dossier} />
+            <AnnotationDossierWorkcell
+              asset={asset}
+              dossier={dossier}
+              section={dossierSection}
+              onSelectSection={onSelectDossierSection}
+            />
           )}
         </div>
 

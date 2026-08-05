@@ -28,7 +28,7 @@ import {
   usePreparationWorkbenchController,
 } from "../pages/spaces/preparation/usePreparationWorkbenchController";
 import type {
-  AnnotationEditSectionId,
+  AnnotationDossierSectionId,
   AnnotationLaneId,
   AnnotationEditChannelId,
   AnnotationWorkcellId,
@@ -36,7 +36,7 @@ import type {
   PreparationCapabilityId,
   SpacePageContent,
 } from "../pages/spaces/spacePageModel";
-import { ANNOTATION_EDIT_SECTION_IDS } from "../pages/spaces/spacePageModel";
+import { ANNOTATION_DOSSIER_SECTION_IDS } from "../pages/spaces/spacePageModel";
 import { getFrontendTheme, resolveFrontendThemeId } from "../themes/themeRegistry";
 import type { ThemeSpacePageProps } from "../themes/themeTypes";
 import { buildFrontendHref, readInitialHomeSpaceId, readRouteIdentifier } from "./routeState";
@@ -204,10 +204,10 @@ function AnnotationRoute({ Page, space, themeId, projectId }: AnnotationRoutePro
       ),
     onOpenProduction: (lane?: AnnotationLaneId, operationId?: string) =>
       navigate(
-        buildFrontendHref("/annotation/stage", {
+        buildFrontendHref("/annotation/stage/production", {
           themeId,
           projectId,
-          query: { focus: "production", lane, operation: operationId },
+          query: { lane, operation: operationId },
         }),
       ),
   });
@@ -280,22 +280,29 @@ interface AnnotationStageQuery {
   workcell: AnnotationWorkcellId | null;
   lane: AnnotationLaneId | null;
   channel: AnnotationEditChannelId | null;
-  editSection: AnnotationEditSectionId | null;
+  dossierSection: AnnotationDossierSectionId | null;
   operationId: string | null;
 }
 
-function readAnnotationStageQuery(search: string): AnnotationStageQuery {
+function annotationStagePath(workcell: AnnotationWorkcellId | null): string {
+  return workcell ? `/annotation/stage/${workcell}` : "/annotation/stage";
+}
+
+function readAnnotationStageQuery(
+  search: string,
+  routeWorkcell: AnnotationWorkcellId | null = null,
+): AnnotationStageQuery {
   const focus = readRouteIdentifier(search, "focus");
   const lane = readRouteIdentifier(search, "lane");
   const channel = readRouteIdentifier(search, "channel");
-  const panel = readRouteIdentifier(search, "panel");
+  const section = readRouteIdentifier(search, "section");
   return {
     assetId: readRouteIdentifier(search, "asset"),
-    workcell: isAnnotationWorkcellId(focus) ? focus : null,
+    workcell: routeWorkcell ?? (isAnnotationWorkcellId(focus) ? focus : null),
     lane: isAnnotationLaneId(lane) ? lane : null,
     channel: isAnnotationEditChannelId(channel) ? channel : null,
-    editSection: ANNOTATION_EDIT_SECTION_IDS.includes(panel as AnnotationEditSectionId)
-      ? (panel as AnnotationEditSectionId)
+    dossierSection: ANNOTATION_DOSSIER_SECTION_IDS.includes(section as AnnotationDossierSectionId)
+      ? (section as AnnotationDossierSectionId)
       : null,
     operationId: readRouteIdentifier(search, "operation"),
   };
@@ -319,15 +326,14 @@ function LoadedAnnotationStageRoute({
   const navigate = useNavigate();
   const stageHref = (overrides: Partial<AnnotationStageQuery>) => {
     const next = { ...query, ...overrides };
-    return buildFrontendHref("/annotation/stage", {
+    return buildFrontendHref(annotationStagePath(next.workcell), {
       themeId,
       projectId,
       query: {
         asset: next.assetId,
-        focus: next.workcell,
         lane: next.lane,
         channel: next.channel,
-        panel: next.editSection,
+        section: next.dossierSection,
         operation: next.operationId,
       },
     });
@@ -338,13 +344,14 @@ function LoadedAnnotationStageRoute({
     requestedOperationId: query.operationId,
     activeWorkcell: query.workcell,
     requestedEditChannel: query.channel,
-    requestedEditSection: query.editSection,
+    requestedDossierSection: query.dossierSection,
     requestedProductionLane: query.lane,
     onAssetIdChange: (assetId) => navigate(stageHref({ assetId }), { replace: true }),
     onOpenWorkcell: (workcell) => navigate(stageHref({ workcell })),
     onCloseWorkcell: () => navigate(stageHref({ workcell: null })),
     onEditChannelChange: (channel) => navigate(stageHref({ workcell: "edit", channel })),
-    onEditSectionChange: (editSection) => navigate(stageHref({ workcell: "edit", editSection })),
+    onDossierSectionChange: (dossierSection) =>
+      navigate(stageHref({ workcell: "dossier", dossierSection }), { replace: true }),
     onProductionLaneChange: (lane) =>
       navigate(stageHref({ workcell: "production", lane, operationId: null }), { replace: true }),
     onProductionOperationChange: (operationId) =>
@@ -372,14 +379,37 @@ function LoadedAnnotationStageRoute({
   );
 }
 
-function AnnotationStageRoute() {
+interface AnnotationStageRouteProps {
+  workcell?: AnnotationWorkcellId;
+}
+
+function AnnotationStageRoute({ workcell = undefined }: AnnotationStageRouteProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { projectId } = useProjectRouteContext();
   const themeId = resolveFrontendThemeId(location.search);
   const theme = getFrontendTheme(themeId);
   const space = getHomeSpace("annotation");
-  const query = readAnnotationStageQuery(location.search);
+  const query = readAnnotationStageQuery(location.search, workcell ?? null);
+
+  if (!workcell && query.workcell) {
+    return (
+      <Navigate
+        replace
+        to={buildFrontendHref(annotationStagePath(query.workcell), {
+          themeId,
+          projectId,
+          query: {
+            asset: query.assetId,
+            lane: query.lane,
+            channel: query.channel,
+            section: query.dossierSection,
+            operation: query.operationId,
+          },
+        })}
+      />
+    );
+  }
 
   if (projectId) {
     return (
@@ -420,15 +450,14 @@ function LegacyAnnotationRedirect({ focus }: LegacyAnnotationRedirectProps) {
   return (
     <Navigate
       replace
-      to={buildFrontendHref("/annotation/stage", {
+      to={buildFrontendHref(annotationStagePath(focus ?? query.workcell), {
         themeId,
         projectId,
         query: {
           asset: query.assetId,
-          focus: focus ?? query.workcell,
           lane: query.lane,
           channel: query.channel,
-          panel: query.editSection,
+          section: query.dossierSection,
           operation: query.operationId,
         },
       })}
@@ -546,6 +575,15 @@ export function FrontendRoutes() {
       <Route path="/" element={<HomeRoute />} />
       <Route path="/preparation/workbench" element={<PreparationWorkbenchRoute />} />
       <Route path="/annotation/stage" element={<AnnotationStageRoute />} />
+      <Route path="/annotation/stage/edit" element={<AnnotationStageRoute workcell="edit" />} />
+      <Route
+        path="/annotation/stage/production"
+        element={<AnnotationStageRoute workcell="production" />}
+      />
+      <Route
+        path="/annotation/stage/dossier"
+        element={<AnnotationStageRoute workcell="dossier" />}
+      />
       <Route path="/annotation/workbench" element={<LegacyAnnotationRedirect />} />
       <Route
         path="/annotation/production"

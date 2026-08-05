@@ -101,14 +101,23 @@ describe("new frontend routes", () => {
     });
   });
 
-  test("redirects the legacy annotation destinations into the stage with focus semantics", async () => {
+  test("redirects legacy annotation destinations into semantic workcell routes", async () => {
     renderRoutes("/annotation/production?theme=dial-archive&lane=tags");
 
     await waitFor(() => {
       expect(screen.getByLabelText("current route").textContent).toBe(
-        "/annotation/stage?theme=dial-archive&focus=production&lane=tags",
+        "/annotation/stage/production?theme=dial-archive&lane=tags",
       );
     });
+  });
+
+  test("keeps fourth-level annotation workcells as explicit semantic routes", async () => {
+    renderRoutes("/annotation/stage/dossier?theme=dial-archive&section=revisions");
+
+    expect(await screen.findByRole("heading", { name: "素材施工场等待项目源" })).toBeTruthy();
+    expect(screen.getByLabelText("current route").textContent).toBe(
+      "/annotation/stage/dossier?theme=dial-archive&section=revisions",
+    );
   });
 
   test("preserves project context from home into a selected space", async () => {
