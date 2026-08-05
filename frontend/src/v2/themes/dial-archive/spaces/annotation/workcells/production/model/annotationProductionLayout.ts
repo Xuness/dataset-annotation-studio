@@ -17,6 +17,12 @@ export interface ProductionNodeRect extends ProductionPoint {
 
 export type ProductionNodeId = "source" | AnnotationLaneId | "terminal";
 
+export interface ProductionFocusViewport {
+  readonly width: number;
+  readonly height: number;
+  readonly inspectorWidth: number;
+}
+
 interface ProductionField {
   readonly id: string;
   readonly index: string;
@@ -165,6 +171,15 @@ export const ANNOTATION_PRODUCTION_ROUTE_LAYOUT = {
   gauge: { cx: 2050, cy: 875, radius: 360, tickCount: 84, majorEvery: 7 },
 } as const;
 
+export const ANNOTATION_PRODUCTION_TOPOLOGY_BOUNDS = {
+  x: 760,
+  y: 290,
+  width: 1990,
+  height: 1310,
+} as const;
+
+const PRODUCTION_WIDE_FOCUS_BREAKPOINT = 1680;
+
 function number(value: number): string {
   return String(Number(value.toFixed(2)));
 }
@@ -206,6 +221,50 @@ export function getProductionNodeRect(id: ProductionNodeId): ProductionNodeRect 
 export function getProductionNodeCenter(id: ProductionNodeId): ProductionPoint {
   const rect = getProductionNodeRect(id);
   return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+}
+
+/**
+ * Keep the complete production topology in view on wide workstations while
+ * retaining the closer selected-node composition on compact screens.
+ */
+export function resolveProductionFocus(
+  id: ProductionNodeId,
+  viewport: ProductionFocusViewport,
+): { readonly center: ProductionPoint; readonly scale: number } {
+  const camera = ANNOTATION_PRODUCTION_ROUTE_LAYOUT.camera;
+  if (
+    viewport.width >= PRODUCTION_WIDE_FOCUS_BREAKPOINT &&
+    viewport.height > 0 &&
+    viewport.inspectorWidth > 0
+  ) {
+    const visibleWidth = Math.max(640, viewport.width - viewport.inspectorWidth - 36);
+    const inset = Math.min(96, Math.max(64, viewport.width * 0.035));
+    const bounds = ANNOTATION_PRODUCTION_TOPOLOGY_BOUNDS;
+    const scale = Math.min(
+      camera.maxScale,
+      Math.max(
+        camera.minScale,
+        Math.min(
+          (visibleWidth - inset * 2) / bounds.width,
+          (viewport.height - inset * 2) / bounds.height,
+        ),
+      ),
+    );
+    return {
+      center: { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 },
+      scale,
+    };
+  }
+
+  let center = getProductionNodeCenter(id);
+  if (id !== "source" && id !== "terminal") {
+    const terminalCenter = getProductionNodeCenter("terminal");
+    center = {
+      x: (center.x + terminalCenter.x) / 2,
+      y: (center.y + terminalCenter.y) / 2,
+    };
+  }
+  return { center, scale: camera.focusScale };
 }
 
 export function projectProductionCanvasRectToMinimap(rect: SpatialCanvasRect): SpatialCanvasRect {

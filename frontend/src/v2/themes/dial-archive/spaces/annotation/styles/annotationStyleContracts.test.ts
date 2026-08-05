@@ -65,7 +65,11 @@ describe("annotation stage visual contracts", () => {
     );
     expect(legibility).toMatch(/\.dial-archive-production-commit__overview\s*>\s*span/u);
     expect(legibility).toMatch(
-      /\.dial-archive-production-workcell\.has-inspector[\s\S]*\.dial-archive-production-lane:not\(\.is-active\)\s*\{[^}]*visibility:\s*hidden;/u,
+      /\.dial-archive-production-workcell__console-field\.dial-archive-preparation-inspector\s*\{[^}]*--dial-archive-annotation-type-meta:\s*clamp\(12px,/su,
+    );
+    expect(legibility).toMatch(/width:\s*clamp\(560px,\s*32vw,\s*900px\);/u);
+    expect(legibility).not.toMatch(
+      /\.dial-archive-production-lane:not\(\.is-active\)[^{]*\{[^}]*visibility:\s*hidden;/su,
     );
   });
 });

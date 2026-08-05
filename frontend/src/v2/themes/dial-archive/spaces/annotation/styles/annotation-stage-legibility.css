@@ -242,20 +242,53 @@
   font-size: var(--dial-archive-annotation-type-label);
 }
 
-/* Production keeps the Space 02 layout while restoring the missing second
- * navigation line and reserving scroll room above its fixed footer. */
+/* Production keeps the Space 02 layout while giving the inspector enough room
+ * to behave as a reading surface instead of a narrow utility drawer. */
+.dial-archive-production-workcell__console-field.dial-archive-preparation-inspector {
+  --dial-archive-annotation-type-meta: clamp(12px, 0.5vw, 13px);
+  --dial-archive-annotation-type-label: clamp(13px, 0.54vw, 14px);
+  --dial-archive-annotation-type-body: clamp(14px, 0.58vw, 15px);
+  border: 1px solid rgba(25, 25, 25, 0.24);
+}
+
+@media (min-width: 1121px) {
+  .dial-archive-production-workcell
+    .dial-archive-production-workcell__console-field.dial-archive-preparation-inspector {
+    top: 18px;
+    right: 18px;
+    bottom: 18px;
+    width: clamp(560px, 32vw, 900px);
+    max-width: calc(100% - 36px);
+  }
+}
+
+.dial-archive-production-workcell__console-field.dial-archive-preparation-inspector > header {
+  padding: clamp(24px, 1.25vw, 32px) clamp(30px, 1.55vw, 40px) clamp(20px, 1.05vw, 27px);
+}
+
+.dial-archive-production-workcell__console-field.dial-archive-preparation-inspector
+  > header
+  :is(span, b) {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-production-workcell__console-field.dial-archive-preparation-inspector > header h2 {
+  font-size: clamp(29px, 1.55vw, 40px);
+  letter-spacing: 0.05em;
+}
+
 .dial-archive-production-input-nav {
-  min-height: 50px;
-  margin-bottom: 16px;
+  min-height: 58px;
+  margin-bottom: 18px;
   align-items: stretch;
 }
 
 .dial-archive-production-input-nav button {
   display: grid;
-  min-height: 49px;
+  min-height: 57px;
   align-content: center;
   gap: 3px;
-  padding: 6px 10px 10px;
+  padding: 7px 12px 11px;
   color: rgba(25, 25, 25, 0.68);
   text-align: left;
 }
@@ -275,8 +308,46 @@
 }
 
 .dial-archive-production-workcell__console-body.dial-archive-preparation-inspector__body {
-  padding-bottom: 72px;
-  scroll-padding-bottom: 72px;
+  padding: clamp(24px, 1.2vw, 31px) clamp(30px, 1.5vw, 38px) 80px;
+  scroll-padding-bottom: 80px;
+}
+
+.dial-archive-production-workcell__console-field
+  :is(
+    .dial-archive-production-field__control select,
+    .dial-archive-context-surface select,
+    .dial-archive-context-surface textarea,
+    .dial-archive-context-surface__toggle b,
+    .dial-archive-request-preview.is-inspector dd,
+    .dial-archive-request-preview.is-inspector code
+  ) {
+  font-size: var(--dial-archive-annotation-type-body);
+}
+
+.dial-archive-production-workcell__console-field
+  :is(
+    .dial-archive-production-console__parameters > legend span,
+    .dial-archive-production-console__parameters > legend b,
+    .dial-archive-production-field__identity small,
+    .dial-archive-production-workcell__console-foot span,
+    .dial-archive-production-workcell__console-foot b
+  ) {
+  font-size: var(--dial-archive-annotation-type-meta);
+}
+
+.dial-archive-production-workcell__console-field
+  :is(
+    .dial-archive-production-field > span,
+    .dial-archive-production-field__identity b,
+    .dial-archive-production-commit__overview p,
+    .dial-archive-production-launch em
+  ) {
+  font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-production-source__scope,
+.dial-archive-production-source__scope button {
+  pointer-events: auto;
 }
 
 .dial-archive-production-workcell .dial-archive-preparation-node__code {
@@ -290,24 +361,6 @@
   button:not(.is-active)
   :is(span, b) {
   color: rgba(25, 25, 25, 0.62);
-}
-
-/* Once a node opens its inspector, keep the active route and COMMIT terminal as
- * the two readable subjects. Cropped inactive cards otherwise look like broken
- * content at compact viewports; closing the inspector restores the full map. */
-.dial-archive-production-source,
-.dial-archive-production-lane {
-  transition:
-    opacity 180ms ease,
-    visibility 0s linear;
-}
-
-.dial-archive-production-workcell.has-inspector .dial-archive-production-source,
-.dial-archive-production-workcell.has-inspector .dial-archive-production-lane:not(.is-active) {
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transition-delay: 0s, 180ms;
 }
 
 .dial-archive-production-console__handoff span,

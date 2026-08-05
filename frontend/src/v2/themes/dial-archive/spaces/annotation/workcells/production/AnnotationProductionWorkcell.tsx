@@ -20,6 +20,7 @@ import {
   getProductionNodeCenter,
   projectProductionCanvasPointToMinimap,
   projectProductionCanvasRectToMinimap,
+  resolveProductionFocus,
   type ProductionNodeId,
 } from "./model/annotationProductionLayout";
 import { ANNOTATION_PRODUCTION_LANE_PRESENTATION } from "./model/annotationProductionPresentation";
@@ -41,6 +42,12 @@ interface ProductionFocusRequest {
 
 interface ProductionMinimapStyle extends CSSProperties {
   "--dial-archive-production-minimap-padding": string;
+}
+
+interface ProductionCanvasSize {
+  readonly width: number;
+  readonly height: number;
+  readonly inspectorWidth: number;
 }
 
 const PRODUCTION_CANVAS_GEOMETRY = {
@@ -75,6 +82,11 @@ export function AnnotationProductionWorkcell({
     production?.operation ? "terminal" : (production?.lane ?? "description"),
   );
   const [focusRequest, setFocusRequest] = useState<ProductionFocusRequest | null>(null);
+  const [canvasSize, setCanvasSize] = useState<ProductionCanvasSize>({
+    width: 0,
+    height: 0,
+    inspectorWidth: 0,
+  });
   const inspectorRef = useRef<HTMLElement>(null);
   const appliedEntryRef = useRef<string | null>(null);
   const motion = useSpatialCanvasMotion({
@@ -108,17 +120,42 @@ export function AnnotationProductionWorkcell({
   }, [entryIntent, operationId, productionStatus, selectedLane]);
 
   useLayoutEffect(() => {
-    if (!focusRequest) return;
-    let center = getProductionNodeCenter(focusRequest.node);
-    if (focusRequest.node !== "source" && focusRequest.node !== "terminal") {
-      const terminalCenter = getProductionNodeCenter("terminal");
-      center = {
-        x: (center.x + terminalCenter.x) / 2,
-        y: (center.y + terminalCenter.y) / 2,
+    const viewport = motion.viewportRef.current;
+    if (!viewport) return;
+
+    const updateSize = () => {
+      const next = {
+        width: viewport.clientWidth,
+        height: viewport.clientHeight,
+        inspectorWidth: inspectorOpen ? (inspectorRef.current?.offsetWidth ?? 0) : 0,
       };
+      setCanvasSize((current) =>
+        current.width === next.width &&
+        current.height === next.height &&
+        current.inspectorWidth === next.inspectorWidth
+          ? current
+          : next,
+      );
+    };
+
+    updateSize();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(viewport);
+    if (inspectorRef.current) observer.observe(inspectorRef.current);
+    return () => observer.disconnect();
+  }, [inspectorOpen, motion.viewportRef]);
+
+  useLayoutEffect(() => {
+    if (!focusRequest) return;
+    if (focusRequest.scale !== undefined) {
+      const center = getProductionNodeCenter(focusRequest.node);
+      focusAt(center.x, center.y, focusRequest.scale, true);
+      return;
     }
-    focusAt(center.x, center.y, focusRequest.scale, true);
-  }, [focusAt, focusRequest, inspectorOpen]);
+    const target = resolveProductionFocus(focusRequest.node, canvasSize);
+    focusAt(target.center.x, target.center.y, target.scale, true);
+  }, [canvasSize, focusAt, focusRequest, inspectorOpen]);
 
   if (!production) {
     return (
