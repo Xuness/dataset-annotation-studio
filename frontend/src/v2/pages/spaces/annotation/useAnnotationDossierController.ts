@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
-import { useAnnotationTrace, useAssetMetadata } from "../../../../features/assets/hooks";
+import { useAnnotationTraceHistory, useAssetMetadata } from "../../../../features/assets/hooks";
 import {
   useAnnotationBundle,
   useAnnotationChannelHistory,
@@ -12,7 +12,7 @@ import {
   projectDossierDocuments,
   projectDossierMetadata,
   projectDossierJobs,
-  projectDossierProvenance,
+  projectDossierProvenanceHistory,
   projectDossierRevisions,
   projectDossierTranslations,
 } from "./annotationDossierModel";
@@ -38,11 +38,15 @@ export function useAnnotationDossierController({
   onOpenArchive,
   onOpenQuality,
 }: UseAnnotationDossierControllerOptions): AnnotationDossierContent {
+  const [provenanceSelection, setProvenanceSelection] = useState<{
+    assetId: string;
+    traceId: string;
+  } | null>(null);
   const active = Boolean(enabled && projectId && assetId);
   const bundle = useAnnotationBundle(projectId, assetId, active);
   const metadata = useAssetMetadata(projectId, assetId, active);
   const translations = useTranslations(projectId, assetId, active);
-  const trace = useAnnotationTrace(projectId, assetId, active);
+  const traces = useAnnotationTraceHistory(projectId, assetId, active);
   const jobs = useAssetJobs(projectId, assetId, active);
   const existingHistory = useAnnotationChannelHistory(
     projectId,
@@ -87,7 +91,18 @@ export function useAnnotationDossierController({
     () => projectDossierTranslations(translations.data),
     [translations.data],
   );
-  const provenance = useMemo(() => projectDossierProvenance(trace.data), [trace.data]);
+  const provenanceHistory = useMemo(
+    () => projectDossierProvenanceHistory(traces.data),
+    [traces.data],
+  );
+  const selectedProvenanceId =
+    provenanceSelection?.assetId === assetId ? provenanceSelection.traceId : null;
+  const provenance =
+    provenanceHistory.find((record) => record.id === selectedProvenanceId) ??
+    provenanceHistory.find((record) => record.current && record.executionBackend === "provider") ??
+    provenanceHistory.find((record) => record.current) ??
+    provenanceHistory[0] ??
+    null;
   const jobRecords = useMemo(() => projectDossierJobs(jobs.data), [jobs.data]);
 
   return {
@@ -106,13 +121,19 @@ export function useAnnotationDossierController({
     revisions,
     translations: translationRecords,
     provenance,
-    provenanceLoading: active && trace.isPending,
-    provenanceIssue: trace.isError
-      ? describeError(trace.error, "无法读取当前对象的生成溯源。")
+    provenanceHistory,
+    selectedProvenanceId: provenance?.id ?? null,
+    provenanceLoading: active && traces.isPending,
+    provenanceIssue: traces.isError
+      ? describeError(traces.error, "无法读取当前对象的生成溯源。")
       : null,
     jobs: jobRecords,
     jobsLoading: active && jobs.isPending,
     jobsIssue: jobs.isError ? describeError(jobs.error, "无法读取当前对象的关联任务。") : null,
+    selectProvenance: (traceId) => {
+      if (!assetId) return;
+      setProvenanceSelection({ assetId, traceId });
+    },
     openJob: onOpenJob,
     openArchive: onOpenArchive,
     openQuality: onOpenQuality,

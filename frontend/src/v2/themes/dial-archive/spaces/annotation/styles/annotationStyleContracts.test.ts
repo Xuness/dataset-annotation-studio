@@ -25,7 +25,8 @@ describe("annotation stage visual contracts", () => {
     expect(legibility).toMatch(/--dial-archive-annotation-type-meta:\s*10px;/u);
     expect(legibility).toMatch(/--dial-archive-annotation-type-label:\s*11px;/u);
     expect(legibility).toMatch(/--dial-archive-annotation-type-body:\s*12px;/u);
-    expect(specimenRule).toMatch(/#eceeea/u);
+    expect(specimenRule).toMatch(/--dial-archive-surface-soft/u);
+    expect(specimenRule).toMatch(/#f2f2f2/u);
     expect(specimenRule).not.toMatch(/background[^;]*#(?:000|191919)/u);
   });
 
@@ -71,7 +72,7 @@ describe("annotation stage visual contracts", () => {
       /\.dial-archive-production-input-nav\s+b\s*\{[^}]*display:\s*block;/su,
     );
     expect(legibility).toMatch(
-      /\.dial-archive-context-surface\.is-inspector\s+textarea\s*\{[^}]*height:\s*58px;/su,
+      /\.dial-archive-context-surface\.is-inspector\s+textarea\s*\{[^}]*min-height:\s*150px;/su,
     );
     expect(legibility).toMatch(/\.dial-archive-production-commit__overview\s*>\s*span/u);
     expect(legibility).toMatch(
@@ -80,6 +81,34 @@ describe("annotation stage visual contracts", () => {
     expect(legibility).toMatch(/width:\s*clamp\(560px,\s*32vw,\s*900px\);/u);
     expect(legibility).not.toMatch(
       /\.dial-archive-production-lane:not\(\.is-active\)[^{]*\{[^}]*visibility:\s*hidden;/su,
+    );
+  });
+
+  test("keeps edit hover contrast, translation planes, and dossier history legible", () => {
+    const surfaces = style("annotation-stage-surfaces.css");
+    const dossier = style("annotation-workcell-dossier-endfield.css");
+    const legibility = style("annotation-stage-legibility.css");
+
+    expect(surfaces).toMatch(
+      /button\.is-active:hover:not\(:disabled\)[^{]*\{[^}]*color:\s*var\(--dial-archive-carbon\);[^}]*background:\s*var\(--dial-archive-yellow\);/su,
+    );
+    expect(surfaces).toMatch(
+      /\.dial-archive-edit-translation__source,[^}]*\.dial-archive-edit-translation__target[^}]*\{[^}]*background:\s*var\(--dial-archive-stage-plane-white\);/su,
+    );
+    expect(dossier).toMatch(
+      /\.dial-archive-dossier-register__body\s*\{[^}]*grid-template-columns:\s*clamp\(176px,\s*10\.5vw,\s*226px\)\s+minmax\(0,\s*1fr\);/su,
+    );
+    expect(dossier).toMatch(
+      /\.dial-archive-dossier-provenance__focus::before\s*\{[^}]*background:\s*var\(--dial-archive-yellow\);/su,
+    );
+    expect(dossier).toMatch(
+      /\.dial-archive-dossier-provenance__history\s+button\.is-active\s*\{[^}]*grid-column:\s*span\s+2;[^}]*color:\s*var\(--dial-archive-paper\);[^}]*background:\s*var\(--dial-archive-carbon\);/su,
+    );
+    expect(dossier).toMatch(
+      /\.dial-archive-dossier-raw\[open\]\s*>\s*summary\s*\{[^}]*background:\s*var\(--dial-archive-carbon\);[^}]*box-shadow:\s*inset\s+8px\s+0\s+var\(--dial-archive-yellow\);/su,
+    );
+    expect(legibility).toMatch(
+      /\.dial-archive-dossier-register\s*\{[^}]*--dial-archive-annotation-type-body:\s*clamp\(14px,/su,
     );
   });
 });

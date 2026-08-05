@@ -65,6 +65,11 @@ class TraceResponse(BaseModel):
 
 
 class AssetAnnotationTrace(BaseModel):
+    job_kind: Literal["annotation", "translation"] = "annotation"
+    output_channel: AnnotationChannel = AnnotationChannel.DESCRIPTION
+    output_language: str | None = None
+    translation_source_kind: str | None = None
+    translation_producer_kind: str | None = None
     job_id: str
     job_status: str
     item_id: str
@@ -95,24 +100,71 @@ class AnnotationTraceService:
         self._annotations = annotations
 
     def get(self, project_id: str, asset_id: str) -> AssetAnnotationTrace | None:
+        candidates = [
+            candidate
+            for candidate in self.list(project_id, asset_id)
+            if candidate.job_kind == "annotation"
+        ]
+        if not candidates:
+            return None
+        matching = next(
+            (candidate for candidate in candidates if candidate.matches_current_annotation),
+            None,
+        )
+        if matching is not None:
+            return matching
+        return candidates[0]
+
+    def list(
+        self,
+        project_id: str,
+        asset_id: str,
+        *,
+        limit: int = 100,
+    ) -> list[AssetAnnotationTrace]:
         paths, _ = self._workspaces.get(project_id)
         metadata = self._assets.metadata(project_id, asset_id)
-        rows = self._attempt_rows(paths.database, asset_id)
+        rows = self._attempt_rows(paths.database, asset_id, limit=limit)
         if not rows:
-            return None
+            return []
 
         candidates: list[AssetAnnotationTrace] = []
         annotation_repository = AnnotationRepository(paths.database)
         tag_names_by_revision: dict[str, list[str]] = {}
+        source_job_item_by_revision: dict[str, str | None] = {}
         for row in rows:
             channel = AnnotationChannel(
                 _string(row.get("output_channel")) or AnnotationChannel.DESCRIPTION.value
+            )
+            configuration = _json_object(row.get("configuration_snapshot"))
+            output_language = (
+                _string(configuration.get("target_language"))
+                if channel == AnnotationChannel.TRANSLATION
+                else None
+            )
+            translation_source_kind = (
+                _string(configuration.get("translation_source_kind")) or "description"
+                if channel == AnnotationChannel.TRANSLATION
+                else None
+            )
+            translation_producer_kind = (
+                _string(configuration.get("translation_producer_kind")) or "llm"
+                if channel == AnnotationChannel.TRANSLATION
+                else None
             )
             annotation = self._annotations.get_channel(
                 project_id,
                 asset_id,
                 channel,
+                output_language or "",
+                translation_source_kind or "description",
+                translation_producer_kind or "llm",
             )
+            head_revision_id = annotation.head_revision_id
+            if head_revision_id and head_revision_id not in source_job_item_by_revision:
+                source_job_item_by_revision[head_revision_id] = self._revision_source_job_item_id(
+                    paths.database, head_revision_id
+                )
             tag_revision_id = _string(row.get("tag_context_revision_id"))
             if tag_revision_id and tag_revision_id not in tag_names_by_revision:
                 tag_names_by_revision[tag_revision_id] = annotation_repository.tag_names(
@@ -122,25 +174,56 @@ class AnnotationTraceService:
                 self._build_trace(
                     paths,
                     row,
+                    output_channel=channel,
+                    output_language=output_language,
+                    translation_source_kind=translation_source_kind,
+                    translation_producer_kind=translation_producer_kind,
                     annotation_exists=annotation.exists,
                     annotation_content=annotation.content,
                     annotation_source=annotation.source if annotation.exists else None,
+                    current_source_job_item_id=(
+                        source_job_item_by_revision.get(head_revision_id)
+                        if head_revision_id
+                        else None
+                    ),
                     metadata=metadata.value if metadata.exists and not metadata.error else None,
                     auxiliary_tags=(
                         tag_names_by_revision.get(tag_revision_id, []) if tag_revision_id else []
                     ),
                 )
             )
-        matching = next(
-            (candidate for candidate in candidates if candidate.matches_current_annotation),
-            None,
-        )
-        if matching is not None:
-            return matching
-        return candidates[0]
+        return candidates
 
     @staticmethod
-    def _attempt_rows(database_path: Path, asset_id: str) -> list[dict[str, object]]:
+    def _revision_source_job_item_id(
+        database_path: Path,
+        revision_id: str,
+    ) -> str | None:
+        connection = connect(database_path)
+        try:
+            row = connection.execute(
+                """
+                SELECT source_job_item_id
+                FROM annotation_document_revisions
+                WHERE id = ?
+                """,
+                (revision_id,),
+            ).fetchone()
+            return (
+                str(row["source_job_item_id"])
+                if row is not None and row["source_job_item_id"]
+                else None
+            )
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _attempt_rows(
+        database_path: Path,
+        asset_id: str,
+        *,
+        limit: int,
+    ) -> list[dict[str, object]]:
         connection = connect(database_path)
         try:
             rows = connection.execute(
@@ -148,6 +231,8 @@ class AnnotationTraceService:
                 SELECT
                     j.id AS job_id,
                     j.status AS job_status,
+                    j.kind AS job_kind,
+                    j.configuration_snapshot,
                     j.system_prompt_snapshot,
                     j.user_prompt_snapshot,
                     j.json_fields_snapshot,
@@ -181,11 +266,11 @@ class AnnotationTraceService:
                 FROM job_attempts ja
                 JOIN job_items ji ON ji.id = ja.job_item_id
                 JOIN jobs j ON j.id = ji.job_id
-                WHERE ji.asset_id = ? AND j.kind = 'annotation'
+                WHERE ji.asset_id = ? AND j.kind IN ('annotation', 'translation')
                 ORDER BY ja.started_at DESC, ja.rowid DESC
-                LIMIT 100
+                LIMIT ?
                 """,
-                (asset_id,),
+                (asset_id, limit),
             ).fetchall()
             return [dict(row) for row in rows]
         finally:
@@ -196,9 +281,14 @@ class AnnotationTraceService:
         paths: WorkspacePaths,
         row: dict[str, object],
         *,
+        output_channel: AnnotationChannel,
+        output_language: str | None,
+        translation_source_kind: str | None,
+        translation_producer_kind: str | None,
         annotation_exists: bool,
         annotation_content: str,
         annotation_source: str | None,
+        current_source_job_item_id: str | None,
         metadata: object,
         auxiliary_tags: list[str],
     ) -> AssetAnnotationTrace:
@@ -270,6 +360,11 @@ class AnnotationTraceService:
             ),
         )
         return AssetAnnotationTrace(
+            job_kind=_string(row.get("job_kind")) or "annotation",
+            output_channel=output_channel,
+            output_language=output_language,
+            translation_source_kind=translation_source_kind,
+            translation_producer_kind=translation_producer_kind,
             job_id=str(row["job_id"]),
             job_status=str(row["job_status"]),
             item_id=str(row["item_id"]),
@@ -283,8 +378,11 @@ class AnnotationTraceService:
             annotation_source=annotation_source,
             matches_current_annotation=(
                 annotation_exists
-                and final_content is not None
-                and final_content == annotation_content
+                and (
+                    current_source_job_item_id == str(row["item_id"])
+                    if current_source_job_item_id is not None
+                    else final_content is not None and final_content == annotation_content
+                )
             ),
             request=TraceRequest(
                 system_prompt=system_prompt,

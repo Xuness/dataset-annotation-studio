@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import {
   getAnnotationTrace,
+  getAnnotationTraces,
   getMetadata,
   getPromptPreview,
   listAssetIds,
@@ -71,6 +72,26 @@ export function useAnnotationTrace(projectId: string, assetId: string | null, en
         ? 1000
         : false;
     },
+  });
+}
+
+export function useAnnotationTraceHistory(
+  projectId: string,
+  assetId: string | null,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: annotationTraceKeys.history(projectId, assetId),
+    queryFn: () => getAnnotationTraces(projectId, assetId!),
+    enabled: Boolean(projectId && assetId && enabled),
+    refetchInterval: (query) =>
+      query.state.data?.some(
+        (trace) =>
+          ["queued", "running", "stopping"].includes(trace.job_status) ||
+          trace.attempt_status === "running",
+      )
+        ? 1000
+        : false,
   });
 }
 

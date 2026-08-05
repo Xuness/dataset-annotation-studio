@@ -6,14 +6,14 @@
 
 .dial-archive-space--stage {
   --dial-archive-stage-paper: #ffffff;
-  --dial-archive-stage-paper-low: #f2f3f1;
-  --dial-archive-stage-paper-high: #fafbfa;
+  --dial-archive-stage-paper-low: var(--dial-archive-surface-soft);
+  --dial-archive-stage-paper-high: var(--dial-archive-surface-subtle);
   --dial-archive-stage-ink: #191919;
-  --dial-archive-stage-muted: #6f716e;
+  --dial-archive-stage-muted: var(--dial-archive-copy-secondary);
   --dial-archive-stage-hairline: rgba(25, 25, 25, 0.13);
   --dial-archive-stage-hairline-strong: rgba(25, 25, 25, 0.34);
-  --dial-archive-stage-panel: rgba(255, 255, 255, 0.94);
-  --dial-archive-stage-aperture: #111317;
+  --dial-archive-stage-panel: #ffffff;
+  --dial-archive-stage-aperture: #191919;
   --dial-archive-stage-axis: var(--dial-archive-stage-axis-wide);
   --dial-archive-stage-px: 0;
   --dial-archive-stage-py: 0;
@@ -33,7 +33,7 @@
 .dial-archive-space--stage .dial-archive-space-chrome {
   border-bottom-color: var(--dial-archive-stage-hairline);
   color: var(--dial-archive-stage-ink);
-  background: rgba(255, 255, 255, 0.96);
+  background: #ffffff;
 }
 
 .dial-archive-space--stage .dial-archive-space-chrome__brand span {

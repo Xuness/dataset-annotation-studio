@@ -108,6 +108,9 @@ export function AnnotationProductionOperation({
             <dd>{operation.executionProfile}</dd>
           </div>
         </dl>
+        <div className="dial-archive-production-operation__progress" aria-hidden="true">
+          <i style={{ width: `${operation.progressPercent}%` }} />
+        </div>
       </section>
 
       <div className="dial-archive-production-operation__metrics dial-archive-preparation-inspector__metrics">

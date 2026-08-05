@@ -594,6 +594,13 @@ export interface AnnotationDossierReading {
 }
 
 export interface AnnotationDossierProvenance {
+  id: string;
+  code: string;
+  title: string;
+  model: string;
+  executionBackend: string;
+  outputChannel: string;
+  startedAt: string;
   source: string | null;
   current: boolean;
   readings: readonly AnnotationDossierReading[];
@@ -628,11 +635,14 @@ export interface AnnotationDossierContent {
   revisions: readonly AnnotationDossierRevision[];
   translations: readonly AnnotationDossierTranslation[];
   provenance: AnnotationDossierProvenance | null;
+  provenanceHistory: readonly AnnotationDossierProvenance[];
+  selectedProvenanceId: string | null;
   provenanceLoading: boolean;
   provenanceIssue: string | null;
   jobs: readonly AnnotationDossierJob[];
   jobsLoading: boolean;
   jobsIssue: string | null;
+  selectProvenance(traceId: string): void;
   openJob(jobId: string): void;
   openArchive(): void;
   openQuality(): void;

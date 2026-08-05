@@ -59,7 +59,6 @@ export function AnnotationDossierWorkcell({
 
   return (
     <div className="dial-archive-dossier-workcell">
-      <i className="dial-archive-dossier-workcell__yellow-field" aria-hidden="true" />
       <i className="dial-archive-dossier-workcell__measure" aria-hidden="true" />
       <AnnotationDossierEvidence asset={asset} dossier={dossier} />
       <AnnotationDossierRegister

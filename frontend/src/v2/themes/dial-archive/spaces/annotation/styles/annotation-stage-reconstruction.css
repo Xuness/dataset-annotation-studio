@@ -1056,7 +1056,7 @@
   height: var(--dial-archive-stage-film-item-height);
   padding: 3px;
   border: 1px solid rgba(25, 25, 25, 0.22);
-  background: #eef0ed;
+  background: var(--dial-archive-surface-soft);
   box-shadow: none;
   transform: translateX(calc(-1 * var(--dial-archive-stage-film-item-half))) scale(0.88);
   transition:
@@ -1470,7 +1470,7 @@
   border-radius: 0;
   color: #191919;
   font: inherit;
-  background: #f7f8f6;
+  background: var(--dial-archive-surface-subtle);
 }
 
 .dial-archive-stage-context-dock__scope input:focus,
@@ -1823,7 +1823,7 @@
   min-width: 0;
   padding: 0 18px;
   border-bottom: 1px solid rgba(25, 25, 25, 0.16);
-  background: #f5f6f4;
+  background: var(--dial-archive-surface-soft);
 }
 
 .dial-archive-edit-workcell__document-head > div {
@@ -1918,7 +1918,7 @@
   padding: 7px 12px 7px 16px;
   border-top: 1px solid rgba(25, 25, 25, 0.2);
   gap: 10px;
-  background: #f5f6f4;
+  background: var(--dial-archive-surface-soft);
 }
 
 .dial-archive-edit-workcell__footer > div:first-child {
@@ -2075,7 +2075,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #f7f8f6;
+  background: var(--dial-archive-surface-subtle);
 }
 
 .dial-archive-production-workcell__route-field {
@@ -2085,7 +2085,7 @@
   background:
     linear-gradient(90deg, rgba(25, 25, 25, 0.038) 1px, transparent 1px) 0 0 / 72px 72px,
     linear-gradient(rgba(25, 25, 25, 0.038) 1px, transparent 1px) 0 0 / 72px 72px,
-    #f7f8f6;
+    var(--dial-archive-surface-subtle);
   cursor: grab;
   touch-action: none;
 }
@@ -2119,7 +2119,7 @@
   overflow: hidden;
   border-top: 1px solid rgba(25, 25, 25, 0.24);
   border-bottom: 1px solid rgba(25, 25, 25, 0.12);
-  background: #eef0ed;
+  background: var(--dial-archive-surface-soft);
   clip-path: polygon(0 0, 82% 0, 100% 19%, 92% 100%, 8% 94%, 0 74%);
   pointer-events: none;
 }
@@ -2252,7 +2252,7 @@
   display: grid;
   align-content: end;
   padding: 18px;
-  background: #f0f1ef;
+  background: var(--dial-archive-surface-soft);
 }
 
 .dial-archive-production-source > span:not(.dial-archive-production-node__corners),
@@ -3141,7 +3141,7 @@
   padding: 12px 14px;
   border: 1px solid rgba(25, 25, 25, 0.17);
   border-left: 4px solid rgba(25, 25, 25, 0.28);
-  background: #f8f9f7;
+  background: var(--dial-archive-surface-subtle);
 }
 
 .dial-archive-dossier-channels > li + li,
@@ -3185,7 +3185,7 @@
   padding: 0 18px;
   border-top: 1px solid rgba(25, 25, 25, 0.2);
   gap: 14px;
-  background: #f5f6f4;
+  background: var(--dial-archive-surface-soft);
 }
 
 .dial-archive-dossier-register__foot > b {

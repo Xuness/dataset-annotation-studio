@@ -1,0 +1,1057 @@
+/* Object dossier editorial composition.
+ * Visual reference: official Endfield website sections 06-08.
+ * One narrow index, one dominant record plane, and one yellow signal anchor. */
+
+.dial-archive-stage .dial-archive-dossier-workcell {
+  overflow: hidden;
+  background: var(--dial-archive-paper);
+}
+
+/* The image remains the shared specimen. Its identity is a quiet caption block,
+ * not another bordered card below the visual subject. */
+.dial-archive-stage .dial-archive-dossier-evidence {
+  top: 52%;
+  bottom: auto;
+  left: 5.4%;
+  width: 27.5%;
+  padding: 0 0 0 clamp(22px, 1.5vw, 36px);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  clip-path: none;
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__head {
+  margin: 0;
+  padding: 0 0 14px;
+  border: 0;
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__head::before {
+  display: none;
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__head span {
+  color: var(--dial-archive-copy-secondary);
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__head b {
+  margin-top: 6px;
+  font-size: clamp(18px, 1.35vw, 28px);
+  letter-spacing: 0.01em;
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__head small {
+  margin-top: 3px;
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__continuity {
+  position: relative;
+  margin-top: 2px;
+  padding: 19px 0 12px;
+  border: 0;
+  background: transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__continuity::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 34%;
+  height: 7px;
+  background: var(--dial-archive-carbon);
+  content: "";
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__continuity i {
+  width: 22%;
+  height: 5px;
+  margin-top: 10px;
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__facts {
+  gap: 12px clamp(18px, 1.8vw, 34px);
+  margin-top: 12px;
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__facts > div {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__facts dd {
+  margin-top: 5px;
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__seal {
+  margin-top: 18px;
+  padding-top: 10px;
+  border-top: 1px solid var(--dial-archive-rule);
+}
+
+.dial-archive-stage .dial-archive-dossier-evidence__seal b {
+  padding: 5px 9px;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+/* Register frame: a large editorial heading and a narrow chapter index.
+ * The six chapters no longer form a dashboard-like row of equal tabs. */
+.dial-archive-stage .dial-archive-dossier-register {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 66%;
+  grid-template-rows: clamp(126px, 11.5vh, 158px) minmax(0, 1fr) 52px;
+  border: 0;
+  background: var(--dial-archive-paper);
+  box-shadow: none;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__title {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: clamp(18px, 1.6vw, 32px);
+  padding: 20px clamp(28px, 2.2vw, 48px) 25px;
+  border: 0;
+  background: var(--dial-archive-paper);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__title::after {
+  position: absolute;
+  bottom: 0;
+  left: clamp(28px, 2.2vw, 48px);
+  width: min(36%, 430px);
+  height: 7px;
+  background: linear-gradient(
+    90deg,
+    var(--dial-archive-carbon) 0 78%,
+    var(--dial-archive-yellow) 78% 100%
+  );
+  content: "";
+}
+
+.dial-archive-stage .dial-archive-dossier-register__title > div > span {
+  color: var(--dial-archive-copy-secondary);
+  letter-spacing: 0.18em;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__title h2 {
+  margin: 6px 0 0;
+  font-size: clamp(34px, 2.35vw, 54px);
+  font-weight: 820;
+  letter-spacing: 0.055em;
+  line-height: 0.94;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__title > b {
+  margin: 0;
+  color: transparent;
+  font-size: clamp(76px, 5.4vw, 124px);
+  letter-spacing: -0.08em;
+  line-height: 0.72;
+  -webkit-text-stroke: 1px var(--dial-archive-rule);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__title > dl {
+  display: grid;
+  min-width: 232px;
+  grid-template-columns: minmax(130px, 1fr) 90px;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__title > dl > div {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__title dt,
+.dial-archive-stage .dial-archive-dossier-register__title dd {
+  text-align: left;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__title dd {
+  margin-top: 5px;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__body {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: clamp(176px, 10.5vw, 226px) minmax(0, 1fr);
+  gap: clamp(28px, 2.2vw, 48px);
+  padding: 0 clamp(22px, 1.8vw, 38px) 0 0;
+  overflow: hidden;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail {
+  position: static;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 6px;
+  padding: clamp(26px, 2.5vh, 38px) 0;
+  border: 0;
+  background: var(--dial-archive-paper);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: clamp(62px, 6.3vh, 78px);
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 10px 16px;
+  border: 0;
+  color: var(--dial-archive-carbon);
+  text-align: left;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    color 180ms var(--dial-archive-ease),
+    background 180ms var(--dial-archive-ease);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail button::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 6px;
+  height: 0;
+  background: var(--dial-archive-yellow);
+  content: "";
+  transition: height 180ms var(--dial-archive-ease);
+  transform: translateY(-50%);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail button span {
+  color: var(--dial-archive-copy-muted);
+  font-family: var(--dial-archive-font-mono);
+  letter-spacing: 0.08em;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail button b {
+  margin: 0;
+  font-weight: 740;
+  line-height: 1.12;
+  white-space: normal;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail button small {
+  color: var(--dial-archive-copy-muted);
+  font-family: var(--dial-archive-font-mono);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail button:hover,
+.dial-archive-stage .dial-archive-dossier-register__rail button:focus-visible {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+  outline: none;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail button:hover :is(span, small),
+.dial-archive-stage .dial-archive-dossier-register__rail button:focus-visible :is(span, small) {
+  color: var(--dial-archive-carbon);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail button.is-active,
+.dial-archive-stage .dial-archive-dossier-register__rail button.is-active:hover,
+.dial-archive-stage .dial-archive-dossier-register__rail button.is-active:focus-visible {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail button.is-active::before {
+  height: 100%;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__rail button.is-active :is(span, small) {
+  color: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage .dial-archive-dossier-section {
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: clamp(26px, 2.5vh, 38px) 0 42px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: var(--dial-archive-rule) transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-section__head {
+  display: grid;
+  min-height: 34px;
+  grid-template-columns: auto minmax(80px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: clamp(22px, 2.4vh, 34px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-section__head span {
+  width: auto;
+  padding: 0;
+  color: var(--dial-archive-carbon);
+  background: transparent;
+  letter-spacing: 0.15em;
+}
+
+.dial-archive-stage .dial-archive-dossier-section__head i {
+  width: min(100%, 220px);
+  height: 6px;
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage .dial-archive-dossier-section__head > b {
+  margin: 0;
+  color: var(--dial-archive-carbon);
+  font-family: var(--dial-archive-font-mono);
+  font-size: var(--dial-archive-annotation-type-meta);
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  -webkit-text-stroke: 0;
+}
+
+/* Provenance: one dominant selected-call plane, then a featured index.
+ * Current history occupies two columns; historical neighbors read as thumbnails. */
+.dial-archive-stage .dial-archive-dossier-provenance {
+  margin: 0;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus {
+  position: relative;
+  min-height: 168px;
+  padding: clamp(24px, 2vw, 36px) clamp(126px, 8vw, 168px) 24px clamp(24px, 2vw, 36px);
+  overflow: hidden;
+  background: var(--dial-archive-surface-soft);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus::before {
+  position: absolute;
+  inset: 0 0 0 auto;
+  display: grid;
+  width: clamp(98px, 7vw, 142px);
+  place-items: center;
+  color: var(--dial-archive-carbon);
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(24px, 1.9vw, 42px);
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  background: var(--dial-archive-yellow);
+  content: attr(data-trace-code);
+  writing-mode: vertical-rl;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus.is-stale::before {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-alert);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus > header {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "code state"
+    "title state"
+    "model state";
+  align-items: center;
+  gap: 4px 18px;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus > header span {
+  grid-area: code;
+  color: var(--dial-archive-copy-secondary);
+  font-family: var(--dial-archive-font-mono);
+  letter-spacing: 0.15em;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus > header b {
+  grid-area: title;
+  margin-top: 5px;
+  overflow: hidden;
+  font-size: clamp(25px, 1.7vw, 38px);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus > header small {
+  grid-area: model;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--dial-archive-copy-secondary);
+  font-family: var(--dial-archive-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus > header output {
+  grid-area: state;
+  align-self: start;
+  padding: 6px 9px;
+  color: var(--dial-archive-paper);
+  font-family: var(--dial-archive-font-mono);
+  font-weight: 760;
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus > dl {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  margin: 24px 0 0;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus > dl > div {
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--dial-archive-paper);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus :is(dt, dd, small) {
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--dial-archive-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus dd {
+  margin-top: 5px;
+  font-weight: 740;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__focus dl small {
+  display: block;
+  margin-top: 3px;
+  color: var(--dial-archive-copy-secondary);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history-head {
+  display: flex;
+  min-height: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: clamp(26px, 2.5vh, 38px);
+  padding: 0 0 12px;
+  color: var(--dial-archive-carbon);
+  background: transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history-head span {
+  font-family: var(--dial-archive-font-mono);
+  letter-spacing: 0.14em;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history-head b {
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(20px, 1.2vw, 28px);
+  letter-spacing: 0.05em;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 0 24px;
+  background: transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 94px;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "code identity state"
+    "code identity time";
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 13px 10px 0;
+  border: 0;
+  color: var(--dial-archive-carbon);
+  text-align: left;
+  background: var(--dial-archive-surface-soft);
+  transition:
+    color 180ms var(--dial-archive-ease),
+    background 180ms var(--dial-archive-ease);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button.is-active {
+  grid-column: span 2;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button > span {
+  grid-area: code;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  color: var(--dial-archive-copy-secondary);
+  font-family: var(--dial-archive-font-mono);
+  font-weight: 760;
+  background: var(--dial-archive-paper);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button > div {
+  grid-area: identity;
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button :is(b, small, time, output) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button small,
+.dial-archive-stage .dial-archive-dossier-provenance__history button time,
+.dial-archive-stage .dial-archive-dossier-provenance__history button output {
+  color: var(--dial-archive-copy-secondary);
+  font-family: var(--dial-archive-font-mono);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button time {
+  grid-area: time;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button output {
+  grid-area: state;
+  align-self: end;
+  font-weight: 740;
+}
+
+.dial-archive-stage
+  .dial-archive-dossier-provenance__history
+  button.is-current:not(.is-active)::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: var(--dial-archive-yellow);
+  content: "";
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button:hover:not(.is-active),
+.dial-archive-stage .dial-archive-dossier-provenance__history button:focus-visible:not(.is-active) {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+  outline: none;
+}
+
+.dial-archive-stage
+  .dial-archive-dossier-provenance__history
+  button:is(:hover, :focus-visible):not(.is-active)
+  :is(span, small, time, output) {
+  color: var(--dial-archive-carbon);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button.is-active > span {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button.is-active :is(small, time) {
+  color: var(--dial-archive-rule);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__history button.is-active output {
+  color: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__technical {
+  margin: 0 0 8px;
+  border: 0;
+  background: transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__technical > summary {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--dial-archive-carbon);
+  font-family: var(--dial-archive-font-mono);
+  font-weight: 740;
+  letter-spacing: 0.1em;
+  background: var(--dial-archive-surface-soft);
+  cursor: pointer;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__technical[open] > summary {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+  box-shadow: inset 8px 0 var(--dial-archive-yellow);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__technical > dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin: 5px 0 12px;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__technical > dl > div {
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--dial-archive-surface-subtle);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__technical :is(dt, dd, small) {
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--dial-archive-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__technical dd {
+  margin-top: 5px;
+  font-weight: 720;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__technical small {
+  display: block;
+  margin-top: 3px;
+  color: var(--dial-archive-copy-secondary);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__raw {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__raw .dial-archive-dossier-raw {
+  margin: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__raw .dial-archive-dossier-raw > summary {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border: 0;
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-surface-soft);
+  box-shadow: inset 8px 0 var(--dial-archive-carbon);
+  transition:
+    color 180ms var(--dial-archive-ease),
+    background 180ms var(--dial-archive-ease);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__raw .dial-archive-dossier-raw > summary:hover,
+.dial-archive-stage
+  .dial-archive-dossier-provenance__raw
+  .dial-archive-dossier-raw
+  > summary:focus-visible {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+  outline: none;
+}
+
+.dial-archive-stage
+  .dial-archive-dossier-provenance__raw
+  .dial-archive-dossier-raw[open]
+  > summary {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+  box-shadow: inset 8px 0 var(--dial-archive-yellow);
+}
+
+.dial-archive-stage .dial-archive-dossier-provenance__raw .dial-archive-dossier-raw pre {
+  max-height: 340px;
+  padding: 20px;
+  border: 0;
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-surface-soft);
+}
+
+/* Other dossier pages share the same broad-plane rhythm. */
+.dial-archive-stage
+  :is(
+    .dial-archive-dossier-channels,
+    .dial-archive-dossier-timeline,
+    .dial-archive-dossier-translations,
+    .dial-archive-dossier-jobs
+  ) {
+  gap: 8px;
+  margin: 0;
+}
+
+.dial-archive-stage
+  :is(
+    .dial-archive-dossier-channels,
+    .dial-archive-dossier-timeline,
+    .dial-archive-dossier-translations,
+    .dial-archive-dossier-jobs
+  )
+  > li {
+  min-height: 88px;
+  border: 0;
+  border-left: 0;
+  background: var(--dial-archive-surface-soft);
+  box-shadow: inset 7px 0 var(--dial-archive-surface-muted);
+}
+
+.dial-archive-stage
+  :is(
+    .dial-archive-dossier-channels > li.is-usable,
+    .dial-archive-dossier-timeline > li.is-candidate,
+    .dial-archive-dossier-jobs > li.is-succeeded
+  ) {
+  box-shadow: inset 7px 0 var(--dial-archive-yellow);
+}
+
+.dial-archive-stage .dial-archive-dossier-metadata__identity {
+  margin: 0 0 8px;
+  padding: 14px 16px;
+  border: 0;
+  background: var(--dial-archive-surface-soft);
+}
+
+.dial-archive-stage .dial-archive-dossier-metadata > div {
+  gap: 5px;
+  border: 0;
+  background: var(--dial-archive-paper);
+}
+
+.dial-archive-stage .dial-archive-dossier-metadata dt,
+.dial-archive-stage .dial-archive-dossier-metadata dd {
+  border: 0;
+  background: var(--dial-archive-surface-subtle);
+}
+
+/* Jobs no longer inherit the old five-column dashboard grid. */
+.dial-archive-stage .dial-archive-dossier-jobs > li {
+  grid-template-columns: 46px minmax(180px, 1fr) auto auto;
+  grid-template-areas:
+    "index head state action"
+    "detail detail detail detail";
+  gap: 7px 18px;
+  padding: 14px 14px 10px;
+}
+
+.dial-archive-stage .dial-archive-dossier-jobs > li.is-succeeded {
+  box-shadow: inset 7px 0 var(--dial-archive-surface-muted);
+}
+
+.dial-archive-stage .dial-archive-dossier-jobs > li > output {
+  grid-area: state;
+  min-width: 112px;
+  justify-self: end;
+  padding: 7px 12px;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+  box-shadow: none;
+}
+
+.dial-archive-stage .dial-archive-dossier-jobs > li > button {
+  grid-area: action;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 0;
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage .dial-archive-dossier-jobs > li > button:hover,
+.dial-archive-stage .dial-archive-dossier-jobs > li > button:focus-visible {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+  outline: none;
+}
+
+.dial-archive-stage
+  :is(
+    .dial-archive-dossier-channels,
+    .dial-archive-dossier-timeline,
+    .dial-archive-dossier-translations,
+    .dial-archive-dossier-jobs
+  )
+  details {
+  margin-top: 3px;
+  border-top: 0;
+}
+
+.dial-archive-stage .dial-archive-dossier-jobs > li > details {
+  grid-area: detail;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__foot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  margin: 0;
+  padding: 0 clamp(22px, 1.8vw, 38px) 0 clamp(176px, 10.5vw, 226px);
+  border: 0;
+  background: var(--dial-archive-paper);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__crosslinks {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__crosslinks button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 0;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__crosslinks button:last-child {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage .dial-archive-dossier-register__crosslinks button:hover,
+.dial-archive-stage .dial-archive-dossier-register__crosslinks button:focus-visible {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+  outline: none;
+}
+
+.dial-archive-stage .dial-archive-dossier-register__foot > b {
+  color: var(--dial-archive-copy-secondary);
+}
+
+@media (max-width: 1540px), (max-height: 820px) {
+  .dial-archive-stage .dial-archive-dossier-evidence {
+    top: 52%;
+    bottom: auto;
+    left: 5.2%;
+    width: 28.2%;
+    padding-left: 18px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register {
+    width: 64%;
+    grid-template-rows: 112px minmax(0, 1fr) 46px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__title {
+    gap: 14px;
+    padding: 14px 22px 19px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__title::after {
+    left: 22px;
+    height: 6px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__title h2 {
+    font-size: 31px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__title > b {
+    font-size: 72px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__title > dl {
+    min-width: 160px;
+    grid-template-columns: minmax(96px, 1fr) 54px;
+    gap: 10px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__body {
+    grid-template-columns: 146px minmax(0, 1fr);
+    gap: 22px;
+    padding-right: 18px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__rail {
+    gap: 4px;
+    padding: 18px 0;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__rail button {
+    min-height: 54px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 6px;
+    padding: 8px 8px 8px 12px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__rail button small {
+    display: none;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-section {
+    padding: 18px 0 32px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-section__head {
+    margin-bottom: 18px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__focus {
+    min-height: 146px;
+    padding: 20px 82px 18px 20px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__focus::before {
+    width: 64px;
+    font-size: 22px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__focus > header b {
+    font-size: 24px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__focus > header output {
+    padding: 5px 7px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__focus > dl {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 18px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__focus > dl > div:nth-child(3),
+  .dial-archive-stage .dial-archive-dossier-provenance__focus > dl > div:nth-child(4) {
+    display: none;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__history-head {
+    margin-top: 22px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__history button {
+    min-height: 78px;
+    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-areas:
+      "code identity"
+      "code identity";
+    gap: 4px 8px;
+    padding: 8px 9px 8px 0;
+  }
+
+  .dial-archive-stage
+    .dial-archive-dossier-provenance__history
+    button:not(.is-active)
+    :is(small, time, output) {
+    display: none;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__history button.is-active time,
+  .dial-archive-stage .dial-archive-dossier-provenance__history button.is-active output {
+    display: none;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__technical > dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dial-archive-stage .dial-archive-dossier-provenance__raw {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__foot {
+    padding-right: 18px;
+    padding-left: 146px;
+  }
+}
+
+@media (max-height: 820px) {
+  .dial-archive-stage.is-workcell-dossier:not(.is-workcell-closing) .dial-archive-stage-specimen {
+    top: 27%;
+    height: 30%;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register {
+    grid-template-rows: 96px minmax(0, 1fr) 38px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__title {
+    padding-top: 10px;
+    padding-bottom: 15px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-section {
+    padding-top: 14px;
+    padding-bottom: 24px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-section__head {
+    margin-bottom: 14px;
+  }
+}
+
+@media (max-width: 1540px) {
+  .dial-archive-stage .dial-archive-dossier-register__title > dl {
+    display: none;
+  }
+}
+
+@media (max-width: 1120px) {
+  .dial-archive-stage .dial-archive-dossier-register__title > dl,
+  .dial-archive-stage .dial-archive-dossier-register__foot > b {
+    display: none;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__body {
+    grid-template-columns: 78px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__rail button {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 8px 5px;
+    text-align: center;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__rail button b {
+    display: none;
+  }
+
+  .dial-archive-stage .dial-archive-dossier-register__foot {
+    padding-left: 78px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dial-archive-stage .dial-archive-dossier-register__rail button,
+  .dial-archive-stage .dial-archive-dossier-provenance__history button,
+  .dial-archive-stage .dial-archive-dossier-provenance__raw summary {
+    transition-duration: 1ms;
+  }
+}

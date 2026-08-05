@@ -21,21 +21,28 @@ interface SelectFieldProps {
 function SelectField({ code, label, value, options, disabled, onChange }: SelectFieldProps) {
   return (
     <label className="dial-archive-production-field dial-archive-preparation-inspector__field">
-      <span title={code}>{label}</span>
-      <select
-        value={value}
-        title={options.find((option) => option.id === value)?.label ?? value}
-        disabled={disabled || options.length === 0}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.length === 0 ? <option value="">当前没有可用选项</option> : null}
-        {options.map((option) => (
-          <option value={option.id} disabled={option.disabled} key={option.id}>
-            {option.label}
-            {option.detail ? ` · ${option.detail}` : ""}
-          </option>
-        ))}
-      </select>
+      <span className="dial-archive-production-field__identity">
+        <small>{code}</small>
+        <b>{label}</b>
+      </span>
+      <span className="dial-archive-production-field__control">
+        <select
+          value={value}
+          title={options.find((option) => option.id === value)?.label ?? value}
+          aria-label={label}
+          disabled={disabled || options.length === 0}
+          onChange={(event) => onChange(event.target.value)}
+        >
+          {options.length === 0 ? <option value="">当前没有可用选项</option> : null}
+          {options.map((option) => (
+            <option value={option.id} disabled={option.disabled} key={option.id}>
+              {option.label}
+              {option.detail ? ` · ${option.detail}` : ""}
+            </option>
+          ))}
+        </select>
+        <i aria-hidden="true">⌄</i>
+      </span>
     </label>
   );
 }
@@ -53,9 +60,20 @@ export function AnnotationProductionConfiguration({
       role="tabpanel"
       aria-label="生产线路配置"
     >
+      <header className="dial-archive-production-console__identity">
+        <div>
+          <span>CONFIGURATION // {identity.englishTitle}</span>
+          <h3>生产参数装配</h3>
+          <p>选择生产后端与模型参数；范围、上下文与最终请求分别在相邻输入面核对。</p>
+        </div>
+        <strong aria-hidden="true">{identity.code}</strong>
+      </header>
       <div className="dial-archive-production-console__form">
         <fieldset className="dial-archive-production-console__parameters">
-          <legend>任务参数 // {identity.code}.CFG</legend>
+          <legend>
+            <span>LANE PARAMETERS</span>
+            <b>{identity.code}.CFG</b>
+          </legend>
 
           {configuration.backendOptions.length > 1 ? (
             <SelectField

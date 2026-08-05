@@ -39,6 +39,15 @@
   --dial-archive-gray-8: #858585;
   --dial-archive-gray-9: #999999;
   --dial-archive-gray-b: #b8b8b8;
+  /* Official Endfield website neutral scale. Keep these as solid surface roles;
+   * translucent carbon is reserved for overlays, never used to manufacture gray. */
+  --dial-archive-surface-subtle: #fafafa;
+  --dial-archive-surface-soft: #f2f2f2;
+  --dial-archive-surface-muted: #e5e5e5;
+  --dial-archive-surface-carbon-soft: #2e2e2e;
+  --dial-archive-rule: #d9d9d9;
+  --dial-archive-copy-muted: #999999;
+  --dial-archive-copy-secondary: #7c7c7c;
   --dial-archive-hairline: rgba(25, 25, 25, 0.16);
   --dial-archive-hairline-strong: rgba(25, 25, 25, 0.28);
   --dial-archive-ease: cubic-bezier(0.16, 1, 0.3, 1);

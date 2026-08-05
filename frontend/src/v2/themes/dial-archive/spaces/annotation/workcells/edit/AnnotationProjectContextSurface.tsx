@@ -67,6 +67,9 @@ export function AnnotationProjectContextSurface({
           <span>PROJECT INSTRUCTION // WRITABLE</span>
           <h3>模型上下文配置</h3>
           {context.dirty ? <em>UNSAVED</em> : <em className="is-synced">SYNCHRONIZED</em>}
+          <strong className="dial-archive-context-surface__index" aria-hidden="true">
+            CTX
+          </strong>
         </header>
 
         <label className="dial-archive-context-surface__preset">
@@ -137,6 +140,10 @@ export function AnnotationProjectContextSurface({
       <aside className="dial-archive-context-surface__evidence">
         {compact ? (
           <>
+            <header className="dial-archive-context-surface__evidence-head">
+              <span>FROZEN EVIDENCE REGISTER</span>
+              <b>02 SOURCES</b>
+            </header>
             <details className="dial-archive-context-surface__register">
               <summary>
                 <span>SYS.01 // SYSTEM PRESET</span>

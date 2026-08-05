@@ -214,11 +214,28 @@ export function projectDossierProvenance(
 ): AnnotationDossierProvenance | null {
   if (!trace) return null;
   const parameters = trace.request.parameters;
+  const executionBackend = parameters.execution_backend || "provider";
+  const outputChannel = trace.output_channel ?? "description";
+  const presentation =
+    outputChannel === "tags"
+      ? { code: "TAG", title: "Tagger 标签" }
+      : outputChannel === "translation"
+        ? executionBackend === "local_dictionary"
+          ? { code: "DCT", title: "词典译文" }
+          : { code: "TRN", title: "LLM 译文" }
+        : { code: "LLM", title: "LLM 描述" };
   const tokenTotal =
     (trace.response.input_tokens ?? 0) +
     (trace.response.output_tokens ?? 0) +
     (trace.response.reasoning_tokens ?? 0);
   return {
+    id: trace.attempt_id,
+    code: presentation.code,
+    title: presentation.title,
+    model: parameters.model || "未记录模型",
+    executionBackend,
+    outputChannel,
+    startedAt: trace.started_at,
     source: trace.annotation_source ?? null,
     current: trace.matches_current_annotation,
     readings: [
@@ -235,6 +252,15 @@ export function projectDossierProvenance(
         label: "MODEL",
         value: parameters.model || "—",
         detail: parameters.execution_backend,
+      },
+      {
+        id: "channel",
+        label: "CHANNEL",
+        value:
+          outputChannel === "translation" && trace.output_language
+            ? `${outputChannel} · ${trace.output_language}`
+            : outputChannel,
+        detail: trace.job_kind,
       },
       {
         id: "provider",
@@ -255,6 +281,14 @@ export function projectDossierProvenance(
     requestJson: stringifyDossierJson(trace.request) ?? "{}",
     responseJson: stringifyDossierJson(trace.response) ?? "{}",
   };
+}
+
+export function projectDossierProvenanceHistory(
+  traces: readonly AssetAnnotationTrace[] | null | undefined,
+): AnnotationDossierProvenance[] {
+  return (traces ?? [])
+    .map((trace) => projectDossierProvenance(trace))
+    .filter((trace): trace is AnnotationDossierProvenance => trace !== null);
 }
 
 const JOB_STATUS_LABELS: Readonly<Record<string, string>> = {

@@ -15,22 +15,16 @@
   --dial-archive-stage-film-range-width: 108px;
 }
 
-/* The image is the visual subject. A paper-gray calibration bed keeps empty
- * space quiet; black remains a narrow structural accent instead of a backdrop. */
+/* The image is the visual subject. The calibration bed uses the official
+ * source gray as one uninterrupted plane; black remains a narrow accent. */
 .dial-archive-stage-specimen__frame {
-  border-color: rgba(25, 25, 25, 0.42);
-  background:
-    linear-gradient(rgba(25, 25, 25, 0.035) 1px, transparent 1px) 0 0 / 48px 48px,
-    linear-gradient(90deg, rgba(25, 25, 25, 0.035) 1px, transparent 1px) 0 0 / 48px 48px,
-    #eceeea;
-  box-shadow:
-    0 24px 60px rgba(25, 25, 25, 0.12),
-    12px 14px 0 rgba(25, 25, 25, 0.08),
-    inset 0 0 0 7px rgba(255, 255, 255, 0.54);
+  border-color: transparent;
+  background: var(--dial-archive-surface-soft, #f2f2f2);
+  box-shadow: 14px 16px 0 var(--dial-archive-surface-muted, #e5e5e5);
 }
 
 .dial-archive-stage-specimen__frame::after {
-  border-color: rgba(25, 25, 25, 0.16);
+  display: none;
 }
 
 .dial-archive-stage-specimen__frame.is-empty {
@@ -494,11 +488,11 @@
   line-height: 1.65;
 }
 
-/* CONTEXT and REQUEST are operational reading surfaces, not microcopy panels.
- * Keep the complete context edit loop visible at 768px while preserving the
- * evidence registers below it as optional scroll content. */
+/* CONTEXT and REQUEST are full reading compositions inside the inspector.
+ * Keep their primary text at body scale and let the body scroll instead of
+ * collapsing the editable plane into a microcopy strip. */
 .dial-archive-context-surface.is-inspector .dial-archive-context-surface__config {
-  gap: 5px;
+  gap: 12px;
 }
 
 .dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > header > span,
@@ -516,12 +510,12 @@
 }
 
 .dial-archive-context-surface.is-inspector textarea {
-  height: 58px;
-  min-height: 58px;
+  height: 100%;
+  min-height: 150px;
 }
 
 .dial-archive-context-surface.is-inspector .dial-archive-context-surface__toggle {
-  padding: 6px 9px;
+  padding: 17px;
 }
 
 .dial-archive-context-surface.is-inspector .dial-archive-context-surface__toggle small {
@@ -531,8 +525,7 @@
 .dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > footer {
   grid-template-columns: minmax(0, 1fr) minmax(190px, 0.9fr);
   align-items: center;
-  gap: 8px;
-  padding-top: 7px;
+  gap: 12px;
 }
 
 .dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > footer div {
@@ -553,6 +546,12 @@
 }
 
 /* Dossier: reserve the persistent film dock and expose stable identity data. */
+.dial-archive-dossier-register {
+  --dial-archive-annotation-type-meta: clamp(12px, 0.6vw, 14px);
+  --dial-archive-annotation-type-label: clamp(13px, 0.7vw, 16px);
+  --dial-archive-annotation-type-body: clamp(14px, 0.78vw, 18px);
+}
+
 .dial-archive-stage .dial-archive-dossier-register {
   bottom: 0;
 }
@@ -616,6 +615,20 @@
 
 .dial-archive-dossier-register__rail button b {
   font-size: var(--dial-archive-annotation-type-label);
+}
+
+.dial-archive-dossier-provenance__history button b,
+.dial-archive-dossier-provenance > header b,
+.dial-archive-dossier-channels > li > div b,
+.dial-archive-dossier-timeline > li > header b,
+.dial-archive-dossier-translations > li b,
+.dial-archive-dossier-jobs > li > header b {
+  font-size: var(--dial-archive-annotation-type-body);
+}
+
+.dial-archive-dossier-section :is(p, li > p) {
+  font-size: var(--dial-archive-annotation-type-body);
+  line-height: 1.65;
 }
 
 .dial-archive-dossier-metadata__identity > span,

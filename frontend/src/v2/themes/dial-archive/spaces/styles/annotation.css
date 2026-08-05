@@ -87,7 +87,7 @@
   padding: 0;
   border: 0;
   text-align: left;
-  background: #e7e8e6;
+  background: var(--dial-archive-surface-soft);
   clip-path: polygon(0 0, 88% 0, 100% 13%, 100% 100%, 7% 100%, 0 91%);
   cursor: pointer;
   isolation: isolate;
@@ -293,7 +293,7 @@
   padding: 0;
   border: 0;
   border-right: 1px solid var(--dial-archive-paper);
-  background: #ececea;
+  background: var(--dial-archive-surface-muted);
   cursor: pointer;
 }
 
@@ -1187,7 +1187,7 @@
 .dial-archive-annotation-operation__empty button:hover,
 .dial-archive-annotation-operation__empty button:focus-visible {
   color: var(--dial-archive-paper);
-  background: #060606;
+  background: var(--dial-archive-carbon);
 }
 
 .dial-archive-annotation-operation > button:focus-visible,
@@ -1509,5 +1509,158 @@
 
   .dial-archive-annotation-operation {
     min-height: 520px;
+  }
+}
+
+/*
+ * Official-source solid plane pass.
+ * The Endfield site separates regions with white space and complete neutral
+ * fields. These rules intentionally remove ornamental dividers while keeping
+ * dense, operational data localized inside the channel and production blocks.
+ */
+.dial-archive-annotation-hero::before,
+.dial-archive-annotation-specimen::after,
+.dial-archive-annotation-specimen__main::before,
+.dial-archive-annotation-specimen__main::after {
+  display: none;
+}
+
+.dial-archive-annotation-specimen::before {
+  top: -18px;
+  right: 4%;
+  width: 22%;
+  height: 9px;
+}
+
+.dial-archive-annotation-specimen__main {
+  background: var(--dial-archive-surface-soft);
+}
+
+.dial-archive-annotation-hero__facts {
+  gap: 4px;
+  padding: 14px 18px;
+  border-top: 0;
+  background: var(--dial-archive-surface-soft);
+}
+
+.dial-archive-annotation-hero__facts > div {
+  padding: 7px 0;
+  border-bottom: 0;
+}
+
+.dial-archive-annotation-hero__actions button {
+  border: 0;
+  background: var(--dial-archive-surface-muted);
+}
+
+.dial-archive-annotation-hero__actions button.is-primary {
+  border-color: transparent;
+}
+
+.dial-archive-annotation-channels,
+.dial-archive-annotation-production {
+  border-top: 0;
+}
+
+.dial-archive-annotation-channel-list {
+  display: grid;
+  gap: 20px;
+  border-top: 0;
+}
+
+.dial-archive-annotation-channel {
+  border-bottom: 0;
+  background: var(--dial-archive-surface-soft);
+}
+
+.dial-archive-annotation-channel:hover {
+  background: var(--dial-archive-surface-muted);
+}
+
+.dial-archive-annotation-channel__identity {
+  padding-left: 24px;
+  border-right: 0;
+  background: var(--dial-archive-surface-muted);
+}
+
+.dial-archive-annotation-channel__body > dl {
+  gap: 6px;
+}
+
+.dial-archive-annotation-channel__body > dl div,
+.dial-archive-annotation-channel__body > dl div + div {
+  padding: 10px 12px;
+  border-right: 0;
+  background: var(--dial-archive-paper);
+}
+
+.dial-archive-annotation-channel__variants {
+  padding: 0 14px 10px;
+  border-top: 0;
+  background: var(--dial-archive-surface-muted);
+}
+
+.dial-archive-annotation-channel__actions {
+  gap: 4px;
+  border-left: 0;
+  background: var(--dial-archive-surface-muted);
+}
+
+.dial-archive-annotation-channel__actions button,
+.dial-archive-annotation-channel__actions button + button {
+  border: 0;
+  background: var(--dial-archive-paper);
+}
+
+.dial-archive-annotation-channel__actions button:last-child {
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-annotation-production {
+  background: var(--dial-archive-paper);
+}
+
+.dial-archive-annotation-context {
+  border-top: 0;
+  border-bottom: 0;
+}
+
+.dial-archive-annotation-context__axis i,
+.dial-archive-annotation-context__axis i::after {
+  display: none;
+}
+
+.dial-archive-annotation-context__signals {
+  gap: 10px;
+}
+
+.dial-archive-annotation-context__signals article,
+.dial-archive-annotation-context__signals article:nth-child(odd),
+.dial-archive-annotation-context__signals article:nth-child(even) {
+  padding: 20px 22px;
+  border: 0;
+  background: var(--dial-archive-surface-soft);
+}
+
+.dial-archive-annotation-context__empty {
+  border-top: 0;
+  background: var(--dial-archive-surface-soft);
+}
+
+.dial-archive-annotation-operation::after {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .dial-archive-annotation-channel-list {
+    gap: 12px;
+  }
+
+  .dial-archive-annotation-channel__identity {
+    padding-left: 12px;
+  }
+
+  .dial-archive-annotation-channel__body {
+    padding-right: 18px;
   }
 }

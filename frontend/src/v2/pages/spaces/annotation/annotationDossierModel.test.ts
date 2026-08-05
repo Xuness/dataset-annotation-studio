@@ -10,6 +10,7 @@ import {
   projectDossierDocuments,
   projectDossierMetadata,
   projectDossierProvenance,
+  projectDossierProvenanceHistory,
   projectDossierRevisions,
   projectDossierTranslations,
 } from "./annotationDossierModel";
@@ -184,8 +185,11 @@ describe("annotation dossier projection", () => {
       item_id: "item-1",
       item_status: "succeeded",
       job_id: "job-1",
+      job_kind: "annotation",
       job_status: "completed",
       matches_current_annotation: true,
+      output_channel: "description",
+      output_language: null,
       request: {
         parameters: {
           adapter_id: null,
@@ -227,6 +231,8 @@ describe("annotation dossier projection", () => {
         reasoning_tokens: null,
       },
       started_at: "2026-08-05T10:02:00Z",
+      translation_producer_kind: null,
+      translation_source_kind: null,
     };
 
     expect(projectDossierTranslations([translation])[0]).toMatchObject({
@@ -235,9 +241,12 @@ describe("annotation dossier projection", () => {
       model: "gpt-test",
     });
     expect(projectDossierProvenance(trace)).toMatchObject({
+      code: "LLM",
       current: true,
       source: "model_response",
+      title: "LLM 描述",
     });
+    expect(projectDossierProvenanceHistory([trace])).toHaveLength(1);
     expect(projectDossierProvenance(null)).toBeNull();
   });
 });

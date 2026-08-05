@@ -23,6 +23,8 @@ export const annotationTraceKeys = {
   project: (projectId: string) => workspaceQueryKeys.scope(projectId, "annotation-trace"),
   detail: (projectId: string, assetId: string | null) =>
     [...workspaceQueryKeys.scope(projectId, "annotation-trace"), assetId] as const,
+  history: (projectId: string, assetId: string | null) =>
+    [...workspaceQueryKeys.scope(projectId, "annotation-trace"), assetId, "history"] as const,
 };
 
 export const metadataKeys = {

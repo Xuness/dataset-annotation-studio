@@ -54,6 +54,9 @@ export function AnnotationRequestPreviewSurface({
               <dd>{contextParts.join(" + ") || "EMPTY"}</dd>
             </div>
           </dl>
+          <strong className="dial-archive-request-preview__index" aria-hidden="true">
+            REQ
+          </strong>
         </header>
         {preview.basedOnSavedContext ? (
           <p className="dial-archive-request-preview__notice">

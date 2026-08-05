@@ -1,0 +1,1741 @@
+/*
+ * Space 03 solid-surface system.
+ *
+ * Geometry and transitions remain owned by annotation-stage-reconstruction.css.
+ * This layer maps the official Endfield website palette to clear planes, and
+ * removes non-semantic grids, frames, and registration noise from the stage.
+ */
+
+.dial-archive-stage {
+  --dial-archive-stage-plane-white: var(--dial-archive-paper);
+  --dial-archive-stage-plane-subtle: var(--dial-archive-surface-subtle);
+  --dial-archive-stage-plane-soft: var(--dial-archive-surface-soft);
+  --dial-archive-stage-plane-muted: var(--dial-archive-surface-muted);
+  --dial-archive-stage-plane-rule: var(--dial-archive-rule);
+}
+
+/* Shared stage: white is the field; decoration is localized to one route axis. */
+.dial-archive-stage-canvas__paper {
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-stage-canvas__points.is-ambient,
+.dial-archive-stage-canvas__points.is-measure,
+.dial-archive-stage-canvas__evidence,
+.dial-archive-stage-canvas__ghost-word,
+.dial-archive-stage-canvas__crop.is-right {
+  display: none;
+}
+
+.dial-archive-stage-canvas__points.is-flow {
+  opacity: 0.16;
+}
+
+.dial-archive-stage-canvas__guides path {
+  stroke: var(--dial-archive-stage-plane-rule);
+}
+
+.dial-archive-stage-canvas__crop.is-left {
+  top: 13%;
+  left: 33%;
+  width: min(24vw, 470px);
+  height: 46%;
+  background: var(--dial-archive-yellow);
+  clip-path: none;
+}
+
+.dial-archive-stage-canvas__section-mark {
+  color: var(--dial-archive-copy-muted);
+}
+
+.dial-archive-stage-readout__ledger {
+  gap: 4px;
+  border-top: 0;
+}
+
+.dial-archive-stage-readout__ledger > div,
+.dial-archive-stage-readout__ledger > div:nth-child(even) {
+  padding: 8px 10px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-stage__masthead {
+  border-bottom: 0;
+  background: var(--dial-archive-stage-plane-white);
+  backdrop-filter: none;
+}
+
+.dial-archive-stage-specimen__ring,
+.dial-archive-stage-specimen__rear.is-register,
+.dial-archive-stage-specimen__corner,
+.dial-archive-stage-specimen__measure {
+  display: none;
+}
+
+.dial-archive-stage-specimen__rear.is-signal {
+  top: -8px;
+  right: 4%;
+  width: 24%;
+  height: 8px;
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-stage-specimen__viewport-tools {
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+  box-shadow: -8px 8px 0 var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-stage-specimen__viewport-tools button,
+.dial-archive-stage-specimen__viewport-tools output {
+  border-right-color: var(--dial-archive-stage-plane-muted);
+}
+
+/* The three destinations are architectural planes, not floating instrument cards. */
+.dial-archive-stage-workcell__connector {
+  display: none;
+}
+
+.dial-archive-stage-workcell__surface {
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+  box-shadow: none;
+  clip-path: none;
+  transition:
+    transform 320ms var(--dial-archive-ease),
+    color 180ms ease,
+    background 180ms ease;
+}
+
+.dial-archive-stage-workcell.is-dossier .dial-archive-stage-workcell__surface {
+  border-left: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-stage-workcell.is-production .dial-archive-stage-workcell__surface {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-stage-workcell.is-edit .dial-archive-stage-workcell__surface {
+  background: var(--dial-archive-yellow);
+  box-shadow: none;
+}
+
+.dial-archive-stage-workcell:hover .dial-archive-stage-workcell__surface,
+.dial-archive-stage-workcell:focus-visible .dial-archive-stage-workcell__surface {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+  transform: translate3d(-10px, 0, 24px);
+}
+
+.dial-archive-stage-workcell.is-production:hover .dial-archive-stage-workcell__surface,
+.dial-archive-stage-workcell.is-production:focus-visible .dial-archive-stage-workcell__surface {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage-workcell__ordinal {
+  opacity: 0.18;
+}
+
+/* One continuous material strip. Only the active object receives a hard frame. */
+.dial-archive-stage-filmstrip {
+  border-top: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-stage-filmstrip__rail {
+  display: none;
+}
+
+.dial-archive-stage-filmstrip__range {
+  padding: 0 16px;
+  border-right: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-stage-filmstrip__cell {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0.62;
+}
+
+.dial-archive-stage-filmstrip__cell:hover,
+.dial-archive-stage-filmstrip__cell:focus-visible {
+  border-color: transparent;
+  opacity: 1;
+}
+
+.dial-archive-stage-filmstrip__cell.is-current {
+  border-color: transparent;
+  opacity: 1;
+  box-shadow:
+    0 0 0 3px var(--dial-archive-carbon),
+    0 0 0 6px var(--dial-archive-yellow);
+}
+
+.dial-archive-stage-filmstrip__pager {
+  border: 0;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-stage-filmstrip__pager button,
+.dial-archive-stage-filmstrip__pager output {
+  color: inherit;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.dial-archive-stage-filmstrip__pager button:hover:not(:disabled),
+.dial-archive-stage-filmstrip__pager button:focus-visible {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-stage-filmstrip::before {
+  background: linear-gradient(90deg, var(--dial-archive-stage-plane-soft), transparent);
+}
+
+.dial-archive-stage-filmstrip::after {
+  background: linear-gradient(-90deg, var(--dial-archive-stage-plane-soft), transparent);
+}
+
+/* Workcell shell: a white page inside the persistent material stage. */
+.dial-archive-workcell-viewport__plane {
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-workcell-viewport__departing {
+  background: var(--dial-archive-stage-plane-white);
+}
+
+/* Edit: one light image field and one solid document plane. */
+.dial-archive-edit-workcell__ghost {
+  display: none;
+}
+
+.dial-archive-edit-workcell__console {
+  border-left: 0;
+  background: var(--dial-archive-stage-plane-soft);
+  box-shadow: none;
+}
+
+.dial-archive-edit-workcell__heading {
+  border-bottom: 0;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-edit-workcell__heading > span {
+  color: var(--dial-archive-rule);
+}
+
+.dial-archive-edit-workcell__heading output {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-workcell__channels {
+  gap: 4px;
+  border-bottom: 0;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-edit-workcell__channels button {
+  border-right: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-edit-workcell__channels button:hover:not(:disabled),
+.dial-archive-edit-workcell__channels button:focus-visible {
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-workcell__channels button.is-active {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+  box-shadow: none;
+}
+
+.dial-archive-edit-workcell__channels button.is-active:hover:not(:disabled),
+.dial-archive-edit-workcell__channels button.is-active:focus-visible:not(:disabled) {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-edit-workcell__channels
+  button.is-active:is(:hover, :focus-visible):not(:disabled)
+  :is(span, b, em) {
+  color: var(--dial-archive-carbon);
+}
+
+.dial-archive-edit-translation__source,
+.dial-archive-edit-translation__target,
+.dial-archive-edit-translation__source > pre,
+.dial-archive-edit-translation__target > pre {
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-edit-workcell__workspace {
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-edit-workcell__register {
+  display: none;
+}
+
+.dial-archive-edit-workcell__document-head {
+  margin: 12px 18px 0;
+  padding: 0 16px;
+  border-bottom: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-edit-workcell__document-head dl > div {
+  border-left: 0;
+  background: var(--dial-archive-stage-plane-soft);
+  padding: 7px 10px;
+}
+
+.dial-archive-edit-workcell__surface {
+  margin: 0 18px;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-edit-workcell__footer {
+  margin: 0 18px 14px;
+  border-top: 0;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-edit-workcell__footer select,
+.dial-archive-edit-workcell__footer-actions button {
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-edit-workcell__footer-actions button.is-primary {
+  border: 0;
+  background: var(--dial-archive-yellow);
+}
+
+/* Production: retain route semantics, remove the decorative plotting sheet. */
+.dial-archive-production-workcell,
+.dial-archive-production-workcell__route-field {
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-production-routes__ghost,
+.dial-archive-production-routes__blade,
+.dial-archive-production-routes__fields,
+.dial-archive-production-routes__contours,
+.dial-archive-production-routes__decor,
+.dial-archive-preparation-connectors__gauges {
+  display: none;
+}
+
+.dial-archive-production-routes__main .is-route-bed.is-bypassed {
+  stroke-dasharray: none;
+  opacity: 0.06;
+}
+
+.dial-archive-production-workcell__controls,
+.dial-archive-production-workcell__minimap {
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+  box-shadow: 8px 8px 0 var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-production-workcell__console-field.dial-archive-preparation-inspector {
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+  box-shadow: -18px 0 0 var(--dial-archive-stage-plane-muted);
+  clip-path: none;
+}
+
+.dial-archive-production-workcell__console-head {
+  border-bottom: 0;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-workcell__console-close {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-production-input-nav {
+  gap: 4px;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-production-input-nav button {
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-production-input-nav button.is-active {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+  box-shadow: none;
+}
+
+.dial-archive-production-workcell__console-foot {
+  border-top: 0;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+/* Production inspector: five modes, five reading compositions. The common
+ * shell only owns navigation; each mode receives one dominant plane and one
+ * restrained supporting register. */
+.dial-archive-production-input-nav {
+  position: relative;
+  padding: 4px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-production-input-nav::after {
+  display: none;
+}
+
+.dial-archive-production-input-nav button {
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-production-input-nav button.is-active {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+  box-shadow: none;
+}
+
+/* CONFIG: a lane identity slab followed by broad, borderless parameter bays. */
+.dial-archive-production-console {
+  display: grid;
+  min-height: min(760px, calc(100vh - 330px));
+  align-content: start;
+  gap: 18px;
+}
+
+.dial-archive-production-console__identity {
+  position: relative;
+  display: grid;
+  min-height: 164px;
+  align-items: end;
+  padding: 24px 31% 26px 28px;
+  overflow: hidden;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-console__identity::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 27%;
+  background: var(--dial-archive-yellow);
+  content: "";
+}
+
+.dial-archive-production-console__identity > div {
+  position: relative;
+  z-index: 1;
+}
+
+.dial-archive-production-console__identity span {
+  color: var(--dial-archive-rule);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+}
+
+.dial-archive-production-console__identity h3 {
+  margin: 17px 0 0;
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(28px, 1.45vw, 38px);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.dial-archive-production-console__identity p {
+  max-width: 38em;
+  margin: 12px 0 0;
+  color: var(--dial-archive-rule);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.dial-archive-production-console__identity > strong {
+  position: absolute;
+  z-index: 1;
+  right: 2.5%;
+  bottom: -0.08em;
+  color: var(--dial-archive-carbon);
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(62px, 4.6vw, 112px);
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  line-height: 0.78;
+}
+
+.dial-archive-production-console__form {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: 1fr auto;
+  gap: 18px;
+}
+
+.dial-archive-production-console__parameters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 12px;
+}
+
+.dial-archive-production-console__parameters > legend {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0 15px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-production-console__parameters > legend span,
+.dial-archive-production-console__parameters > legend b {
+  font-family: var(--dial-archive-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.dial-archive-production-console__parameters > legend b {
+  padding: 6px 9px;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-field.dial-archive-preparation-inspector__field {
+  display: grid;
+  min-width: 0;
+  min-height: 120px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-production-field__identity {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 10px;
+}
+
+.dial-archive-production-field__identity small {
+  padding: 5px 7px;
+  color: var(--dial-archive-paper);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-field__identity b {
+  overflow: visible;
+  color: var(--dial-archive-carbon);
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  white-space: normal;
+}
+
+.dial-archive-production-field__control {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 58px;
+  overflow: hidden;
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-production-field__control::before {
+  display: none;
+}
+
+.dial-archive-production-field__control select,
+.dial-archive-production-workcell__console-field .dial-archive-production-field__control select {
+  width: 100%;
+  height: 100%;
+  min-height: 58px;
+  padding: 0 58px 0 16px;
+  border: 0;
+  color: var(--dial-archive-carbon);
+  font-size: 14px;
+  background: transparent;
+  appearance: none;
+}
+
+.dial-archive-production-field__control > i {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  width: 48px;
+  place-items: center;
+  color: var(--dial-archive-carbon);
+  font-size: 22px;
+  font-style: normal;
+  background: var(--dial-archive-yellow);
+  pointer-events: none;
+}
+
+.dial-archive-production-field__control:focus-within {
+  outline: 2px solid var(--dial-archive-carbon);
+  outline-offset: -2px;
+}
+
+.dial-archive-production-console__handoff {
+  display: grid;
+  min-height: 72px;
+  grid-template-columns: minmax(150px, 0.32fr) minmax(0, 1fr);
+  align-items: stretch;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-production-console__handoff span,
+.dial-archive-production-console__handoff b {
+  display: flex;
+  align-items: center;
+  padding: 15px 17px;
+}
+
+.dial-archive-production-console__handoff span {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+  opacity: 1;
+}
+
+/* COMMIT: a dark validation field terminates in one tall yellow write slab. */
+.dial-archive-production-commit {
+  gap: 14px;
+}
+
+.dial-archive-production-commit__overview {
+  min-height: 194px;
+  align-content: end;
+  padding: 28px 32% 28px 28px;
+  clip-path: none;
+}
+
+.dial-archive-production-commit__overview::after {
+  top: 0;
+  right: 0;
+  width: 27%;
+  height: 100%;
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-production-commit__overview > span,
+.dial-archive-production-commit__overview > b,
+.dial-archive-production-commit__overview h3,
+.dial-archive-production-commit__overview p {
+  position: relative;
+  z-index: 2;
+}
+
+.dial-archive-production-commit__overview > b {
+  top: 25px;
+  right: 24px;
+  color: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-commit__overview h3 {
+  margin-top: 24px;
+  font-size: clamp(30px, 1.55vw, 40px);
+}
+
+.dial-archive-production-commit__overview p {
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.dial-archive-production-commit__index {
+  position: absolute;
+  z-index: 1;
+  right: 3%;
+  bottom: -0.05em;
+  color: var(--dial-archive-carbon);
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(88px, 5.4vw, 134px);
+  font-weight: 900;
+  font-style: normal;
+  letter-spacing: -0.09em;
+  line-height: 0.78;
+}
+
+.dial-archive-production-commit__sequence {
+  padding: 4px;
+  gap: 4px;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-production-commit__sequence li,
+.dial-archive-production-commit__sequence li.is-complete,
+.dial-archive-production-commit__sequence li.is-attention {
+  min-height: 70px;
+  align-content: center;
+  padding: 12px 14px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+  box-shadow: none;
+}
+
+.dial-archive-production-commit__sequence li.is-ready {
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-production-commit__readings {
+  gap: 4px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-production-commit__readings > div,
+.dial-archive-production-commit__readings > div + div {
+  min-height: 76px;
+  padding: 14px 15px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-production-snapshot,
+.dial-archive-production-operation__snapshot {
+  clip-path: none;
+}
+
+.dial-archive-production-snapshot > summary,
+.dial-archive-production-operation__snapshot > summary {
+  min-height: 54px;
+  padding: 0 16px;
+}
+
+.dial-archive-production-snapshot dl,
+.dial-archive-production-operation__snapshot dl {
+  gap: 4px;
+  padding: 4px;
+  border-top: 0;
+}
+
+.dial-archive-production-snapshot dl > div,
+.dial-archive-production-snapshot dl > div:nth-child(even),
+.dial-archive-production-snapshot dl > div:nth-child(n + 3),
+.dial-archive-production-operation__snapshot dl > div,
+.dial-archive-production-operation__snapshot dl > div:nth-child(even) {
+  border: 0;
+  background: var(--dial-archive-surface-carbon-soft);
+}
+
+.dial-archive-production-ready {
+  min-height: 56px;
+  padding: 0 17px;
+  border: 0;
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-launch {
+  min-height: 86px;
+  padding: 14px 22px;
+  border: 0;
+  box-shadow: none;
+  clip-path: none;
+}
+
+/* CONTEXT: one editable project plane, followed by a single evidence register. */
+.dial-archive-context-surface__index,
+.dial-archive-request-preview__index {
+  display: none;
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.72fr) minmax(0, 1.28fr);
+  grid-template-areas:
+    "head head"
+    "preset prompt"
+    "toggle prompt"
+    "foot foot";
+  grid-template-rows: auto auto 1fr auto;
+  gap: 12px;
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > header {
+  position: relative;
+  display: grid;
+  min-height: 150px;
+  grid-area: head;
+  align-content: end;
+  padding: 24px 30% 24px 26px;
+  overflow: hidden;
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > header > span,
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > header > h3,
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > header > em {
+  position: relative;
+  z-index: 2;
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > header > h3 {
+  margin-top: 16px;
+  font-size: clamp(28px, 1.45vw, 38px);
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > header > em {
+  top: 20px;
+  right: 22px;
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__index {
+  position: absolute;
+  right: 2%;
+  bottom: -0.08em;
+  display: block;
+  color: var(--dial-archive-stage-plane-muted);
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(78px, 5vw, 124px);
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  line-height: 0.78;
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__preset,
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__prompt,
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__toggle {
+  margin: 0;
+  border: 0;
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__preset {
+  display: grid;
+  min-width: 0;
+  grid-area: preset;
+  align-content: start;
+  gap: 12px;
+  padding: 17px;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__prompt {
+  display: grid;
+  min-width: 0;
+  grid-area: prompt;
+  grid-template-rows: auto minmax(150px, 1fr);
+  gap: 12px;
+  padding: 17px;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-context-surface.is-inspector select,
+.dial-archive-context-surface.is-inspector textarea {
+  border: 0;
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-context-surface.is-inspector select {
+  min-height: 52px;
+  padding-right: 40px;
+}
+
+.dial-archive-context-surface.is-inspector textarea {
+  height: 100%;
+  min-height: 150px;
+  padding: 16px;
+  line-height: 1.7;
+}
+
+.dial-archive-context-surface.is-inspector select:focus,
+.dial-archive-context-surface.is-inspector textarea:focus {
+  outline: 2px solid var(--dial-archive-carbon);
+  outline-offset: -2px;
+  box-shadow: inset 6px 0 var(--dial-archive-yellow);
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__toggle {
+  min-height: 96px;
+  grid-area: toggle;
+  align-items: center;
+  padding: 17px;
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__config > footer {
+  min-height: 72px;
+  grid-area: foot;
+  padding: 10px 12px 10px 17px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-context-surface.is-inspector button {
+  border: 0;
+}
+
+.dial-archive-context-surface.is-inspector
+  .dial-archive-context-surface__config
+  > footer
+  button.is-primary {
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__evidence {
+  display: grid;
+  gap: 10px;
+}
+
+.dial-archive-context-surface__evidence-head {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 17px;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-context-surface__evidence-head span,
+.dial-archive-context-surface__evidence-head b {
+  font-family: var(--dial-archive-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.dial-archive-context-surface__evidence-head span {
+  color: var(--dial-archive-rule);
+}
+
+.dial-archive-context-surface__evidence-head b {
+  color: var(--dial-archive-yellow);
+}
+
+.dial-archive-context-surface__register,
+.dial-archive-context-surface__raw-register {
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+  clip-path: none;
+}
+
+.dial-archive-context-surface__register > summary,
+.dial-archive-context-surface__raw-register > summary {
+  min-height: 62px;
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-context-surface__register > summary b,
+.dial-archive-context-surface__raw-register > summary b {
+  color: var(--dial-archive-carbon);
+}
+
+.dial-archive-context-surface__register > pre,
+.dial-archive-context-surface__raw-register > pre {
+  background: var(--dial-archive-stage-plane-subtle);
+}
+
+.dial-archive-context-surface__raw-register {
+  background: var(--dial-archive-stage-plane-white);
+}
+
+/* REQUEST: compact system/context registers feed one large, readable user payload. */
+.dial-archive-request-preview.is-inspector > header {
+  position: relative;
+  display: grid;
+  min-height: 158px;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 0.86fr);
+  align-items: end;
+  gap: 24px;
+  padding: 24px 26px;
+  overflow: hidden;
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-request-preview.is-inspector > header > div,
+.dial-archive-request-preview.is-inspector > header dl {
+  position: relative;
+  z-index: 2;
+}
+
+.dial-archive-request-preview.is-inspector > header h3 {
+  margin-top: 16px;
+  font-size: clamp(28px, 1.45vw, 38px);
+}
+
+.dial-archive-request-preview.is-inspector > header dl {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 14px 16px;
+  gap: 10px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-request-preview.is-inspector > header dl > div,
+.dial-archive-request-preview.is-inspector > header dl > div + div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__index {
+  position: absolute;
+  right: 1.5%;
+  bottom: -0.08em;
+  display: block;
+  color: var(--dial-archive-stage-plane-muted);
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(78px, 5vw, 124px);
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  line-height: 0.78;
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__notice,
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__warning {
+  margin: 0;
+  padding: 13px 16px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__warning {
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  gap: 12px;
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages details,
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages details.is-user {
+  min-width: 0;
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+  clip-path: none;
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages details.is-user {
+  grid-column: 1 / -1;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages summary {
+  min-height: 72px;
+  padding: 12px 15px;
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-request-preview.is-inspector
+  .dial-archive-request-preview__messages
+  details.is-system
+  > summary {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-request-preview.is-inspector
+  .dial-archive-request-preview__messages
+  details.is-system
+  > summary
+  span {
+  color: var(--dial-archive-paper);
+}
+
+.dial-archive-request-preview.is-inspector
+  .dial-archive-request-preview__messages
+  details.is-user
+  > summary {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-request-preview.is-inspector
+  .dial-archive-request-preview__messages
+  details.is-user
+  > summary
+  :is(b, span) {
+  color: var(--dial-archive-carbon);
+}
+
+.dial-archive-request-preview.is-inspector
+  .dial-archive-request-preview__messages
+  details.is-context
+  > summary
+  :is(b, span) {
+  color: var(--dial-archive-carbon);
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages pre {
+  min-height: 150px;
+  padding: 18px 20px 22px;
+  background: var(--dial-archive-stage-plane-subtle);
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages details > div {
+  padding: 12px;
+  background: var(--dial-archive-stage-plane-subtle);
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages code {
+  margin-top: 4px;
+  padding: 9px 10px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages code.is-signal {
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-request-preview.is-inspector > footer {
+  display: grid;
+  min-height: 72px;
+  grid-template-columns: minmax(180px, 0.34fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-request-preview.is-inspector > footer > span,
+.dial-archive-request-preview.is-inspector > footer > b {
+  display: flex;
+  align-items: center;
+  padding: 14px 17px;
+}
+
+.dial-archive-request-preview.is-inspector > footer > span {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+/* RESULT: progress is the dominant field; exceptions remain a secondary ledger. */
+.dial-archive-production-operation {
+  gap: 14px;
+}
+
+.dial-archive-production-operation > .dial-archive-preparation-inspector__operation {
+  position: relative;
+  display: grid;
+  min-height: 206px;
+  grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.28fr);
+  grid-template-rows: 1fr 8px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-operation__register {
+  display: grid;
+  min-width: 0;
+  align-content: end;
+  gap: 14px;
+  padding: 25px;
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-production-operation__register span {
+  font-family: var(--dial-archive-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+.dial-archive-production-operation__register b {
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(22px, 1.35vw, 34px);
+  line-height: 1.08;
+  word-break: break-all;
+}
+
+.dial-archive-production-operation__readout,
+.dial-archive-production-operation
+  > .dial-archive-preparation-inspector__operation
+  .dial-archive-production-operation__readout {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: stretch;
+  margin: 0;
+  padding: 4px;
+  gap: 4px;
+  border: 0;
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-operation__readout > div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: center;
+  gap: 9px;
+  padding: 13px 14px;
+  border: 0;
+  background: var(--dial-archive-surface-carbon-soft);
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-preparation-inspector__operation
+  > .dial-archive-production-operation__readout
+  > div {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  gap: 7px;
+}
+
+.dial-archive-production-operation__readout :is(dt, dd) {
+  margin: 0;
+}
+
+.dial-archive-production-operation__readout dt {
+  color: var(--dial-archive-copy-muted);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.dial-archive-production-operation__readout dd {
+  overflow-wrap: normal;
+  word-break: keep-all;
+  color: var(--dial-archive-paper);
+  font-size: 13px;
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-preparation-inspector__operation
+  > .dial-archive-production-operation__readout
+  dd {
+  overflow-wrap: break-word;
+  word-break: keep-all;
+}
+
+.dial-archive-production-operation__readout dd b {
+  color: var(--dial-archive-yellow);
+  font-size: 25px;
+}
+
+.dial-archive-production-operation__progress {
+  position: relative;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  background: var(--dial-archive-surface-carbon-soft);
+}
+
+.dial-archive-production-operation__progress > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 3px;
+  background: var(--dial-archive-yellow);
+  transition: width 480ms var(--dial-archive-ease);
+}
+
+.dial-archive-production-operation__metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-production-operation__metrics > span,
+.dial-archive-production-operation__metrics > span + span {
+  display: flex;
+  min-width: 0;
+  min-height: 88px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px;
+  border: 0;
+  color: var(--dial-archive-copy-secondary);
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-production-operation__metrics > span b {
+  color: var(--dial-archive-carbon);
+  font-family: var(--dial-archive-font-display);
+  font-size: clamp(24px, 1.35vw, 34px);
+}
+
+.dial-archive-production-operation__snapshot dl > div,
+.dial-archive-production-operation__snapshot dl > div:nth-child(even) {
+  border: 0;
+  background: var(--dial-archive-surface-carbon-soft);
+}
+
+.dial-archive-production-exceptions {
+  gap: 10px;
+}
+
+.dial-archive-production-exceptions > header {
+  min-height: 54px;
+  padding: 0 15px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-production-exceptions article {
+  margin-top: 4px;
+  padding: 14px 16px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-production-exceptions__empty {
+  min-height: 116px;
+  padding: 24px;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-production-operation__actions button,
+.dial-archive-production-operation__actions button.dial-archive-preparation-inspector__primary {
+  min-height: 72px;
+  border: 0;
+  clip-path: none;
+}
+
+/* The shared Space 02 inspector stylesheet is loaded after this feature sheet.
+ * Keep these selectors deliberately scoped so its legacy field borders and
+ * disabled opacity cannot reappear inside the production compositions. */
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-console__parameters
+  > legend {
+  border: 0;
+}
+
+.dial-archive-production-workcell__console-field .dial-archive-production-launch,
+.dial-archive-production-workcell__console-field .dial-archive-production-operation__actions button,
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-operation__metrics
+  > span {
+  border: 0;
+}
+
+.dial-archive-production-workcell__console-field .dial-archive-production-operation__metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.dial-archive-production-workcell__console-head span {
+  color: var(--dial-archive-rule);
+}
+
+.dial-archive-production-workcell__console-field
+  > .dial-archive-production-workcell__console-head
+  span {
+  color: var(--dial-archive-rule);
+}
+
+.dial-archive-production-workcell__console-field
+  > .dial-archive-production-workcell__console-foot
+  span,
+.dial-archive-production-workcell__console-field
+  .dial-archive-context-surface.is-inspector
+  .dial-archive-context-surface__config
+  > footer
+  > :is(span, strong) {
+  color: var(--dial-archive-gray-6, #666666);
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-context-surface.is-inspector
+  .dial-archive-context-surface__evidence-head
+  span {
+  color: var(--dial-archive-rule);
+  font-size: 11px;
+}
+
+.dial-archive-production-workcell__console-field
+  :is(
+    .dial-archive-context-surface.is-inspector label > span,
+    .dial-archive-context-surface.is-inspector
+      .dial-archive-context-surface__config
+      > header
+      > span,
+    .dial-archive-request-preview.is-inspector > header > div > span,
+    .dial-archive-request-preview.is-inspector > header dt,
+    .dial-archive-production-operation__metrics > span,
+    .dial-archive-production-exceptions > header > span,
+    .dial-archive-production-exceptions__empty
+  ) {
+  color: var(--dial-archive-gray-6, #666666);
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-context-surface__register.is-metadata
+  > p,
+.dial-archive-production-workcell__console-field .dial-archive-production-exceptions__empty p {
+  color: var(--dial-archive-gray-6, #666666);
+}
+
+.dial-archive-production-workcell__console-field .dial-archive-production-commit__overview > span,
+.dial-archive-production-workcell__console-field .dial-archive-production-commit__overview p {
+  color: var(--dial-archive-rule);
+}
+
+.dial-archive-production-workcell__console-field
+  :is(.dial-archive-production-snapshot, .dial-archive-production-operation__snapshot)
+  :is(dt, small) {
+  color: var(--dial-archive-copy-muted);
+}
+
+.dial-archive-production-workcell__console-field .dial-archive-production-operation__register span {
+  color: var(--dial-archive-carbon);
+}
+
+.dial-archive-context-surface.is-inspector .dial-archive-context-surface__toggle small {
+  color: var(--dial-archive-carbon);
+  opacity: 0.72;
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-field__control
+  select:disabled {
+  color: var(--dial-archive-gray-6, #666666);
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-field__control:has(select:disabled) {
+  opacity: 1;
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-context-surface.is-inspector
+  button:disabled,
+.dial-archive-production-workcell__console-field .dial-archive-production-launch:disabled,
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-operation__actions
+  button:disabled {
+  color: var(--dial-archive-gray-6, #666666);
+  background: var(--dial-archive-stage-plane-muted);
+  opacity: 1;
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-input-nav
+  button:hover:not(.is-active),
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-input-nav
+  button:focus-visible:not(.is-active) {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-context-surface.is-inspector
+  .dial-archive-context-surface__config
+  > footer
+  button:hover:not(:disabled),
+.dial-archive-production-workcell__console-field
+  .dial-archive-context-surface.is-inspector
+  .dial-archive-context-surface__config
+  > footer
+  button:focus-visible:not(:disabled),
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-launch:hover:not(:disabled),
+.dial-archive-production-workcell__console-field .dial-archive-production-launch:focus-visible {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-workcell__console-field
+  :is(.dial-archive-context-surface__register, .dial-archive-context-surface__raw-register)
+  > summary:hover,
+.dial-archive-production-workcell__console-field
+  :is(.dial-archive-context-surface__register, .dial-archive-context-surface__raw-register)
+  > summary:focus-visible,
+.dial-archive-production-workcell__console-field
+  .dial-archive-request-preview__messages
+  summary:hover,
+.dial-archive-production-workcell__console-field
+  .dial-archive-request-preview__messages
+  summary:focus-visible {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+  outline: none;
+}
+
+.dial-archive-production-workcell__console-field
+  :is(.dial-archive-context-surface__register, .dial-archive-context-surface__raw-register)
+  > summary:is(:hover, :focus-visible)
+  :is(span, b),
+.dial-archive-production-workcell__console-field
+  .dial-archive-request-preview__messages
+  summary:is(:hover, :focus-visible)
+  :is(span, b) {
+  color: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-request-preview.is-inspector
+  .dial-archive-request-preview__messages
+  details.is-system
+  > summary:is(:hover, :focus-visible) {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-request-preview.is-inspector
+  .dial-archive-request-preview__messages
+  details.is-system
+  > summary:is(:hover, :focus-visible)
+  :is(b, span) {
+  color: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-operation__actions
+  button.is-primary:hover:not(:disabled),
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-operation__actions
+  button.is-primary:focus-visible {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-operation__actions
+  button:not(.is-primary):hover:not(:disabled),
+.dial-archive-production-workcell__console-field
+  .dial-archive-production-operation__actions
+  button:not(.is-primary):focus-visible {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+}
+
+/* Dossier: restrained yellow identity slab plus broad record bands. */
+.dial-archive-dossier-workcell__yellow-field {
+  top: 12%;
+  left: 2%;
+  width: 5.5%;
+  height: 58%;
+  background: var(--dial-archive-yellow);
+  clip-path: none;
+}
+
+.dial-archive-dossier-workcell__measure,
+.dial-archive-dossier-register__ghost {
+  display: none;
+}
+
+.dial-archive-dossier-evidence {
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+  box-shadow: none;
+}
+
+.dial-archive-dossier-evidence__head,
+.dial-archive-dossier-evidence__facts,
+.dial-archive-dossier-evidence__seal {
+  border-color: transparent;
+}
+
+.dial-archive-dossier-evidence__continuity {
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+  padding: 10px 12px;
+}
+
+.dial-archive-dossier-evidence__facts {
+  gap: 4px;
+}
+
+.dial-archive-dossier-evidence__facts > div {
+  padding: 8px 10px;
+  border-bottom: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-dossier-register {
+  border: 0;
+  background: var(--dial-archive-stage-plane-white);
+  box-shadow: none;
+}
+
+.dial-archive-dossier-register__title,
+.dial-archive-dossier-register__foot {
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-dossier-register__title dl > div {
+  border-left: 0;
+  background: var(--dial-archive-stage-plane-white);
+}
+
+.dial-archive-dossier-register__rail {
+  gap: 4px;
+  border: 0;
+  background: var(--dial-archive-stage-plane-muted);
+}
+
+.dial-archive-dossier-register__rail button {
+  border: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-dossier-register__rail button:hover,
+.dial-archive-dossier-register__rail button:focus-visible {
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-dossier-register__rail button.is-active {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+  box-shadow: none;
+}
+
+.dial-archive-dossier-section__head {
+  border-bottom: 0;
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-dossier-channels,
+.dial-archive-dossier-timeline,
+.dial-archive-dossier-translations,
+.dial-archive-dossier-jobs {
+  display: grid;
+  gap: 10px;
+}
+
+.dial-archive-dossier-channels > li,
+.dial-archive-dossier-timeline > li,
+.dial-archive-dossier-translations > li,
+.dial-archive-dossier-jobs > li {
+  border: 0;
+  border-left: 6px solid var(--dial-archive-stage-plane-muted);
+  background: var(--dial-archive-stage-plane-soft);
+}
+
+.dial-archive-dossier-channels > li + li,
+.dial-archive-dossier-timeline > li + li,
+.dial-archive-dossier-translations > li + li,
+.dial-archive-dossier-jobs > li + li {
+  margin-top: 0;
+}
+
+.dial-archive-dossier-channels > li.is-usable,
+.dial-archive-dossier-timeline > li.is-candidate,
+.dial-archive-dossier-jobs > li.is-succeeded {
+  border-left-color: var(--dial-archive-yellow);
+}
+
+.dial-archive-dossier-channels details,
+.dial-archive-dossier-timeline details,
+.dial-archive-dossier-translations details,
+.dial-archive-dossier-jobs details {
+  border-top-color: var(--dial-archive-stage-plane-muted);
+}
+
+@media (max-width: 1120px) {
+  .dial-archive-stage-canvas__crop.is-left {
+    left: 28%;
+    width: 34vw;
+  }
+
+  .dial-archive-edit-workcell__document-head,
+  .dial-archive-edit-workcell__surface,
+  .dial-archive-edit-workcell__footer {
+    margin-right: 12px;
+    margin-left: 12px;
+  }
+}
+
+@media (max-width: 780px), (orientation: portrait) {
+  .dial-archive-production-console__identity,
+  .dial-archive-production-commit__overview {
+    padding-right: 34%;
+  }
+
+  .dial-archive-production-console__parameters,
+  .dial-archive-production-operation__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .dial-archive-context-surface.is-inspector .dial-archive-context-surface__config {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "head"
+      "preset"
+      "prompt"
+      "toggle"
+      "foot";
+    grid-template-rows: none;
+  }
+
+  .dial-archive-request-preview.is-inspector > header,
+  .dial-archive-request-preview.is-inspector .dial-archive-request-preview__messages,
+  .dial-archive-production-operation > .dial-archive-preparation-inspector__operation {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dial-archive-request-preview.is-inspector > header {
+    align-items: start;
+  }
+
+  .dial-archive-request-preview.is-inspector
+    .dial-archive-request-preview__messages
+    details.is-user {
+    grid-column: 1;
+  }
+
+  .dial-archive-production-operation > .dial-archive-preparation-inspector__operation {
+    grid-template-rows: auto auto 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dial-archive-stage-workcell__surface {
+    transition-duration: 1ms;
+  }
+}

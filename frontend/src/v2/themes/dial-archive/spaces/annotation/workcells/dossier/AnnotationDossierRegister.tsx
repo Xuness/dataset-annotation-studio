@@ -42,14 +42,15 @@ function sectionCount(section: AnnotationDossierSectionId, dossier: AnnotationDo
   if (section === "revisions") return dossier.revisions.length;
   if (section === "translations") return dossier.translations.length;
   if (section === "jobs") return dossier.jobs.length;
-  return dossier.provenance ? 1 : 0;
+  return dossier.provenanceHistory.length;
 }
 
 function DossierSectionHeading({ code, count }: { code: string; count: number }) {
   return (
     <header className="dial-archive-dossier-section__head">
       <span>REG.{code} / CURRENT PAGE</span>
-      <b>{String(count).padStart(2, "0")}</b>
+      <i aria-hidden="true" />
+      <b>{String(count).padStart(2, "0")} RECORD</b>
     </header>
   );
 }
@@ -287,18 +288,68 @@ function DossierSectionBody({
   }
   return dossier.provenance ? (
     <div className="dial-archive-dossier-provenance">
-      <header className={dossier.provenance.current ? "is-current" : "is-stale"}>
-        <span>TRACE LINK</span>
-        <b>{dossier.provenance.source ?? "来源未命名"}</b>
-        <output>
-          {dossier.provenance.current ? "MATCHES CURRENT HEAD" : "HISTORICAL RESPONSE"}
-        </output>
-      </header>
-      <dl>
-        {dossier.provenance.readings.map((reading) => (
-          <ProvenanceReading reading={reading} key={reading.id} />
+      <section
+        className={`dial-archive-dossier-provenance__focus ${dossier.provenance.current ? "is-current" : "is-stale"}`}
+        data-trace-code={dossier.provenance.code}
+      >
+        <header>
+          <span>{dossier.provenance.code} / SELECTED TRACE</span>
+          <b>{dossier.provenance.title}</b>
+          <small>{dossier.provenance.model}</small>
+          <output>
+            {dossier.provenance.current ? "MATCHES CURRENT HEAD" : "HISTORICAL RESPONSE"}
+          </output>
+        </header>
+        <dl>
+          {dossier.provenance.readings
+            .filter((reading) =>
+              ["channel", "provider", "started", "finished", "tokens"].includes(reading.id),
+            )
+            .map((reading) => (
+              <ProvenanceReading reading={reading} key={reading.id} />
+            ))}
+        </dl>
+      </section>
+
+      <div className="dial-archive-dossier-provenance__history-head">
+        <span>CALL INDEX / 生成调用历史</span>
+        <b>{dossier.provenanceHistory.length} TRACE</b>
+      </div>
+      <nav className="dial-archive-dossier-provenance__history" aria-label="生成调用历史">
+        {dossier.provenanceHistory.map((record, index) => (
+          <button
+            className={`${record.id === dossier.selectedProvenanceId ? "is-active" : ""}${record.current ? " is-current" : ""}`}
+            type="button"
+            aria-pressed={record.id === dossier.selectedProvenanceId}
+            onClick={() => dossier.selectProvenance(record.id)}
+            key={record.id}
+          >
+            <span>
+              {record.code}.{(index + 1).toString().padStart(2, "0")}
+            </span>
+            <div>
+              <b>{record.title}</b>
+              <small>{record.model}</small>
+            </div>
+            <time dateTime={record.startedAt}>{formatTimestamp(record.startedAt)}</time>
+            <output>{record.current ? "CURRENT HEAD" : "HISTORICAL"}</output>
+          </button>
         ))}
-      </dl>
+      </nav>
+
+      <details className="dial-archive-dossier-provenance__technical">
+        <summary>TECHNICAL IDENTITY // 技术标识</summary>
+        <dl>
+          {dossier.provenance.readings
+            .filter((reading) =>
+              ["started", "finished", "job", "item", "attempt", "model"].includes(reading.id),
+            )
+            .map((reading) => (
+              <ProvenanceReading reading={reading} key={reading.id} />
+            ))}
+        </dl>
+      </details>
+
       <div className="dial-archive-dossier-provenance__raw">
         <details className="dial-archive-dossier-raw">
           <summary>REQUEST ENVELOPE // 请求证据</summary>
@@ -330,7 +381,7 @@ export function AnnotationDossierRegister({
     <article className="dial-archive-dossier-register" aria-labelledby="dossier-register-title">
       <header className="dial-archive-dossier-register__title">
         <div>
-          <span>RL-DAS / OBJECT EVIDENCE REGISTER</span>
+          <span>MATERIAL DOSSIER / CURRENT OBJECT</span>
           <h2 id="dossier-register-title">{active.title}</h2>
         </div>
         <b aria-hidden="true">{active.code}</b>
@@ -346,25 +397,28 @@ export function AnnotationDossierRegister({
         </dl>
       </header>
 
-      <nav className="dial-archive-dossier-register__rail" aria-label="对象档案章节">
-        {DOSSIER_SECTIONS.map((item) => (
-          <button
-            className={item.id === active.id ? "is-active" : undefined}
-            type="button"
-            aria-pressed={item.id === active.id}
-            onClick={() => onSelectSection(item.id)}
-            key={item.id}
-          >
-            <span>{item.code}</span>
-            <b>{item.title}</b>
-          </button>
-        ))}
-      </nav>
+      <div className="dial-archive-dossier-register__body">
+        <nav className="dial-archive-dossier-register__rail" aria-label="对象档案章节">
+          {DOSSIER_SECTIONS.map((item) => (
+            <button
+              className={item.id === active.id ? "is-active" : undefined}
+              type="button"
+              aria-pressed={item.id === active.id}
+              onClick={() => onSelectSection(item.id)}
+              key={item.id}
+            >
+              <span>{item.code}</span>
+              <b>{item.title}</b>
+              <small>{String(sectionCount(item.id, dossier)).padStart(2, "0")}</small>
+            </button>
+          ))}
+        </nav>
 
-      <section className={`dial-archive-dossier-section is-${active.id}`}>
-        <DossierSectionHeading code={active.code} count={count} />
-        <DossierSectionBody section={active.id} dossier={dossier} />
-      </section>
+        <section className={`dial-archive-dossier-section is-${active.id}`}>
+          <DossierSectionHeading code={active.code} count={count} />
+          <DossierSectionBody section={active.id} dossier={dossier} />
+        </section>
+      </div>
 
       <footer className="dial-archive-dossier-register__foot">
         <div className="dial-archive-dossier-register__crosslinks" aria-label="跨空间关联入口">

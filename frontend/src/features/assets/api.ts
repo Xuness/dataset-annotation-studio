@@ -53,6 +53,17 @@ export function getAnnotationTrace(
   return apiRequest(`/api/v1/workspaces/${projectId}/assets/${assetId}/annotation-trace`);
 }
 
+export function getAnnotationTraces(
+  projectId: string,
+  assetId: string,
+  limit = 100,
+): Promise<AssetAnnotationTrace[]> {
+  const parameters = new URLSearchParams({ limit: String(limit) });
+  return apiRequest(
+    `/api/v1/workspaces/${projectId}/assets/${assetId}/annotation-traces?${parameters}`,
+  );
+}
+
 export function imageUrl(projectId: string, assetId: string, contentVersion: string): string {
   const version = encodeURIComponent(contentVersion);
   return apiAssetUrl(`/api/v1/workspaces/${projectId}/assets/${assetId}/image?v=${version}`);

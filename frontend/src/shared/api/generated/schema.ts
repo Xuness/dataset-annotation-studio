@@ -1084,6 +1084,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation-traces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Annotation Traces */
+        get: operations["list_annotation_traces_api_v1_workspaces__project_id__assets__asset_id__annotation_traces_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation/history": {
         parameters: {
             query?: never;
@@ -2276,14 +2293,28 @@ export type components = {
             item_status: string;
             /** Job Id */
             job_id: string;
+            /**
+             * Job Kind
+             * @default annotation
+             * @enum {string}
+             */
+            job_kind: "annotation" | "translation";
             /** Job Status */
             job_status: string;
             /** Matches Current Annotation */
             matches_current_annotation: boolean;
+            /** @default description */
+            output_channel: components["schemas"]["AnnotationChannel"];
+            /** Output Language */
+            output_language?: string | null;
             request: components["schemas"]["TraceRequest"];
             response: components["schemas"]["TraceResponse"];
             /** Started At */
             started_at: string;
+            /** Translation Producer Kind */
+            translation_producer_kind?: string | null;
+            /** Translation Source Kind */
+            translation_source_kind?: string | null;
         };
         /** AssetDeleteOperation */
         AssetDeleteOperation: {
@@ -7132,6 +7163,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssetAnnotationTrace"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_annotation_traces_api_v1_workspaces__project_id__assets__asset_id__annotation_traces_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetAnnotationTrace"][];
                 };
             };
             /** @description Validation Error */

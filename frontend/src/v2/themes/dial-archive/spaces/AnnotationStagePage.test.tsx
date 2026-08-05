@@ -5,6 +5,7 @@ import { getHomeSpace } from "../../../navigation/spaceRegistry";
 import type {
   AnnotationBatchContent,
   AnnotationDossierContent,
+  AnnotationDossierProvenance,
   AnnotationEditContent,
   AnnotationProjectContextContent,
   AnnotationProductionContent,
@@ -453,6 +454,23 @@ function productionOperation(
 function dossierContent(
   overrides: Partial<AnnotationDossierContent> = {},
 ): AnnotationDossierContent {
+  const provenance: AnnotationDossierProvenance = {
+    id: "attempt-001",
+    code: "LLM",
+    title: "LLM 描述",
+    model: "gpt-test",
+    executionBackend: "provider",
+    outputChannel: "description",
+    startedAt: "2026-08-05T10:02:00Z",
+    source: "model_response",
+    current: true,
+    readings: [
+      { id: "job", label: "JOB", value: "job-001", detail: "completed" },
+      { id: "model", label: "MODEL", value: "gpt-test", detail: "provider" },
+    ],
+    requestJson: '{\n  "model": "gpt-test"\n}',
+    responseJson: '{\n  "finish_reason": "stop"\n}',
+  };
   return {
     status: "ready",
     message: null,
@@ -534,16 +552,9 @@ function dossierContent(
         qualityIssues: [],
       },
     ],
-    provenance: {
-      source: "model_response",
-      current: true,
-      readings: [
-        { id: "job", label: "JOB", value: "job-001", detail: "completed" },
-        { id: "model", label: "MODEL", value: "gpt-test", detail: "provider" },
-      ],
-      requestJson: '{\n  "model": "gpt-test"\n}',
-      responseJson: '{\n  "finish_reason": "stop"\n}',
-    },
+    provenance,
+    provenanceHistory: [provenance],
+    selectedProvenanceId: provenance.id,
     provenanceLoading: false,
     provenanceIssue: null,
     jobs: [
@@ -568,6 +579,7 @@ function dossierContent(
     ],
     jobsLoading: false,
     jobsIssue: null,
+    selectProvenance: vi.fn(),
     openJob: vi.fn(),
     openArchive: vi.fn(),
     openQuality: vi.fn(),
@@ -1051,6 +1063,41 @@ describe("dial archive annotation stage", () => {
     expect(content.selectDossierSection).toHaveBeenCalledWith("provenance");
     fireEvent.click(screen.getByRole("button", { name: /项目档案/u }));
     expect(dossier.openArchive).toHaveBeenCalledOnce();
+  });
+
+  test("switches between LLM and Tagger generation traces in the object dossier", () => {
+    const dossier = dossierContent();
+    const llmTrace = dossier.provenance!;
+    const taggerTrace: AnnotationDossierProvenance = {
+      ...llmTrace,
+      id: "attempt-tagger-001",
+      code: "TAG",
+      title: "Tagger 标签",
+      model: "CL Tagger",
+      executionBackend: "local_tagger",
+      outputChannel: "tags",
+      startedAt: "2026-08-05T09:58:00Z",
+      current: false,
+    };
+    dossier.provenanceHistory = [llmTrace, taggerTrace];
+    dossier.selectedProvenanceId = llmTrace.id;
+
+    renderStage(
+      stageContent({
+        activeWorkcell: "dossier",
+        dossierWorkcell: { section: "provenance", dossier },
+      }),
+    );
+
+    expect(screen.getByRole("navigation", { name: "生成调用历史" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: /LLM 描述/u }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    const taggerButton = screen.getByRole("button", { name: /Tagger 标签/u });
+    fireEvent.click(taggerButton);
+    expect(dossier.selectProvenance).toHaveBeenCalledWith("attempt-tagger-001");
+    expect(screen.getByText(/REQUEST ENVELOPE/u)).not.toBeNull();
+    expect(screen.getByText(/RESPONSE ENVELOPE/u)).not.toBeNull();
   });
 
   test("keeps the core dossier readable when optional registers fail", () => {

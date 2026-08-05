@@ -541,7 +541,7 @@
 .dial-archive-production-launch:disabled {
   border-color: rgba(25, 25, 25, 0.2);
   color: rgba(25, 25, 25, 0.4);
-  background: #e8e9e6;
+  background: var(--dial-archive-surface-muted);
   box-shadow: none;
   cursor: default;
 }

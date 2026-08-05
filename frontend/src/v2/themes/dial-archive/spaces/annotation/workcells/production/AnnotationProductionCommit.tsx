@@ -30,6 +30,9 @@ export function AnnotationProductionCommit({
         <b>{blocked ? "INTERLOCK" : "ROUTE CLEAR"}</b>
         <h3>冻结执行快照</h3>
         <p>汇总当前支路参数与素材范围，通过校验后建立唯一生产任务。</p>
+        <i className="dial-archive-production-commit__index" aria-hidden="true">
+          03
+        </i>
       </header>
 
       <ol className="dial-archive-production-commit__sequence" aria-label="合流写入阶段">

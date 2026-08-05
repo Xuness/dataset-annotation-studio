@@ -123,6 +123,16 @@ def get_annotation_trace(project_id: str, asset_id: str, container: Container):
     return container.annotation_traces.get(project_id, asset_id)
 
 
+@router.get("/{asset_id}/annotation-traces", response_model=list[AssetAnnotationTrace])
+def list_annotation_traces(
+    project_id: str,
+    asset_id: str,
+    container: Container,
+    limit: int = Query(default=100, ge=1, le=500),
+):
+    return container.annotation_traces.list(project_id, asset_id, limit=limit)
+
+
 @router.get("/{asset_id}/jobs", response_model=list[AssetRelatedJob])
 def list_asset_jobs(
     project_id: str,

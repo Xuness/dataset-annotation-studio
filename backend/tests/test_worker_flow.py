@@ -403,6 +403,13 @@ async def test_worker_runs_local_tagger_without_prompt_or_provider(
     assert trace.request.parameters.execution_backend == "local_tagger"
     assert trace.request.parameters.threshold == 0.55
     assert trace.response.final_content == "alice, blue_hair"
+    trace_history = container.annotation_traces.list(
+        workspace.project_id,
+        detail.items[0].asset_id,
+    )
+    assert len(trace_history) == 1
+    assert trace_history[0].job_kind == JobKind.ANNOTATION
+    assert trace_history[0].output_channel == AnnotationChannel.TAGS
 
 
 @pytest.mark.asyncio
@@ -553,6 +560,10 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
     assert trace.request.user_prompt == expected_prompt
     assert trace.response.reasoning_content == "The scene contains a quiet garden."
     assert trace.response.final_content == "<caption>quiet garden</caption>"
+    trace_history = container.annotation_traces.list(workspace.project_id, asset.id)
+    assert len(trace_history) == 1
+    assert trace_history[0].job_kind == JobKind.ANNOTATION
+    assert trace_history[0].output_channel == AnnotationChannel.DESCRIPTION
 
     payloads[0].unlink()
     reconstructed = container.annotation_traces.get(
@@ -718,6 +729,15 @@ async def test_worker_translates_annotation_without_sending_image(tmp_path: Path
     assert translation.alignment_status.value == "aligned"
     assert translation.alignment_parts[1].source_text == "quiet garden"
     assert translation.alignment_parts[1].translated_text == "安静的花园"
+    trace_history = container.annotation_traces.list(workspace.project_id, asset.id)
+    assert len(trace_history) == 1
+    assert trace_history[0].job_kind == JobKind.TRANSLATION
+    assert trace_history[0].output_channel == AnnotationChannel.TRANSLATION
+    assert trace_history[0].output_language == "zh-CN"
+    assert trace_history[0].translation_source_kind == "description"
+    assert trace_history[0].translation_producer_kind == "llm"
+    assert trace_history[0].matches_current_annotation
+    assert container.annotation_traces.get(workspace.project_id, asset.id) is None
 
 
 @pytest.mark.asyncio

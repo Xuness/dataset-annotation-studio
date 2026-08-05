@@ -1774,6 +1774,15 @@
             "title": "Job Id",
             "type": "string"
           },
+          "job_kind": {
+            "default": "annotation",
+            "enum": [
+              "annotation",
+              "translation"
+            ],
+            "title": "Job Kind",
+            "type": "string"
+          },
           "job_status": {
             "title": "Job Status",
             "type": "string"
@@ -1781,6 +1790,21 @@
           "matches_current_annotation": {
             "title": "Matches Current Annotation",
             "type": "boolean"
+          },
+          "output_channel": {
+            "$ref": "#/components/schemas/AnnotationChannel",
+            "default": "description"
+          },
+          "output_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Language"
           },
           "request": {
             "$ref": "#/components/schemas/TraceRequest"
@@ -1791,6 +1815,28 @@
           "started_at": {
             "title": "Started At",
             "type": "string"
+          },
+          "translation_producer_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Producer Kind"
+          },
+          "translation_source_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Source Kind"
           }
         },
         "required": [
@@ -12516,6 +12562,73 @@
           }
         },
         "summary": "Get Annotation Trace",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation-traces": {
+      "get": {
+        "operationId": "list_annotation_traces_api_v1_workspaces__project_id__assets__asset_id__annotation_traces_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssetAnnotationTrace"
+                  },
+                  "title": "Response List Annotation Traces Api V1 Workspaces  Project Id  Assets  Asset Id  Annotation Traces Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Annotation Traces",
         "tags": [
           "assets"
         ]
