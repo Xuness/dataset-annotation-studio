@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 
 import type {
-  AnnotationLaneId,
   AnnotationProjectContextContent,
   AnnotationProductionContent,
   AnnotationRequestPreviewContent,
@@ -13,41 +12,38 @@ import { AnnotationProductionCommit } from "./AnnotationProductionCommit";
 import { AnnotationProductionConfiguration } from "./AnnotationProductionConfiguration";
 import { AnnotationProductionOperation } from "./AnnotationProductionOperation";
 import { AnnotationProductionRouteMap } from "./AnnotationProductionRouteMap";
+import { AnnotationProductionScope } from "./AnnotationProductionScope";
 import { AnnotationProjectContextSurface } from "../edit/AnnotationProjectContextSurface";
 import { AnnotationRequestPreviewSurface } from "../edit/AnnotationRequestPreviewSurface";
 import {
   ANNOTATION_PRODUCTION_ROUTE_LAYOUT,
+  PRODUCTION_CANVAS_NODE_IDS,
   getProductionNodeCenter,
+  isProductionLaneNode,
   projectProductionCanvasPointToMinimap,
   projectProductionCanvasRectToMinimap,
-  resolveProductionFocus,
-  type ProductionNodeId,
+  type ProductionCanvasNodeId,
 } from "./model/annotationProductionLayout";
 import { ANNOTATION_PRODUCTION_LANE_PRESENTATION } from "./model/annotationProductionPresentation";
 
 interface AnnotationProductionWorkcellProps {
   asset: AnnotationStageAsset | null;
+  assets: readonly AnnotationStageAsset[];
   production: AnnotationProductionContent | null;
   projectContext: AnnotationProjectContextContent | null;
   requestPreview: AnnotationRequestPreviewContent | null;
 }
 
 type ProductionInspectorView = "configuration" | "context" | "request";
-type ProductionInspectableNodeId = AnnotationLaneId | "terminal";
-
-interface ProductionFocusRequest {
-  node: ProductionNodeId;
-  scale?: number;
-}
 
 interface ProductionMinimapStyle extends CSSProperties {
   "--dial-archive-production-minimap-padding": string;
+  "--dial-archive-minimap-padding": string;
 }
 
-interface ProductionCanvasSize {
-  readonly width: number;
-  readonly height: number;
-  readonly inspectorWidth: number;
+interface ProductionSurfaceStyle extends CSSProperties {
+  "--dial-archive-grid-minor": string;
+  "--dial-archive-grid-major": string;
 }
 
 const PRODUCTION_CANVAS_GEOMETRY = {
@@ -57,16 +53,9 @@ const PRODUCTION_CANVAS_GEOMETRY = {
   projectRectToMinimap: projectProductionCanvasRectToMinimap,
 } as const;
 
-const PRODUCTION_NODE_IDS: readonly ProductionNodeId[] = [
-  "source",
-  "tags",
-  "description",
-  "translation",
-  "terminal",
-];
-
 export function AnnotationProductionWorkcell({
   asset,
+  assets,
   production,
   projectContext,
   requestPreview,
@@ -78,17 +67,12 @@ export function AnnotationProductionWorkcell({
     ),
   );
   const [inspectorView, setInspectorView] = useState<ProductionInspectorView>("configuration");
-  const [selectedNode, setSelectedNode] = useState<ProductionInspectableNodeId>(() =>
-    production?.operation ? "terminal" : (production?.lane ?? "description"),
+  const [selectedNode, setSelectedNode] = useState<ProductionCanvasNodeId>(() =>
+    production?.operation ? "result" : (production?.lane ?? "description"),
   );
-  const [focusRequest, setFocusRequest] = useState<ProductionFocusRequest | null>(null);
-  const [canvasSize, setCanvasSize] = useState<ProductionCanvasSize>({
-    width: 0,
-    height: 0,
-    inspectorWidth: 0,
-  });
   const inspectorRef = useRef<HTMLElement>(null);
   const appliedEntryRef = useRef<string | null>(null);
+  const pendingFocusRef = useRef<ProductionCanvasNodeId | null>(null);
   const motion = useSpatialCanvasMotion({
     geometry: PRODUCTION_CANVAS_GEOMETRY,
     reducedMotion,
@@ -100,6 +84,15 @@ export function AnnotationProductionWorkcell({
   const operationId = production?.operation?.id;
   const selectedLane = production?.lane;
   const focusAt = motion.focusAt;
+  const fitCanvas = motion.fit;
+
+  useLayoutEffect(() => {
+    const node = pendingFocusRef.current;
+    if (!inspectorOpen || !node) return;
+    pendingFocusRef.current = null;
+    const center = getProductionNodeCenter(node);
+    focusAt(center.x, center.y);
+  }, [focusAt, inspectorOpen]);
 
   useEffect(() => {
     if (!productionStatus || productionStatus === "inactive") return;
@@ -108,54 +101,23 @@ export function AnnotationProductionWorkcell({
     appliedEntryRef.current = requestKey;
     setInspectorView("configuration");
     if (entryIntent === "overview") {
+      pendingFocusRef.current = null;
       setSelectedNode(selectedLane ?? "description");
       setInspectorOpen(false);
-      setFocusRequest({ node: "description", scale: 0.5 });
+      fitCanvas(true);
       return;
     }
     if (!selectedLane) return;
-    setSelectedNode(operationId ? "terminal" : selectedLane);
-    setInspectorOpen(true);
-    setFocusRequest({ node: operationId ? "terminal" : selectedLane });
-  }, [entryIntent, operationId, productionStatus, selectedLane]);
-
-  useLayoutEffect(() => {
-    const viewport = motion.viewportRef.current;
-    if (!viewport) return;
-
-    const updateSize = () => {
-      const next = {
-        width: viewport.clientWidth,
-        height: viewport.clientHeight,
-        inspectorWidth: inspectorOpen ? (inspectorRef.current?.offsetWidth ?? 0) : 0,
-      };
-      setCanvasSize((current) =>
-        current.width === next.width &&
-        current.height === next.height &&
-        current.inspectorWidth === next.inspectorWidth
-          ? current
-          : next,
-      );
-    };
-
-    updateSize();
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(updateSize);
-    observer.observe(viewport);
-    if (inspectorRef.current) observer.observe(inspectorRef.current);
-    return () => observer.disconnect();
-  }, [inspectorOpen, motion.viewportRef]);
-
-  useLayoutEffect(() => {
-    if (!focusRequest) return;
-    if (focusRequest.scale !== undefined) {
-      const center = getProductionNodeCenter(focusRequest.node);
-      focusAt(center.x, center.y, focusRequest.scale, true);
+    const node = operationId ? "result" : selectedLane;
+    setSelectedNode(node);
+    if (!inspectorOpen) {
+      pendingFocusRef.current = node;
+      setInspectorOpen(true);
       return;
     }
-    const target = resolveProductionFocus(focusRequest.node, canvasSize);
-    focusAt(target.center.x, target.center.y, target.scale, true);
-  }, [canvasSize, focusAt, focusRequest, inspectorOpen]);
+    const center = getProductionNodeCenter(node);
+    focusAt(center.x, center.y);
+  }, [entryIntent, fitCanvas, focusAt, inspectorOpen, operationId, productionStatus, selectedLane]);
 
   if (!production) {
     return (
@@ -166,50 +128,96 @@ export function AnnotationProductionWorkcell({
     );
   }
 
-  const selectLane = (lane: AnnotationLaneId) => {
-    setSelectedNode(lane);
-    setInspectorOpen(true);
-    setInspectorView("configuration");
-    production.selectLane(lane);
-    setFocusRequest({ node: lane });
-  };
-
-  const selectTerminal = () => {
-    setSelectedNode("terminal");
-    setInspectorOpen(true);
-    setInspectorView("configuration");
-    setFocusRequest({ node: "terminal" });
+  const selectNode = (node: ProductionCanvasNodeId) => {
+    setSelectedNode(node);
+    if (!inspectorOpen) {
+      pendingFocusRef.current = node;
+      setInspectorOpen(true);
+    }
+    if (isProductionLaneNode(node)) {
+      appliedEntryRef.current = `${production.status}:lane:${node}`;
+      production.selectLane(node);
+    }
+    setInspectorView(
+      node === "source" ? "context" : node === "validation" ? "request" : "configuration",
+    );
+    if (inspectorOpen) {
+      const center = getProductionNodeCenter(node);
+      focusAt(center.x, center.y);
+    }
   };
 
   const reopenInspector = () => {
+    pendingFocusRef.current = selectedNode;
     setInspectorOpen(true);
-    setFocusRequest({ node: selectedNode });
   };
 
   const closeInspector = () => {
+    pendingFocusRef.current = null;
     setInspectorOpen(false);
-    setFocusRequest({ node: selectedNode });
   };
 
   const { surface, minimap } = ANNOTATION_PRODUCTION_ROUTE_LAYOUT;
-  const inspectorLane = selectedNode === "terminal" ? production.lane : selectedNode;
+  const inspectorLane = isProductionLaneNode(selectedNode) ? selectedNode : production.lane;
   const identity = ANNOTATION_PRODUCTION_LANE_PRESENTATION[inspectorLane];
   const inspectorRegister = production.operation
     ? "OPERATION INSPECTOR"
-    : selectedNode === "terminal"
-      ? "COMMIT INSPECTOR"
-      : "NODE INSPECTOR";
-  const inspectorCode = selectedNode === "terminal" ? "CMT.04" : identity.code;
+    : selectedNode === "source"
+      ? "SOURCE INSPECTOR"
+      : selectedNode === "scope"
+        ? "SCOPE INSPECTOR"
+        : selectedNode === "validation"
+          ? "PREVIEW INSPECTOR"
+          : selectedNode === "terminal" || selectedNode === "result"
+            ? "COMMIT INSPECTOR"
+            : "NODE INSPECTOR";
+  const inspectorCode =
+    selectedNode === "source"
+      ? "SRC.00"
+      : selectedNode === "scope"
+        ? "SCP.01"
+        : selectedNode === "validation"
+          ? "PRV.04"
+          : selectedNode === "terminal"
+            ? "CMT.05"
+            : selectedNode === "result"
+              ? "RES.06"
+              : identity.code;
   const inspectorTitle = production.operation
     ? production.operation.statusLabel
-    : selectedNode === "terminal"
-      ? "合流写入"
-      : identity.title;
-  const surfaceStyle = { width: surface.width, height: surface.height };
+    : selectedNode === "source"
+      ? "当前素材"
+      : selectedNode === "scope"
+        ? "处理范围"
+        : selectedNode === "validation"
+          ? "路线校验"
+          : selectedNode === "terminal" || selectedNode === "result"
+            ? "合流写入"
+            : identity.title;
+  const inspectorTabs =
+    selectedNode === "validation"
+      ? ([["request", "REQUEST", "请求预览"]] as const)
+      : selectedNode === "source"
+        ? ([["context", "CONTEXT", "项目上下文"]] as const)
+        : selectedNode === "scope"
+          ? ([["configuration", "CONFIG", "任务参数"]] as const)
+          : isProductionLaneNode(selectedNode)
+            ? ([
+                ["configuration", "CONFIG", "任务参数"],
+                ["context", "CONTEXT", "项目上下文"],
+              ] as const)
+            : [];
+  const surfaceStyle = {
+    width: surface.width,
+    height: surface.height,
+    "--dial-archive-grid-minor": `${ANNOTATION_PRODUCTION_ROUTE_LAYOUT.grid.minor}px`,
+    "--dial-archive-grid-major": `${ANNOTATION_PRODUCTION_ROUTE_LAYOUT.grid.major}px`,
+  } as ProductionSurfaceStyle;
   const minimapStyle = {
     width: minimap.width,
     height: minimap.height,
     "--dial-archive-production-minimap-padding": `${minimap.padding}px`,
+    "--dial-archive-minimap-padding": `${minimap.padding}px`,
   } as ProductionMinimapStyle;
 
   return (
@@ -231,21 +239,6 @@ export function AnnotationProductionWorkcell({
         onWheel={motion.onWheel}
         onKeyDown={motion.onKeyDown}
       >
-        {asset ? (
-          <figure
-            className="dial-archive-production-routes__evidence dial-archive-preparation-canvas__frame"
-            aria-hidden="true"
-          >
-            <img src={asset.thumbnailUrl} alt="" draggable={false} />
-            <figcaption>
-              <span>SOURCE / {asset.suffix.replace(/^\./u, "").toUpperCase()}</span>
-              <b>
-                {asset.width} × {asset.height}
-              </b>
-              <small>{asset.filename}</small>
-            </figcaption>
-          </figure>
-        ) : null}
         <div
           className="dial-archive-production-workcell__surface dial-archive-preparation-canvas__surface"
           ref={motion.surfaceRef}
@@ -257,10 +250,11 @@ export function AnnotationProductionWorkcell({
             style={surfaceStyle}
           >
             <AnnotationProductionRouteMap
+              asset={asset}
+              assets={assets}
               production={production}
               selectedNode={selectedNode}
-              onSelectLane={selectLane}
-              onSelectTerminal={selectTerminal}
+              onSelectNode={selectNode}
             />
           </div>
         </div>
@@ -296,7 +290,7 @@ export function AnnotationProductionWorkcell({
           style={minimapStyle}
           aria-hidden="true"
         >
-          {PRODUCTION_NODE_IDS.map((node) => {
+          {PRODUCTION_CANVAS_NODE_IDS.map((node) => {
             const point = projectProductionCanvasPointToMinimap(getProductionNodeCenter(node));
             return (
               <span
@@ -338,19 +332,14 @@ export function AnnotationProductionWorkcell({
             </button>
           </header>
           <div className="dial-archive-production-workcell__console-body dial-archive-preparation-inspector__body">
-            {!production.operation && selectedNode !== "terminal" ? (
+            {!production.operation && inspectorTabs.length > 0 ? (
               <nav
                 className="dial-archive-production-input-nav"
                 data-active-view={inspectorView}
+                data-tab-count={inspectorTabs.length}
                 aria-label="生产输入阶段"
               >
-                {(
-                  [
-                    ["configuration", "CONFIG", "任务参数"],
-                    ["context", "CONTEXT", "项目上下文"],
-                    ["request", "REQUEST", "请求预览"],
-                  ] as const
-                ).map(([id, code, label]) => (
+                {inspectorTabs.map(([id, code, label]) => (
                   <button
                     className={inspectorView === id ? "is-active" : undefined}
                     type="button"
@@ -389,7 +378,7 @@ export function AnnotationProductionWorkcell({
                   message={production.message}
                   onCreateNew={production.createNew}
                 />
-              ) : selectedNode === "terminal" ? (
+              ) : selectedNode === "terminal" || selectedNode === "result" ? (
                 <AnnotationProductionCommit
                   lane={production.lane}
                   configuration={production.configuration}
@@ -403,6 +392,8 @@ export function AnnotationProductionWorkcell({
                 <div className="dial-archive-production-input-surface is-request">
                   <AnnotationRequestPreviewSurface preview={requestPreview} asset={asset} compact />
                 </div>
+              ) : selectedNode === "scope" ? (
+                <AnnotationProductionScope configuration={production.configuration} />
               ) : (
                 <AnnotationProductionConfiguration
                   lane={inspectorLane}
@@ -411,16 +402,6 @@ export function AnnotationProductionWorkcell({
               )}
             </div>
           </div>
-          <footer className="dial-archive-production-workcell__console-foot">
-            <span>NODE // {inspectorCode}</span>
-            <b>
-              {production.operation
-                ? `${production.operation.statusLabel} ${production.operation.progressPercent}%`
-                : production.configuration.ready
-                  ? "PARAMETERS READY"
-                  : `${production.configuration.blockers.length} INTERLOCK`}
-            </b>
-          </footer>
         </aside>
       ) : (
         <button
@@ -433,13 +414,6 @@ export function AnnotationProductionWorkcell({
           <b>INSPECT {selectedNode.toUpperCase()} →</b>
         </button>
       )}
-
-      <div className="dial-archive-production-workcell__film-dock" aria-hidden="true">
-        <span>RANGE EVIDENCE</span>
-        <i />
-        <b>{production.configuration.scopeCount.toString().padStart(4, "0")}</b>
-        <small>MATERIAL IN SCOPE / FILM DOCK BELOW</small>
-      </div>
     </div>
   );
 }

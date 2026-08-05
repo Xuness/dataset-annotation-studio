@@ -3,21 +3,66 @@ import type { CSSProperties } from "react";
 import type {
   AnnotationLaneId,
   AnnotationProductionContent,
+  AnnotationStageAsset,
 } from "../../../../../../pages/spaces/spacePageModel";
 import {
+  createPreparationCanvasEdgePath,
+  createPreparationCanvasPolylinePath,
+  type PreparationCanvasEdge,
+  type PreparationCanvasGauge,
+} from "../../../preparation/model/preparationCanvasLayout";
+import {
   ANNOTATION_PRODUCTION_ROUTE_LAYOUT,
-  productionDecorRoutePath,
+  isProductionLaneNode,
   productionNodeStyle,
-  productionRoutePath,
-  type ProductionNodeId,
+  type ProductionCanvasNodeId,
 } from "./model/annotationProductionLayout";
 
 interface AnnotationProductionRouteMapProps {
+  asset: AnnotationStageAsset | null;
+  assets: readonly AnnotationStageAsset[];
   production: AnnotationProductionContent;
-  selectedNode: ProductionNodeId;
-  onSelectLane(lane: AnnotationLaneId): void;
-  onSelectTerminal(): void;
+  selectedNode: ProductionCanvasNodeId;
+  onSelectNode(node: ProductionCanvasNodeId): void;
 }
+
+interface ProductionNodeProgressStyle extends CSSProperties {
+  "--dial-archive-node-progress": string;
+}
+
+interface ProductionEdgeOrderStyle extends CSSProperties {
+  "--dial-archive-edge-order": number;
+}
+
+interface ProductionCanvasNodeProps {
+  id: ProductionCanvasNodeId;
+  code: string;
+  title: string;
+  detail: string;
+  active: boolean;
+  selected: boolean;
+  signaling?: boolean;
+  progress?: number | null;
+  status: string;
+  reading?: string | number | null;
+  ariaLabel?: string;
+  onSelect(node: ProductionCanvasNodeId): void;
+}
+
+const PRODUCTION_FIELD_COPY = {
+  input: { kicker: "SOURCE EVIDENCE", title: "INPUT / SCOPE" },
+  transform: { kicker: "PARALLEL PRODUCTION FIELD", title: "ANNOTATION ARRAY" },
+  verify: { kicker: "EXECUTION PROJECTION", title: "VERIFY / COMMIT" },
+  trace: { kicker: "OUTPUT VERSION TRACE", title: "RESULT LINE" },
+} as const;
+
+const PRODUCTION_FRAME_CODES = [
+  "SOURCE / EVIDENCE",
+  "TAGS / SIGNAL",
+  "DESCRIPTION / CONTEXT",
+  "TRANSLATION / TARGET",
+  "COMMIT / WRITE",
+] as const;
 
 function laneStateLabel(state: AnnotationProductionContent["lanes"][number]["state"]): string {
   if (state === "running") return "LIVE";
@@ -25,6 +70,50 @@ function laneStateLabel(state: AnnotationProductionContent["lanes"][number]["sta
   if (state === "ready") return "READY";
   if (state === "attention") return "ATTENTION";
   return "STANDBY";
+}
+
+function productionEvidenceAssets(
+  asset: AnnotationStageAsset | null,
+  assets: readonly AnnotationStageAsset[],
+): readonly AnnotationStageAsset[] {
+  if (!asset) return assets.slice(0, PRODUCTION_FRAME_CODES.length);
+  return [asset, ...assets.filter((candidate) => candidate.id !== asset.id)].slice(
+    0,
+    PRODUCTION_FRAME_CODES.length,
+  );
+}
+
+function laneForEdge(edge: PreparationCanvasEdge): AnnotationLaneId | null {
+  if (edge.activation === "geometry") return "tags";
+  if (edge.activation === "encoding") return "description";
+  if (edge.activation === "identity") return "translation";
+  return null;
+}
+
+function edgeIsActive(
+  edge: PreparationCanvasEdge,
+  production: AnnotationProductionContent,
+): boolean {
+  const lane = laneForEdge(edge);
+  if (lane) return lane === production.lane;
+  if (edge.activation === "preview") {
+    return production.configuration.ready || Boolean(production.operation);
+  }
+  if (edge.activation === "recovery") return Boolean(production.operation);
+  return true;
+}
+
+function edgeIsSignaling(
+  edge: PreparationCanvasEdge,
+  signalingLane: AnnotationLaneId | null,
+): boolean {
+  if (!signalingLane) return false;
+  const lane = laneForEdge(edge);
+  if (lane) return lane === signalingLane;
+  if (edge.activation === "recovery") return false;
+  return (
+    edge.activation === "always" || edge.activation === "transform" || edge.activation === "preview"
+  );
 }
 
 function polarPoint(cx: number, cy: number, radius: number, degrees: number) {
@@ -35,99 +124,194 @@ function polarPoint(cx: number, cy: number, radius: number, degrees: number) {
   };
 }
 
-function RouteGauge() {
-  const gauge = ANNOTATION_PRODUCTION_ROUTE_LAYOUT.gauge;
+function GaugeTicks({ gauge }: { gauge: PreparationCanvasGauge }) {
   return (
-    <g className="dial-archive-production-gauge dial-archive-preparation-gauge">
+    <>
+      {Array.from({ length: gauge.tickCount }, (_, index) => {
+        const major = index % gauge.majorEvery === 0;
+        const inner = gauge.radius - (major ? gauge.tickLength * 1.9 : gauge.tickLength);
+        const from = polarPoint(gauge.cx, gauge.cy, inner, (index / gauge.tickCount) * 360);
+        const to = polarPoint(gauge.cx, gauge.cy, gauge.radius, (index / gauge.tickCount) * 360);
+        return (
+          <line
+            className={major ? "is-major" : undefined}
+            x1={from.x}
+            y1={from.y}
+            x2={to.x}
+            y2={to.y}
+            key={index}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function ProductionGauge({ gauge }: { gauge: PreparationCanvasGauge }) {
+  const crosshairLength = gauge.radius * 1.2;
+  return (
+    <g className={`dial-archive-preparation-gauge is-${gauge.id}`}>
+      {gauge.crosshair ? (
+        <g className="dial-archive-preparation-gauge__crosshair">
+          <line
+            x1={gauge.cx - crosshairLength}
+            y1={gauge.cy}
+            x2={gauge.cx + crosshairLength}
+            y2={gauge.cy}
+          />
+          <line
+            x1={gauge.cx}
+            y1={gauge.cy - crosshairLength}
+            x2={gauge.cx}
+            y2={gauge.cy + crosshairLength}
+          />
+          <rect
+            x={gauge.cx - 4}
+            y={gauge.cy - 4}
+            width={8}
+            height={8}
+            transform={`rotate(45 ${gauge.cx} ${gauge.cy})`}
+          />
+        </g>
+      ) : null}
       <circle
         className="dial-archive-preparation-gauge__ring"
         cx={gauge.cx}
         cy={gauge.cy}
         r={gauge.radius}
       />
-      <circle
-        className="dial-archive-preparation-gauge__ring"
-        cx={gauge.cx}
-        cy={gauge.cy}
-        r={gauge.radius - 46}
-      />
       <g
-        className="dial-archive-production-gauge__rotor dial-archive-preparation-gauge__rotor"
-        style={{ transformOrigin: `${gauge.cx}px ${gauge.cy}px`, animationDuration: "80s" }}
+        className="dial-archive-preparation-gauge__rotor"
+        style={{
+          transformOrigin: `${gauge.cx}px ${gauge.cy}px`,
+          animationDuration: `${gauge.spinSeconds}s`,
+        }}
       >
-        {Array.from({ length: gauge.tickCount }, (_, index) => {
-          const major = index % gauge.majorEvery === 0;
-          const degrees = (index / gauge.tickCount) * 360;
-          const from = polarPoint(gauge.cx, gauge.cy, gauge.radius - (major ? 22 : 11), degrees);
-          const to = polarPoint(gauge.cx, gauge.cy, gauge.radius, degrees);
+        <GaugeTicks gauge={gauge} />
+        {gauge.accentArcs.map((arc) => {
+          const from = polarPoint(gauge.cx, gauge.cy, gauge.radius, arc.start);
+          const to = polarPoint(gauge.cx, gauge.cy, gauge.radius, arc.end);
+          const largeArc = arc.end - arc.start > 180 ? 1 : 0;
           return (
-            <line
-              className={major ? "is-major" : undefined}
-              x1={from.x}
-              y1={from.y}
-              x2={to.x}
-              y2={to.y}
-              key={index}
-            />
+            <g className="dial-archive-preparation-gauge__arc" key={`${arc.start}-${arc.end}`}>
+              <path
+                d={`M ${from.x.toFixed(2)} ${from.y.toFixed(2)} A ${gauge.radius} ${gauge.radius} 0 ${largeArc} 1 ${to.x.toFixed(2)} ${to.y.toFixed(2)}`}
+              />
+              <rect
+                x={to.x - 4}
+                y={to.y - 4}
+                width={8}
+                height={8}
+                transform={`rotate(45 ${to.x} ${to.y})`}
+              />
+            </g>
           );
         })}
-        <g className="dial-archive-preparation-gauge__arc">
-          <path
-            d={`M ${gauge.cx - gauge.radius} ${gauge.cy} A ${gauge.radius} ${gauge.radius} 0 0 1 ${gauge.cx} ${gauge.cy - gauge.radius}`}
-          />
-        </g>
       </g>
-      <path
-        className="is-crosshair"
-        d={`M ${gauge.cx - 370} ${gauge.cy} L ${gauge.cx + 370} ${gauge.cy} M ${gauge.cx} ${gauge.cy - 370} L ${gauge.cx} ${gauge.cy + 370}`}
-      />
     </g>
   );
 }
 
+function ProductionCanvasNode({
+  id,
+  code,
+  title,
+  detail,
+  active,
+  selected,
+  signaling = false,
+  progress = null,
+  status,
+  reading = null,
+  ariaLabel,
+  onSelect,
+}: ProductionCanvasNodeProps) {
+  const laneNode = isProductionLaneNode(id);
+  return (
+    <button
+      className={`dial-archive-production-canvas-node dial-archive-preparation-node is-${id}${
+        active ? " is-active" : " is-bypassed"
+      }${selected ? " is-selected" : ""}${signaling ? " is-signaling" : ""}`}
+      style={
+        {
+          ...productionNodeStyle(id),
+          "--dial-archive-node-progress": `${progress ?? 0}%`,
+        } as ProductionNodeProgressStyle
+      }
+      type="button"
+      role={laneNode ? "tab" : undefined}
+      aria-selected={laneNode ? active : undefined}
+      aria-pressed={laneNode ? undefined : selected}
+      aria-controls={laneNode ? "annotation-production-inspector" : undefined}
+      aria-label={ariaLabel ?? `检查生产节点 ${title}`}
+      onClick={() => onSelect(id)}
+    >
+      <span className="dial-archive-preparation-node__visual">
+        <span className="dial-archive-preparation-node__corners" aria-hidden="true" />
+        <span className="dial-archive-preparation-node__head">
+          <em>{title}</em>
+          <i className="dial-archive-preparation-node__lamp" aria-hidden="true" />
+        </span>
+        <b className="dial-archive-preparation-node__code">{code}</b>
+        <small>{detail}</small>
+        <span className="dial-archive-preparation-node__status">
+          {status}
+          {reading != null ? <strong>{reading}</strong> : null}
+        </span>
+        <span className="dial-archive-preparation-node__meter" aria-hidden="true">
+          <i />
+        </span>
+      </span>
+    </button>
+  );
+}
+
 export function AnnotationProductionRouteMap({
+  asset,
+  assets,
   production,
   selectedNode,
-  onSelectLane,
-  onSelectTerminal,
+  onSelectNode,
 }: AnnotationProductionRouteMapProps) {
   const { configuration, operation } = production;
+  const layout = ANNOTATION_PRODUCTION_ROUTE_LAYOUT;
   const routeCount = production.lanes.filter((lane) => lane.state !== "inactive").length;
-  const fieldReadings: Readonly<Record<string, string>> = {
-    source: `${configuration.scopeCount.toLocaleString()} MATERIAL`,
-    synthesis: `${routeCount || 1} / 3 COVERED`,
-    commit: operation
+  const evidenceAssets = productionEvidenceAssets(asset, assets);
+  const signalingLane =
+    production.lanes.find((lane) => lane.state === "running")?.id ??
+    (operation?.tone === "active" ? operation.lane : null);
+  const fieldReadings = {
+    input: `${configuration.scopeCount.toLocaleString()} MATERIAL / ${configuration.selectedCount.toLocaleString()} CHECKED`,
+    transform: `${routeCount || 1} / 3 COVERED`,
+    verify: operation
       ? `${operation.statusLabel.toUpperCase()} / ${operation.progressPercent}%`
       : configuration.ready
-        ? "SNAPSHOT ARMED"
-        : "INTERLOCK OPEN",
-  };
+        ? "ROUTE VALID / SNAPSHOT ARMED"
+        : `${configuration.blockers.length} INTERLOCK`,
+    trace: operation
+      ? `${operation.outputChannel.toUpperCase()} / ${operation.statusLabel.toUpperCase()}`
+      : "NO OPERATION RECORD",
+  } as const;
 
   return (
     <section
-      className={`dial-archive-production-routes is-${production.lane}`}
-      style={{
-        width: ANNOTATION_PRODUCTION_ROUTE_LAYOUT.surface.width,
-        height: ANNOTATION_PRODUCTION_ROUTE_LAYOUT.surface.height,
-      }}
+      className={`dial-archive-production-canvas-map is-${production.lane}`}
+      style={{ width: layout.surface.width, height: layout.surface.height }}
       aria-label="生产线路"
+      data-canvas-parity="space-02"
     >
-      <div className="dial-archive-production-routes__ghost" aria-hidden="true">
-        OPERATION
-      </div>
-      <div className="dial-archive-production-routes__blade" aria-hidden="true">
-        <span>03 / VECTOR 02</span>
-        <b>ROUTE FIELD</b>
-      </div>
       <div
-        className="dial-archive-production-routes__fields dial-archive-preparation-canvas__fields"
+        className="dial-archive-preparation-canvas__ghost-word"
+        style={{ top: layout.landmarks.ghostWord.y, left: layout.landmarks.ghostWord.x }}
         aria-hidden="true"
       >
-        {ANNOTATION_PRODUCTION_ROUTE_LAYOUT.fields.map((field) => (
+        OPERATION
+      </div>
+
+      <div className="dial-archive-preparation-canvas__fields" aria-hidden="true">
+        {layout.fields.map((field) => (
           <section
-            className={`dial-archive-production-routes__field dial-archive-preparation-canvas__field is-${field.id} is-${
-              field.id === "synthesis" ? "transform" : field.id === "commit" ? "verify" : "input"
-            } is-${field.id === "synthesis" ? "vertical" : "horizontal"}`}
+            className={`dial-archive-preparation-canvas__field is-${field.id} is-${field.axis}`}
             style={{
               top: field.rect.y,
               left: field.rect.x,
@@ -138,70 +322,163 @@ export function AnnotationProductionRouteMap({
           >
             <span>{field.index}</span>
             <div>
-              <small>{field.kicker}</small>
-              <b>{field.title}</b>
+              <small>{PRODUCTION_FIELD_COPY[field.id].kicker}</small>
+              <b>{PRODUCTION_FIELD_COPY[field.id].title}</b>
             </div>
-            <output>{fieldReadings[field.id] ?? field.reading}</output>
+            <output>{fieldReadings[field.id]}</output>
           </section>
         ))}
       </div>
+
+      <div className="dial-archive-preparation-canvas__background" aria-hidden="true">
+        {layout.backgroundFrames.map((frame, index) => {
+          const sample = evidenceAssets[index % Math.max(1, evidenceAssets.length)];
+          if (!sample) return null;
+          return (
+            <figure
+              className={`dial-archive-preparation-canvas__frame is-${frame.id}`}
+              style={{
+                top: frame.rect.y,
+                left: frame.rect.x,
+                width: frame.rect.width,
+                height: frame.rect.height,
+              }}
+              key={`${frame.id}:${sample.id}`}
+            >
+              <img
+                src={sample.thumbnailUrl}
+                alt=""
+                draggable={false}
+                style={{
+                  clipPath: frame.clipPath ?? undefined,
+                  opacity: frame.opacity,
+                }}
+              />
+              <figcaption>
+                <span>{PRODUCTION_FRAME_CODES[index]}</span>
+                <b>
+                  {sample.width} × {sample.height}
+                </b>
+                <small>{sample.filename}</small>
+              </figcaption>
+            </figure>
+          );
+        })}
+      </div>
+
       <div
-        className="dial-archive-production-routes__contours dial-archive-preparation-canvas__contours"
+        className="dial-archive-preparation-canvas__contours"
+        style={{
+          top: layout.landmarks.contours.y,
+          left: layout.landmarks.contours.x,
+          width: layout.landmarks.contours.width,
+          height: layout.landmarks.contours.height,
+        }}
         aria-hidden="true"
       />
 
       <svg
-        className="dial-archive-production-routes__wiring dial-archive-preparation-connectors"
-        viewBox={`0 0 ${ANNOTATION_PRODUCTION_ROUTE_LAYOUT.viewBox.width} ${ANNOTATION_PRODUCTION_ROUTE_LAYOUT.viewBox.height}`}
+        className="dial-archive-preparation-connectors"
+        viewBox={`0 0 ${layout.surface.width} ${layout.surface.height}`}
         aria-hidden="true"
       >
-        <g className="dial-archive-production-routes__decor dial-archive-preparation-connectors__decor">
-          {ANNOTATION_PRODUCTION_ROUTE_LAYOUT.decorRoutes.map((_, index) => (
-            <path d={productionDecorRoutePath(index)} key={index} />
+        <g className="dial-archive-preparation-connectors__decor">
+          {layout.decorRoutes.map((route, index) => (
+            <path d={createPreparationCanvasPolylinePath(route)} key={index} />
           ))}
         </g>
         <g className="dial-archive-preparation-connectors__gauges">
-          <RouteGauge />
+          {layout.gauges.map((gauge) => (
+            <ProductionGauge gauge={gauge} key={gauge.id} />
+          ))}
         </g>
-        <g className="dial-archive-production-routes__main dial-archive-preparation-connectors__main">
-          {production.lanes.map((lane, index) => (
+        <g className="dial-archive-preparation-connectors__main">
+          {layout.edges.map((edge, index) => (
             <path
-              className={`is-route-bed ${
-                lane.id === production.lane ? "is-active" : "is-bypassed"
+              className={`${edge.activation === "recovery" ? "is-recovery " : ""}${
+                edgeIsActive(edge, production) ? "is-active" : "is-bypassed"
               }`}
-              style={{ "--dial-archive-edge-order": index } as CSSProperties}
-              d={productionRoutePath(lane.id)}
-              data-lane-id={lane.id}
-              key={lane.id}
+              style={{ "--dial-archive-edge-order": index } as ProductionEdgeOrderStyle}
+              d={createPreparationCanvasEdgePath(edge)}
+              data-edge-id={edge.id}
+              key={edge.id}
             />
           ))}
         </g>
-        <g className="dial-archive-production-routes__junctions dial-archive-preparation-connectors__junctions">
-          {ANNOTATION_PRODUCTION_ROUTE_LAYOUT.junctions.map((junction, index) => (
+        <g className="dial-archive-preparation-connectors__junctions">
+          {Object.values(layout.junctions).map((junction) => (
             <g
-              className="dial-archive-production-junction is-active"
-              transform={`translate(${junction.x} ${junction.y})`}
-              key={index}
+              className={`is-${junction.kind} is-active`}
+              transform={`translate(${junction.point.x} ${junction.point.y})`}
+              data-junction-id={junction.id}
+              key={junction.id}
             >
-              <rect x="-8" y="-8" width="16" height="16" />
-              <circle r="3" />
+              <rect x={-7} y={-7} width={14} height={14} transform="rotate(45)" />
+              <circle r={2.2} />
             </g>
           ))}
         </g>
-        {production.lanes.some((lane) => lane.state === "running") ? (
-          <g className="dial-archive-production-routes__signal dial-archive-preparation-connectors__signal">
-            {production.lanes
-              .filter((lane) => lane.state === "running")
-              .map((lane) => (
-                <path d={productionRoutePath(lane.id)} data-lane-id={lane.id} key={lane.id} />
+        {signalingLane ? (
+          <g className="dial-archive-preparation-connectors__signal">
+            {layout.edges
+              .filter((edge) => edgeIsSignaling(edge, signalingLane))
+              .map((edge) => (
+                <path
+                  d={createPreparationCanvasEdgePath(edge)}
+                  data-edge-id={edge.id}
+                  key={edge.id}
+                />
               ))}
           </g>
         ) : null}
       </svg>
 
       <div
-        className="dial-archive-production-source dial-archive-preparation-node is-active"
-        style={productionNodeStyle(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.source)}
+        className="dial-archive-preparation-fusion-label"
+        style={{
+          top: layout.landmarks.fusionLabel.y,
+          left: layout.landmarks.fusionLabel.x,
+          width: layout.landmarks.fusionLabel.width,
+          height: layout.landmarks.fusionLabel.height,
+        }}
+        aria-hidden="true"
+      >
+        <span>PARALLEL ANNOTATION FIELD</span>
+        <b>{routeCount > 1 ? "FUSED / SHARED SOURCE" : "SINGLE ROUTE"}</b>
+      </div>
+
+      <ProductionCanvasNode
+        id="source"
+        code="SRC / 00"
+        title="当前素材"
+        detail={asset?.filename ?? "NO MATERIAL EVIDENCE"}
+        active={Boolean(asset)}
+        selected={selectedNode === "source"}
+        status={operation ? "LOCKED" : "READY"}
+        onSelect={onSelectNode}
+      />
+
+      <div
+        className={`dial-archive-production-canvas-node dial-archive-production-canvas-scope dial-archive-preparation-node is-active${
+          selectedNode === "scope" ? " is-selected" : ""
+        }`}
+        style={
+          {
+            ...productionNodeStyle("scope"),
+            "--dial-archive-node-progress": "100%",
+          } as ProductionNodeProgressStyle
+        }
+        role="group"
+        aria-label="任务素材范围"
+        aria-current={selectedNode === "scope" ? "step" : undefined}
+        tabIndex={0}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={() => onSelectNode("scope")}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          onSelectNode("scope");
+        }}
       >
         <span className="dial-archive-preparation-node__visual">
           <span className="dial-archive-preparation-node__corners" aria-hidden="true" />
@@ -211,15 +488,16 @@ export function AnnotationProductionRouteMap({
           </span>
           <b className="dial-archive-preparation-node__code">SCP / 01</b>
           <small>{configuration.scopeCount.toLocaleString()} MATERIAL IN SCOPE</small>
-          <span
-            className="dial-archive-preparation-node__status dial-archive-production-source__scope"
-            aria-label="任务素材范围"
-          >
+          <span className="dial-archive-preparation-node__status dial-archive-production-canvas-scope__options">
             <button
               className={configuration.scope === "all" ? "is-active" : undefined}
               type="button"
               disabled={Boolean(operation)}
-              onClick={() => configuration.setScope("all")}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelectNode("scope");
+                configuration.setScope("all");
+              }}
             >
               ALL {configuration.totalCount.toLocaleString()}
             </button>
@@ -227,97 +505,98 @@ export function AnnotationProductionRouteMap({
               className={configuration.scope === "selected" ? "is-active" : undefined}
               type="button"
               disabled={Boolean(operation)}
-              onClick={() => configuration.setScope("selected")}
-            >
-              RANGE {configuration.selectedCount.toLocaleString()}
-            </button>
-          </span>
-          <span className="dial-archive-preparation-node__meter" aria-hidden="true">
-            <i style={{ width: "100%" }} />
-          </span>
-        </span>
-      </div>
-
-      <div className="dial-archive-production-lanes" role="tablist" aria-label="选择生产线路">
-        {production.lanes.map((lane) => {
-          const active = lane.id === production.lane;
-          const selected = lane.id === selectedNode;
-          return (
-            <button
-              className={`dial-archive-production-lane dial-archive-preparation-node is-${lane.id} is-${lane.state} is-${
-                active ? "active" : "bypassed"
-              }${selected ? " is-selected" : ""}${lane.state === "running" ? " is-signaling" : ""}`}
-              style={productionNodeStyle(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.lanes[lane.id])}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              aria-controls="annotation-production-console"
-              onClick={() => onSelectLane(lane.id)}
-              key={lane.id}
-            >
-              <span className="dial-archive-production-lane__visual dial-archive-preparation-node__visual">
-                <span className="dial-archive-preparation-node__corners" aria-hidden="true" />
-                <span className="dial-archive-production-lane__head dial-archive-preparation-node__head">
-                  <em>{lane.title}</em>
-                  <i className="dial-archive-preparation-node__lamp" aria-hidden="true" />
-                </span>
-                <b className="dial-archive-preparation-node__code">{lane.code}</b>
-                <small>{lane.summary}</small>
-                <span className="dial-archive-production-lane__reading dial-archive-preparation-node__status">
-                  {laneStateLabel(lane.state)}
-                  <strong>{lane.coveragePercent}%</strong>
-                </span>
-                <span className="dial-archive-preparation-node__meter" aria-hidden="true">
-                  <i style={{ width: `${lane.coveragePercent}%` }} />
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <button
-        className={`dial-archive-production-terminal dial-archive-preparation-node is-active${
-          selectedNode === "terminal" ? " is-selected" : ""
-        } is-${operation?.tone ?? "configure"}`}
-        style={productionNodeStyle(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.terminal)}
-        type="button"
-        aria-label="打开合流写入检查器"
-        aria-controls="annotation-production-inspector"
-        aria-pressed={selectedNode === "terminal"}
-        onClick={onSelectTerminal}
-      >
-        <span className="dial-archive-preparation-node__visual">
-          <span className="dial-archive-preparation-node__corners" aria-hidden="true" />
-          <span className="dial-archive-preparation-node__head">
-            <em>合流写入</em>
-            <i className="dial-archive-preparation-node__lamp" aria-hidden="true" />
-          </span>
-          <b className="dial-archive-preparation-node__code">COMMIT</b>
-          <small>{operation ? operation.id : "EXECUTION SNAPSHOT"}</small>
-          <span className="dial-archive-preparation-node__status">
-            {operation
-              ? operation.statusLabel.toUpperCase()
-              : configuration.ready
-                ? "ARMED"
-                : "LOCKED"}
-            <strong>
-              {operation ? `${operation.progressPercent}%` : configuration.scopeCount}
-            </strong>
-          </span>
-          <span className="dial-archive-preparation-node__meter" aria-hidden="true">
-            <i
-              style={{
-                width: operation
-                  ? `${operation.progressPercent}%`
-                  : configuration.ready
-                    ? "32%"
-                    : "0%",
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelectNode("scope");
+                configuration.setScope("selected");
               }}
-            />
+            >
+              SEL {configuration.selectedCount.toLocaleString()}
+            </button>
+            <button
+              className={configuration.scope === "folder" ? "is-active" : undefined}
+              type="button"
+              disabled={Boolean(operation) || configuration.folderOptions.length === 0}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelectNode("scope");
+                configuration.setScope("folder");
+              }}
+            >
+              DIR {configuration.folderOptions.length.toLocaleString()}
+            </button>
+          </span>
+          <span className="dial-archive-preparation-node__meter" aria-hidden="true">
+            <i />
           </span>
         </span>
-      </button>
+      </div>
+
+      {production.lanes.map((lane) => {
+        const active = lane.id === production.lane;
+        return (
+          <ProductionCanvasNode
+            id={lane.id}
+            code={lane.code}
+            title={lane.title}
+            detail={lane.summary}
+            active={active}
+            selected={selectedNode === lane.id}
+            signaling={lane.state === "running"}
+            progress={active ? lane.coveragePercent : null}
+            status={laneStateLabel(lane.state)}
+            reading={`${lane.coveragePercent}%`}
+            onSelect={onSelectNode}
+            key={lane.id}
+          />
+        );
+      })}
+
+      <ProductionCanvasNode
+        id="validation"
+        code="PRV / 04"
+        title="路线校验"
+        detail={
+          configuration.ready
+            ? `${configuration.snapshot.length} SNAPSHOT READINGS`
+            : `${configuration.blockers.length} INTERLOCK`
+        }
+        active={configuration.ready || Boolean(operation)}
+        selected={selectedNode === "validation"}
+        status={operation ? "LOCKED" : configuration.ready ? "VALID" : "UNLOADED"}
+        onSelect={onSelectNode}
+      />
+
+      <ProductionCanvasNode
+        id="terminal"
+        code="CMT / 05"
+        title="合流写入"
+        detail={operation?.id ?? "EXECUTION SNAPSHOT"}
+        active={configuration.ready || Boolean(operation)}
+        selected={selectedNode === "terminal"}
+        signaling={operation?.tone === "active"}
+        progress={operation?.progressPercent ?? (configuration.ready ? 32 : null)}
+        status={
+          operation ? operation.statusLabel.toUpperCase() : configuration.ready ? "ARMED" : "LOCKED"
+        }
+        reading={operation ? `${operation.progressPercent}%` : configuration.scopeCount}
+        ariaLabel="打开合流写入检查器"
+        onSelect={onSelectNode}
+      />
+
+      <ProductionCanvasNode
+        id="result"
+        code="RES / 06"
+        title="执行结果"
+        detail={operation?.outputChannel ?? "NO OPERATION RECORD"}
+        active={Boolean(operation)}
+        selected={selectedNode === "result"}
+        signaling={operation?.tone === "active"}
+        progress={operation?.progressPercent ?? null}
+        status={operation ? operation.statusLabel.toUpperCase() : "STANDBY"}
+        reading={operation ? `${operation.succeeded}/${operation.total}` : null}
+        onSelect={onSelectNode}
+      />
     </section>
   );
 }

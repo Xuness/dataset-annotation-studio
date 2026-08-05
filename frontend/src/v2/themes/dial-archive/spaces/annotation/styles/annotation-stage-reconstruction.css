@@ -4059,6 +4059,7 @@
 .dial-archive-stage[data-workcell="production"] {
   --dial-archive-stage-header-h: 72px;
   --dial-archive-stage-page-gutter: 0px;
+  --dial-archive-production-rail-width: clamp(560px, 29vw, 820px);
   --dial-archive-workbench-bg: #ffffff;
   --dial-archive-workbench-ink: #191919;
   --dial-archive-workbench-line: rgba(25, 25, 25, 0.3);
@@ -4073,7 +4074,9 @@
 
 .dial-archive-stage[data-workcell="production"] .dial-archive-stage__masthead {
   height: 72px;
-  grid-template-columns: 196px minmax(230px, 0.6fr) minmax(420px, 1fr) minmax(300px, 0.72fr);
+  grid-template-columns:
+    196px minmax(230px, 0.6fr) minmax(420px, 1fr)
+    var(--dial-archive-production-rail-width);
   padding: 0;
   border-bottom-color: var(--dial-archive-hairline);
   background: rgba(255, 255, 255, 0.92);
@@ -4554,11 +4557,23 @@
 
 @media (max-width: 1500px) {
   .dial-archive-stage[data-workcell="production"] .dial-archive-stage__masthead {
-    grid-template-columns: 178px minmax(210px, 0.65fr) minmax(370px, 1fr) minmax(240px, 0.62fr);
+    grid-template-columns:
+      178px minmax(210px, 0.65fr) minmax(370px, 1fr)
+      var(--dial-archive-production-rail-width);
   }
 
   .dial-archive-production-workcell__console-field.dial-archive-preparation-inspector {
     width: 370px;
+  }
+}
+
+@media (min-width: 1121px) and (max-width: 1320px) {
+  .dial-archive-stage[data-workcell="production"] .dial-archive-stage__masthead {
+    grid-template-columns: 178px minmax(210px, 0.65fr) minmax(370px, 1fr);
+  }
+
+  .dial-archive-stage[data-workcell="production"] .dial-archive-stage__project {
+    display: none;
   }
 }
 

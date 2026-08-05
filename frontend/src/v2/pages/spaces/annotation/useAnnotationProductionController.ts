@@ -162,6 +162,15 @@ export function useAnnotationProductionController({
     if (newJob.scope === "selected" && checkedAssetIds.length === 0) {
       issues.push("素材范围尚未选择；请在下方胶片轨道标记素材");
     }
+    if (newJob.scope === "folder" && !newJob.folderPath) {
+      issues.push("尚未选择工作目录下的素材子文件夹");
+    }
+    if (newJob.scope === "folder" && newJob.folderPath && newJob.folderCount === 0) {
+      issues.push("所选子文件夹中没有可处理的素材");
+    }
+    if (newJob.scope === "folder" && newJob.folderError) {
+      issues.push("无法读取所选子文件夹的素材范围");
+    }
     if (backend === "local_tagger" && !newJob.selectedTaggerProfile) {
       issues.push("没有可执行的本地打标配置");
     }
@@ -184,6 +193,9 @@ export function useAnnotationProductionController({
     checkedAssetIds.length,
     lane,
     newJob.dictionaryReady,
+    newJob.folderCount,
+    newJob.folderError,
+    newJob.folderPath,
     newJob.promptConfigurationIssue,
     newJob.providerModelId,
     newJob.scope,
@@ -194,13 +206,22 @@ export function useAnnotationProductionController({
   ]);
 
   const scopeCount =
-    newJob.scope === "selected" ? checkedAssetIds.length : (workspace?.asset_count ?? 0);
+    newJob.scope === "selected"
+      ? checkedAssetIds.length
+      : newJob.scope === "folder"
+        ? newJob.folderCount
+        : (workspace?.asset_count ?? 0);
   const snapshot = useMemo(() => {
     const fields: AnnotationProductionSnapshotField[] = [
       {
         id: "scope",
         label: "任务范围",
-        value: newJob.scope === "selected" ? "选定素材" : "全项目",
+        value:
+          newJob.scope === "selected"
+            ? "工作台选中项"
+            : newJob.scope === "folder"
+              ? newJob.folderPath
+              : "全部素材",
         detail: `${scopeCount.toLocaleString()} MATERIAL`,
       },
       {
@@ -289,6 +310,7 @@ export function useAnnotationProductionController({
     newJob.configuredSystemPreset,
     newJob.configuredTranslationPrompt,
     newJob.dictionaryReady,
+    newJob.folderPath,
     newJob.providerModelId,
     newJob.scope,
     newJob.selectedProvider,
@@ -347,6 +369,7 @@ export function useAnnotationProductionController({
         : "configure";
   const message =
     newJob.error ??
+    (newJob.folderError ? queryMessage(newJob.folderError, "无法读取素材目录。") : null) ??
     (detail.job.isError
       ? queryMessage(detail.job.error, "无法读取指定生产任务。")
       : newJob.providerProfiles.isError && backend === "provider"
@@ -367,6 +390,9 @@ export function useAnnotationProductionController({
       scopeCount,
       totalCount: workspace?.asset_count ?? 0,
       selectedCount: checkedAssetIds.length,
+      folderPath: newJob.folderPath,
+      folderOptions: newJob.folderOptions,
+      folderLoading: newJob.folderLoading,
       backend,
       backendOptions: productionBackendOptions(lane),
       providerProfileId: newJob.providerProfileId,
@@ -389,6 +415,7 @@ export function useAnnotationProductionController({
       ready: newJob.ready && blockers.length === 0,
       pending: newJob.createPending,
       setScope: newJob.setScope,
+      setFolderPath: newJob.setFolderPath,
       setBackend,
       setProviderProfile: newJob.setProviderProfileId,
       setModel: newJob.setProviderModelId,

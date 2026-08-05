@@ -50,6 +50,7 @@ describe("annotation stage visual contracts", () => {
 
   test("reserves stable reading space for film, dossier, and production inspectors", () => {
     const legibility = style("annotation-stage-legibility.css");
+    const reconstruction = style("annotation-stage-reconstruction.css");
     const translation = style("annotation-workcell-edit-translation.css");
 
     expect(legibility).toMatch(/\.dial-archive-stage-filmstrip__track-viewport\s*\{/u);
@@ -78,9 +79,30 @@ describe("annotation stage visual contracts", () => {
     expect(legibility).toMatch(
       /\.dial-archive-production-workcell__console-field\.dial-archive-preparation-inspector\s*\{[^}]*--dial-archive-annotation-type-meta:\s*clamp\(12px,/su,
     );
-    expect(legibility).toMatch(/width:\s*clamp\(560px,\s*32vw,\s*900px\);/u);
+    expect(legibility).toMatch(
+      /\.dial-archive-production-workcell__console-field\.dial-archive-preparation-inspector\s*\{[^}]*right:\s*0;[^}]*bottom:\s*0;/su,
+    );
+    expect(legibility).toMatch(/width:\s*var\(--dial-archive-production-rail-width\);/u);
+    expect(reconstruction).toMatch(
+      /--dial-archive-production-rail-width:\s*clamp\(560px,\s*29vw,\s*820px\);/u,
+    );
     expect(legibility).not.toMatch(
       /\.dial-archive-production-lane:not\(\.is-active\)[^{]*\{[^}]*visibility:\s*hidden;/su,
+    );
+  });
+
+  test("keeps the production canvas on the complete Space 02 visual contract", () => {
+    const parity = style("annotation-production-canvas-parity.css");
+
+    expect(parity).toMatch(/Space 03 \/ Production canvas parity contract/u);
+    expect(parity).toMatch(
+      /\.dial-archive-production-workcell__route-field\.dial-archive-preparation-canvas\s*\{[^}]*128deg[^}]*#ffffff;/su,
+    );
+    expect(parity).toMatch(
+      /\.dial-archive-production-workcell__help\.dial-archive-preparation-canvas__help\s+span\s*\{[^}]*display:\s*inline;/su,
+    );
+    expect(parity).toMatch(
+      /\.dial-archive-production-workcell\.has-inspector[^{]*\.dial-archive-production-workcell__controls\.dial-archive-preparation-canvas__controls\s*\{[^}]*left:\s*50%;/su,
     );
   });
 

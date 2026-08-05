@@ -91,6 +91,9 @@ export function useSpatialCanvasMotion({
   const viewModeRef = useRef<CanvasViewMode>({ kind: "fit" });
   const pointerRef = useRef<{ id: number; x: number; y: number } | null>(null);
   const frameRef = useRef(0);
+  const settleTimerRef = useRef(0);
+  const renderVersionRef = useRef(0);
+  const scaleModeRef = useRef<"zoom" | "transform">("zoom");
   const initializedRef = useRef(false);
 
   const getVisibleViewport = useCallback((): SpatialCanvasRect | null => {
@@ -152,6 +155,8 @@ export function useSpatialCanvasMotion({
   const renderTransform = useCallback(
     (animate = false) => {
       cancelAnimationFrame(frameRef.current);
+      window.clearTimeout(settleTimerRef.current);
+      const renderVersion = ++renderVersionRef.current;
       frameRef.current = requestAnimationFrame(() => {
         const surface = surfaceRef.current;
         const scene = sceneRef.current;
@@ -164,16 +169,36 @@ export function useSpatialCanvasMotion({
           animate && !reducedMotion
             ? `${camera.focusDurationMs}ms var(--dial-archive-ease)`
             : "none";
-        surface.style.transition = transition === "none" ? "none" : `transform ${transition}`;
-        surface.style.transform = `translate3d(${renderedX}px, ${renderedY}px, 0)`;
-        if (CSS.supports("zoom", "1")) {
-          scene.style.transition = transition === "none" ? "none" : `zoom ${transition}`;
-          scene.style.setProperty("zoom", String(scale));
+        if (transition === "none") {
+          scaleModeRef.current = "zoom";
+          surface.style.transition = "none";
+          surface.style.transform = `translate3d(${renderedX}px, ${renderedY}px, 0)`;
+          scene.style.transition = "none";
           scene.style.transform = "none";
+          scene.style.setProperty("zoom", String(scale));
         } else {
-          scene.style.transition = transition === "none" ? "none" : `transform ${transition}`;
-          scene.style.removeProperty("zoom");
+          if (scaleModeRef.current === "zoom") {
+            const renderedScale = Number.parseFloat(getComputedStyle(scene).zoom) || 1;
+            scene.style.transition = "none";
+            scene.style.setProperty("zoom", "1");
+            scene.style.transform = `scale(${renderedScale})`;
+            // Commit the visually equivalent transform base before both camera
+            // axes start their shared compositor transition.
+            scene.getBoundingClientRect();
+            scaleModeRef.current = "transform";
+          }
+          surface.style.transition = `transform ${transition}`;
+          scene.style.transition = `transform ${transition}`;
+          surface.style.transform = `translate3d(${renderedX}px, ${renderedY}px, 0)`;
           scene.style.transform = `scale(${scale})`;
+          settleTimerRef.current = window.setTimeout(() => {
+            if (renderVersionRef.current !== renderVersion || !sceneRef.current) return;
+            const settledScene = sceneRef.current;
+            settledScene.style.transition = "none";
+            settledScene.style.setProperty("zoom", String(scale));
+            settledScene.style.transform = "none";
+            scaleModeRef.current = "zoom";
+          }, camera.focusDurationMs + 34);
         }
         if (scaleReadoutRef.current) {
           const readout = `${Math.round(scale * 100)}%`;
@@ -369,7 +394,22 @@ export function useSpatialCanvasMotion({
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => syncView(false));
+    const observedSizes = new WeakMap<Element, { width: number; height: number }>();
+    const observer = new ResizeObserver((entries) => {
+      let resized = false;
+      for (const entry of entries) {
+        const size = { width: entry.contentRect.width, height: entry.contentRect.height };
+        const previous = observedSizes.get(entry.target);
+        observedSizes.set(entry.target, size);
+        if (previous && (previous.width !== size.width || previous.height !== size.height)) {
+          resized = true;
+        }
+      }
+      // The observer's first delivery only reports the dimensions already used by
+      // the layout effect above. Re-applying them would cancel an in-flight focus
+      // transition when an inspector has just mounted.
+      if (resized) syncView(false);
+    });
     observer.observe(viewport);
     const occlusion = occlusionActive ? occlusionRef.current : null;
     if (occlusion) observer.observe(occlusion);
@@ -378,6 +418,7 @@ export function useSpatialCanvasMotion({
   useEffect(
     () => () => {
       cancelAnimationFrame(frameRef.current);
+      window.clearTimeout(settleTimerRef.current);
     },
     [],
   );

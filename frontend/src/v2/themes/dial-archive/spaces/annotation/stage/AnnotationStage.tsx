@@ -281,6 +281,7 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
           <AnnotationWorkcellViewport
             transition={workcellTransition}
             asset={navigation.visualAsset}
+            assets={content.sequence.assets}
             channels={content.channels}
             edit={content.editWorkcell.editor}
             projectContext={content.productionWorkcell.projectContext}

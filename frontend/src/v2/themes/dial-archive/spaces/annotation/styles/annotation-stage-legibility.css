@@ -325,17 +325,32 @@
   --dial-archive-annotation-type-meta: clamp(12px, 0.5vw, 13px);
   --dial-archive-annotation-type-label: clamp(13px, 0.54vw, 14px);
   --dial-archive-annotation-type-body: clamp(14px, 0.58vw, 15px);
+  right: 0;
+  bottom: 0;
   border: 1px solid rgba(25, 25, 25, 0.24);
+  animation: dial-archive-production-inspector-in 360ms var(--dial-archive-ease) both;
+}
+
+@keyframes dial-archive-production-inspector-in {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 0 100%);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+  }
 }
 
 @media (min-width: 1121px) {
   .dial-archive-production-workcell
     .dial-archive-production-workcell__console-field.dial-archive-preparation-inspector {
-    top: 18px;
-    right: 18px;
-    bottom: 18px;
-    width: clamp(560px, 32vw, 900px);
-    max-width: calc(100% - 36px);
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--dial-archive-production-rail-width);
+    max-width: calc(100% - 18px);
   }
 }
 

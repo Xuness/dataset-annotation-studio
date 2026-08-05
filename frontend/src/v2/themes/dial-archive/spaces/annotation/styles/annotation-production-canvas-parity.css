@@ -1,0 +1,104 @@
+/*
+ * Space 03 / Production canvas parity contract.
+ *
+ * This file loads after spaces/styles/workbench.css so the production canvas
+ * keeps Space 02's proven visual and motion primitives without inheriting the
+ * former production-only dashboard overrides. The inspector remains its own
+ * Space 03 surface and is intentionally outside this contract.
+ */
+
+.dial-archive-stage[data-workcell="production"] .dial-archive-production-workcell {
+  background: #ffffff;
+}
+
+.dial-archive-stage[data-workcell="production"]
+  .dial-archive-production-workcell__route-field.dial-archive-preparation-canvas {
+  background:
+    linear-gradient(
+      128deg,
+      transparent 0 64%,
+      rgba(25, 25, 25, 0.018) 64% 64.1%,
+      transparent 64.1%
+    ),
+    #ffffff;
+}
+
+.dial-archive-production-canvas-map {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.dial-archive-production-canvas-node {
+  --dial-archive-production-elevation: var(--dial-archive-node-elevation, 10px);
+}
+
+.dial-archive-production-canvas-scope__options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding-top: 7px;
+  pointer-events: auto;
+}
+
+.dial-archive-production-canvas-scope__options button {
+  min-width: 0;
+  min-height: 27px;
+  padding: 4px 6px;
+  border: 1px solid rgba(245, 246, 241, 0.28);
+  color: inherit;
+  font-family: var(--dial-archive-font-mono);
+  font-size: var(--dial-archive-workbench-type-canvas-micro);
+  letter-spacing: 0.06em;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dial-archive-production-canvas-scope__options button.is-active {
+  color: var(--dial-archive-carbon);
+  border-color: var(--dial-archive-yellow);
+  background: var(--dial-archive-yellow);
+}
+
+.dial-archive-production-canvas-scope__options button:hover:not(:disabled),
+.dial-archive-production-canvas-scope__options button:focus-visible {
+  color: var(--dial-archive-carbon);
+  border-color: var(--dial-archive-yellow);
+  background: var(--dial-archive-yellow);
+  outline: 1px solid var(--dial-archive-carbon);
+}
+
+.dial-archive-production-canvas-scope__options button:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.dial-archive-production-workcell__help.dial-archive-preparation-canvas__help span {
+  display: inline;
+}
+
+.dial-archive-production-workcell.has-inspector
+  .dial-archive-production-workcell__controls.dial-archive-preparation-canvas__controls {
+  left: 50%;
+}
+
+.dial-archive-production-workcell.has-inspector
+  .dial-archive-production-workcell__minimap.dial-archive-preparation-minimap {
+  right: 26px;
+  left: auto;
+}
+
+@media (max-width: 900px) {
+  .dial-archive-production-workcell__help.dial-archive-preparation-canvas__help {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dial-archive-production-canvas-map .dial-archive-preparation-canvas__frame,
+  .dial-archive-production-canvas-map .dial-archive-preparation-gauge__rotor,
+  .dial-archive-production-canvas-map .dial-archive-preparation-connectors__signal path,
+  .dial-archive-production-canvas-map .dial-archive-preparation-node__visual {
+    animation: none;
+  }
+}

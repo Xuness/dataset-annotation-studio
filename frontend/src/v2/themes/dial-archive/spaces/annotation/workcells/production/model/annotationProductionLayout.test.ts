@@ -1,36 +1,63 @@
 import { describe, expect, test } from "vitest";
 
+import { PREPARATION_CANVAS_LAYOUT } from "../../../../preparation/model/preparationCanvasLayout";
 import {
   ANNOTATION_PRODUCTION_ROUTE_LAYOUT,
-  ANNOTATION_PRODUCTION_TOPOLOGY_BOUNDS,
-  resolveProductionFocus,
+  PRODUCTION_CANVAS_NODE_IDS,
+  getProductionNodeCenter,
+  projectProductionCanvasPointToMinimap,
 } from "./annotationProductionLayout";
 
-describe("annotation production camera layout", () => {
-  test("fits the complete topology beside a fluid inspector on a 2560px display", () => {
-    const viewport = { width: 2560, height: 1294, inspectorWidth: 819 };
-    const target = resolveProductionFocus("description", viewport);
-    const visibleWidth = viewport.width - viewport.inspectorWidth - 36;
-    const halfWorldWidth = visibleWidth / target.scale / 2;
-    const halfWorldHeight = viewport.height / target.scale / 2;
-    const bounds = ANNOTATION_PRODUCTION_TOPOLOGY_BOUNDS;
-
-    expect(target.scale).toBeGreaterThan(0.7);
-    expect(target.center.x - halfWorldWidth).toBeLessThanOrEqual(bounds.x);
-    expect(target.center.x + halfWorldWidth).toBeGreaterThanOrEqual(bounds.x + bounds.width);
-    expect(target.center.y - halfWorldHeight).toBeLessThanOrEqual(bounds.y);
-    expect(target.center.y + halfWorldHeight).toBeGreaterThanOrEqual(bounds.y + bounds.height);
+describe("annotation production canvas parity", () => {
+  test("uses the complete Space 02 canvas, camera, decoration, and evidence geometry", () => {
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.surface).toBe(PREPARATION_CANVAS_LAYOUT.surface);
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.taskBounds).toBe(
+      PREPARATION_CANVAS_LAYOUT.taskBounds,
+    );
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.camera).toBe(PREPARATION_CANVAS_LAYOUT.camera);
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.fields).toBe(PREPARATION_CANVAS_LAYOUT.fields);
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.decorRoutes).toBe(
+      PREPARATION_CANVAS_LAYOUT.decorRoutes,
+    );
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.backgroundFrames).toBe(
+      PREPARATION_CANVAS_LAYOUT.backgroundFrames,
+    );
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.gauges).toBe(PREPARATION_CANVAS_LAYOUT.gauges);
   });
 
-  test("retains the closer selected-route composition below the wide breakpoint", () => {
-    const target = resolveProductionFocus("description", {
-      width: 1366,
-      height: 622,
-      inspectorWidth: 560,
-    });
+  test("maps all eight production meanings onto the established Space 02 node slots", () => {
+    expect(PRODUCTION_CANVAS_NODE_IDS).toHaveLength(8);
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.nodes.source).toBe(
+      PREPARATION_CANVAS_LAYOUT.nodes.source,
+    );
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.nodes.scope).toBe(
+      PREPARATION_CANVAS_LAYOUT.nodes.scope,
+    );
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.nodes.tags).toBe(
+      PREPARATION_CANVAS_LAYOUT.nodes.geometry,
+    );
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.nodes.description).toBe(
+      PREPARATION_CANVAS_LAYOUT.nodes.encoding,
+    );
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.nodes.translation).toBe(
+      PREPARATION_CANVAS_LAYOUT.nodes.identity,
+    );
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.nodes.validation).toBe(
+      PREPARATION_CANVAS_LAYOUT.nodes.preview,
+    );
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.nodes.terminal).toBe(
+      PREPARATION_CANVAS_LAYOUT.nodes.commit,
+    );
+    expect(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.nodes.result).toBe(
+      PREPARATION_CANVAS_LAYOUT.nodes.recovery,
+    );
+  });
 
-    expect(target.scale).toBe(ANNOTATION_PRODUCTION_ROUTE_LAYOUT.camera.focusScale);
-    expect(target.center.x).toBe(2075);
-    expect(target.center.y).toBe(907.5);
+  test("projects node readings through the same minimap geometry", () => {
+    const center = getProductionNodeCenter("description");
+    expect(center).toEqual({ x: 1695, y: 945 });
+    expect(projectProductionCanvasPointToMinimap(center)).toEqual(
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    );
   });
 });

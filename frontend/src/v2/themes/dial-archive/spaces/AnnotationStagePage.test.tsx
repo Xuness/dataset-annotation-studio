@@ -242,6 +242,9 @@ function productionContent(
       scopeCount: 3,
       totalCount: 3,
       selectedCount: 1,
+      folderPath: "set-a",
+      folderOptions: [{ id: "set-a", label: "set-a", detail: "2 MATERIAL · set-a" }],
+      folderLoading: false,
       backend: "local_tagger",
       backendOptions: [{ id: "local_tagger", label: "本地打标器" }],
       providerProfileId: "",
@@ -264,6 +267,7 @@ function productionContent(
       ready: true,
       pending: false,
       setScope: vi.fn(),
+      setFolderPath: vi.fn(),
       setBackend: vi.fn(),
       setProviderProfile: vi.fn(),
       setModel: vi.fn(),
@@ -928,7 +932,7 @@ describe("dial archive annotation stage", () => {
       }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /REQUEST请求预览/u }));
+    fireEvent.click(screen.getByRole("button", { name: "检查生产节点 路线校验" }));
     expect(screen.getByRole("heading", { name: "最终请求预览" })).not.toBeNull();
     const compactRequest = document.querySelector(".dial-archive-request-preview.is-inspector");
     expect(compactRequest).not.toBeNull();
@@ -978,9 +982,44 @@ describe("dial archive annotation stage", () => {
 
     expect(screen.getByRole("region", { name: "自动生产工作间" })).not.toBeNull();
     expect(screen.getByRole("region", { name: "可拖动的生产路由画布" })).not.toBeNull();
-    expect(screen.getByRole("region", { name: "生产线路" })).not.toBeNull();
+    const productionRoute = screen.getByRole("region", { name: "生产线路" });
+    expect(productionRoute).not.toBeNull();
     expect(screen.getByRole("heading", { name: "标签生产线路" })).not.toBeNull();
-    expect(screen.getByText("RANGE EVIDENCE")).not.toBeNull();
+    expect(screen.queryByText("PARAMETERS READY")).toBeNull();
+    expect(screen.getByText("SOURCE EVIDENCE")).not.toBeNull();
+    expect(productionRoute.dataset.canvasParity).toBe("space-02");
+    expect(productionRoute.querySelectorAll(".dial-archive-production-canvas-node")).toHaveLength(
+      8,
+    );
+    expect(
+      productionRoute.querySelectorAll(".dial-archive-preparation-canvas__frame"),
+    ).toHaveLength(5);
+    expect(
+      productionRoute.querySelectorAll(".dial-archive-preparation-canvas__field"),
+    ).toHaveLength(4);
+    expect(productionRoute.querySelectorAll(".dial-archive-preparation-gauge")).toHaveLength(2);
+    expect(
+      productionRoute.querySelectorAll(".dial-archive-preparation-connectors__main > path"),
+    ).toHaveLength(12);
+    let inputNavigation = screen.getByRole("navigation", { name: "生产输入阶段" });
+    expect(inputNavigation.textContent).toContain("CONFIG");
+    expect(inputNavigation.textContent).toContain("CONTEXT");
+    expect(inputNavigation.textContent).not.toContain("REQUEST");
+    fireEvent.click(screen.getByRole("group", { name: "任务素材范围" }));
+    expect(screen.getByRole("heading", { name: "处理范围" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "素材范围装配" })).not.toBeNull();
+    inputNavigation = screen.getByRole("navigation", { name: "生产输入阶段" });
+    expect(inputNavigation.textContent).toContain("CONFIG");
+    expect(inputNavigation.textContent).not.toContain("CONTEXT");
+    expect(inputNavigation.textContent).not.toContain("REQUEST");
+    fireEvent.click(screen.getByRole("button", { name: /DIR\.02工作目录子文件夹/u }));
+    expect(production.configuration.setScope).toHaveBeenCalledWith("folder");
+    fireEvent.click(screen.getByRole("button", { name: "检查生产节点 路线校验" }));
+    inputNavigation = screen.getByRole("navigation", { name: "生产输入阶段" });
+    expect(inputNavigation.textContent).toContain("REQUEST");
+    expect(inputNavigation.textContent).not.toContain("CONFIG");
+    expect(inputNavigation.textContent).not.toContain("CONTEXT");
+    fireEvent.click(screen.getByRole("tab", { name: /标签生产/u }));
     expect(
       screen
         .getByRole("complementary", { name: "生产执行检查器" })
@@ -1014,6 +1053,41 @@ describe("dial archive annotation stage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /建立并启动生产任务/u }));
     expect(production.configuration.create).toHaveBeenCalledOnce();
+  });
+
+  test("configures an actual workspace subfolder from the scope node", () => {
+    const baseProduction = productionContent({ status: "configure", entryIntent: "lane" });
+    const setFolderPath = vi.fn();
+    const production: AnnotationProductionContent = {
+      ...baseProduction,
+      configuration: {
+        ...baseProduction.configuration,
+        scope: "folder",
+        scopeCount: 2,
+        folderPath: "set-a",
+        folderOptions: [
+          { id: "set-a", label: "set-a", detail: "2 MATERIAL · set-a" },
+          { id: "set-b", label: "set-b", detail: "1 MATERIAL · set-b" },
+        ],
+        setFolderPath,
+      },
+    };
+    renderStage(
+      stageContent({
+        activeWorkcell: "production",
+        productionWorkcell: {
+          production,
+          projectContext: projectContextContent(),
+          requestPreview: requestPreviewContent(),
+        },
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("group", { name: "任务素材范围" }));
+    const folder = screen.getByRole("combobox", { name: "素材子文件夹" });
+    expect((folder as HTMLSelectElement).value).toBe("set-a");
+    fireEvent.change(folder, { target: { value: "set-b" } });
+    expect(setFolderPath).toHaveBeenCalledWith("set-b");
   });
 
   test("keeps a running operation on the same route topology", () => {

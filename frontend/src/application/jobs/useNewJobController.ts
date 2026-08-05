@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useAssetFolders, useAssetIds } from "../../features/assets/hooks";
 import { useJobActions } from "../../features/jobs/hooks";
 import {
   useProviderProfiles,
@@ -26,6 +27,8 @@ interface UseNewJobControllerOptions {
   enabled?: boolean;
 }
 
+type NewJobScope = "all" | "selected" | "folder";
+
 export function useNewJobController({
   projectId,
   workspace,
@@ -48,12 +51,33 @@ export function useNewJobController({
   const [providerModelId, setProviderModelId] = useState("");
   const [taggerProfileId, setTaggerProfileId] = useState("");
   const [translationPromptPresetId, setTranslationPromptPresetId] = useState("");
-  const [scope, setScope] = useState<"all" | "selected">("all");
+  const [scope, setScope] = useState<NewJobScope>("all");
+  const [folderPath, setFolderPath] = useState("");
   const [targetLanguage, setTargetLanguage] = useState("zh-CN");
   const [translationSourceKind, setTranslationSourceKind] =
     useState<TranslationSourceKind>("description");
   const [translationPolicy, setTranslationPolicy] = useState<ExistingTranslationPolicy>("skip");
   const [error, setError] = useState<string | null>(null);
+  const folderLibrary = useAssetFolders(projectId, enabled);
+  const folderOptions = useMemo(
+    () =>
+      folderLibrary.data?.items
+        .filter((folder) => Boolean(folder.path))
+        .map((folder) => ({
+          id: folder.path,
+          label: folder.name,
+          detail: `${folder.descendant_asset_count.toLocaleString()} MATERIAL · ${folder.path}`,
+        })) ?? [],
+    [folderLibrary.data?.items],
+  );
+  const selectedFolder = folderLibrary.data?.items.find((folder) => folder.path === folderPath);
+  const folderAssetIds = useAssetIds(
+    projectId,
+    { folderPath },
+    enabled && scope === "folder" && Boolean(folderPath),
+  );
+  const refetchFolderAssetIds = folderAssetIds.refetch;
+  const folderCount = folderAssetIds.data?.total ?? selectedFolder?.descendant_asset_count ?? 0;
   const executionBackend = kind === "translation" ? translationBackend : annotationBackend;
   const selectedProvider = providerProfiles.data?.find(
     (profile) => profile.id === providerProfileId,
@@ -65,6 +89,16 @@ export function useNewJobController({
   const selectedTaggerProfile = readyTaggerProfiles.find(
     (profile) => profile.id === taggerProfileId,
   );
+
+  useEffect(() => {
+    if (!folderOptions.length) {
+      if (folderPath) setFolderPath("");
+      return;
+    }
+    if (!folderOptions.some((folder) => folder.id === folderPath)) {
+      setFolderPath(folderOptions[0].id);
+    }
+  }, [folderOptions, folderPath]);
 
   useEffect(() => {
     const available = providerProfiles.data;
@@ -152,7 +186,9 @@ export function useNewJobController({
       : executionBackend === "local_dictionary"
         ? dictionaryReady
         : providerReady && promptReady) &&
-    (scope === "all" || checkedAssetIds.length > 0),
+    (scope === "all" ||
+      (scope === "selected" && checkedAssetIds.length > 0) ||
+      (scope === "folder" && Boolean(folderPath) && folderCount > 0 && !folderAssetIds.isError)),
   );
 
   const createJob = useCallback(async () => {
@@ -161,14 +197,24 @@ export function useNewJobController({
       if (!workspace) throw new Error("当前项目上下文不可用。");
       const providerExecution = executionBackend === "provider";
       const taggerExecution = executionBackend === "local_tagger";
+      let scopedAssetIds: string[] = [];
+      if (scope === "selected") {
+        scopedAssetIds = [...checkedAssetIds];
+      } else if (scope === "folder") {
+        if (!folderPath) throw new Error("请选择工作目录下的素材子文件夹。");
+        const result = await refetchFolderAssetIds();
+        if (result.error) throw result.error;
+        scopedAssetIds = result.data?.ids ?? [];
+        if (!scopedAssetIds.length) throw new Error("所选子文件夹中没有可处理的素材。");
+      }
       const job = await actions.create.mutateAsync({
         execution_backend: executionBackend,
         provider_profile_id: providerExecution ? providerProfileId : undefined,
         model_id: providerExecution ? providerModelId : undefined,
         tagger_profile_id: taggerExecution ? taggerProfileId : undefined,
         kind,
-        scope,
-        asset_ids: scope === "selected" ? [...checkedAssetIds] : [],
+        scope: scope === "all" ? "all" : "selected",
+        asset_ids: scopedAssetIds,
         translation_prompt_preset_id:
           kind === "translation" && providerExecution ? translationPromptPresetId : undefined,
         target_language: targetLanguage,
@@ -183,10 +229,12 @@ export function useNewJobController({
     actions.create,
     checkedAssetIds,
     executionBackend,
+    folderPath,
     kind,
     onCreated,
     providerModelId,
     providerProfileId,
+    refetchFolderAssetIds,
     scope,
     taggerProfileId,
     targetLanguage,
@@ -218,6 +266,12 @@ export function useNewJobController({
     setTranslationPromptPresetId,
     scope,
     setScope,
+    folderPath,
+    setFolderPath,
+    folderOptions,
+    folderCount,
+    folderLoading: folderLibrary.isPending || folderAssetIds.isFetching,
+    folderError: folderLibrary.error ?? folderAssetIds.error,
     targetLanguage,
     setTargetLanguage,
     translationSourceKind,

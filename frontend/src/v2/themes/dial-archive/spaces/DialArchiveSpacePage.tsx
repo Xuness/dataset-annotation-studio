@@ -28,6 +28,7 @@ import "./styles/annotation.css";
 import "./annotation/styles/annotation-stage.css";
 import "./styles/preparation.css";
 import "./styles/workbench.css";
+import "./annotation/styles/annotation-production-canvas-parity.css";
 import "./styles/motion.css";
 
 function DialArchiveSecondarySpacePage({

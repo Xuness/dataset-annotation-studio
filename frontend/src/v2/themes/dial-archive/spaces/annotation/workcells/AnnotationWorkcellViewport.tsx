@@ -21,6 +21,7 @@ import { AnnotationProductionWorkcell } from "./production/AnnotationProductionW
 interface AnnotationWorkcellViewportProps {
   transition: WorkcellTransitionState;
   asset: AnnotationStageAsset | null;
+  assets: readonly AnnotationStageAsset[];
   channels: readonly AnnotationCoverageLane[];
   edit: AnnotationEditContent | null;
   projectContext: AnnotationProjectContextContent | null;
@@ -36,6 +37,7 @@ interface AnnotationWorkcellViewportProps {
 export function AnnotationWorkcellViewport({
   transition,
   asset,
+  assets,
   channels,
   edit,
   projectContext,
@@ -88,6 +90,7 @@ export function AnnotationWorkcellViewport({
           ) : workcell === "production" ? (
             <AnnotationProductionWorkcell
               asset={asset}
+              assets={assets}
               production={production}
               projectContext={projectContext}
               requestPreview={requestPreview}

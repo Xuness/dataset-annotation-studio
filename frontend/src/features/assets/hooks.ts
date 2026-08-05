@@ -34,20 +34,20 @@ export function useInfiniteAssets(projectId: string, query: AssetQuery, pageSize
   });
 }
 
-export function useAssetIds(projectId: string, query: AssetQuery) {
+export function useAssetIds(projectId: string, query: AssetQuery, enabled = false) {
   return useQuery({
     queryKey: assetKeys.ids(projectId, query),
     queryFn: () => listAssetIds(projectId, query),
-    enabled: false,
+    enabled: Boolean(projectId) && enabled,
     staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
-export function useAssetFolders(projectId: string) {
+export function useAssetFolders(projectId: string, enabled = true) {
   return useQuery({
     queryKey: assetKeys.folders(projectId),
     queryFn: () => listAssetFolders(projectId),
-    enabled: Boolean(projectId),
+    enabled: Boolean(projectId) && enabled,
   });
 }
 

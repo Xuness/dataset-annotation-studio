@@ -649,6 +649,7 @@ export interface AnnotationDossierContent {
 }
 
 export type AnnotationProductionBackendId = "provider" | "local_tagger" | "local_dictionary";
+export type AnnotationProductionScopeId = "all" | "selected" | "folder";
 
 export interface AnnotationProductionOption {
   id: string;
@@ -677,10 +678,13 @@ export interface AnnotationProductionSnapshotField {
 }
 
 export interface AnnotationProductionConfiguration {
-  scope: "all" | "selected";
+  scope: AnnotationProductionScopeId;
   scopeCount: number;
   totalCount: number;
   selectedCount: number;
+  folderPath: string;
+  folderOptions: readonly AnnotationProductionOption[];
+  folderLoading: boolean;
   backend: AnnotationProductionBackendId;
   backendOptions: readonly AnnotationProductionOption[];
   providerProfileId: string;
@@ -699,7 +703,8 @@ export interface AnnotationProductionConfiguration {
   blockers: readonly string[];
   ready: boolean;
   pending: boolean;
-  setScope(scope: "all" | "selected"): void;
+  setScope(scope: AnnotationProductionScopeId): void;
+  setFolderPath(folderPath: string): void;
   setBackend(backend: AnnotationProductionBackendId): void;
   setProviderProfile(profileId: string): void;
   setModel(modelId: string): void;
