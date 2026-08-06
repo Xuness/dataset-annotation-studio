@@ -18,6 +18,15 @@ import {
   createNoContextAnnotationStage,
   useAnnotationStageController,
 } from "../pages/spaces/annotation/useAnnotationStageController";
+import { isQualityFilterId } from "../pages/spaces/quality/qualitySpaceModel";
+import {
+  createNoContextQualityReview,
+  useQualityReviewController,
+} from "../pages/spaces/quality/useQualityReviewController";
+import {
+  createNoContextQualitySpace,
+  useQualitySpaceController,
+} from "../pages/spaces/quality/useQualitySpaceController";
 import {
   isPreparationCanvasNodeId,
   isPreparationCapabilityId,
@@ -34,6 +43,7 @@ import type {
   AnnotationWorkcellId,
   PreparationCanvasNodeId,
   PreparationCapabilityId,
+  QualityFilterId,
   SpacePageContent,
 } from "../pages/spaces/spacePageModel";
 import { ANNOTATION_DOSSIER_SECTION_IDS } from "../pages/spaces/spacePageModel";
@@ -222,6 +232,118 @@ function AnnotationRoute({ Page, space, themeId, projectId }: AnnotationRoutePro
   );
 }
 
+interface QualityQuery {
+  assetId: string | null;
+  filter: QualityFilterId | null;
+  channel: AnnotationLaneId | null;
+}
+
+function readQualityQuery(search: string): QualityQuery {
+  const filter = readRouteIdentifier(search, "filter");
+  const channel = readRouteIdentifier(search, "channel");
+  return {
+    assetId: readRouteIdentifier(search, "asset"),
+    filter: isQualityFilterId(filter) ? filter : null,
+    channel: isAnnotationLaneId(channel) ? channel : null,
+  };
+}
+
+interface LoadedQualityRouteProps {
+  Page: LazyExoticComponent<ComponentType<ThemeSpacePageProps>>;
+  space: HomeSpace;
+  themeId: string;
+  projectId: string;
+  query: QualityQuery;
+}
+
+function LoadedQualityRoute({ Page, space, themeId, projectId, query }: LoadedQualityRouteProps) {
+  const navigate = useNavigate();
+  const qualityHref = (overrides: Partial<QualityQuery>) => {
+    const next = { ...query, ...overrides };
+    return buildFrontendHref(space.route, {
+      themeId,
+      projectId,
+      query: { asset: next.assetId, filter: next.filter, channel: next.channel },
+    });
+  };
+  const content = useQualitySpaceController({
+    projectId,
+    requestedAssetId: query.assetId,
+    requestedFilter: query.filter,
+    requestedChannel: query.channel,
+    onAssetIdChange: (assetId) => navigate(qualityHref({ assetId }), { replace: true }),
+    onFilterChange: (filter) => navigate(qualityHref({ assetId: null, filter }), { replace: true }),
+    onChannelChange: (channel) => navigate(qualityHref({ channel }), { replace: true }),
+    onOpenReview: (assetId, filter, channel) =>
+      navigate(
+        buildFrontendHref("/quality/review", {
+          themeId,
+          projectId,
+          query: { asset: assetId, filter, channel },
+        }),
+      ),
+    onOpenAnnotation: (assetId, channel) =>
+      navigate(
+        buildFrontendHref("/annotation/stage/edit", {
+          themeId,
+          projectId,
+          query: { asset: assetId, channel },
+        }),
+      ),
+    onOpenArchive: () =>
+      navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId, projectId })),
+    onOpenDelivery: () =>
+      navigate(buildFrontendHref(getHomeSpace("delivery").route, { themeId, projectId })),
+  });
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
+interface QualityRouteProps {
+  Page: LazyExoticComponent<ComponentType<ThemeSpacePageProps>>;
+  space: HomeSpace;
+  themeId: string;
+  projectId: string | null;
+}
+
+function QualityRoute({ Page, space, themeId, projectId }: QualityRouteProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const query = readQualityQuery(location.search);
+
+  if (projectId) {
+    return (
+      <LoadedQualityRoute
+        Page={Page}
+        space={space}
+        themeId={themeId}
+        projectId={projectId}
+        query={query}
+      />
+    );
+  }
+
+  const content = createNoContextQualitySpace({
+    onOpenArchive: () => navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId })),
+  });
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={null}
+    />
+  );
+}
+
 function SpaceRoute() {
   const location = useLocation();
   const { spaceId = "" } = useParams();
@@ -262,6 +384,11 @@ function SpaceRoute() {
         themeId={themeId}
         projectId={projectId}
       />
+    );
+  }
+  if (space.id === "quality") {
+    return (
+      <QualityRoute Page={theme.SpacePage} space={space} themeId={themeId} projectId={projectId} />
     );
   }
   return (
@@ -465,6 +592,110 @@ function LegacyAnnotationRedirect({ focus }: LegacyAnnotationRedirectProps) {
   );
 }
 
+interface LoadedQualityReviewRouteProps {
+  Page: LazyExoticComponent<ComponentType<ThemeSpacePageProps>>;
+  space: HomeSpace;
+  themeId: string;
+  projectId: string;
+  query: QualityQuery;
+}
+
+function LoadedQualityReviewRoute({
+  Page,
+  space,
+  themeId,
+  projectId,
+  query,
+}: LoadedQualityReviewRouteProps) {
+  const navigate = useNavigate();
+  const filter = query.filter ?? "needs_review";
+  const channel = query.channel ?? "tags";
+  const reviewHref = (overrides: Partial<QualityQuery>) => {
+    const next = { ...query, filter, channel, ...overrides };
+    return buildFrontendHref("/quality/review", {
+      themeId,
+      projectId,
+      query: { asset: next.assetId, filter: next.filter, channel: next.channel },
+    });
+  };
+  const content = useQualityReviewController({
+    projectId,
+    requestedAssetId: query.assetId,
+    filter,
+    channel,
+    onAssetIdChange: (assetId) => navigate(reviewHref({ assetId }), { replace: true }),
+    onChannelChange: (nextChannel) =>
+      navigate(reviewHref({ channel: nextChannel }), { replace: true }),
+    onReturnToQuality: (assetId, nextFilter, nextChannel) =>
+      navigate(
+        buildFrontendHref(space.route, {
+          themeId,
+          projectId,
+          query: { asset: assetId, filter: nextFilter, channel: nextChannel },
+        }),
+      ),
+    onOpenAnnotation: (assetId, nextChannel) =>
+      navigate(
+        buildFrontendHref("/annotation/stage/edit", {
+          themeId,
+          projectId,
+          query: { asset: assetId, channel: nextChannel },
+        }),
+      ),
+    onOpenArchive: () =>
+      navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId, projectId })),
+  });
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
+function QualityReviewRoute() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { projectId } = useProjectRouteContext();
+  const themeId = resolveFrontendThemeId(location.search);
+  const theme = getFrontendTheme(themeId);
+  const space = getHomeSpace("quality");
+  const query = readQualityQuery(location.search);
+  const filter = query.filter ?? "needs_review";
+  const channel = query.channel ?? "tags";
+
+  if (projectId) {
+    return (
+      <LoadedQualityReviewRoute
+        Page={theme.SpacePage}
+        space={space}
+        themeId={themeId}
+        projectId={projectId}
+        query={query}
+      />
+    );
+  }
+
+  const content = createNoContextQualityReview({
+    filter,
+    channel,
+    onReturnToQuality: () => navigate(buildFrontendHref(space.route, { themeId })),
+    onOpenArchive: () => navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId })),
+  });
+  return (
+    <SpaceRouteView
+      Page={theme.SpacePage}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={null}
+    />
+  );
+}
+
 interface LoadedPreparationWorkbenchRouteProps {
   Page: LazyExoticComponent<ComponentType<ThemeSpacePageProps>>;
   space: HomeSpace;
@@ -589,6 +820,7 @@ export function FrontendRoutes() {
         path="/annotation/production"
         element={<LegacyAnnotationRedirect focus="production" />}
       />
+      <Route path="/quality/review" element={<QualityReviewRoute />} />
       <Route path="/:spaceId" element={<SpaceRoute />} />
       <Route path="*" element={<FallbackRoute />} />
     </Routes>

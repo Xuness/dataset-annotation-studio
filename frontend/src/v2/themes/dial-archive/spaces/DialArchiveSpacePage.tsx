@@ -6,6 +6,7 @@ import type {
   PreparationCanvasNodeId,
   PreparationCapabilityId,
   PreparationSpaceContent as PreparationSpaceContentModel,
+  QualitySpaceContent as QualitySpaceContentModel,
 } from "../../../pages/spaces/spacePageModel";
 import type { ThemeSpacePageProps } from "../../themeTypes";
 import { RouteSweep } from "../components/RouteSweep";
@@ -22,6 +23,8 @@ import { SpaceRail } from "./components/SpaceRail";
 import { useSpaceRouteTransition } from "./hooks/useSpaceRouteTransition";
 import { PreparationSpaceContent } from "./preparation/PreparationSpaceContent";
 import { PreparationWorkbench } from "./preparation/PreparationWorkbench";
+import { QualityReviewStage } from "./quality/QualityReviewStage";
+import { QualitySpaceContent } from "./quality/QualitySpaceContent";
 import "./styles/space.css";
 import "./styles/archive.css";
 import "./styles/annotation.css";
@@ -29,6 +32,8 @@ import "./annotation/styles/annotation-stage.css";
 import "./styles/preparation.css";
 import "./styles/workbench.css";
 import "./annotation/styles/annotation-production-canvas-parity.css";
+import "./quality/styles/quality.css";
+import "./quality/styles/quality-reconstruction.css";
 import "./styles/motion.css";
 
 function DialArchiveSecondarySpacePage({
@@ -91,6 +96,22 @@ function DialArchiveSecondarySpacePage({
         }),
     };
   }, [content, startRouteSweep]);
+  const qualityContent = useMemo<QualitySpaceContentModel | null>(() => {
+    if (content.kind !== "quality") return null;
+    return {
+      ...content,
+      openReview: (assetId, channel) =>
+        startRouteSweep({
+          label: "ENTERING // QAC — REVIEW DESK",
+          onCommit: () => content.openReview(assetId, channel),
+        }),
+      openAnnotation: (assetId, channel) =>
+        startRouteSweep({
+          label: "RETURNING // ANN — REPAIR ROUTE",
+          onCommit: () => content.openAnnotation(assetId, channel),
+        }),
+    };
+  }, [content, startRouteSweep]);
 
   return (
     <main
@@ -117,6 +138,8 @@ function DialArchiveSecondarySpacePage({
             <PreparationSpaceContent content={preparationContent} />
           ) : space.id === "annotation" && annotationContent ? (
             <AnnotationSpaceContent content={annotationContent} />
+          ) : space.id === "quality" && qualityContent ? (
+            <QualitySpaceContent content={qualityContent} />
           ) : (
             <PendingSpaceContent space={space} />
           )}
@@ -148,6 +171,17 @@ export function DialArchiveSpacePage(props: ThemeSpacePageProps) {
       >
         <SpaceChrome space={props.space} />
         <AnnotationStage content={props.content} />
+      </main>
+    );
+  }
+  if (props.content.kind === "quality-review") {
+    return (
+      <main
+        className="dial-archive-space dial-archive-space--quality-review"
+        aria-label="Dataset Annotation Studio 证据复核台"
+      >
+        <SpaceChrome space={props.space} tone="dark" />
+        <QualityReviewStage content={props.content} />
       </main>
     );
   }

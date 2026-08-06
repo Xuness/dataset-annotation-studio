@@ -841,6 +841,179 @@ export interface AnnotationStageContent {
   openArchive(): void;
 }
 
+export const QUALITY_FILTER_IDS = [
+  "needs_review",
+  "unreviewed",
+  "stale",
+  "invalid",
+  "failed",
+  "missing",
+  "all",
+] as const;
+
+export type QualityFilterId = (typeof QUALITY_FILTER_IDS)[number];
+
+export type QualityAsset = AnnotationStageAsset;
+
+export interface QualityQueuePresentation {
+  code: string;
+  label: string;
+  description: string;
+  tone: "focus" | "attention" | "danger" | "neutral";
+}
+
+export const QUALITY_QUEUE_PRESENTATION: Readonly<
+  Record<QualityFilterId, QualityQueuePresentation>
+> = {
+  needs_review: {
+    code: "REVIEW",
+    label: "待判定",
+    description: "存在尚未复核的当前版本",
+    tone: "focus",
+  },
+  unreviewed: {
+    code: "OPEN",
+    label: "未复核",
+    description: "当前标注仍处于开放状态",
+    tone: "attention",
+  },
+  stale: {
+    code: "STALE",
+    label: "来源过期",
+    description: "图片或源标注已经变化",
+    tone: "attention",
+  },
+  invalid: {
+    code: "INVALID",
+    label: "校验异常",
+    description: "至少一条证据未通过校验",
+    tone: "danger",
+  },
+  failed: {
+    code: "FAILED",
+    label: "任务失败",
+    description: "生成任务留下失败记录",
+    tone: "danger",
+  },
+  missing: {
+    code: "MISSING",
+    label: "缺少标注",
+    description: "对象尚未形成完整证据",
+    tone: "neutral",
+  },
+  all: {
+    code: "ALL",
+    label: "全部对象",
+    description: "查看项目中的完整素材序列",
+    tone: "neutral",
+  },
+};
+
+export const QUALITY_CHANNEL_PRESENTATION: Readonly<
+  Record<AnnotationLaneId, { code: string; label: string; description: string }>
+> = {
+  tags: { code: "TAG.01", label: "标签证据", description: "类别、置信度与词项结构" },
+  description: { code: "DSC.02", label: "描述证据", description: "自然语言内容与版本来源" },
+  translation: { code: "TRN.03", label: "译文证据", description: "语言身份、源版本与对齐关系" },
+};
+
+export interface QualityQueueSummary extends QualityQueuePresentation {
+  id: QualityFilterId;
+  count: number;
+}
+
+export interface QualitySpaceContent {
+  kind: "quality";
+  status: "no-context" | "loading" | "ready" | "error";
+  project: AnnotationProjectContext | null;
+  focusAsset: QualityAsset | null;
+  focusIndex: number;
+  samples: readonly QualityAsset[];
+  totalCount: number;
+  loadedCount: number;
+  fetchingMore: boolean;
+  hasMore: boolean;
+  filter: QualityFilterId;
+  channel: AnnotationLaneId;
+  queues: readonly QualityQueueSummary[];
+  channels: readonly AnnotationCoverageLane[];
+  translationVariants: readonly AnnotationTranslationVariant[];
+  checkedCount: number;
+  statusCounts: Readonly<Record<string, number>>;
+  message: string | null;
+  selectAsset(assetId: string): void;
+  selectFilter(filter: QualityFilterId): void;
+  selectChannel(channel: AnnotationLaneId): void;
+  loadMore(): void;
+  openReview(assetId?: string, channel?: AnnotationLaneId): void;
+  openAnnotation(assetId?: string, channel?: AnnotationLaneId): void;
+  openArchive(): void;
+  openDelivery(): void;
+}
+
+export interface QualityReviewTag {
+  name: string;
+  category: string | null;
+  confidence: number | null;
+}
+
+export interface QualityReviewDocument {
+  id: string;
+  channel: AnnotationLaneId;
+  displayName: string;
+  contentKind: "text" | "tags";
+  content: string;
+  tags: readonly QualityReviewTag[];
+  availabilityStatus: string;
+  reviewStatus: string | null;
+  validationStatus: string | null;
+  validationIssues: readonly string[];
+  sourceLabel: string;
+  sourceDetail: string | null;
+  headRevisionId: string | null;
+  reviewedRevisionId: string | null;
+  updatedAt: string | null;
+  language: string | null;
+  translationSourceKind: string | null;
+  translationProducerKind: string | null;
+  canReview: boolean;
+}
+
+export interface QualityReviewSequence {
+  assets: readonly QualityAsset[];
+  totalCount: number;
+  loadedCount: number;
+  fetchingMore: boolean;
+  hasMore: boolean;
+  loadError: string | null;
+  loadMore(): void;
+}
+
+export interface QualityReviewContent {
+  kind: "quality-review";
+  status: "no-context" | "loading" | "ready" | "error";
+  project: AnnotationProjectContext | null;
+  sequence: QualityReviewSequence;
+  currentAsset: QualityAsset | null;
+  currentIndex: number;
+  filter: QualityFilterId;
+  channel: AnnotationLaneId;
+  queues: readonly QualityQueueSummary[];
+  documents: readonly QualityReviewDocument[];
+  activeDocument: QualityReviewDocument | null;
+  reviewPending: boolean;
+  actionMessage: string | null;
+  message: string | null;
+  selectAsset(assetId: string): void;
+  stepAsset(offset: number): void;
+  selectChannel(channel: AnnotationLaneId): void;
+  loadMore(): void;
+  reviewCurrent(): Promise<void>;
+  returnToQuality(): void;
+  openAnnotation(): void;
+  openArchive(): void;
+}
+
 export const PREPARATION_CAPABILITY_IDS = ["geometry", "encoding", "identity"] as const;
 
 export type PreparationCapabilityId = (typeof PREPARATION_CAPABILITY_IDS)[number];
@@ -988,6 +1161,8 @@ export type SpacePageContent =
   | ArchiveSpaceContent
   | AnnotationSpaceContent
   | AnnotationStageContent
+  | QualitySpaceContent
+  | QualityReviewContent
   | PreparationSpaceContent
   | PreparationWorkbenchContent
   | PendingSpaceContent;
