@@ -1,4 +1,5 @@
 import type { HomeSpace } from "../../navigation/spaceRegistry";
+import type { ExportFormState } from "../../../application/exports/exportState";
 import type { PreprocessFormState } from "../../../application/preprocessing/preprocessState";
 
 export interface ArchiveProjectRecord {
@@ -1157,6 +1158,153 @@ export interface PreparationWorkbenchContent {
   openArchive(): void;
 }
 
+export type DeliveryOperationTone = "active" | "success" | "attention" | "danger" | "idle";
+
+export interface DeliverySelectionSummary {
+  id: string;
+  channel: "existing_annotation" | "tags" | "description" | "translation";
+  code: string;
+  label: string;
+  detail: string;
+  revision: "current" | "reviewed";
+  revisionLabel: string;
+}
+
+export interface DeliveryManifestSummary {
+  source: "draft" | "operation";
+  scope: "all" | "selected";
+  scopeLabel: string;
+  itemCount: number;
+  selections: readonly DeliverySelectionSummary[];
+  formats: readonly ("txt" | "json")[];
+  formatLabel: string;
+  packaging: "directory" | "zip";
+  packagingLabel: string;
+  destinationPath: string;
+  destinationLabel: string;
+  draft: boolean;
+}
+
+export interface DeliveryOperationSummary {
+  id: string;
+  shortId: string;
+  status: string;
+  statusLabel: string;
+  statusCode: string;
+  tone: DeliveryOperationTone;
+  createdAt: string;
+  completedAt: string | null;
+  destinationPath: string;
+  totalItems: number;
+  completedItems: number;
+  progressPercent: number;
+  totalBytes: number;
+  copiedBytes: number;
+  warningCount: number;
+  currentRelativePath: string | null;
+  errorMessage: string | null;
+  canStop: boolean;
+  canResume: boolean;
+  canOpenFolder: boolean;
+  manifest: DeliveryManifestSummary;
+}
+
+export interface DeliverySpaceContent {
+  kind: "delivery";
+  status: "no-context" | "loading" | "ready" | "error";
+  project: AnnotationProjectContext | null;
+  checkedCount: number;
+  manifest: DeliveryManifestSummary;
+  operations: readonly DeliveryOperationSummary[];
+  focusOperation: DeliveryOperationSummary | null;
+  activeOperation: DeliveryOperationSummary | null;
+  message: string | null;
+  openArchive(): void;
+  openQuality(filter?: QualityFilterId): void;
+  openWorkbench(operationId?: string): void;
+  openFolder(path: string): Promise<void>;
+}
+
+export interface DeliveryPreviewItem {
+  assetId: string;
+  sourceRelativePath: string;
+  targetImageName: string;
+  targetAnnotationName: string;
+  targetOutputs: readonly string[];
+  annotationStatus: string;
+  channelStatuses: Readonly<Record<string, string>>;
+  imageBytes: number;
+  annotationBytes: number;
+  warningCode: string | null;
+  warningMessage: string | null;
+  blockingIssue: string | null;
+}
+
+export interface DeliveryPreviewSummary {
+  token: string;
+  totalItems: number;
+  usableCount: number;
+  reviewedCount: number;
+  unreviewedCount: number;
+  staleCount: number;
+  missingCount: number;
+  emptyCount: number;
+  invalidCount: number;
+  encodingErrorCount: number;
+  warningCount: number;
+  blockingIssueCount: number;
+  blockingIssues: readonly string[];
+  imageBytes: number;
+  annotationBytes: number;
+  truncated: boolean;
+  items: readonly DeliveryPreviewItem[];
+}
+
+export interface DeliveryDialog {
+  kind: "confirm" | "alert";
+  title: string;
+  message: string;
+  tone: "default" | "danger";
+  confirmLabel: string;
+  cancelLabel: string | null;
+}
+
+export type DeliveryWorkbenchPhase = "spec" | "preflight" | "materialize";
+
+export interface DeliveryWorkbenchContent {
+  kind: "delivery-workbench";
+  status: "no-context" | "loading" | "ready" | "error";
+  project: AnnotationProjectContext | null;
+  phase: DeliveryWorkbenchPhase;
+  form: Readonly<ExportFormState>;
+  manifest: DeliveryManifestSummary;
+  assetCount: number;
+  checkedCount: number;
+  preview: DeliveryPreviewSummary | null;
+  previewPending: boolean;
+  exportPending: boolean;
+  canPreview: boolean;
+  canExport: boolean;
+  operations: readonly DeliveryOperationSummary[];
+  activeOperation: DeliveryOperationSummary | null;
+  selectedOperation: DeliveryOperationSummary | null;
+  error: string | null;
+  dialog: DeliveryDialog | null;
+  updateForm(update: Partial<ExportFormState>): void;
+  chooseDestination(): Promise<void>;
+  previewAction(): Promise<void>;
+  startExport(): Promise<void>;
+  stopOperation(operationId: string): Promise<void>;
+  resumeOperation(operationId: string): Promise<void>;
+  openFolder(path: string): Promise<void>;
+  selectOperation(operationId: string | null): void;
+  returnToSpec(): void;
+  resolveDialog(accepted: boolean): void;
+  returnToSpace(): void;
+  openQuality(filter?: QualityFilterId): void;
+  openArchive(): void;
+}
+
 export type SpacePageContent =
   | ArchiveSpaceContent
   | AnnotationSpaceContent
@@ -1165,6 +1313,8 @@ export type SpacePageContent =
   | QualityReviewContent
   | PreparationSpaceContent
   | PreparationWorkbenchContent
+  | DeliverySpaceContent
+  | DeliveryWorkbenchContent
   | PendingSpaceContent;
 
 export interface SpacePageFrame {

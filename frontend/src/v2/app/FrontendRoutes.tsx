@@ -18,6 +18,11 @@ import {
   createNoContextAnnotationStage,
   useAnnotationStageController,
 } from "../pages/spaces/annotation/useAnnotationStageController";
+import { useDeliverySpaceController } from "../pages/spaces/delivery/useDeliverySpaceController";
+import {
+  createNoContextDeliveryWorkbench,
+  useDeliveryWorkbenchController,
+} from "../pages/spaces/delivery/useDeliveryWorkbenchController";
 import { isQualityFilterId } from "../pages/spaces/quality/qualitySpaceModel";
 import {
   createNoContextQualityReview,
@@ -344,6 +349,47 @@ function QualityRoute({ Page, space, themeId, projectId }: QualityRouteProps) {
   );
 }
 
+interface DeliveryRouteProps {
+  Page: LazyExoticComponent<ComponentType<ThemeSpacePageProps>>;
+  space: HomeSpace;
+  themeId: string;
+  projectId: string | null;
+}
+
+function DeliveryRoute({ Page, space, themeId, projectId }: DeliveryRouteProps) {
+  const navigate = useNavigate();
+  const content = useDeliverySpaceController({
+    projectId,
+    onOpenArchive: () =>
+      navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId, projectId })),
+    onOpenQuality: (filter) =>
+      navigate(
+        buildFrontendHref(getHomeSpace("quality").route, {
+          themeId,
+          projectId,
+          query: { filter },
+        }),
+      ),
+    onOpenWorkbench: (operationId) =>
+      navigate(
+        buildFrontendHref("/delivery/workbench", {
+          themeId,
+          projectId,
+          query: { operation: operationId },
+        }),
+      ),
+  });
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
 function SpaceRoute() {
   const location = useLocation();
   const { spaceId = "" } = useParams();
@@ -389,6 +435,11 @@ function SpaceRoute() {
   if (space.id === "quality") {
     return (
       <QualityRoute Page={theme.SpacePage} space={space} themeId={themeId} projectId={projectId} />
+    );
+  }
+  if (space.id === "delivery") {
+    return (
+      <DeliveryRoute Page={theme.SpacePage} space={space} themeId={themeId} projectId={projectId} />
     );
   }
   return (
@@ -537,7 +588,6 @@ function AnnotationStageRoute({ workcell = undefined }: AnnotationStageRouteProp
       />
     );
   }
-
   if (projectId) {
     return (
       <LoadedAnnotationStageRoute
@@ -793,6 +843,95 @@ function PreparationWorkbenchRoute() {
   );
 }
 
+interface LoadedDeliveryWorkbenchRouteProps {
+  Page: LazyExoticComponent<ComponentType<ThemeSpacePageProps>>;
+  space: HomeSpace;
+  themeId: string;
+  projectId: string;
+  initialOperationId: string | null;
+}
+
+function LoadedDeliveryWorkbenchRoute({
+  Page,
+  space,
+  themeId,
+  projectId,
+  initialOperationId,
+}: LoadedDeliveryWorkbenchRouteProps) {
+  const navigate = useNavigate();
+  const content = useDeliveryWorkbenchController({
+    projectId,
+    initialOperationId,
+    onOperationIdChange: (operationId) =>
+      navigate(
+        buildFrontendHref("/delivery/workbench", {
+          themeId,
+          projectId,
+          query: { operation: operationId },
+        }),
+        { replace: true },
+      ),
+    onReturnToSpace: () => navigate(buildFrontendHref(space.route, { themeId, projectId })),
+    onOpenQuality: (filter) =>
+      navigate(
+        buildFrontendHref(getHomeSpace("quality").route, {
+          themeId,
+          projectId,
+          query: { filter },
+        }),
+      ),
+    onOpenArchive: () =>
+      navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId, projectId })),
+  });
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
+function DeliveryWorkbenchRoute() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { projectId } = useProjectRouteContext();
+  const themeId = resolveFrontendThemeId(location.search);
+  const theme = getFrontendTheme(themeId);
+  const space = getHomeSpace("delivery");
+  const initialOperationId = readRouteIdentifier(location.search, "operation");
+
+  if (projectId) {
+    return (
+      <LoadedDeliveryWorkbenchRoute
+        Page={theme.SpacePage}
+        space={space}
+        themeId={themeId}
+        projectId={projectId}
+        initialOperationId={initialOperationId}
+      />
+    );
+  }
+
+  const content = createNoContextDeliveryWorkbench({
+    onReturnToSpace: () => navigate(buildFrontendHref(space.route, { themeId })),
+    onOpenQuality: (filter) =>
+      navigate(buildFrontendHref(getHomeSpace("quality").route, { themeId, query: { filter } })),
+    onOpenArchive: () => navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId })),
+  });
+  return (
+    <SpaceRouteView
+      Page={theme.SpacePage}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={null}
+    />
+  );
+}
+
 function FallbackRoute() {
   const location = useLocation();
   const { projectId } = useProjectRouteContext();
@@ -821,6 +960,7 @@ export function FrontendRoutes() {
         element={<LegacyAnnotationRedirect focus="production" />}
       />
       <Route path="/quality/review" element={<QualityReviewRoute />} />
+      <Route path="/delivery/workbench" element={<DeliveryWorkbenchRoute />} />
       <Route path="/:spaceId" element={<SpaceRoute />} />
       <Route path="*" element={<FallbackRoute />} />
     </Routes>

@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef } from "react";
 import type {
   AnnotationLaneId,
   AnnotationSpaceContent as AnnotationSpaceContentModel,
+  DeliverySpaceContent as DeliverySpaceContentModel,
   PreparationCanvasNodeId,
   PreparationCapabilityId,
   PreparationSpaceContent as PreparationSpaceContentModel,
@@ -16,6 +17,8 @@ import "../styles/tokens.css";
 import { AnnotationSpaceContent } from "./annotation/AnnotationSpaceContent";
 import { AnnotationStage } from "./annotation/stage/AnnotationStage";
 import { ArchiveSpaceContent } from "./components/ArchiveSpaceContent";
+import { DeliverySpaceContent } from "./delivery/DeliverySpaceContent";
+import { DeliveryWorkbench } from "./delivery/DeliveryWorkbench";
 import { PendingSpaceContent } from "./components/PendingSpaceContent";
 import { RouteHandoff } from "./components/RouteHandoff";
 import { SpaceChrome } from "./components/SpaceChrome";
@@ -34,6 +37,8 @@ import "./styles/workbench.css";
 import "./annotation/styles/annotation-production-canvas-parity.css";
 import "./quality/styles/quality.css";
 import "./quality/styles/quality-reconstruction.css";
+import "./delivery/styles/delivery.css";
+import "./delivery/styles/delivery-workbench.css";
 import "./styles/motion.css";
 
 function DialArchiveSecondarySpacePage({
@@ -112,6 +117,22 @@ function DialArchiveSecondarySpacePage({
         }),
     };
   }, [content, startRouteSweep]);
+  const deliveryContent = useMemo<DeliverySpaceContentModel | null>(() => {
+    if (content.kind !== "delivery") return null;
+    return {
+      ...content,
+      openWorkbench: (operationId) =>
+        startRouteSweep({
+          label: operationId ? "OPENING // DLV — OPERATION" : "ENTERING // DLV — WORKBENCH",
+          onCommit: () => content.openWorkbench(operationId),
+        }),
+      openQuality: (filter) =>
+        startRouteSweep({
+          label: "RETURNING // QAC — QUALITY STATUS",
+          onCommit: () => content.openQuality(filter),
+        }),
+    };
+  }, [content, startRouteSweep]);
 
   return (
     <main
@@ -140,6 +161,8 @@ function DialArchiveSecondarySpacePage({
             <AnnotationSpaceContent content={annotationContent} />
           ) : space.id === "quality" && qualityContent ? (
             <QualitySpaceContent content={qualityContent} />
+          ) : space.id === "delivery" && deliveryContent ? (
+            <DeliverySpaceContent content={deliveryContent} />
           ) : (
             <PendingSpaceContent space={space} />
           )}
@@ -152,6 +175,17 @@ function DialArchiveSecondarySpacePage({
 }
 
 export function DialArchiveSpacePage(props: ThemeSpacePageProps) {
+  if (props.content.kind === "delivery-workbench") {
+    return (
+      <main
+        className="dial-archive-space dial-archive-space--delivery-workbench"
+        aria-label="Dataset Annotation Studio 交付台"
+      >
+        <SpaceChrome space={props.space} />
+        <DeliveryWorkbench content={props.content} />
+      </main>
+    );
+  }
   if (props.content.kind === "preparation-workbench") {
     return (
       <main

@@ -88,6 +88,22 @@ describe("new frontend routes", () => {
     });
   });
 
+  test("keeps delivery and its workbench as implemented semantic routes", async () => {
+    const secondary = renderRoutes("/delivery?theme=dial-archive");
+    expect(await screen.findByRole("heading", { name: "尚未装载项目" })).toBeTruthy();
+    secondary.unmount();
+
+    renderRoutes("/delivery/workbench?theme=dial-archive");
+    expect(await screen.findByRole("heading", { name: "尚未装载项目" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "返回 05 交付空间" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/delivery?theme=dial-archive",
+      );
+    });
+  });
+
   test("keeps the annotation stage as an explicit third-level route", async () => {
     renderRoutes("/annotation/stage?theme=dial-archive");
 

@@ -77,6 +77,11 @@ export function useExportController({ projectId, confirm, alert }: UseExportCont
     }
   }, [actions.preview, request, requestFingerprint]);
 
+  const resetPreview = useCallback(() => {
+    actions.preview.reset();
+    setPreviewFingerprint(null);
+  }, [actions.preview]);
+
   const startExport = useCallback(async () => {
     const previewData = validPreview;
     if (!previewData || previewData.blocking_issue_count) return;
@@ -184,8 +189,11 @@ export function useExportController({ projectId, confirm, alert }: UseExportCont
     activeExport,
     error,
     operations: operations.data ?? [],
+    operationsPending: operations.isPending,
+    operationsError: operations.error,
     chooseFolder,
     previewAction: preview,
+    resetPreview,
     startExport,
     stop,
     resume,
