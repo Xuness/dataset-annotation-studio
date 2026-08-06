@@ -1,6 +1,13 @@
 import type { HomeSpace } from "../../navigation/spaceRegistry";
 import type { ExportFormState } from "../../../application/exports/exportState";
 import type { PreprocessFormState } from "../../../application/preprocessing/preprocessState";
+import type { CapabilityLibraryContent as CapabilityLibraryPageContent } from "./capability-library/capabilityLibraryModel";
+
+export type {
+  CapabilityLibraryCategory,
+  CapabilityLibraryCategoryId,
+  CapabilityLibraryContent,
+} from "./capability-library/capabilityLibraryModel";
 
 export interface ArchiveProjectRecord {
   id: string;
@@ -1573,6 +1580,7 @@ export type SpacePageContent =
   | PreparationWorkbenchContent
   | DeliverySpaceContent
   | DeliveryWorkbenchContent
+  | CapabilityLibraryPageContent
   | PendingSpaceContent;
 
 export interface SpacePageFrame {

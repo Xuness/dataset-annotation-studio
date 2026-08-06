@@ -17,6 +17,7 @@ import "../styles/tokens.css";
 import { AnnotationSpaceContent } from "./annotation/AnnotationSpaceContent";
 import { AnnotationStage } from "./annotation/stage/AnnotationStage";
 import { ArchiveSpaceContent } from "./components/ArchiveSpaceContent";
+import { CapabilityLibraryContent } from "./capability-library/CapabilityLibraryContent";
 import { DeliverySpaceContent } from "./delivery/DeliverySpaceContent";
 import { DeliveryWorkbench } from "./delivery/DeliveryWorkbench";
 import { PendingSpaceContent } from "./components/PendingSpaceContent";
@@ -39,6 +40,7 @@ import "./quality/styles/quality.css";
 import "./quality/styles/quality-reconstruction.css";
 import "./delivery/styles/delivery.css";
 import "./delivery/styles/delivery-workbench.css";
+import "./capability-library/capability-library.css";
 import "./styles/motion.css";
 
 function DialArchiveSecondarySpacePage({
@@ -163,6 +165,8 @@ function DialArchiveSecondarySpacePage({
             <QualitySpaceContent content={qualityContent} />
           ) : space.id === "delivery" && deliveryContent ? (
             <DeliverySpaceContent content={deliveryContent} />
+          ) : space.id === "capability" && content.kind === "capability-library" ? (
+            <CapabilityLibraryContent content={content} />
           ) : (
             <PendingSpaceContent space={space} />
           )}

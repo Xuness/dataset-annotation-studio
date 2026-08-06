@@ -19,6 +19,7 @@ import {
   useAnnotationStageController,
 } from "../pages/spaces/annotation/useAnnotationStageController";
 import { useDeliverySpaceController } from "../pages/spaces/delivery/useDeliverySpaceController";
+import { useCapabilityLibraryController } from "../pages/spaces/capability-library/useCapabilityLibraryController";
 import {
   createNoContextDeliveryWorkbench,
   useDeliveryWorkbenchController,
@@ -137,6 +138,26 @@ interface ArchiveRouteProps {
   themeId: string;
   projectId: string | null;
   onProjectIdChange(projectId: string | null): void;
+}
+
+interface CapabilityRouteProps {
+  Page: LazyExoticComponent<ComponentType<ThemeSpacePageProps>>;
+  space: HomeSpace;
+  themeId: string;
+  projectId: string | null;
+}
+
+function CapabilityRoute({ Page, space, themeId, projectId }: CapabilityRouteProps) {
+  const content = useCapabilityLibraryController();
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
 }
 
 function ArchiveRoute({ Page, space, themeId, projectId, onProjectIdChange }: ArchiveRouteProps) {
@@ -440,6 +461,16 @@ function SpaceRoute() {
   if (space.id === "delivery") {
     return (
       <DeliveryRoute Page={theme.SpacePage} space={space} themeId={themeId} projectId={projectId} />
+    );
+  }
+  if (space.id === "capability") {
+    return (
+      <CapabilityRoute
+        Page={theme.SpacePage}
+        space={space}
+        themeId={themeId}
+        projectId={projectId}
+      />
     );
   }
   return (

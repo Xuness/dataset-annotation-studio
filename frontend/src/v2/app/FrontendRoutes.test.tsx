@@ -104,12 +104,13 @@ describe("new frontend routes", () => {
     });
   });
 
-  test("keeps capability on its preset page while the prototype stays archived", async () => {
+  test("mounts the classic capability library while the 3D prototype stays archived", async () => {
     renderRoutes("/capability?theme=dial-archive");
 
     expect(await screen.findByRole("heading", { name: "能力库" })).toBeTruthy();
-    expect(screen.getByText("CONTENT PENDING")).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "CAPABILITY" })).toBeNull();
+    expect(screen.getByRole("tablist", { name: "能力分类" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /PVD/u }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.queryByText("CONTENT PENDING")).toBeNull();
     expect(screen.getByLabelText("current route").textContent).toBe(
       "/capability?theme=dial-archive",
     );
