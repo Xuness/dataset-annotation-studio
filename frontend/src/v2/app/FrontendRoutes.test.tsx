@@ -104,6 +104,20 @@ describe("new frontend routes", () => {
     });
   });
 
+  test("keeps capability districts inside the persistent wildcard route", async () => {
+    renderRoutes("/capability?theme=dial-archive");
+
+    expect(await screen.findByRole("heading", { name: "CAPABILITY" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "进入能力分区 A1 PVD 模型接入" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/capability/providers?theme=dial-archive",
+      );
+    });
+    expect(screen.getByRole("heading", { name: "CAPABILITY" })).toBeTruthy();
+  });
+
   test("keeps the annotation stage as an explicit third-level route", async () => {
     renderRoutes("/annotation/stage?theme=dial-archive");
 

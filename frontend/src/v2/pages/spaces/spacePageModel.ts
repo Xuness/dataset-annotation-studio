@@ -1305,6 +1305,264 @@ export interface DeliveryWorkbenchContent {
   openArchive(): void;
 }
 
+export const CAPABILITY_DISTRICT_IDS = ["providers", "taggers", "dictionaries", "prompts"] as const;
+
+export type CapabilityDistrictId = (typeof CAPABILITY_DISTRICT_IDS)[number];
+
+export type CapabilityObjectKind =
+  | "provider"
+  | "tagger-runtime"
+  | "tagger-installation"
+  | "tagger-profile"
+  | "dictionary"
+  | "dictionary-overrides"
+  | "system-prompt"
+  | "translation-prompt";
+
+export type CapabilitySignalTone = "neutral" | "ready" | "attention" | "offline";
+
+export interface CapabilityReading {
+  label: string;
+  value: string;
+  tone?: CapabilitySignalTone;
+}
+
+export interface CapabilityObjectItem {
+  id: string;
+  label: string;
+  value: string;
+  active?: boolean;
+  tone?: CapabilitySignalTone;
+}
+
+export interface CapabilityObjectRecord {
+  id: string;
+  routeId: string;
+  districtId: CapabilityDistrictId;
+  branchId: string;
+  kind: CapabilityObjectKind;
+  code: string;
+  name: string;
+  englishName: string;
+  summary: string;
+  status: CapabilitySignalTone;
+  statusLabel: string;
+  readings: readonly CapabilityReading[];
+  items: readonly CapabilityObjectItem[];
+  body: string | null;
+  updatedAt: string | null;
+}
+
+export interface CapabilityBranchRecord {
+  id: string;
+  code: string;
+  name: string;
+  englishName: string;
+  summary: string;
+  count: number;
+  status: CapabilitySignalTone;
+  objectIds: readonly string[];
+}
+
+export interface CapabilityDistrictRecord {
+  id: CapabilityDistrictId;
+  code: string;
+  index: string;
+  name: string;
+  englishName: string;
+  summary: string;
+  inventoryLabel: string;
+  inventoryValue: string;
+  status: CapabilitySignalTone;
+  branches: readonly CapabilityBranchRecord[];
+  objects: readonly CapabilityObjectRecord[];
+}
+
+export type CapabilityProviderProtocol =
+  "openrouter" | "openai_compatible" | "opencode_go" | "gemini" | "codex";
+
+export type CapabilityReasoningEffort =
+  "max" | "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
+
+export interface CapabilityProviderProtocolOption {
+  id: CapabilityProviderProtocol;
+  label: string;
+  defaultBaseUrl: string;
+  defaultConcurrency: number;
+  requiresBaseUrl: boolean;
+  authentication: "api-key" | "account";
+}
+
+export interface CapabilityProviderModelDraft {
+  modelId: string;
+  temperature: number | null;
+  maxOutputTokens: number;
+  timeoutSeconds: number;
+  topP: number | null;
+  seed: number | null;
+  reasoningEffort: CapabilityReasoningEffort | null;
+  serviceTier: "flex" | "priority" | null;
+  promptCacheStrategy: "explicit_system" | null;
+}
+
+export interface CapabilityProviderDraft {
+  name: string;
+  providerType: CapabilityProviderProtocol;
+  baseUrl: string;
+  apiKey: string;
+  concurrency: number;
+  defaultModelId: string;
+  models: readonly CapabilityProviderModelDraft[];
+}
+
+export interface CapabilityProviderEditor {
+  kind: "provider";
+  form: CapabilityProviderDraft;
+  protocols: readonly CapabilityProviderProtocolOption[];
+  hasApiKey: boolean;
+  pending: boolean;
+  save(input: CapabilityProviderDraft): Promise<void>;
+  clearApiKey(): Promise<void>;
+  remove(): Promise<void>;
+}
+
+export interface CapabilityPromptEditor {
+  kind: "prompt";
+  promptKind: "system" | "translation";
+  form: { name: string; prompt: string };
+  pending: boolean;
+  save(input: { name: string; prompt: string }): Promise<void>;
+  remove(): Promise<void>;
+}
+
+export interface CapabilityTaggerRuntimeEditor {
+  kind: "tagger-runtime";
+  modelRoot: string;
+  devices: readonly string[];
+  providers: readonly string[];
+  scanIssues: readonly string[];
+  pending: boolean;
+  rescan(): Promise<void>;
+  chooseRoot(): Promise<void>;
+  importModel(): Promise<void>;
+  openRoot(): Promise<void>;
+}
+
+export interface CapabilityTaggerInstallationEditor {
+  kind: "tagger-installation";
+  path: string;
+  files: readonly { path: string; size: string }[];
+  issues: readonly string[];
+  linkedProfileCount: number;
+  ready: boolean;
+  pending: boolean;
+  validate(): Promise<void>;
+  openFolder(): Promise<void>;
+  createProfile(): Promise<void>;
+  remove(): Promise<void>;
+}
+
+export type CapabilityTaggerDevice = "auto" | "cpu" | "cuda" | "directml";
+export type CapabilityTaggerSelectionMode = "global" | "category" | "model_recommended";
+
+export interface CapabilityTaggerInstallationOption {
+  id: string;
+  name: string;
+  modelVersion: string;
+  categories: Readonly<Record<string, number>>;
+  supportedSelectionModes: readonly CapabilityTaggerSelectionMode[];
+}
+
+export interface CapabilityTaggerProfileDraft {
+  name: string;
+  installationId: string;
+  selectionMode: CapabilityTaggerSelectionMode;
+  globalThreshold: number;
+  categoryThresholds: Readonly<Record<string, number>>;
+  maxTags: number | null;
+  categories: readonly string[];
+  device: CapabilityTaggerDevice;
+  batchSize: number | null;
+}
+
+export interface CapabilityTaggerProfileEditor {
+  kind: "tagger-profile";
+  form: CapabilityTaggerProfileDraft;
+  installations: readonly CapabilityTaggerInstallationOption[];
+  availableDevices: readonly CapabilityTaggerDevice[];
+  pending: boolean;
+  save(input: CapabilityTaggerProfileDraft): Promise<void>;
+  remove(): Promise<void>;
+}
+
+export interface CapabilityDictionaryEditor {
+  kind: "dictionary";
+  form: { name: string; enabled: boolean };
+  path: string;
+  licenseUrl: string;
+  priority: number;
+  installationCount: number;
+  ready: boolean;
+  pending: boolean;
+  save(input: { name: string; enabled: boolean }): Promise<void>;
+  move(offset: -1 | 1): Promise<void>;
+  openFolder(): Promise<void>;
+  openLicense(): Promise<void>;
+  remove(): Promise<void>;
+}
+
+export interface CapabilityDictionarySearchItem {
+  tag: string;
+  normalizedTag: string;
+  translation: string;
+  category: string;
+  source: string;
+  postCount: number | null;
+  hasOverride: boolean;
+}
+
+export interface CapabilityDictionaryOverridesEditor {
+  kind: "dictionary-overrides";
+  dictionaryRoot: string;
+  query: string;
+  results: readonly CapabilityDictionarySearchItem[];
+  searching: boolean;
+  searchError: string | null;
+  pending: boolean;
+  importFile(): Promise<void>;
+  importFolder(): Promise<void>;
+  openRoot(): Promise<void>;
+  search(query: string): void;
+  save(input: { tag: string; translation: string; category: string | null }): Promise<void>;
+  remove(tag: string): Promise<void>;
+}
+
+export type CapabilityObjectEditor =
+  | CapabilityProviderEditor
+  | CapabilityPromptEditor
+  | CapabilityTaggerRuntimeEditor
+  | CapabilityTaggerInstallationEditor
+  | CapabilityTaggerProfileEditor
+  | CapabilityDictionaryEditor
+  | CapabilityDictionaryOverridesEditor;
+
+export interface CapabilitySpaceContent {
+  kind: "capability";
+  status: "loading" | "ready" | "partial-error" | "error";
+  districts: readonly CapabilityDistrictRecord[];
+  activeDistrictId: CapabilityDistrictId | null;
+  activeObjectId: string | null;
+  activeObject: CapabilityObjectRecord | null;
+  activeEditor: CapabilityObjectEditor | null;
+  message: string | null;
+  selectDistrict(districtId: CapabilityDistrictId): void;
+  selectObject(object: CapabilityObjectRecord): void;
+  returnOverview(): void;
+  closeObject(): void;
+  setEditorDirty(dirty: boolean): void;
+  refresh(): void;
+}
+
 export type SpacePageContent =
   | ArchiveSpaceContent
   | AnnotationSpaceContent
@@ -1315,6 +1573,7 @@ export type SpacePageContent =
   | PreparationWorkbenchContent
   | DeliverySpaceContent
   | DeliveryWorkbenchContent
+  | CapabilitySpaceContent
   | PendingSpaceContent;
 
 export interface SpacePageFrame {
