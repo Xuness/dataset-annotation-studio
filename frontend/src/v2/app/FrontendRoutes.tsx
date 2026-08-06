@@ -1,10 +1,4 @@
-import {
-  Suspense,
-  useMemo,
-  type ComponentType,
-  type LazyExoticComponent,
-  type ReactNode,
-} from "react";
+import { Suspense, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -25,11 +19,6 @@ import {
   useAnnotationStageController,
 } from "../pages/spaces/annotation/useAnnotationStageController";
 import { useDeliverySpaceController } from "../pages/spaces/delivery/useDeliverySpaceController";
-import {
-  capabilityObjectPath,
-  parseCapabilityPath,
-} from "../pages/spaces/capability/capabilitySpaceModel";
-import { useCapabilitySpaceController } from "../pages/spaces/capability/useCapabilitySpaceController";
 import {
   createNoContextDeliveryWorkbench,
   useDeliveryWorkbenchController,
@@ -393,34 +382,6 @@ function DeliveryRoute({ Page, space, themeId, projectId }: DeliveryRouteProps) 
   return (
     <SpaceRouteView
       Page={Page}
-      space={space}
-      content={content}
-      themeId={themeId}
-      projectId={projectId}
-    />
-  );
-}
-
-function CapabilityRoute() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { projectId } = useProjectRouteContext();
-  const themeId = resolveFrontendThemeId(location.search);
-  const theme = getFrontendTheme(themeId);
-  const space = getHomeSpace("capability");
-  const selection = useMemo(() => parseCapabilityPath(location.pathname), [location.pathname]);
-  const navigateCapability = (path: string, replace = false) =>
-    navigate(buildFrontendHref(path, { themeId, projectId }), { replace });
-  const content = useCapabilitySpaceController({
-    selection,
-    onSelectDistrict: (districtId) => navigateCapability(`/capability/${districtId}`),
-    onSelectObject: (object) => navigateCapability(capabilityObjectPath(object)),
-    onReturnOverview: () => navigateCapability("/capability"),
-  });
-
-  return (
-    <SpaceRouteView
-      Page={theme.SpacePage}
       space={space}
       content={content}
       themeId={themeId}
@@ -1000,7 +961,6 @@ export function FrontendRoutes() {
       />
       <Route path="/quality/review" element={<QualityReviewRoute />} />
       <Route path="/delivery/workbench" element={<DeliveryWorkbenchRoute />} />
-      <Route path="/capability/*" element={<CapabilityRoute />} />
       <Route path="/:spaceId" element={<SpaceRoute />} />
       <Route path="*" element={<FallbackRoute />} />
     </Routes>

@@ -3,7 +3,6 @@ import { useCallback, useMemo, useRef } from "react";
 import type {
   AnnotationLaneId,
   AnnotationSpaceContent as AnnotationSpaceContentModel,
-  CapabilitySpaceContent as CapabilitySpaceContentModel,
   DeliverySpaceContent as DeliverySpaceContentModel,
   PreparationCanvasNodeId,
   PreparationCapabilityId,
@@ -18,7 +17,6 @@ import "../styles/tokens.css";
 import { AnnotationSpaceContent } from "./annotation/AnnotationSpaceContent";
 import { AnnotationStage } from "./annotation/stage/AnnotationStage";
 import { ArchiveSpaceContent } from "./components/ArchiveSpaceContent";
-import { CapabilitySpace } from "./capability/CapabilitySpace";
 import { DeliverySpaceContent } from "./delivery/DeliverySpaceContent";
 import { DeliveryWorkbench } from "./delivery/DeliveryWorkbench";
 import { PendingSpaceContent } from "./components/PendingSpaceContent";
@@ -41,55 +39,7 @@ import "./quality/styles/quality.css";
 import "./quality/styles/quality-reconstruction.css";
 import "./delivery/styles/delivery.css";
 import "./delivery/styles/delivery-workbench.css";
-import "./capability/styles/capability.css";
 import "./styles/motion.css";
-
-interface DialArchiveCapabilitySpacePageProps extends Omit<ThemeSpacePageProps, "content"> {
-  content: CapabilitySpaceContentModel;
-}
-
-function DialArchiveCapabilitySpacePage({
-  space,
-  content,
-  onNavigateSpace,
-  onReturnHome,
-}: DialArchiveCapabilitySpacePageProps) {
-  const reducedMotion = usePrefersReducedMotion();
-  const pageRef = useRef<HTMLDivElement>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const route = useSpaceRouteTransition({
-    currentSpaceId: space.id,
-    reducedMotion,
-    pageRef,
-    scrollRef: viewportRef,
-    onNavigateSpace,
-  });
-
-  return (
-    <main
-      className="dial-archive-space dial-archive-space--capability"
-      aria-label="Dataset Annotation Studio 能力库"
-    >
-      <SpaceChrome space={space} />
-      <SpaceRail
-        currentSpace={space}
-        intentSpaceId={route.intentSpaceId}
-        routing={route.active}
-        onRequestSpace={route.requestSpace}
-        onReturnHome={() => onReturnHome(space.id)}
-      />
-      <div className="dial-archive-capability-viewport" ref={viewportRef}>
-        <div
-          className={`dial-archive-capability-page${route.active ? " is-routing" : ""}`}
-          ref={pageRef}
-        >
-          <CapabilitySpace content={content} />
-        </div>
-      </div>
-      <RouteHandoff spaceId={route.intentSpaceId} running={route.active} version={route.version} />
-    </main>
-  );
-}
 
 function DialArchiveSecondarySpacePage({
   space,
@@ -225,9 +175,6 @@ function DialArchiveSecondarySpacePage({
 }
 
 export function DialArchiveSpacePage(props: ThemeSpacePageProps) {
-  if (props.content.kind === "capability") {
-    return <DialArchiveCapabilitySpacePage {...props} content={props.content} />;
-  }
   if (props.content.kind === "delivery-workbench") {
     return (
       <main

@@ -104,18 +104,15 @@ describe("new frontend routes", () => {
     });
   });
 
-  test("keeps capability districts inside the persistent wildcard route", async () => {
+  test("keeps capability on its preset page while the prototype stays archived", async () => {
     renderRoutes("/capability?theme=dial-archive");
 
-    expect(await screen.findByRole("heading", { name: "CAPABILITY" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "进入能力分区 A1 PVD 模型接入" }));
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("current route").textContent).toBe(
-        "/capability/providers?theme=dial-archive",
-      );
-    });
-    expect(screen.getByRole("heading", { name: "CAPABILITY" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "能力库" })).toBeTruthy();
+    expect(screen.getByText("CONTENT PENDING")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "CAPABILITY" })).toBeNull();
+    expect(screen.getByLabelText("current route").textContent).toBe(
+      "/capability?theme=dial-archive",
+    );
   });
 
   test("keeps the annotation stage as an explicit third-level route", async () => {

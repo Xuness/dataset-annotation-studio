@@ -1573,7 +1573,6 @@ export type SpacePageContent =
   | PreparationWorkbenchContent
   | DeliverySpaceContent
   | DeliveryWorkbenchContent
-  | CapabilitySpaceContent
   | PendingSpaceContent;
 
 export interface SpacePageFrame {
