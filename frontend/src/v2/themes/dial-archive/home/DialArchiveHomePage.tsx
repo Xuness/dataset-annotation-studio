@@ -33,7 +33,7 @@ export function DialArchiveHomePage({ initialSpaceId, onEnterSpace }: ThemeHomeP
   const requestedInitialIndex = initialSpaceId
     ? DIAL_ARCHIVE_SPACES.findIndex((space) => space.id === initialSpaceId)
     : -1;
-  const initialIndex = requestedInitialIndex >= 0 ? requestedInitialIndex : 2;
+  const initialIndex = requestedInitialIndex >= 0 ? requestedInitialIndex : 0;
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);

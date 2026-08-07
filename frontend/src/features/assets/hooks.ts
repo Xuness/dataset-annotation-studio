@@ -12,6 +12,10 @@ import {
 } from "./api";
 import { annotationTraceKeys, assetKeys, metadataKeys, promptPreviewKeys } from "./queryKeys";
 
+interface InfiniteAssetQueryOptions {
+  keepPreviousData?: boolean;
+}
+
 export function useAssets(projectId: string, query: AssetQuery) {
   return useQuery({
     queryKey: assetKeys.list(projectId, query),
@@ -20,7 +24,12 @@ export function useAssets(projectId: string, query: AssetQuery) {
   });
 }
 
-export function useInfiniteAssets(projectId: string, query: AssetQuery, pageSize = 500) {
+export function useInfiniteAssets(
+  projectId: string,
+  query: AssetQuery,
+  pageSize = 500,
+  options: InfiniteAssetQueryOptions = {},
+) {
   return useInfiniteQuery({
     queryKey: assetKeys.infinite(projectId, query, pageSize),
     queryFn: ({ pageParam }) =>
@@ -30,6 +39,10 @@ export function useInfiniteAssets(projectId: string, query: AssetQuery, pageSize
       const nextOffset = lastPage.offset + lastPage.items.length;
       return nextOffset < lastPage.total ? nextOffset : undefined;
     },
+    placeholderData: options.keepPreviousData
+      ? (previousData, previousQuery) =>
+          previousQuery?.queryKey[1] === projectId ? previousData : undefined
+      : undefined,
     enabled: Boolean(projectId),
   });
 }

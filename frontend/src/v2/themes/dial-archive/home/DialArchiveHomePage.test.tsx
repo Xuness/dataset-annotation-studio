@@ -19,6 +19,13 @@ describe("dial archive home page", () => {
     }
   });
 
+  test("selects project archive when the home route does not request a space", () => {
+    render(<DialArchiveHomePage onEnterSpace={vi.fn()} />);
+
+    expect(screen.getByRole("heading", { name: "Project Archive" })).toBeTruthy();
+    expect(row("预览并锁定空间 01 项目档案").getAttribute("aria-pressed")).toBe("true");
+  });
+
   test("renders the approved annotation channel without product data on the home page", () => {
     render(<DialArchiveHomePage initialSpaceId="annotation" onEnterSpace={vi.fn()} />);
 

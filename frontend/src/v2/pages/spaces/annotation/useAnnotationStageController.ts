@@ -108,7 +108,9 @@ export function useAnnotationStageController({
     }),
     [deferredSearch, filter, folderPaths],
   );
-  const assets = useInfiniteAssets(projectId, assetQuery, STAGE_PAGE_SIZE);
+  const assets = useInfiniteAssets(projectId, assetQuery, STAGE_PAGE_SIZE, {
+    keepPreviousData: true,
+  });
   const filteredAssetIds = useAssetIds(projectId, assetQuery);
   const overview = useAnnotationOverview(projectId);
   const jobs = useJobHistory(projectId, 20);

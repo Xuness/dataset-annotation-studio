@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 
 import { useDesktopWindowBehavior } from "../../shared/desktop/useDesktopWindowBehavior";
 import { FrontendErrorBoundary } from "./FrontendErrorBoundary";
+import { FrontendFirstUseDialog } from "./FrontendFirstUseDialog";
 import { FrontendRoutes } from "./FrontendRoutes";
 import { createFrontendQueryClient } from "./queryClient";
 
@@ -15,6 +16,7 @@ export function FrontendApp() {
       <FrontendErrorBoundary>
         <BrowserRouter>
           <FrontendRoutes />
+          <FrontendFirstUseDialog />
         </BrowserRouter>
       </FrontendErrorBoundary>
     </QueryClientProvider>
