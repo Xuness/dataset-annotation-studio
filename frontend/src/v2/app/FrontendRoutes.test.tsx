@@ -41,11 +41,12 @@ describe("new frontend routes", () => {
           dispatchEvent: () => false,
         }) satisfies MediaQueryList,
     });
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify([]), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () =>
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
   });
 
@@ -114,6 +115,84 @@ describe("new frontend routes", () => {
     expect(screen.getByLabelText("current route").textContent).toBe(
       "/capability?theme=dial-archive",
     );
+  });
+
+  test("enters a semantic capability register from the level-two overview", async () => {
+    renderRoutes("/capability?theme=dial-archive");
+
+    fireEvent.click(await screen.findByRole("button", { name: /进入 PVD 资源名册/u }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/capability/providers?theme=dial-archive",
+      );
+    });
+    expect(screen.getByRole("heading", { name: "模型连接管理台" })).toBeTruthy();
+  });
+
+  test("opens the real API provider creation workbench from the provider register", async () => {
+    renderRoutes("/capability/providers?theme=dial-archive&view=connections");
+
+    fireEvent.click(await screen.findByRole("button", { name: /新增 API 供应商/u }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/capability/providers/new?theme=dial-archive",
+      );
+    });
+    expect(await screen.findByRole("heading", { name: "新增 API 供应商" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "CREATE CONNECTION" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+  });
+
+  test("keeps the category function lane in the third-level route and enters level four", async () => {
+    renderRoutes("/capability/taggers?theme=dial-archive&view=profiles");
+
+    expect(await screen.findByRole("heading", { name: "本地打标配置台" })).toBeTruthy();
+    expect(screen.getByLabelText("current route").textContent).toBe(
+      "/capability/taggers?theme=dial-archive&view=profiles",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /RUN.*运行时/u }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/capability/taggers/runtime?theme=dial-archive",
+      );
+    });
+    expect(screen.getByRole("heading", { name: "本地推理运行时" })).toBeTruthy();
+  });
+
+  test("redirects unknown capability category routes to the library overview", async () => {
+    renderRoutes("/capability/legacy-settings?theme=dial-archive");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/capability?theme=dial-archive",
+      );
+    });
+  });
+
+  test("keeps downloads and Studio controls as distinct third-level modules", async () => {
+    const download = renderRoutes("/capability/taggers/downloads?theme=dial-archive");
+    expect(await screen.findByRole("heading", { name: "模型下载中心" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /返回TAG工作面/u }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/capability/taggers?theme=dial-archive&view=profiles",
+      );
+    });
+    download.unmount();
+
+    renderRoutes("/capability/system?theme=dial-archive&view=diagnostics");
+    expect(await screen.findByRole("heading", { level: 1, name: "Studio 控制中心" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "本地运行状态" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /BLT.*更新公告/u }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/capability/system?theme=dial-archive&view=announcements",
+      );
+    });
   });
 
   test("keeps the annotation stage as an explicit third-level route", async () => {

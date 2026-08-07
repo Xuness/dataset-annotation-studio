@@ -137,44 +137,42 @@ function taggerDistrict(library: TaggerLibrary | null): CapabilityDistrictRecord
   const profiles = library?.profiles ?? [];
   const runtime = library?.runtime;
   const objects: CapabilityObjectRecord[] = [];
-  if (runtime) {
-    objects.push({
-      id: "tagger-runtime:runtime",
-      routeId: "runtime",
-      districtId: "taggers",
-      branchId: "runtime",
-      kind: "tagger-runtime",
-      code: "RUN-00",
-      name: "本地推理运行时",
-      englishName: "LOCAL INFERENCE RUNTIME",
-      summary: runtime.error || "设备与执行提供程序状态",
-      status: runtime.available ? "ready" : "offline",
-      statusLabel: runtime.available ? "运行时可用" : "运行时离线",
-      readings: [
-        {
-          label: "可用",
-          value: runtime.available ? "YES" : "NO",
-          tone: runtime.available ? "ready" : "offline",
-        },
-        { label: "设备", value: `${runtime.devices?.length ?? 0}` },
-        { label: "后端", value: `${runtime.providers?.length ?? 0}` },
-      ],
-      items: [
-        ...(runtime.devices ?? []).map((device) => ({
-          id: `device:${device}`,
-          label: device,
-          value: "DEVICE",
-        })),
-        ...(runtime.providers ?? []).map((provider) => ({
-          id: `provider:${provider}`,
-          label: provider,
-          value: "RUNTIME",
-        })),
-      ],
-      body: runtime.error ?? null,
-      updatedAt: null,
-    });
-  }
+  objects.push({
+    id: "tagger-runtime:runtime",
+    routeId: "runtime",
+    districtId: "taggers",
+    branchId: "runtime",
+    kind: "tagger-runtime",
+    code: "RUN-00",
+    name: "本地推理运行时",
+    englishName: "LOCAL INFERENCE RUNTIME",
+    summary: runtime?.error || "设备、执行提供程序与模型根目录状态",
+    status: runtime?.available ? "ready" : runtime ? "offline" : "attention",
+    statusLabel: runtime?.available ? "运行时可用" : runtime ? "运行时离线" : "等待索引",
+    readings: [
+      {
+        label: "可用",
+        value: runtime?.available ? "YES" : "NO",
+        tone: runtime?.available ? "ready" : runtime ? "offline" : "attention",
+      },
+      { label: "设备", value: `${runtime?.devices?.length ?? 0}` },
+      { label: "后端", value: `${runtime?.providers?.length ?? 0}` },
+    ],
+    items: [
+      ...(runtime?.devices ?? []).map((device) => ({
+        id: `device:${device}`,
+        label: device,
+        value: "DEVICE",
+      })),
+      ...(runtime?.providers ?? []).map((provider) => ({
+        id: `provider:${provider}`,
+        label: provider,
+        value: "RUNTIME",
+      })),
+    ],
+    body: runtime?.error ?? null,
+    updatedAt: null,
+  });
   installations.forEach((installation, index) => {
     const status: CapabilitySignalTone = installation.status === "ready" ? "ready" : "attention";
     objects.push({
@@ -509,6 +507,9 @@ export function parseCapabilityPath(pathname: string): CapabilityRouteSelection 
   }
   const category = segments[1];
   const routeId = segments[2] ?? null;
+  if (districtId === "providers" && category === "new") {
+    return { districtId, kind: "provider", routeId: "new" };
+  }
   if (districtId === "providers" && category === "profile" && routeId) {
     return { districtId, kind: "provider", routeId };
   }

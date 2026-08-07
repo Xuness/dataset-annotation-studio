@@ -1482,8 +1482,18 @@
   height: 78px;
   color: var(--dial-archive-carbon);
   background: var(--dial-archive-yellow);
-  cursor: not-allowed;
+  cursor: pointer;
   opacity: 1;
+}
+
+.dial-archive-space .dial-archive-capability-library-status__enter:hover {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-space .dial-archive-capability-library-status__enter:focus-visible {
+  outline: 2px solid var(--dial-archive-carbon);
+  outline-offset: 3px;
 }
 
 .dial-archive-capability-library-status__enter span,

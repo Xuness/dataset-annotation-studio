@@ -18,6 +18,19 @@ import {
   createNoContextAnnotationStage,
   useAnnotationStageController,
 } from "../pages/spaces/annotation/useAnnotationStageController";
+import {
+  isCapabilityLibraryCategoryId,
+  type CapabilityLibraryCategoryId,
+  type CapabilityLibraryGroupId,
+} from "../pages/spaces/capability-library/capabilityLibraryModel";
+import { useCapabilityCategoryController } from "../pages/spaces/capability-library/useCapabilityCategoryController";
+import { useCapabilityDownloadWorkbenchController } from "../pages/spaces/capability-library/useCapabilityDownloadWorkbenchController";
+import { useCapabilitySystemWorkbenchController } from "../pages/spaces/capability-library/useCapabilitySystemWorkbenchController";
+import {
+  capabilityObjectPath,
+  parseCapabilityPath,
+} from "../pages/spaces/capability/capabilitySpaceModel";
+import { useCapabilitySpaceController } from "../pages/spaces/capability/useCapabilitySpaceController";
 import { useDeliverySpaceController } from "../pages/spaces/delivery/useDeliverySpaceController";
 import { useCapabilityLibraryController } from "../pages/spaces/capability-library/useCapabilityLibraryController";
 import {
@@ -47,6 +60,10 @@ import type {
   AnnotationLaneId,
   AnnotationEditChannelId,
   AnnotationWorkcellId,
+  CapabilityDistrictId,
+  CapabilityDownloadCategoryId,
+  CapabilityObjectRecord,
+  CapabilitySystemSectionId,
   PreparationCanvasNodeId,
   PreparationCapabilityId,
   QualityFilterId,
@@ -148,7 +165,16 @@ interface CapabilityRouteProps {
 }
 
 function CapabilityRoute({ Page, space, themeId, projectId }: CapabilityRouteProps) {
-  const content = useCapabilityLibraryController();
+  const navigate = useNavigate();
+  const content = useCapabilityLibraryController({
+    onOpenCategory: (categoryId) =>
+      navigate(
+        buildFrontendHref(`/capability/${categoryId}`, {
+          themeId,
+          projectId,
+        }),
+      ),
+  });
   return (
     <SpaceRouteView
       Page={Page}
@@ -156,6 +182,337 @@ function CapabilityRoute({ Page, space, themeId, projectId }: CapabilityRoutePro
       content={content}
       themeId={themeId}
       projectId={projectId}
+    />
+  );
+}
+
+interface LoadedCapabilityCategoryRouteProps extends CapabilityRouteProps {
+  categoryId: CapabilityLibraryCategoryId;
+  requestedGroupId: string | null;
+  requestedResourceId: string | null;
+}
+
+function capabilityModulePath(
+  categoryId: CapabilityLibraryCategoryId,
+  groupId: CapabilityLibraryGroupId,
+): string | null {
+  if (categoryId === "taggers" && groupId === "runtime") return "/capability/taggers/runtime";
+  if (categoryId === "taggers" && groupId === "downloads") {
+    return "/capability/taggers/downloads";
+  }
+  if (categoryId === "dictionaries" && groupId === "overrides") {
+    return "/capability/dictionaries/overrides";
+  }
+  if (categoryId === "dictionaries" && groupId === "downloads") {
+    return "/capability/dictionaries/downloads";
+  }
+  return null;
+}
+
+function LoadedCapabilityCategoryRoute({
+  Page,
+  space,
+  themeId,
+  projectId,
+  categoryId,
+  requestedGroupId,
+  requestedResourceId,
+}: LoadedCapabilityCategoryRouteProps) {
+  const navigate = useNavigate();
+  const categoryHref = (
+    nextCategoryId: string,
+    groupId: string | null = null,
+    resourceId: string | null = null,
+  ) =>
+    buildFrontendHref(`/capability/${nextCategoryId}`, {
+      themeId,
+      projectId,
+      query: { view: groupId, focus: resourceId },
+    });
+  const content = useCapabilityCategoryController({
+    categoryId,
+    requestedGroupId,
+    requestedResourceId,
+    onCategoryChange: (nextCategoryId) => navigate(categoryHref(nextCategoryId)),
+    onGroupIdChange: (groupId) => {
+      const modulePath = capabilityModulePath(categoryId, groupId);
+      navigate(
+        modulePath
+          ? buildFrontendHref(modulePath, { themeId, projectId })
+          : categoryHref(categoryId, groupId),
+      );
+    },
+    onResourceIdChange: (groupId, resourceId) =>
+      navigate(categoryHref(categoryId, groupId, resourceId)),
+    onCreateResource: () =>
+      navigate(buildFrontendHref("/capability/providers/new", { themeId, projectId })),
+    onOpenWorkbench: (resource) =>
+      navigate(buildFrontendHref(resource.workbenchPath, { themeId, projectId })),
+    onReturnOverview: () => navigate(buildFrontendHref(space.route, { themeId, projectId })),
+  });
+
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
+function CapabilityCategoryRoute() {
+  const location = useLocation();
+  const { categoryId } = useParams();
+  const { projectId } = useProjectRouteContext();
+  const themeId = resolveFrontendThemeId(location.search);
+  const theme = getFrontendTheme(themeId);
+  const space = getHomeSpace("capability");
+
+  if (!isCapabilityLibraryCategoryId(categoryId)) {
+    return (
+      <Navigate
+        replace
+        to={buildFrontendHref(space.route, {
+          themeId,
+          projectId,
+        })}
+      />
+    );
+  }
+
+  return (
+    <LoadedCapabilityCategoryRoute
+      Page={theme.SpacePage}
+      space={space}
+      themeId={themeId}
+      projectId={projectId}
+      categoryId={categoryId}
+      requestedGroupId={readRouteIdentifier(location.search, "view")}
+      requestedResourceId={readRouteIdentifier(location.search, "focus")}
+    />
+  );
+}
+
+const CAPABILITY_DISTRICT_DEFAULT_VIEWS: Readonly<Record<CapabilityDistrictId, string>> = {
+  providers: "connections",
+  taggers: "profiles",
+  dictionaries: "installations",
+  prompts: "system",
+};
+
+interface LoadedCapabilityObjectWorkbenchRouteProps extends CapabilityRouteProps {
+  pathname: string;
+}
+
+function LoadedCapabilityObjectWorkbenchRoute({
+  Page,
+  space,
+  themeId,
+  projectId,
+  pathname,
+}: LoadedCapabilityObjectWorkbenchRouteProps) {
+  const navigate = useNavigate();
+  const selection = parseCapabilityPath(pathname);
+  const categoryHref = (districtId: CapabilityDistrictId) =>
+    buildFrontendHref(`/capability/${districtId}`, {
+      themeId,
+      projectId,
+      query: { view: CAPABILITY_DISTRICT_DEFAULT_VIEWS[districtId] },
+    });
+  const content = useCapabilitySpaceController({
+    selection,
+    onSelectDistrict: (districtId) => navigate(categoryHref(districtId)),
+    onSelectObject: (object: CapabilityObjectRecord) =>
+      navigate(buildFrontendHref(capabilityObjectPath(object), { themeId, projectId })),
+    onProviderCreated: (providerId) =>
+      navigate(
+        buildFrontendHref(`/capability/providers/profile/${encodeURIComponent(providerId)}`, {
+          themeId,
+          projectId,
+        }),
+      ),
+    onReturnOverview: () => navigate(buildFrontendHref(space.route, { themeId, projectId })),
+  });
+
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
+function CapabilityObjectWorkbenchRoute() {
+  const location = useLocation();
+  const { projectId } = useProjectRouteContext();
+  const themeId = resolveFrontendThemeId(location.search);
+  const theme = getFrontendTheme(themeId);
+  const space = getHomeSpace("capability");
+  const selection = parseCapabilityPath(location.pathname);
+
+  if (!selection.districtId || !selection.kind) {
+    return (
+      <Navigate
+        replace
+        to={buildFrontendHref(space.route, {
+          themeId,
+          projectId,
+        })}
+      />
+    );
+  }
+
+  return (
+    <LoadedCapabilityObjectWorkbenchRoute
+      Page={theme.SpacePage}
+      space={space}
+      themeId={themeId}
+      projectId={projectId}
+      pathname={location.pathname}
+    />
+  );
+}
+
+function isCapabilityDownloadCategoryId(
+  value: string | undefined,
+): value is CapabilityDownloadCategoryId {
+  return value === "taggers" || value === "dictionaries";
+}
+
+interface LoadedCapabilityDownloadWorkbenchRouteProps extends CapabilityRouteProps {
+  categoryId: CapabilityDownloadCategoryId;
+}
+
+function LoadedCapabilityDownloadWorkbenchRoute({
+  Page,
+  space,
+  themeId,
+  projectId,
+  categoryId,
+}: LoadedCapabilityDownloadWorkbenchRouteProps) {
+  const navigate = useNavigate();
+  const content = useCapabilityDownloadWorkbenchController({
+    categoryId,
+    onReturnCategory: () =>
+      navigate(
+        buildFrontendHref(`/capability/${categoryId}`, {
+          themeId,
+          projectId,
+          query: { view: categoryId === "taggers" ? "profiles" : "installations" },
+        }),
+      ),
+    onReturnOverview: () => navigate(buildFrontendHref(space.route, { themeId, projectId })),
+  });
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
+function CapabilityDownloadWorkbenchRoute() {
+  const location = useLocation();
+  const { categoryId } = useParams();
+  const { projectId } = useProjectRouteContext();
+  const themeId = resolveFrontendThemeId(location.search);
+  const theme = getFrontendTheme(themeId);
+  const space = getHomeSpace("capability");
+  if (!isCapabilityDownloadCategoryId(categoryId)) {
+    return <Navigate replace to={buildFrontendHref(space.route, { themeId, projectId })} />;
+  }
+  return (
+    <LoadedCapabilityDownloadWorkbenchRoute
+      Page={theme.SpacePage}
+      space={space}
+      themeId={themeId}
+      projectId={projectId}
+      categoryId={categoryId}
+    />
+  );
+}
+
+function isCapabilitySystemSectionId(
+  value: string | undefined,
+): value is CapabilitySystemSectionId {
+  return value === "appearance" || value === "announcements" || value === "diagnostics";
+}
+
+interface LoadedCapabilitySystemWorkbenchRouteProps extends CapabilityRouteProps {
+  sectionId: CapabilitySystemSectionId;
+}
+
+function LoadedCapabilitySystemWorkbenchRoute({
+  Page,
+  space,
+  themeId,
+  projectId,
+  sectionId,
+}: LoadedCapabilitySystemWorkbenchRouteProps) {
+  const navigate = useNavigate();
+  const systemSectionHref = (nextSectionId: CapabilitySystemSectionId) =>
+    buildFrontendHref("/capability/system", {
+      themeId,
+      projectId,
+      query: { view: nextSectionId },
+    });
+  const content = useCapabilitySystemWorkbenchController({
+    sectionId,
+    themeId,
+    onSelectSection: (nextSectionId) => navigate(systemSectionHref(nextSectionId)),
+    onReturnCategory: () => navigate(buildFrontendHref(space.route, { themeId, projectId })),
+    onReturnOverview: () => navigate(buildFrontendHref(space.route, { themeId, projectId })),
+  });
+  return (
+    <SpaceRouteView
+      Page={Page}
+      space={space}
+      content={content}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
+function CapabilitySystemWorkbenchRoute() {
+  const location = useLocation();
+  const { sectionId } = useParams();
+  const { projectId } = useProjectRouteContext();
+  const themeId = resolveFrontendThemeId(location.search);
+  const theme = getFrontendTheme(themeId);
+  const space = getHomeSpace("capability");
+  const requestedSectionId =
+    sectionId ?? readRouteIdentifier(location.search, "view") ?? "appearance";
+  if (sectionId && isCapabilitySystemSectionId(sectionId)) {
+    return (
+      <Navigate
+        replace
+        to={buildFrontendHref("/capability/system", {
+          themeId,
+          projectId,
+          query: { view: sectionId },
+        })}
+      />
+    );
+  }
+  const resolvedSectionId = isCapabilitySystemSectionId(requestedSectionId)
+    ? requestedSectionId
+    : "appearance";
+  return (
+    <LoadedCapabilitySystemWorkbenchRoute
+      Page={theme.SpacePage}
+      space={space}
+      themeId={themeId}
+      projectId={projectId}
+      sectionId={resolvedSectionId}
     />
   );
 }
@@ -992,6 +1349,43 @@ export function FrontendRoutes() {
       />
       <Route path="/quality/review" element={<QualityReviewRoute />} />
       <Route path="/delivery/workbench" element={<DeliveryWorkbenchRoute />} />
+      <Route
+        path="/capability/:categoryId/downloads"
+        element={<CapabilityDownloadWorkbenchRoute />}
+      />
+      <Route path="/capability/system" element={<CapabilitySystemWorkbenchRoute />} />
+      <Route path="/capability/system/:sectionId" element={<CapabilitySystemWorkbenchRoute />} />
+      <Route path="/capability/providers/new" element={<CapabilityObjectWorkbenchRoute />} />
+      <Route
+        path="/capability/providers/profile/:resourceId"
+        element={<CapabilityObjectWorkbenchRoute />}
+      />
+      <Route path="/capability/taggers/runtime" element={<CapabilityObjectWorkbenchRoute />} />
+      <Route
+        path="/capability/taggers/installation/:resourceId"
+        element={<CapabilityObjectWorkbenchRoute />}
+      />
+      <Route
+        path="/capability/taggers/profile/:resourceId"
+        element={<CapabilityObjectWorkbenchRoute />}
+      />
+      <Route
+        path="/capability/dictionaries/installation/:resourceId"
+        element={<CapabilityObjectWorkbenchRoute />}
+      />
+      <Route
+        path="/capability/dictionaries/overrides"
+        element={<CapabilityObjectWorkbenchRoute />}
+      />
+      <Route
+        path="/capability/prompts/system/:resourceId"
+        element={<CapabilityObjectWorkbenchRoute />}
+      />
+      <Route
+        path="/capability/prompts/translation/:resourceId"
+        element={<CapabilityObjectWorkbenchRoute />}
+      />
+      <Route path="/capability/:categoryId" element={<CapabilityCategoryRoute />} />
       <Route path="/:spaceId" element={<SpaceRoute />} />
       <Route path="*" element={<FallbackRoute />} />
     </Routes>

@@ -1,12 +1,25 @@
 import type { HomeSpace } from "../../navigation/spaceRegistry";
 import type { ExportFormState } from "../../../application/exports/exportState";
 import type { PreprocessFormState } from "../../../application/preprocessing/preprocessState";
-import type { CapabilityLibraryContent as CapabilityLibraryPageContent } from "./capability-library/capabilityLibraryModel";
+import type {
+  CapabilityCategoryContent as CapabilityCategoryPageContent,
+  CapabilityDownloadWorkbenchContent as CapabilityDownloadWorkbenchPageContent,
+  CapabilityLibraryContent as CapabilityLibraryPageContent,
+  CapabilitySystemWorkbenchContent as CapabilitySystemWorkbenchPageContent,
+} from "./capability-library/capabilityLibraryModel";
 
 export type {
+  CapabilityCategoryContent,
   CapabilityLibraryCategory,
   CapabilityLibraryCategoryId,
   CapabilityLibraryContent,
+  CapabilityLibraryGroup,
+  CapabilityLibraryGroupId,
+  CapabilityLibraryInventoryItem,
+  CapabilityDownloadWorkbenchContent,
+  CapabilityDownloadCategoryId,
+  CapabilitySystemSectionId,
+  CapabilitySystemWorkbenchContent,
 } from "./capability-library/capabilityLibraryModel";
 
 export interface ArchiveProjectRecord {
@@ -1424,13 +1437,14 @@ export interface CapabilityProviderDraft {
 
 export interface CapabilityProviderEditor {
   kind: "provider";
+  mode: "create" | "edit";
   form: CapabilityProviderDraft;
   protocols: readonly CapabilityProviderProtocolOption[];
   hasApiKey: boolean;
   pending: boolean;
   save(input: CapabilityProviderDraft): Promise<void>;
-  clearApiKey(): Promise<void>;
-  remove(): Promise<void>;
+  clearApiKey?(): Promise<void>;
+  remove?(): Promise<void>;
 }
 
 export interface CapabilityPromptEditor {
@@ -1581,6 +1595,10 @@ export type SpacePageContent =
   | DeliverySpaceContent
   | DeliveryWorkbenchContent
   | CapabilityLibraryPageContent
+  | CapabilityCategoryPageContent
+  | CapabilitySpaceContent
+  | CapabilityDownloadWorkbenchPageContent
+  | CapabilitySystemWorkbenchPageContent
   | PendingSpaceContent;
 
 export interface SpacePageFrame {

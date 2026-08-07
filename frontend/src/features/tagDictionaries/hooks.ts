@@ -81,10 +81,11 @@ export function useTagDictionaryResolution(
   };
 }
 
-export function useTagDictionaryDownloadCenter() {
+export function useTagDictionaryDownloadCenter(enabled = true) {
   return useQuery({
     queryKey: tagDictionaryKeys.downloads,
     queryFn: getTagDictionaryDownloadCenter,
+    enabled,
   });
 }
 

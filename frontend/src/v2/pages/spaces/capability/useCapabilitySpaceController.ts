@@ -33,6 +33,7 @@ import type {
 } from "../spacePageModel";
 import {
   CAPABILITY_PROVIDER_PROTOCOLS,
+  createProviderDraft,
   dictionarySearchItem,
   providerDraftToInput,
   providerProfileToDraft,
@@ -49,8 +50,35 @@ interface UseCapabilitySpaceControllerOptions {
   selection: CapabilityRouteSelection;
   onSelectDistrict(districtId: CapabilityDistrictId): void;
   onSelectObject(object: CapabilityObjectRecord): void;
+  onProviderCreated(providerId: string): void;
   onReturnOverview(): void;
 }
+
+const NEW_PROVIDER_OBJECT: CapabilityObjectRecord = {
+  id: "provider:new",
+  routeId: "new",
+  districtId: "providers",
+  branchId: "connections",
+  kind: "provider",
+  code: "CON-NEW",
+  name: "新增 API 供应商",
+  englishName: "NEW PROVIDER CONNECTION",
+  summary: "登记协议端点、认证凭据、模型清单与每个模型的独立生成参数。",
+  status: "attention",
+  statusLabel: "等待登记",
+  readings: [
+    { label: "协议", value: "SELECT" },
+    { label: "模型", value: "ADD" },
+    { label: "认证", value: "PENDING", tone: "attention" },
+  ],
+  items: [
+    { id: "connection", label: "连接端点与并发", value: "CONNECTION" },
+    { id: "models", label: "模型清单与默认模型", value: "MODELS" },
+    { id: "parameters", label: "逐模型生成参数", value: "PARAMETERS" },
+  ],
+  body: null,
+  updatedAt: null,
+};
 
 function isTaggerLibrary(value: unknown): value is TaggerLibrary {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -76,6 +104,7 @@ export function useCapabilitySpaceController({
   selection,
   onSelectDistrict,
   onSelectObject,
+  onProviderCreated,
   onReturnOverview,
 }: UseCapabilitySpaceControllerOptions): CapabilitySpaceContent {
   const providers = useProviderProfiles();
@@ -108,10 +137,15 @@ export function useCapabilitySpaceController({
       }),
     [dictionaries.data, providers.data, systemPrompts.data, taggers.data, translationPrompts.data],
   );
-  const activeObject = useMemo(
+  const selectedObject = useMemo(
     () => findCapabilityObject(districts, selection),
     [districts, selection],
   );
+  const creatingProvider =
+    selection.districtId === "providers" &&
+    selection.kind === "provider" &&
+    selection.routeId === "new";
+  const activeObject = creatingProvider ? NEW_PROVIDER_OBJECT : selectedObject;
   const pendingCount = queries.filter((query) => query.isPending).length;
   const errorQueries = queries.filter((query) => query.isError);
   const loadedCount = queries.length - pendingCount - errorQueries.length;
@@ -129,7 +163,7 @@ export function useCapabilitySpaceController({
     ? [...new Set(errorQueries.map((query) => errorMessage(query.error)))].join(" / ")
     : null;
   const provider =
-    activeObject?.kind === "provider"
+    !creatingProvider && activeObject?.kind === "provider"
       ? providers.data?.find((candidate) => candidate.id === activeObject.routeId)
       : null;
   const systemPrompt =
@@ -156,9 +190,25 @@ export function useCapabilitySpaceController({
       : null;
 
   let activeEditor: CapabilityObjectEditor | null = null;
-  if (provider) {
+  if (creatingProvider) {
     activeEditor = {
       kind: "provider",
+      mode: "create",
+      form: createProviderDraft(),
+      protocols: CAPABILITY_PROVIDER_PROTOCOLS,
+      hasApiKey: false,
+      pending: providerMutations.create.isPending,
+      save: async (draft) => {
+        const created = await providerMutations.create.mutateAsync(
+          providerDraftToInput(draft, true),
+        );
+        onProviderCreated(created.id);
+      },
+    };
+  } else if (provider) {
+    activeEditor = {
+      kind: "provider",
+      mode: "edit",
       form: providerProfileToDraft(provider),
       protocols: CAPABILITY_PROVIDER_PROTOCOLS,
       hasApiKey: provider.has_api_key,

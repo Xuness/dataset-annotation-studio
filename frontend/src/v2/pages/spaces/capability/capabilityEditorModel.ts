@@ -37,6 +37,21 @@ export const CAPABILITY_PROVIDER_PROTOCOLS: readonly CapabilityProviderProtocolO
   authentication: providerCapabilities[id].authMode === "api_key" ? "api-key" : "account",
 }));
 
+export function createProviderDraft(): CapabilityProviderDraft {
+  const protocol =
+    CAPABILITY_PROVIDER_PROTOCOLS.find((candidate) => candidate.id === "openai_compatible") ??
+    CAPABILITY_PROVIDER_PROTOCOLS[0]!;
+  return {
+    name: "",
+    providerType: protocol.id,
+    baseUrl: protocol.defaultBaseUrl,
+    apiKey: "",
+    concurrency: protocol.defaultConcurrency,
+    defaultModelId: "",
+    models: [],
+  };
+}
+
 function reasoningEffort(options: ProviderProtocolOptions): CapabilityReasoningEffort | null {
   return "reasoning_effort" in options ? (options.reasoning_effort ?? null) : null;
 }

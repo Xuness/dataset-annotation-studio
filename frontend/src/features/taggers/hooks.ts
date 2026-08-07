@@ -59,10 +59,11 @@ const ACTIVE_DOWNLOAD_STATUSES = new Set<TaggerDownloadStatus>([
   "installing",
 ]);
 
-export function useTaggerDownloadCenter() {
+export function useTaggerDownloadCenter(enabled = true) {
   return useQuery({
     queryKey: taggerKeys.downloads,
     queryFn: getTaggerDownloadCenter,
+    enabled,
   });
 }
 

@@ -3,6 +3,11 @@ import { useCallback, useMemo, useRef } from "react";
 import type {
   AnnotationLaneId,
   AnnotationSpaceContent as AnnotationSpaceContentModel,
+  CapabilityCategoryContent as CapabilityCategoryContentModel,
+  CapabilityDownloadWorkbenchContent as CapabilityDownloadWorkbenchContentModel,
+  CapabilityLibraryContent as CapabilityLibraryContentModel,
+  CapabilitySpaceContent as CapabilitySpaceContentModel,
+  CapabilitySystemWorkbenchContent as CapabilitySystemWorkbenchContentModel,
   DeliverySpaceContent as DeliverySpaceContentModel,
   PreparationCanvasNodeId,
   PreparationCapabilityId,
@@ -17,7 +22,11 @@ import "../styles/tokens.css";
 import { AnnotationSpaceContent } from "./annotation/AnnotationSpaceContent";
 import { AnnotationStage } from "./annotation/stage/AnnotationStage";
 import { ArchiveSpaceContent } from "./components/ArchiveSpaceContent";
+import { CapabilityCategoryPage } from "./capability-library/CapabilityCategoryPage";
+import { CapabilityDownloadWorkbenchPage } from "./capability-library/CapabilityDownloadWorkbenchPage";
 import { CapabilityLibraryContent } from "./capability-library/CapabilityLibraryContent";
+import { CapabilitySystemWorkbenchPage } from "./capability-library/CapabilitySystemWorkbenchPage";
+import { CapabilityWorkbenchPage } from "./capability-library/CapabilityWorkbenchPage";
 import { DeliverySpaceContent } from "./delivery/DeliverySpaceContent";
 import { DeliveryWorkbench } from "./delivery/DeliveryWorkbench";
 import { PendingSpaceContent } from "./components/PendingSpaceContent";
@@ -41,6 +50,9 @@ import "./quality/styles/quality-reconstruction.css";
 import "./delivery/styles/delivery.css";
 import "./delivery/styles/delivery-workbench.css";
 import "./capability-library/capability-library.css";
+import "./capability-library/capability-category.css";
+import "./capability-library/capability-workbench.css";
+import "./capability-library/capability-utility-workbench.css";
 import "./styles/motion.css";
 
 function DialArchiveSecondarySpacePage({
@@ -135,6 +147,37 @@ function DialArchiveSecondarySpacePage({
         }),
     };
   }, [content, startRouteSweep]);
+  const capabilityLibraryContent = useMemo<CapabilityLibraryContentModel | null>(() => {
+    if (content.kind !== "capability-library") return null;
+    return {
+      ...content,
+      openCategory: (categoryId) => {
+        const category = content.categories.find((candidate) => candidate.id === categoryId);
+        startRouteSweep({
+          label: `ENTERING // ${category?.code ?? "CAP"} — RESOURCE REGISTER`,
+          onCommit: () => content.openCategory(categoryId),
+        });
+      },
+    };
+  }, [content, startRouteSweep]);
+  const capabilityCategoryContent = useMemo<CapabilityCategoryContentModel | null>(() => {
+    if (content.kind !== "capability-category") return null;
+    return {
+      ...content,
+      selectCategory: (categoryId) => {
+        const category = content.categories.find((candidate) => candidate.id === categoryId);
+        startRouteSweep({
+          label: `ROUTING // ${category?.code ?? "CAP"} — RESOURCE REGISTER`,
+          onCommit: () => content.selectCategory(categoryId),
+        });
+      },
+      returnOverview: () =>
+        startRouteSweep({
+          label: "RETURNING // CAP — LIBRARY OVERVIEW",
+          onCommit: content.returnOverview,
+        }),
+    };
+  }, [content, startRouteSweep]);
 
   return (
     <main
@@ -165,8 +208,10 @@ function DialArchiveSecondarySpacePage({
             <QualitySpaceContent content={qualityContent} />
           ) : space.id === "delivery" && deliveryContent ? (
             <DeliverySpaceContent content={deliveryContent} />
-          ) : space.id === "capability" && content.kind === "capability-library" ? (
-            <CapabilityLibraryContent content={content} />
+          ) : space.id === "capability" && capabilityLibraryContent ? (
+            <CapabilityLibraryContent content={capabilityLibraryContent} />
+          ) : space.id === "capability" && capabilityCategoryContent ? (
+            <CapabilityCategoryPage content={capabilityCategoryContent} />
           ) : (
             <PendingSpaceContent space={space} />
           )}
@@ -179,6 +224,43 @@ function DialArchiveSecondarySpacePage({
 }
 
 export function DialArchiveSpacePage(props: ThemeSpacePageProps) {
+  if (props.content.kind === "capability-download-workbench") {
+    return (
+      <main
+        className="dial-archive-space dial-archive-space--capability-workbench"
+        aria-label="Dataset Annotation Studio 能力下载工作台"
+      >
+        <SpaceChrome space={props.space} />
+        <CapabilityDownloadWorkbenchPage
+          content={props.content as CapabilityDownloadWorkbenchContentModel}
+        />
+      </main>
+    );
+  }
+  if (props.content.kind === "capability-system-workbench") {
+    return (
+      <main
+        className="dial-archive-space dial-archive-space--capability-workbench"
+        aria-label="Dataset Annotation Studio Studio 控制工作台"
+      >
+        <SpaceChrome space={props.space} />
+        <CapabilitySystemWorkbenchPage
+          content={props.content as CapabilitySystemWorkbenchContentModel}
+        />
+      </main>
+    );
+  }
+  if (props.content.kind === "capability") {
+    return (
+      <main
+        className="dial-archive-space dial-archive-space--capability-workbench"
+        aria-label="Dataset Annotation Studio 能力对象工作台"
+      >
+        <SpaceChrome space={props.space} />
+        <CapabilityWorkbenchPage content={props.content as CapabilitySpaceContentModel} />
+      </main>
+    );
+  }
   if (props.content.kind === "delivery-workbench") {
     return (
       <main

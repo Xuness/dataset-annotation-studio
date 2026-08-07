@@ -131,6 +131,7 @@ function ProviderEditor({
   const protocol = editor.protocols.find((candidate) => candidate.id === draft.providerType);
   const selectedModel = draft.models.find((model) => model.modelId === selectedModelId);
   const busy = editor.pending || feedback.busy;
+  const creating = editor.mode === "create";
   const valid = Boolean(
     draft.name.trim() &&
     draft.models.length &&
@@ -196,9 +197,13 @@ function ProviderEditor({
   return (
     <section className="dial-archive-capability-editor" data-editor="provider">
       <header>
-        <span>LIVE CONFIGURATION</span>
-        <strong>模型连接编辑</strong>
-        <p>连接、认证、模型清单与逐模型参数会写回共享能力库。</p>
+        <span>{creating ? "REGISTER NEW CONNECTION" : "LIVE CONFIGURATION"}</span>
+        <strong>{creating ? "新增 API 供应商" : "模型连接编辑"}</strong>
+        <p>
+          {creating
+            ? "完成连接、认证与至少一个模型的登记后，供应商会写入共享能力库。"
+            : "连接、认证、模型清单与逐模型参数会写回共享能力库。"}
+        </p>
       </header>
       <div className="dial-archive-capability-editor__grid">
         <Field label="配置名称">
@@ -450,18 +455,23 @@ function ProviderEditor({
       ) : null}
 
       <footer className="dial-archive-capability-editor__actions">
-        <DangerAction
-          disabled={busy}
-          label="DELETE CONNECTION"
-          confirmLabel="CONFIRM DELETE"
-          onConfirm={() => void run(editor.remove, "模型连接已删除。")}
-        />
-        {editor.hasApiKey && protocol?.authentication === "api-key" ? (
+        {!creating && editor.remove ? (
+          <DangerAction
+            disabled={busy}
+            label="DELETE CONNECTION"
+            confirmLabel="CONFIRM DELETE"
+            onConfirm={() => void run(editor.remove!, "模型连接已删除。")}
+          />
+        ) : null}
+        {!creating &&
+        editor.clearApiKey &&
+        editor.hasApiKey &&
+        protocol?.authentication === "api-key" ? (
           <DangerAction
             disabled={busy}
             label="CLEAR API KEY"
             confirmLabel="CONFIRM CLEAR"
-            onConfirm={() => void run(editor.clearApiKey, "API Key 已清除。")}
+            onConfirm={() => void run(editor.clearApiKey!, "API Key 已清除。")}
           />
         ) : null}
         <button
@@ -469,15 +479,26 @@ function ProviderEditor({
           type="button"
           disabled={!dirty || !valid || busy}
           onClick={() =>
-            void run(async () => {
-              await editor.save(draft);
-              const saved = { ...draft, apiKey: "" };
-              setDraft(saved);
-              setBaseline(saved);
-            }, "模型连接已保存。")
+            void run(
+              async () => {
+                await editor.save(draft);
+                if (!creating) {
+                  const saved = { ...draft, apiKey: "" };
+                  setDraft(saved);
+                  setBaseline(saved);
+                }
+              },
+              creating ? "API 供应商已创建。" : "模型连接已保存。",
+            )
           }
         >
-          {busy ? "SAVING…" : "SAVE CONNECTION"}
+          {busy
+            ? creating
+              ? "CREATING…"
+              : "SAVING…"
+            : creating
+              ? "CREATE CONNECTION"
+              : "SAVE CONNECTION"}
         </button>
       </footer>
       <Feedback state={feedback} />

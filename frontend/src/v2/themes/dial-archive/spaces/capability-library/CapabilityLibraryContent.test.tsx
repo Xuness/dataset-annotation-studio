@@ -18,6 +18,16 @@ function category(
   englishLabel: string,
   lane: "primary" | "system",
 ): CapabilityLibraryCategory {
+  const defaultGroupId =
+    id === "providers"
+      ? "connections"
+      : id === "taggers"
+        ? "profiles"
+        : id === "dictionaries"
+          ? "installations"
+          : id === "prompts"
+            ? "system"
+            : "appearance";
   return {
     id,
     index,
@@ -33,12 +43,24 @@ function category(
     summary: `${label}能力索引已就绪。`,
     notice: null,
     metrics: [{ id: "count", label: "COUNT", value: "00" }],
+    groups: [
+      {
+        id: defaultGroupId,
+        code: "REG",
+        label: "资源分区",
+        englishLabel: "Resource Lane",
+        description: "分类内资源分区。",
+        count: 0,
+      },
+    ],
+    defaultGroupId,
     inventory: [],
   };
 }
 
 function renderCapabilityLibrary() {
   const refresh = vi.fn();
+  const openCategory = vi.fn();
   const content: CapabilityLibraryContentModel = {
     kind: "capability-library",
     status: "ready",
@@ -50,10 +72,11 @@ function renderCapabilityLibrary() {
       category("prompts", "04", "PRM", "Prompt 协议", "Prompt Protocols", "primary"),
       category("system", "S1", "SYS", "Studio 控制", "Studio Control", "system"),
     ],
+    openCategory,
     refresh,
   };
   render(<CapabilityLibraryContent content={content} />);
-  return refresh;
+  return { openCategory, refresh };
 }
 
 describe("classic capability library overview", () => {
@@ -71,21 +94,19 @@ describe("classic capability library overview", () => {
     expect(screen.getByRole("img", { name: "TAG 本地打标技术构件" })).toBeTruthy();
   });
 
-  test("separates SYS from production categories and keeps the future level-three gate honest", () => {
-    renderCapabilityLibrary();
+  test("separates SYS from production categories and opens its level-three register", () => {
+    const { openCategory } = renderCapabilityLibrary();
     const system = screen.getByRole("tab", { name: /SYS/u });
     fireEvent.click(system);
 
     expect(system.getAttribute("data-lane")).toBe("system");
     expect(screen.getByRole("heading", { name: "Studio 控制" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /进入 SYS 资源名册/u })).toHaveProperty(
-      "disabled",
-      true,
-    );
+    fireEvent.click(screen.getByRole("button", { name: /进入 SYS 资源名册/u }));
+    expect(openCategory).toHaveBeenCalledWith("system");
   });
 
   test("offers a real refresh action for the read-only overview", () => {
-    const refresh = renderCapabilityLibrary();
+    const { refresh } = renderCapabilityLibrary();
     fireEvent.click(screen.getByRole("button", { name: /刷新能力索引/u }));
     expect(refresh).toHaveBeenCalledOnce();
   });

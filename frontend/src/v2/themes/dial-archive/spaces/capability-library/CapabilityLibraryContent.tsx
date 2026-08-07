@@ -49,9 +49,11 @@ function CategoryButton({
 
 function CapabilityStatusPanel({
   category,
+  onEnter,
   onRefresh,
 }: {
   category: CapabilityLibraryCategory;
+  onEnter(): void;
   onRefresh(): void;
 }) {
   return (
@@ -100,7 +102,7 @@ function CapabilityStatusPanel({
         </header>
         {category.inventory.length > 0 ? (
           <ol>
-            {category.inventory.map((item, index) => (
+            {category.inventory.slice(0, 5).map((item, index) => (
               <li key={item.id} data-state={item.state}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <div>
@@ -121,11 +123,10 @@ function CapabilityStatusPanel({
       <button
         className="dial-archive-capability-library-status__enter"
         type="button"
-        disabled
-        title="三级资源名册将在后续阶段接入"
+        onClick={onEnter}
       >
         <span>进入 {category.code} 资源名册</span>
-        <small>ROUTE RESERVED // LEVEL 03</small>
+        <small>OPEN REGISTER // LEVEL 03</small>
         <i aria-hidden="true">↗</i>
       </button>
 
@@ -248,7 +249,11 @@ export function CapabilityLibraryContent({ content }: CapabilityLibraryContentPr
         </footer>
       </section>
 
-      <CapabilityStatusPanel category={activeCategory} onRefresh={content.refresh} />
+      <CapabilityStatusPanel
+        category={activeCategory}
+        onEnter={() => content.openCategory(activeCategory.id)}
+        onRefresh={content.refresh}
+      />
 
       <footer className="dial-archive-capability-library__footer">
         <span>CAPABILITY REGISTER // 06</span>

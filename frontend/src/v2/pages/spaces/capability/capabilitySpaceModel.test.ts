@@ -120,6 +120,11 @@ describe("capability space model", () => {
   });
 
   test("treats district-only paths as a third-level camera selection", () => {
+    expect(parseCapabilityPath("/capability/providers/new")).toEqual({
+      districtId: "providers",
+      kind: "provider",
+      routeId: "new",
+    });
     expect(parseCapabilityPath("/capability/taggers")).toEqual({
       districtId: "taggers",
       kind: null,

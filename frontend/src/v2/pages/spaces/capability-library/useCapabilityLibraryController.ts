@@ -16,9 +16,14 @@ import type {
 } from "../../../../shared/api/types";
 import {
   createCapabilityLibraryOverview,
+  type CapabilityLibraryCategoryId,
   type CapabilityLibraryContent,
   type CapabilityLibrarySourceState,
 } from "./capabilityLibraryModel";
+
+interface UseCapabilityLibraryControllerOptions {
+  onOpenCategory?(categoryId: CapabilityLibraryCategoryId): void;
+}
 
 function isTaggerLibrary(value: unknown): value is TaggerLibrary {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -51,7 +56,9 @@ function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "能力索引读取失败";
 }
 
-export function useCapabilityLibraryController(): CapabilityLibraryContent {
+export function useCapabilityLibraryController(
+  options: UseCapabilityLibraryControllerOptions = {},
+): CapabilityLibraryContent {
   const providers = useProviderProfiles();
   const taggers = useTaggerLibrary();
   const dictionaries = useTagDictionaryLibrary();
@@ -126,5 +133,10 @@ export function useCapabilityLibraryController(): CapabilityLibraryContent {
     ]);
   };
 
-  return { kind: "capability-library", ...overview, refresh };
+  return {
+    kind: "capability-library",
+    ...overview,
+    openCategory: (categoryId) => options.onOpenCategory?.(categoryId),
+    refresh,
+  };
 }
