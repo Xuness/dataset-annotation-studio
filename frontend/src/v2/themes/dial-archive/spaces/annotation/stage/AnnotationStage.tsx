@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEventHandler } from "react";
+import { useEffect, useRef, useState, type KeyboardEventHandler } from "react";
 
 import {
   ANNOTATION_WORKCELL_IDS,
@@ -38,6 +38,7 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
   const workcellTransition = useWorkcellTransition(content.activeWorkcell, reducedMotion);
   const displayedWorkcell = workcellTransition.displayedWorkcell;
   const workcellVisible = displayedWorkcell !== null;
+  const [contextDockOpen, setContextDockOpen] = useState(false);
 
   useEffect(() => {
     if (content.activeWorkcell) cancelCamera();
@@ -307,6 +308,8 @@ export function AnnotationStage({ content }: AnnotationStageProps) {
           batch={content.overview.batch}
           totalCount={content.sequence.totalCount}
           checkedCount={content.checkedAssetIds.length}
+          open={contextDockOpen}
+          onOpenChange={setContextDockOpen}
           onOpenProduction={() => content.openWorkcell("production")}
         />
       ) : null}

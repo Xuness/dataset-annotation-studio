@@ -70,9 +70,40 @@ export const PreparationInspector = forwardRef<HTMLElement, PreparationInspector
     const form = content.form;
     const locked = content.workspaceBusy || Boolean(operation);
     const hasCapability = form.resizeEnabled || form.convertEnabled || form.renameEnabled;
+    const scopeChoices = [
+      {
+        id: "all",
+        code: "ALL.00",
+        title: "整个项目",
+        detail: "工作目录中的全部有效素材",
+        count: content.assetCount,
+        disabled: false,
+      },
+      {
+        id: "selected",
+        code: "SEL.01",
+        title: "工作台已选素材",
+        detail: "使用 03 素材施工场维护的选中集合",
+        count: content.checkedCount,
+        disabled: content.checkedCount === 0,
+      },
+      {
+        id: "folder",
+        code: "DIR.02",
+        title: "素材子文件夹",
+        detail: "包含所选目录分支下的全部下级目录",
+        count: form.scope === "folder" ? content.scopeCount : 0,
+        disabled: content.folderLoading || content.folderOptions.length === 0,
+      },
+    ] as const;
+    const activeScope = scopeChoices.find((choice) => choice.id === form.scope) ?? scopeChoices[0];
 
     return (
-      <aside ref={ref} className="dial-archive-preparation-inspector" aria-label={`${title}检查器`}>
+      <aside
+        ref={ref}
+        className={`dial-archive-preparation-inspector is-${node}`}
+        aria-label={`${title}检查器`}
+      >
         <header>
           <div>
             <span>NODE INSPECTOR //</span>
@@ -108,33 +139,97 @@ export const PreparationInspector = forwardRef<HTMLElement, PreparationInspector
           ) : null}
 
           {node === "scope" ? (
-            <fieldset className="dial-archive-preparation-inspector__scope" disabled={locked}>
-              <legend>选择任务处理范围</legend>
-              <label>
-                <input
-                  type="radio"
-                  name="preparation-scope"
-                  checked={form.scope === "all"}
-                  onChange={() => content.updateForm({ scope: "all" })}
-                />
+            <fieldset className="dial-archive-preparation-inspector__scope">
+              <legend>
+                <span>选择任务处理范围</span>
+                <b>{content.scopeCount.toLocaleString()}</b>
+              </legend>
+              <div className="dial-archive-preparation-inspector__scope-choices">
+                {scopeChoices.map((choice) => (
+                  <label
+                    className={choice.disabled ? "is-disabled" : undefined}
+                    data-code={choice.code}
+                    key={choice.id}
+                  >
+                    <input
+                      type="radio"
+                      name="preparation-scope"
+                      checked={form.scope === choice.id}
+                      disabled={locked || choice.disabled}
+                      onChange={() =>
+                        content.updateForm({
+                          scope: choice.id,
+                          ...(choice.id === "folder" && !form.folderPath
+                            ? { folderPath: content.folderOptions[0]?.id ?? "" }
+                            : {}),
+                        })
+                      }
+                    />
+                    <span>
+                      <em>{choice.code}</em>
+                      <b>{choice.title}</b>
+                      <small>{choice.detail}</small>
+                    </span>
+                    <strong>{choice.count.toLocaleString()}</strong>
+                  </label>
+                ))}
+              </div>
+              {form.scope === "folder" ? (
+                <label className="dial-archive-preparation-inspector__scope-folder">
+                  <span>
+                    <em>DIRECTORY BRANCH</em>
+                    <b>当前素材分支</b>
+                  </span>
+                  <select
+                    value={form.folderPath}
+                    aria-label="整备素材子文件夹"
+                    disabled={locked || content.folderLoading}
+                    onChange={(event) => content.updateForm({ folderPath: event.target.value })}
+                  >
+                    {content.folderOptions.length === 0 ? (
+                      <option value="">当前项目没有素材子文件夹</option>
+                    ) : null}
+                    {content.folderOptions.map((folder) => (
+                      <option value={folder.id} key={folder.id}>
+                        {folder.detail} · {folder.count.toLocaleString()} 素材
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <div className="dial-archive-preparation-inspector__scope-summary">
                 <span>
-                  <b>整个项目</b>
-                  <small>{content.assetCount} 张有效素材</small>
+                  <small>ACTIVE SOURCE</small>
+                  <b>{activeScope.title}</b>
                 </span>
-              </label>
-              <label className={content.checkedCount ? "" : "is-disabled"}>
-                <input
-                  type="radio"
-                  name="preparation-scope"
-                  checked={form.scope === "selected"}
-                  disabled={!content.checkedCount}
-                  onChange={() => content.updateForm({ scope: "selected" })}
-                />
+                <strong>{content.scopeCount.toLocaleString()}</strong>
                 <span>
-                  <b>工作台已选素材</b>
-                  <small>{content.checkedCount || "当前没有选择"}</small>
+                  <small>RANGE EVIDENCE</small>
+                  <b>
+                    {form.scope === "folder"
+                      ? form.folderPath || "尚未选择目录"
+                      : form.scope === "selected"
+                        ? `${content.checkedCount.toLocaleString()} 项已选`
+                        : "项目根目录"}
+                  </b>
                 </span>
-              </label>
+              </div>
+              <button
+                className="dial-archive-preparation-inspector__scope-handoff"
+                type="button"
+                onClick={content.openAnnotationStage}
+              >
+                <span>
+                  <small>03 / MATERIAL YARD</small>
+                  <b>前往素材施工场选取素材</b>
+                </span>
+                <em>OPEN STAGE →</em>
+              </button>
+              {content.scopeMessage ? (
+                <p className="dial-archive-preparation-inspector__note" role="status">
+                  {content.scopeMessage}
+                </p>
+              ) : null}
             </fieldset>
           ) : null}
 
@@ -299,7 +394,12 @@ export const PreparationInspector = forwardRef<HTMLElement, PreparationInspector
               <button
                 className="dial-archive-preparation-inspector__primary"
                 type="button"
-                disabled={!hasCapability || content.previewPending || content.workspaceBusy}
+                disabled={
+                  !hasCapability ||
+                  !content.scopeReady ||
+                  content.previewPending ||
+                  content.workspaceBusy
+                }
                 onClick={() => void content.previewAction()}
               >
                 <b>{content.previewPending ? "正在生成预演" : "生成方案预演"}</b>

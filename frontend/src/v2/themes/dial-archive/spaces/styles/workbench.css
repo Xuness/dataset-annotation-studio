@@ -1053,6 +1053,10 @@
   animation: dial-archive-preparation-inspector-in 360ms var(--dial-archive-ease) both;
 }
 
+.dial-archive-preparation-inspector.is-scope {
+  width: min(480px, calc(100vw - 72px));
+}
+
 .dial-archive-preparation-inspector > header {
   display: flex;
   align-items: flex-start;
@@ -1221,47 +1225,191 @@
 
 .dial-archive-preparation-inspector__scope {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
-.dial-archive-preparation-inspector__scope > label {
+.dial-archive-preparation-inspector__scope > legend {
   display: flex;
-  min-height: 78px;
   align-items: center;
-  gap: 14px;
-  padding: 14px;
+  justify-content: space-between;
+}
+
+.dial-archive-preparation-inspector__scope > legend b {
+  font-family: var(--dial-archive-font-display);
+  font-size: 30px;
+  line-height: 0.9;
+}
+
+.dial-archive-preparation-inspector__scope-choices {
+  display: grid;
+  gap: 10px;
+}
+
+.dial-archive-preparation-inspector__scope-choices > label {
+  display: grid;
+  min-height: 88px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 15px;
   border: 1px solid rgba(25, 25, 25, 0.2);
   cursor: pointer;
 }
 
-.dial-archive-preparation-inspector__scope > label:has(input:checked) {
+.dial-archive-preparation-inspector__scope-choices > label:has(input:checked) {
   border-color: var(--dial-archive-carbon);
   background: var(--dial-archive-yellow);
+  box-shadow: inset 5px 0 var(--dial-archive-carbon);
 }
 
-.dial-archive-preparation-inspector__scope > label.is-disabled {
+.dial-archive-preparation-inspector__scope-choices > label.is-disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
 
-.dial-archive-preparation-inspector__scope input {
+.dial-archive-preparation-inspector__scope-choices input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
   accent-color: var(--dial-archive-carbon);
 }
 
-.dial-archive-preparation-inspector__scope label span {
+.dial-archive-preparation-inspector__scope-choices label span {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 
-.dial-archive-preparation-inspector__scope label b {
-  font-size: 13px;
+.dial-archive-preparation-inspector__scope-choices label em {
+  color: var(--dial-archive-gray-7);
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.11em;
+}
+
+.dial-archive-preparation-inspector__scope-choices label b {
+  font-size: 14px;
   letter-spacing: 0.1em;
 }
 
-.dial-archive-preparation-inspector__scope label small {
+.dial-archive-preparation-inspector__scope-choices label small {
   color: var(--dial-archive-gray-7);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.dial-archive-preparation-inspector__scope-choices label > strong {
+  font-family: var(--dial-archive-font-display);
+  font-size: 28px;
+  letter-spacing: -0.04em;
+}
+
+.dial-archive-preparation-inspector__scope-folder {
+  display: grid;
+  gap: 9px;
+  padding: 16px;
+  background: rgba(25, 25, 25, 0.06);
+  box-shadow: inset 4px 0 var(--dial-archive-yellow);
+}
+
+.dial-archive-preparation-inspector__scope-folder > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dial-archive-preparation-inspector__scope-folder em,
+.dial-archive-preparation-inspector__scope-summary small,
+.dial-archive-preparation-inspector__scope-handoff small {
+  color: var(--dial-archive-gray-7);
+  font-family: var(--dial-archive-font-mono);
   font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.11em;
+}
+
+.dial-archive-preparation-inspector__scope-folder select {
+  height: 44px;
+  font-size: 12px;
+}
+
+.dial-archive-preparation-inspector__scope-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px 16px;
+  padding: 17px 18px;
+  color: white;
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-preparation-inspector__scope-summary > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.dial-archive-preparation-inspector__scope-summary > span:last-child {
+  grid-column: 1 / -1;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.dial-archive-preparation-inspector__scope-summary small {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.dial-archive-preparation-inspector__scope-summary span > b {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-preparation-inspector__scope-summary > strong {
+  align-self: start;
+  color: var(--dial-archive-yellow);
+  font-family: var(--dial-archive-font-display);
+  font-size: 38px;
+  line-height: 0.9;
+}
+
+.dial-archive-preparation-inspector__scope-handoff {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 15px;
+  border: 0;
+  color: var(--dial-archive-carbon);
+  text-align: left;
+  background: var(--dial-archive-yellow);
+  cursor: pointer;
+}
+
+.dial-archive-preparation-inspector__scope-handoff > span {
+  display: grid;
+  gap: 4px;
+}
+
+.dial-archive-preparation-inspector__scope-handoff b {
+  font-size: 14px;
+  letter-spacing: 0.06em;
+}
+
+.dial-archive-preparation-inspector__scope-handoff em {
+  flex: none;
+  font-family: var(--dial-archive-font-mono);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.dial-archive-preparation-inspector__scope-handoff:hover {
+  color: white;
+  background: var(--dial-archive-carbon);
 }
 
 .dial-archive-preparation-inspector__source > span {

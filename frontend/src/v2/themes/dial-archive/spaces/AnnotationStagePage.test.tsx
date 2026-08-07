@@ -618,10 +618,20 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
       search: "",
       filter: "all",
       filters: [{ id: "all", label: "全部素材", code: "ALL" }],
+      folderPath: "",
+      folderOptions: [
+        { id: "sets/a", label: "a", detail: "sets/a", count: 2 },
+        { id: "sets/b", label: "b", detail: "sets/b", count: 1 },
+      ],
+      folderLoading: false,
+      recursiveScan: true,
+      recursivePending: false,
       selectingAll: false,
       actionError: null,
       setSearch: vi.fn(),
       setFilter: vi.fn(),
+      setFolderPath: vi.fn(),
+      setRecursiveScan: vi.fn(),
       toggleRangeTo: vi.fn(),
       clearChecked: vi.fn(),
       selectAllFiltered: vi.fn(),
@@ -728,8 +738,10 @@ describe("dial archive annotation stage", () => {
     expect(content.selectAsset).toHaveBeenCalledWith("asset-2");
     expect(content.toggleAssetChecked).not.toHaveBeenCalled();
 
-    fireEvent.click(cell, { altKey: true });
-    expect(content.toggleAssetChecked).toHaveBeenCalledWith("asset-2");
+    fireEvent.click(cell, { ctrlKey: true });
+    fireEvent.click(cell, { ctrlKey: true });
+    expect(content.toggleAssetChecked).toHaveBeenNthCalledWith(1, "asset-2");
+    expect(content.toggleAssetChecked).toHaveBeenNthCalledWith(2, "asset-2");
 
     fireEvent.click(cell, { shiftKey: true });
     expect(content.scope.toggleRangeTo).toHaveBeenCalledWith("asset-2");
@@ -740,6 +752,9 @@ describe("dial archive annotation stage", () => {
     renderStage(content);
 
     fireEvent.click(screen.getByRole("button", { name: /RANGE DOCK/u }));
+    expect(
+      screen.getByRole("heading", { name: "素材范围台" }).closest("section")?.dataset.panel,
+    ).toBe("scope");
     fireEvent.change(screen.getByRole("searchbox", { name: "FIND MATERIAL" }), {
       target: { value: "portrait" },
     });
@@ -748,8 +763,42 @@ describe("dial archive annotation stage", () => {
       target: { value: "all" },
     });
     expect(content.scope.setFilter).toHaveBeenCalledWith("all");
+    fireEvent.change(screen.getByRole("combobox", { name: "素材目录分支" }), {
+      target: { value: "sets/a" },
+    });
+    expect(content.scope.setFolderPath).toHaveBeenCalledWith("sets/a");
+    fireEvent.click(screen.getByRole("checkbox", { name: /递归索引子文件夹/u }));
+    expect(content.scope.setRecursiveScan).toHaveBeenCalledWith(false);
     fireEvent.click(screen.getByRole("button", { name: "选择全部筛选结果" }));
     expect(content.scope.selectAllFiltered).toHaveBeenCalledOnce();
+  });
+
+  test("keeps the range dock open while a changed material query reloads", () => {
+    const content = stageContent();
+    const view = renderStage(content);
+
+    fireEvent.click(screen.getByRole("button", { name: /RANGE DOCK/u }));
+    expect(screen.getByRole("heading", { name: "素材范围台" })).not.toBeNull();
+
+    view.rerender(
+      <DialArchiveSpacePage
+        space={getHomeSpace("annotation")}
+        content={{ ...content, status: "loading" }}
+        onNavigateSpace={vi.fn()}
+        onReturnHome={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "正在建立素材施工场" })).not.toBeNull();
+
+    view.rerender(
+      <DialArchiveSpacePage
+        space={getHomeSpace("annotation")}
+        content={content}
+        onNavigateSpace={vi.fn()}
+        onReturnHome={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "素材范围台" })).not.toBeNull();
   });
 
   test("keeps the filmstrip viewport still when a visible material becomes current", () => {
@@ -959,6 +1008,9 @@ describe("dial archive annotation stage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /RANGE DOCK/u }));
     fireEvent.click(screen.getByRole("button", { name: /02批量施工/u }));
+    expect(
+      screen.getByRole("heading", { name: "批量施工台" }).closest("section")?.dataset.panel,
+    ).toBe("batch");
     expect(screen.getByRole("heading", { name: "Tags 批量变更" })).not.toBeNull();
     expect(screen.getByText("portrait, blue_hair")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "执行已预览变更" }));

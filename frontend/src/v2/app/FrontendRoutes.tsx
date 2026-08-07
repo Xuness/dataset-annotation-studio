@@ -1177,6 +1177,8 @@ function LoadedPreparationWorkbenchRoute({
     onReturnToSpace: () => navigate(buildFrontendHref(space.route, { themeId, projectId })),
     onOpenArchive: () =>
       navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId, projectId })),
+    onOpenAnnotationStage: () =>
+      navigate(buildFrontendHref("/annotation/stage", { themeId, projectId })),
   });
   return (
     <SpaceRouteView
@@ -1219,6 +1221,7 @@ function PreparationWorkbenchRoute() {
     initialFocus,
     onReturnToSpace: () => navigate(buildFrontendHref(space.route, { themeId })),
     onOpenArchive: () => navigate(buildFrontendHref(getHomeSpace("archive").route, { themeId })),
+    onOpenAnnotationStage: () => navigate(buildFrontendHref("/annotation/stage", { themeId })),
   });
   return (
     <SpaceRouteView

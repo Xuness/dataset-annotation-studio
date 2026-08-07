@@ -31,6 +31,7 @@ interface UsePreparationWorkbenchControllerOptions {
   onOperationIdChange(operationId: string | null): void;
   onReturnToSpace(): void;
   onOpenArchive(): void;
+  onOpenAnnotationStage(): void;
 }
 
 function describeError(reason: unknown, fallback: string): string {
@@ -54,6 +55,7 @@ export function usePreparationWorkbenchController({
   onOperationIdChange,
   onReturnToSpace,
   onOpenArchive,
+  onOpenAnnotationStage,
 }: UsePreparationWorkbenchControllerOptions): PreparationWorkbenchContent {
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const confirmationRef = useRef<PendingConfirmation | null>(null);
@@ -106,6 +108,22 @@ export function usePreparationWorkbenchController({
     [sourceOperations],
   );
   const signals = useMemo(() => selectPreparationOperationSignals(operations), [operations]);
+  const folderOptions = useMemo(
+    () =>
+      controller.folderOptions.map((folder) => ({
+        id: folder.path,
+        label: folder.name,
+        detail: folder.path,
+        count: folder.descendant_asset_count,
+      })),
+    [controller.folderOptions],
+  );
+  const scopeCount =
+    controller.form.scope === "selected"
+      ? controller.checkedCount
+      : controller.form.scope === "folder"
+        ? controller.folderCount
+        : controller.assetCount;
 
   useEffect(() => {
     if (!initialOperationId || appliedOperationRef.current === initialOperationId) return;
@@ -155,6 +173,11 @@ export function usePreparationWorkbenchController({
     form: controller.form,
     assetCount: controller.assetCount,
     checkedCount: controller.checkedCount,
+    scopeCount,
+    scopeReady: controller.scopeReady,
+    scopeMessage: controller.scopeMessage,
+    folderOptions,
+    folderLoading: controller.folderLoading,
     preview: toPreparationPreview(controller.preview),
     previewPending: controller.previewPending,
     executionPlan: toPreparationExecutionPlan(controller.executionPlan),
@@ -182,6 +205,7 @@ export function usePreparationWorkbenchController({
     resolveConfirmation,
     returnToSpace: onReturnToSpace,
     openArchive: onOpenArchive,
+    openAnnotationStage: onOpenAnnotationStage,
   };
 }
 
@@ -189,12 +213,14 @@ interface NoContextOptions {
   initialFocus: PreparationCanvasNodeId;
   onReturnToSpace(): void;
   onOpenArchive(): void;
+  onOpenAnnotationStage(): void;
 }
 
 export function createNoContextPreparationWorkbench({
   initialFocus,
   onReturnToSpace,
   onOpenArchive,
+  onOpenAnnotationStage,
 }: NoContextOptions): PreparationWorkbenchContent {
   return {
     kind: "preparation-workbench",
@@ -205,6 +231,11 @@ export function createNoContextPreparationWorkbench({
     form: createInitialPreprocessForm(),
     assetCount: 0,
     checkedCount: 0,
+    scopeCount: 0,
+    scopeReady: false,
+    scopeMessage: null,
+    folderOptions: [],
+    folderLoading: false,
     preview: null,
     previewPending: false,
     executionPlan: null,
@@ -226,5 +257,6 @@ export function createNoContextPreparationWorkbench({
     resolveConfirmation: () => undefined,
     returnToSpace: onReturnToSpace,
     openArchive: onOpenArchive,
+    openAnnotationStage: onOpenAnnotationStage,
   };
 }

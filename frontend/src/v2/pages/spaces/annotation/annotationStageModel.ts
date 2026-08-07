@@ -83,3 +83,29 @@ export function stepStageIndex(
   const next = Math.min(Math.max(base + offset, 0), assets.length - 1);
   return assets[next] ?? null;
 }
+
+interface StageRangeToggle {
+  assetIds: string[];
+  checked: boolean;
+}
+
+/**
+ * Shift 范围沿用上一次显式选择锚点；再次落在已选目标上时，
+ * 整段执行取消，以便连续范围和 Ctrl 单项都具备可逆语义。
+ */
+export function resolveStageRangeToggle(
+  assetIds: readonly string[],
+  anchorId: string,
+  targetId: string,
+  checkedAssetIds: readonly string[],
+): StageRangeToggle | null {
+  const targetIndex = assetIds.indexOf(targetId);
+  if (targetIndex < 0) return null;
+  const anchorIndex = assetIds.indexOf(anchorId);
+  const start = Math.min(anchorIndex < 0 ? targetIndex : anchorIndex, targetIndex);
+  const end = Math.max(anchorIndex < 0 ? targetIndex : anchorIndex, targetIndex);
+  return {
+    assetIds: assetIds.slice(start, end + 1),
+    checked: !checkedAssetIds.includes(targetId),
+  };
+}

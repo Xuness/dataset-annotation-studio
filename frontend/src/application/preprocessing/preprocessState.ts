@@ -9,7 +9,8 @@ import type {
 import { createScopedViewState } from "../../shared/store/scopedViewState.ts";
 
 export interface PreprocessFormState {
-  scope: "all" | "selected";
+  scope: "all" | "selected" | "folder";
+  folderPath: string;
   resizeEnabled: boolean;
   maxEdge: number;
   allowUpscale: boolean;
@@ -33,6 +34,7 @@ export interface PreprocessFormState {
 export function createInitialPreprocessForm(): PreprocessFormState {
   return {
     scope: "all",
+    folderPath: "",
     resizeEnabled: true,
     maxEdge: 2048,
     allowUpscale: false,
@@ -72,9 +74,15 @@ export const ACTIVE_PREPROCESS_STATUSES = new Set<PreprocessOperation["status"]>
 export function buildPreprocessRequest(
   form: PreprocessFormState,
   checkedAssetIds: readonly string[],
+  folderAssetIds: readonly string[],
 ): PreprocessRequest {
   return {
-    asset_ids: form.scope === "selected" ? [...checkedAssetIds] : [],
+    asset_ids:
+      form.scope === "selected"
+        ? [...checkedAssetIds]
+        : form.scope === "folder"
+          ? [...folderAssetIds]
+          : [],
     resize: form.resizeEnabled
       ? {
           max_edge: form.maxEdge,

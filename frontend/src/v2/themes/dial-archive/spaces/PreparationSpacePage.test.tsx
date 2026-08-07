@@ -31,6 +31,7 @@ function mockMatchMedia(matches: boolean) {
 function preparationForm(): PreparationWorkbenchContent["form"] {
   return {
     scope: "all",
+    folderPath: "sets/a",
     resizeEnabled: true,
     maxEdge: 2048,
     allowUpscale: false,
@@ -122,6 +123,14 @@ function workbenchContent(
     form: preparationForm(),
     assetCount: 42,
     checkedCount: 3,
+    scopeCount: 42,
+    scopeReady: true,
+    scopeMessage: null,
+    folderOptions: [
+      { id: "sets/a", label: "a", detail: "sets/a", count: 8 },
+      { id: "sets/b", label: "b", detail: "sets/b", count: 5 },
+    ],
+    folderLoading: false,
     preview: null,
     previewPending: false,
     executionPlan: null,
@@ -143,6 +152,7 @@ function workbenchContent(
     resolveConfirmation: vi.fn(),
     returnToSpace: vi.fn(),
     openArchive: vi.fn(),
+    openAnnotationStage: vi.fn(),
     ...overrides,
   };
 }
@@ -269,6 +279,23 @@ describe("dial archive preparation pages", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "启用格式与编码" }));
 
     expect(content.updateForm).toHaveBeenCalledWith({ convertEnabled: true });
+  });
+
+  test("offers project, selected, and folder ranges with a handoff to the material yard", () => {
+    const content = workbenchContent({ initialFocus: "scope" });
+    render(
+      <DialArchiveSpacePage
+        space={getHomeSpace("preparation")}
+        content={content}
+        onNavigateSpace={vi.fn()}
+        onReturnHome={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: /DIR\.02素材子文件夹/u }));
+    expect(content.updateForm).toHaveBeenCalledWith({ scope: "folder" });
+    fireEvent.click(screen.getByRole("button", { name: /前往素材施工场选取素材/u }));
+    expect(content.openAnnotationStage).toHaveBeenCalledOnce();
   });
 
   test("keeps the node inspector closed after its canvas occlusion is removed", () => {

@@ -2,10 +2,10 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 
 import type { ConfirmationRequest, ConfirmInteraction } from "../../../../application/interaction";
 import { imageUrl, thumbnailUrl } from "../../../../features/assets/api";
-import { useAssetIds, useInfiniteAssets } from "../../../../features/assets/hooks";
+import { useAssetFolders, useAssetIds, useInfiniteAssets } from "../../../../features/assets/hooks";
 import { useAnnotationOverview } from "../../../../features/annotations/hooks";
 import { useJob, useJobHistory } from "../../../../features/jobs/hooks";
-import { useWorkspace } from "../../../../features/workspaces/hooks";
+import { useUpdateWorkspace, useWorkspace } from "../../../../features/workspaces/hooks";
 import { useWorkspaceSelectionStore } from "../../../../shared/store/workspaceSelectionStore";
 import type {
   AnnotationLaneId,
@@ -22,6 +22,7 @@ import {
 } from "./annotationSpaceModel";
 import {
   resolveStageFocus,
+  resolveStageRangeToggle,
   shouldContinueStageAssetSearch,
   stepStageIndex,
   toAnnotationStageAsset,
@@ -85,17 +86,21 @@ export function useAnnotationStageController({
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<AnnotationStageFilterId>("all");
+  const [folderPath, setFolderPath] = useState("");
   const [scopeError, setScopeError] = useState<string | null>(null);
   const confirmationRef = useRef<PendingConfirmation | null>(null);
   const rangeAnchorRef = useRef<string | null>(null);
   const workspace = useWorkspace(projectId);
+  const updateWorkspace = useUpdateWorkspace(projectId);
+  const folderLibrary = useAssetFolders(projectId);
   const deferredSearch = useDeferredValue(search.trim());
   const assetQuery = useMemo(
     () => ({
       search: deferredSearch || undefined,
       status: filter === "all" ? null : filter,
+      folderPath: folderPath || undefined,
     }),
-    [deferredSearch, filter],
+    [deferredSearch, filter, folderPath],
   );
   const assets = useInfiniteAssets(projectId, assetQuery, STAGE_PAGE_SIZE);
   const filteredAssetIds = useAssetIds(projectId, assetQuery);
@@ -150,6 +155,24 @@ export function useAnnotationStageController({
   );
   const totalCount = pages?.[0]?.total ?? 0;
   const loadedAssetIds = useMemo(() => stageAssets.map((asset) => asset.id), [stageAssets]);
+  const folderOptions = useMemo(
+    () =>
+      folderLibrary.data?.items
+        .filter((folder) => Boolean(folder.path))
+        .map((folder) => ({
+          id: folder.path,
+          label: folder.name,
+          detail: folder.path,
+          count: folder.descendant_asset_count,
+        })) ?? [],
+    [folderLibrary.data?.items],
+  );
+
+  useEffect(() => {
+    if (!folderLibrary.data || !folderPath) return;
+    if (folderLibrary.data.items.some((folder) => folder.path === folderPath)) return;
+    setFolderPath("");
+  }, [folderLibrary.data, folderPath]);
   const pageLoadError = assets.isFetchNextPageError
     ? describeError(assets.error, "无法继续读取素材序列。")
     : null;
@@ -318,19 +341,13 @@ export function useAnnotationStageController({
 
   const toggleRangeTo = useCallback(
     (assetId: string) => {
-      const targetIndex = stageAssets.findIndex((asset) => asset.id === assetId);
-      if (targetIndex < 0) return;
       const anchorId = rangeAnchorRef.current ?? focus.asset?.id ?? assetId;
-      const anchorIndex = stageAssets.findIndex((asset) => asset.id === anchorId);
-      const start = Math.min(anchorIndex < 0 ? targetIndex : anchorIndex, targetIndex);
-      const end = Math.max(anchorIndex < 0 ? targetIndex : anchorIndex, targetIndex);
-      setAssetsChecked(
-        stageAssets.slice(start, end + 1).map((asset) => asset.id),
-        true,
-      );
+      const range = resolveStageRangeToggle(loadedAssetIds, anchorId, assetId, checkedAssetIds);
+      if (!range) return;
+      setAssetsChecked(range.assetIds, range.checked);
       rangeAnchorRef.current = assetId;
     },
-    [focus.asset?.id, setAssetsChecked, stageAssets],
+    [checkedAssetIds, focus.asset?.id, loadedAssetIds, setAssetsChecked],
   );
 
   const updateScope = useCallback(
@@ -340,13 +357,13 @@ export function useAnnotationStageController({
           action();
           setScopeError(null);
           rangeAnchorRef.current = null;
-          onAssetIdChange(null);
+          if (requestedAssetId) onAssetIdChange(null);
         },
         "切换素材范围",
         "当前标注或项目上下文有尚未保存的修改。确定放弃后切换素材范围吗？",
       );
     },
-    [onAssetIdChange, runWithDraftGuard],
+    [onAssetIdChange, requestedAssetId, runWithDraftGuard],
   );
 
   const selectAllFiltered = useCallback(async () => {
@@ -359,6 +376,29 @@ export function useAnnotationStageController({
       setScopeError(describeError(reason, "无法选择当前筛选范围。"));
     }
   }, [filteredAssetIds, setAssetsChecked]);
+
+  const changeFolderPath = useCallback(
+    (nextFolderPath: string) => updateScope(() => setFolderPath(nextFolderPath)),
+    [updateScope],
+  );
+
+  const changeRecursiveScan = useCallback(
+    (recursiveScan: boolean) => {
+      if (updateWorkspace.isPending || workspace.data?.settings.recursive_scan === recursiveScan) {
+        return;
+      }
+      updateScope(() => {
+        updateWorkspace.mutate(
+          { recursive_scan: recursiveScan },
+          {
+            onError: (reason) =>
+              setScopeError(describeError(reason, "无法更新素材子文件夹扫描方式。")),
+          },
+        );
+      });
+    },
+    [updateScope, updateWorkspace, workspace.data?.settings.recursive_scan],
+  );
 
   const openWorkcell = useCallback(
     (workcell: AnnotationWorkcellId) => {
@@ -458,10 +498,17 @@ export function useAnnotationStageController({
         { id: "invalid", label: "校验异常", code: "INVD" },
         { id: "failed", label: "任务失败", code: "FAIL" },
       ],
+      folderPath,
+      folderOptions,
+      folderLoading: folderLibrary.isPending,
+      recursiveScan: workspace.data?.settings.recursive_scan ?? false,
+      recursivePending: updateWorkspace.isPending,
       selectingAll: filteredAssetIds.isFetching,
       actionError: scopeError,
       setSearch: (value) => updateScope(() => setSearch(value)),
       setFilter: (value) => updateScope(() => setFilter(value)),
+      setFolderPath: changeFolderPath,
+      setRecursiveScan: changeRecursiveScan,
       toggleRangeTo,
       clearChecked: clearCheckedAssets,
       selectAllFiltered,
@@ -535,10 +582,17 @@ export function createNoContextAnnotationStage({
       search: "",
       filter: "all",
       filters: [],
+      folderPath: "",
+      folderOptions: [],
+      folderLoading: false,
+      recursiveScan: false,
+      recursivePending: false,
       selectingAll: false,
       actionError: null,
       setSearch: () => {},
       setFilter: () => {},
+      setFolderPath: () => {},
+      setRecursiveScan: () => {},
       toggleRangeTo: () => {},
       clearChecked: () => {},
       selectAllFiltered: async () => {},

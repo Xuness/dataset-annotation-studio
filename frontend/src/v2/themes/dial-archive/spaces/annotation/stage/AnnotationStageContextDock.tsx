@@ -11,6 +11,8 @@ interface AnnotationStageContextDockProps {
   batch: AnnotationBatchContent | null;
   totalCount: number;
   checkedCount: number;
+  open: boolean;
+  onOpenChange(open: boolean): void;
   onOpenProduction(): void;
 }
 
@@ -19,9 +21,10 @@ export function AnnotationStageContextDock({
   batch,
   totalCount,
   checkedCount,
+  open,
+  onOpenChange,
   onOpenProduction,
 }: AnnotationStageContextDockProps) {
-  const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState<"scope" | "batch">("scope");
 
   return (
@@ -37,7 +40,7 @@ export function AnnotationStageContextDock({
         data-action={open ? "收起" : "展开"}
         aria-expanded={open}
         aria-controls="annotation-stage-context-panel"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => onOpenChange(!open)}
       >
         <span>RANGE DOCK</span>
         <b>{checkedCount ? `${checkedCount} 已选` : "当前素材"}</b>
@@ -50,16 +53,20 @@ export function AnnotationStageContextDock({
             className="dial-archive-stage-context-dock__scrim"
             type="button"
             aria-label="关闭素材范围台"
-            onClick={() => setOpen(false)}
+            onClick={() => onOpenChange(false)}
           />
-          <section>
+          <section data-panel={panel}>
             <header>
               <div>
-                <span>CONTEXT DOCK // MATERIAL RANGE</span>
-                <h2>素材范围台</h2>
+                <span>
+                  {panel === "scope"
+                    ? "03.A // MATERIAL SCOPE ROUTER"
+                    : "03.B // BATCH CONSTRUCTION"}
+                </span>
+                <h2>{panel === "scope" ? "素材范围台" : "批量施工台"}</h2>
               </div>
-              <b>{String(checkedCount || 1).padStart(4, "0")}</b>
-              <button type="button" aria-label="关闭素材范围台" onClick={() => setOpen(false)}>
+              <b>{panel === "scope" ? "03.A" : "03.B"}</b>
+              <button type="button" aria-label="关闭素材范围台" onClick={() => onOpenChange(false)}>
                 ×
               </button>
             </header>
@@ -86,40 +93,90 @@ export function AnnotationStageContextDock({
             <div className="dial-archive-stage-context-dock__body">
               {panel === "scope" ? (
                 <div className="dial-archive-stage-context-dock__scope">
-                  <label>
-                    <span>FIND MATERIAL</span>
-                    <input
-                      type="search"
-                      value={scope.search}
-                      placeholder="文件名 / 相对路径"
-                      onChange={(event) => scope.setSearch(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span>OBJECT STATE</span>
-                    <select
-                      value={scope.filter}
-                      onChange={(event) =>
-                        scope.setFilter(event.target.value as AnnotationStageScope["filter"])
-                      }
-                    >
-                      {scope.filters.map((filter) => (
-                        <option value={filter.id} key={filter.id}>
-                          {filter.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <dl>
+                  <section
+                    className="dial-archive-stage-context-dock__scope-summary"
+                    aria-label="当前素材范围摘要"
+                  >
+                    <span>ACTIVE MATERIAL SCOPE</span>
+                    <h3>{checkedCount ? "显式选取范围" : "当前目录分支"}</h3>
+                    <strong>{(checkedCount || totalCount).toLocaleString()}</strong>
+                    <small>
+                      {checkedCount
+                        ? "后续批量施工只处理显式选中的素材。"
+                        : "尚未建立显式范围，批量施工以当前素材为对象。"}
+                    </small>
+                    <dl>
+                      <div>
+                        <dt>CURRENT BRANCH</dt>
+                        <dd>{totalCount.toLocaleString()}</dd>
+                      </div>
+                      <div>
+                        <dt>EXPLICIT RANGE</dt>
+                        <dd>{checkedCount.toLocaleString()}</dd>
+                      </div>
+                    </dl>
+                  </section>
+                  <div className="dial-archive-stage-context-dock__query">
+                    <label>
+                      <span>FIND MATERIAL</span>
+                      <input
+                        type="search"
+                        value={scope.search}
+                        placeholder="文件名 / 相对路径"
+                        onChange={(event) => scope.setSearch(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>OBJECT STATE</span>
+                      <select
+                        value={scope.filter}
+                        onChange={(event) =>
+                          scope.setFilter(event.target.value as AnnotationStageScope["filter"])
+                        }
+                      >
+                        {scope.filters.map((filter) => (
+                          <option value={filter.id} key={filter.id}>
+                            {filter.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <section className="dial-archive-stage-context-dock__directory">
                     <div>
-                      <dt>VISIBLE RANGE</dt>
-                      <dd>{totalCount.toLocaleString()}</dd>
+                      <span>DIRECTORY BRANCH</span>
+                      <b>素材子文件夹</b>
+                      <small>切换目录后，胶片轨道、搜索和全选只作用于该目录及其下级目录。</small>
                     </div>
-                    <div>
-                      <dt>EXPLICIT RANGE</dt>
-                      <dd>{checkedCount.toLocaleString()}</dd>
-                    </div>
-                  </dl>
+                    <label>
+                      <span>当前目录分支</span>
+                      <select
+                        value={scope.folderPath}
+                        aria-label="素材目录分支"
+                        disabled={scope.folderLoading}
+                        onChange={(event) => scope.setFolderPath(event.target.value)}
+                      >
+                        <option value="">整个项目根目录</option>
+                        {scope.folderOptions.map((folder) => (
+                          <option value={folder.id} key={folder.id}>
+                            {folder.detail} · {folder.count.toLocaleString()} 素材
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="dial-archive-stage-context-dock__recursive">
+                      <input
+                        type="checkbox"
+                        checked={scope.recursiveScan}
+                        disabled={scope.recursivePending}
+                        onChange={(event) => scope.setRecursiveScan(event.target.checked)}
+                      />
+                      <span>
+                        <b>{scope.recursivePending ? "正在更新索引" : "递归索引子文件夹"}</b>
+                        <small>关闭后，重新扫描只保留工作目录根层素材。</small>
+                      </span>
+                    </label>
+                  </section>
                   <div className="dial-archive-stage-context-dock__scope-actions">
                     <button
                       type="button"
@@ -131,8 +188,8 @@ export function AnnotationStageContextDock({
                     <button type="button" disabled={!checkedCount} onClick={scope.clearChecked}>
                       清除显式范围
                     </button>
+                    {scope.actionError ? <p role="alert">{scope.actionError}</p> : null}
                   </div>
-                  {scope.actionError ? <p role="alert">{scope.actionError}</p> : null}
                 </div>
               ) : batch ? (
                 <AnnotationBatchSurface batch={batch} />
@@ -145,12 +202,16 @@ export function AnnotationStageContextDock({
             </div>
 
             <footer>
-              <span>SHIFT + CLICK 扩展连续范围 · ALT + CLICK 切换单项</span>
+              <span>
+                {panel === "scope"
+                  ? "SHIFT + 左键 连续选择/取消 · CTRL + 左键 单项选择/取消"
+                  : "批量变更先生成证据预览，确认后才允许写入"}
+              </span>
               <button
                 className="is-primary"
                 type="button"
                 onClick={() => {
-                  setOpen(false);
+                  onOpenChange(false);
                   onOpenProduction();
                 }}
               >

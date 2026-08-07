@@ -210,14 +210,28 @@ export interface AnnotationStageFilterOption {
   code: string;
 }
 
+export interface AnnotationStageFolderOption {
+  id: string;
+  label: string;
+  detail: string;
+  count: number;
+}
+
 export interface AnnotationStageScope {
   search: string;
   filter: AnnotationStageFilterId;
   filters: readonly AnnotationStageFilterOption[];
+  folderPath: string;
+  folderOptions: readonly AnnotationStageFolderOption[];
+  folderLoading: boolean;
+  recursiveScan: boolean;
+  recursivePending: boolean;
   selectingAll: boolean;
   actionError: string | null;
   setSearch(value: string): void;
   setFilter(filter: AnnotationStageFilterId): void;
+  setFolderPath(folderPath: string): void;
+  setRecursiveScan(recursive: boolean): void;
   toggleRangeTo(assetId: string): void;
   clearChecked(): void;
   selectAllFiltered(): Promise<void>;
@@ -1138,6 +1152,13 @@ export interface PreparationBackendOption {
   deviceName: string | null;
 }
 
+export interface PreparationFolderOption {
+  id: string;
+  label: string;
+  detail: string;
+  count: number;
+}
+
 export interface PreparationConfirmation {
   title: string;
   message: string;
@@ -1155,6 +1176,11 @@ export interface PreparationWorkbenchContent {
   form: Readonly<PreprocessFormState>;
   assetCount: number;
   checkedCount: number;
+  scopeCount: number;
+  scopeReady: boolean;
+  scopeMessage: string | null;
+  folderOptions: readonly PreparationFolderOption[];
+  folderLoading: boolean;
   preview: PreparationPreviewSummary | null;
   previewPending: boolean;
   executionPlan: PreparationExecutionPlanSummary | null;
@@ -1176,6 +1202,7 @@ export interface PreparationWorkbenchContent {
   resolveConfirmation(accepted: boolean): void;
   returnToSpace(): void;
   openArchive(): void;
+  openAnnotationStage(): void;
 }
 
 export type DeliveryOperationTone = "active" | "success" | "attention" | "danger" | "idle";

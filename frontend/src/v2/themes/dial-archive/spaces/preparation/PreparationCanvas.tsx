@@ -314,7 +314,9 @@ export function PreparationCanvas({ content }: PreparationCanvasProps) {
   const scopeDetail =
     content.form.scope === "selected"
       ? `${content.checkedCount} SELECTED ASSETS`
-      : `${content.assetCount} PROJECT ASSETS`;
+      : content.form.scope === "folder"
+        ? `${content.scopeCount} BRANCH ASSETS`
+        : `${content.assetCount} PROJECT ASSETS`;
   const previewReady = Boolean(content.preview);
   const recoveryReady = Boolean(operation?.canRecover || operation?.status === "recovering");
 
@@ -350,7 +352,7 @@ export function PreparationCanvas({ content }: PreparationCanvasProps) {
   } as SurfaceStyle;
 
   const fieldReadings: Readonly<Record<PreparationCanvasFieldId, string>> = {
-    input: `${content.assetCount} ASSET / ${content.checkedCount} CHECKED`,
+    input: `${content.scopeCount} ROUTED / ${content.checkedCount} CHECKED`,
     transform: `${participatingCapabilities.length} / ${PREPARATION_CAPABILITY_IDS.length} ACTIVE`,
     verify: content.preview
       ? `${content.preview.changedCount} DELTA / ${content.preview.warningCount} WARN`

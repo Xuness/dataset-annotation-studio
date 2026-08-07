@@ -188,8 +188,9 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
                 aria-current={current || undefined}
                 onClick={(event) => {
                   if (event.shiftKey) scope.toggleRangeTo(asset.id);
-                  else if (event.altKey) onToggleAssetChecked(asset.id);
-                  else {
+                  else if (event.ctrlKey || event.metaKey || event.altKey) {
+                    onToggleAssetChecked(asset.id);
+                  } else {
                     preserveTrackForIndexRef.current = index;
                     onSelectAsset(asset.id);
                   }
@@ -249,7 +250,7 @@ export const AnnotationFilmstrip = memo(function AnnotationFilmstrip({
             {scope.actionError ??
               (fetchingMore
                 ? "LOADING SEQUENCE…"
-                : "SHIFT + CLICK // EXTEND RANGE · ALT + CLICK // TOGGLE")}
+                : "SHIFT + CLICK // RANGE · CTRL + CLICK // TOGGLE")}
           </span>
         )}
       </footer>

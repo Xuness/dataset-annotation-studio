@@ -170,7 +170,7 @@ test("preprocessing controller maps form state into request and execution contra
     concurrencyMode: "manual" as const,
     maxWorkers: 4,
   };
-  const request = buildPreprocessRequest(form, ["asset-7"]);
+  const request = buildPreprocessRequest(form, ["asset-7"], []);
   const execution = buildPreprocessExecution(form, "cuda");
 
   assert.deepEqual(request.asset_ids, ["asset-7"]);
@@ -179,6 +179,19 @@ test("preprocessing controller maps form state into request and execution contra
   assert.equal(execution.accelerator_id, "cuda");
   assert.equal(execution.max_workers, 4);
   assert.equal(execution.batch_size, null);
+});
+
+test("preprocessing resolves a folder branch into an explicit immutable request", () => {
+  const form = {
+    ...createInitialPreprocessForm(),
+    scope: "folder" as const,
+    folderPath: "characters/main",
+  };
+  const folderAssetIds = ["asset-3", "asset-8"];
+  const request = buildPreprocessRequest(form, ["asset-ignored"], folderAssetIds);
+
+  assert.deepEqual(request.asset_ids, folderAssetIds);
+  assert.notEqual(request.asset_ids, folderAssetIds);
 });
 
 test("export controller freezes selected scope without mutating selection state", () => {
@@ -561,7 +574,7 @@ test("large page scenes use paint containment without changing shared animation 
   assert.match(workspaceMaterialStyles, /backdrop-filter\s+var\(--transition\)/);
 });
 
-test("annotation stage keeps the camera hit-passive and preserves the short dossier split", () => {
+test("annotation stage keeps decorative overlays hit-passive and preserves the short dossier split", () => {
   const stageStyles = readFileSync(
     new URL(
       "../src/v2/themes/dial-archive/spaces/annotation/styles/annotation-stage-reconstruction.css",
@@ -569,9 +582,29 @@ test("annotation stage keeps the camera hit-passive and preserves the short doss
     ),
     "utf8",
   );
+  const legibilityStyles = readFileSync(
+    new URL(
+      "../src/v2/themes/dial-archive/spaces/annotation/styles/annotation-stage-legibility.css",
+      import.meta.url,
+    ),
+    "utf8",
+  );
 
   assert.match(stageStyles, /\.dial-archive-stage__scene-camera\s*\{[^}]*pointer-events:\s*none;/s);
   assert.match(stageStyles, /\.dial-archive-stage-workcell-slot\s*\{[^}]*pointer-events:\s*auto;/s);
+  assert.match(
+    stageStyles,
+    /\.dial-archive-stage-context-dock\s*\{[^}]*bottom:\s*calc\(var\(--dial-archive-stage-film-h\) \+ 26px\);[^}]*left:\s*calc\(var\(--dial-archive-stage-page-gutter\) \+ 292px\);/s,
+  );
+  assert.match(stageStyles, /\.dial-archive-stage-context-dock__scrim\s*\{[^}]*z-index:\s*0;/s);
+  assert.match(
+    stageStyles,
+    /\.dial-archive-stage-context-dock__body \.dial-archive-batch-surface\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;/s,
+  );
+  assert.match(
+    legibilityStyles,
+    /\.dial-archive-stage-filmstrip__range\s*\{[^}]*pointer-events:\s*none;/s,
+  );
   assert.match(
     stageStyles,
     /\.dial-archive-workcell-viewport__plane\s*\{[^}]*pointer-events:\s*auto;/s,

@@ -110,6 +110,10 @@
   z-index: 5;
 }
 
+.dial-archive-stage-filmstrip__range {
+  pointer-events: none;
+}
+
 /* The edit workcell keeps the overview's material sequence within reach.
  * Other workcells retain the compact text-only dock because they operate on a
  * route or dossier rather than stepping through one document at a time. */

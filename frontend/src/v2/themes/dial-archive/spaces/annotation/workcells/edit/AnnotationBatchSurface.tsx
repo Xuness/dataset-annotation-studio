@@ -12,7 +12,7 @@ export function AnnotationBatchSurface({ batch }: AnnotationBatchSurfaceProps) {
       <header>
         <div>
           <span>ACTIVE RANGE // EXPLICIT SCOPE</span>
-          <h3>{batch.rangeCount} 张素材已进入批量施工范围</h3>
+          <h3>{batch.rangeCount} 张素材待批量施工</h3>
         </div>
         <b>{String(batch.rangeCount).padStart(4, "0")}</b>
       </header>

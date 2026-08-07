@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useAssets } from "../../features/assets/hooks";
+import { useAssetFolders, useAssetIds, useAssets } from "../../features/assets/hooks";
 import {
   useImageProcessingBackends,
   usePreprocessExecutionPlan,
@@ -34,6 +34,7 @@ export function usePreprocessController({
 }: UsePreprocessControllerOptions) {
   const workspace = useWorkspace(projectId);
   const assets = useAssets(projectId, { limit: 1 });
+  const folders = useAssetFolders(projectId);
   const imageBackends = useImageProcessingBackends();
   const actions = usePreprocessingActions(projectId);
   const operations = usePreprocessOperations(
@@ -43,6 +44,39 @@ export function usePreprocessController({
   const checkedAssetIds = useWorkspaceSelectionStore((state) => state.checkedAssetIds);
   const setActiveProject = useWorkspaceSelectionStore((state) => state.setActiveProject);
   const { form, selectedOperationId } = preprocessWorkbenchState.useValue(projectId);
+  const folderAssetIds = useAssetIds(
+    projectId,
+    { folderPath: form.folderPath },
+    form.scope === "folder" && Boolean(form.folderPath),
+  );
+  const folderOptions = useMemo(
+    () => folders.data?.items.filter((folder) => Boolean(folder.path)) ?? [],
+    [folders.data?.items],
+  );
+  const selectedFolder = folderOptions.find((folder) => folder.path === form.folderPath);
+  const folderCount = folderAssetIds.data?.total ?? selectedFolder?.descendant_asset_count ?? 0;
+  const folderLoading =
+    folders.isPending ||
+    (form.scope === "folder" && Boolean(form.folderPath) && folderAssetIds.isFetching);
+  const scopeReady =
+    form.scope === "all" ||
+    (form.scope === "selected" && checkedAssetIds.length > 0) ||
+    (form.scope === "folder" &&
+      Boolean(form.folderPath) &&
+      folderAssetIds.isSuccess &&
+      folderCount > 0);
+  const scopeMessage =
+    form.scope === "selected" && checkedAssetIds.length === 0
+      ? "请先前往 03 素材施工场选择需要处理的素材。"
+      : form.scope === "folder" && folders.isSuccess && folderOptions.length === 0
+        ? "当前项目没有已索引的素材子文件夹。"
+        : form.scope === "folder" && !form.folderPath
+          ? "请选择一个素材子文件夹。"
+          : form.scope === "folder" && folderAssetIds.isError
+            ? actionError(folderAssetIds.error, "无法读取所选子文件夹。")
+            : form.scope === "folder" && !folderLoading && folderCount === 0
+              ? "所选子文件夹中没有可处理的素材。"
+              : null;
   const [error, setError] = useState<string | null>(null);
   const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
 
@@ -58,6 +92,13 @@ export function usePreprocessController({
       preprocessWorkbenchState.patch(projectId, { selectedOperationId: operationId }),
     [projectId],
   );
+
+  useEffect(() => {
+    if (!folders.data) return;
+    if (form.folderPath && folderOptions.some((folder) => folder.path === form.folderPath)) return;
+    const nextFolderPath = folderOptions[0]?.path ?? "";
+    if (nextFolderPath !== form.folderPath) patchForm({ folderPath: nextFolderPath });
+  }, [folderOptions, folders.data, form.folderPath, patchForm]);
 
   useEffect(() => {
     setActiveProject(projectId);
@@ -79,8 +120,8 @@ export function usePreprocessController({
   }, [operations.data, projectId]);
 
   const request = useMemo(
-    () => buildPreprocessRequest(form, checkedAssetIds),
-    [checkedAssetIds, form],
+    () => buildPreprocessRequest(form, checkedAssetIds, folderAssetIds.data?.ids ?? []),
+    [checkedAssetIds, folderAssetIds.data?.ids, form],
   );
   const resolvedAcceleratorId = useMemo(
     () => resolvePreprocessAcceleratorId(form, imageBackends.data),
@@ -113,6 +154,10 @@ export function usePreprocessController({
   const preview = useCallback(async () => {
     setError(null);
     setPreviewFingerprint(null);
+    if (!scopeReady) {
+      setError(scopeMessage ?? "当前处理范围尚未就绪。");
+      return;
+    }
     try {
       await actions.preview.mutateAsync(request);
       setPreviewFingerprint(requestFingerprint);
@@ -120,7 +165,14 @@ export function usePreprocessController({
     } catch (reason) {
       setError(actionError(reason, "无法生成预览。"));
     }
-  }, [actions.preview, request, requestFingerprint, setSelectedOperationId]);
+  }, [
+    actions.preview,
+    request,
+    requestFingerprint,
+    scopeMessage,
+    scopeReady,
+    setSelectedOperationId,
+  ]);
 
   const execute = useCallback(async () => {
     const previewData = validPreview;
@@ -186,8 +238,14 @@ export function usePreprocessController({
     patchForm,
     assetCount: assets.data?.total ?? 0,
     checkedCount: checkedAssetIds.length,
+    folderOptions,
+    folderCount,
+    folderLoading,
+    scopeReady,
+    scopeMessage,
     preview: validPreview,
-    previewPending: actions.preview.isPending || workspaceBusy,
+    previewPending:
+      actions.preview.isPending || workspaceBusy || (form.scope === "folder" && folderLoading),
     executePending: workspaceBusy,
     error,
     backends: imageBackends.data,

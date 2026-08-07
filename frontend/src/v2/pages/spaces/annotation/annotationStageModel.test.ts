@@ -4,6 +4,7 @@ import type { AnnotationStageAsset } from "../spacePageModel";
 import {
   isAnnotationWorkcellId,
   resolveStageFocus,
+  resolveStageRangeToggle,
   shouldContinueStageAssetSearch,
   stepStageIndex,
   toAnnotationStageAsset,
@@ -111,5 +112,21 @@ describe("annotation stage model", () => {
     expect(stepStageIndex(assets, 0, -1)?.id).toBe("a");
     expect(stepStageIndex(assets, -1, 1)?.id).toBe("b");
     expect(stepStageIndex([], 0, 1)).toBe(null);
+  });
+
+  test("makes a repeated shift range reversible from the target state", () => {
+    const assetIds = ["a", "b", "c", "d"];
+    expect(resolveStageRangeToggle(assetIds, "b", "d", [])).toEqual({
+      assetIds: ["b", "c", "d"],
+      checked: true,
+    });
+    expect(resolveStageRangeToggle(assetIds, "b", "d", ["b", "c", "d"])).toEqual({
+      assetIds: ["b", "c", "d"],
+      checked: false,
+    });
+    expect(resolveStageRangeToggle(assetIds, "missing", "c", ["c"])).toEqual({
+      assetIds: ["c"],
+      checked: false,
+    });
   });
 });
