@@ -1,5 +1,9 @@
 import { useMemo } from "react";
 
+import {
+  preprocessPreviewFolderPaths,
+  preprocessWorkbenchState,
+} from "../../../../application/preprocessing/preprocessState";
 import { thumbnailUrl } from "../../../../features/assets/api";
 import { useAssets } from "../../../../features/assets/hooks";
 import { usePreprocessOperations } from "../../../../features/preprocessing/hooks";
@@ -35,8 +39,12 @@ export function usePreparationSpaceController({
   onOpenOperation,
 }: UsePreparationSpaceControllerOptions): PreparationSpaceContent {
   const safeProjectId = projectId ?? "";
+  const { form } = preprocessWorkbenchState.useValue(safeProjectId);
   const workspace = useWorkspace(safeProjectId);
-  const assets = useAssets(safeProjectId, { limit: 6 });
+  const assets = useAssets(safeProjectId, {
+    folderPaths: preprocessPreviewFolderPaths(form),
+    limit: 6,
+  });
   const operations = usePreprocessOperations(safeProjectId);
   const checkedCount = useWorkspaceSelectionStore((state) => state.checkedAssetIds.length);
 

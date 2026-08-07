@@ -26,6 +26,7 @@ import {
   toAnnotationAssetSample,
   toAnnotationProject,
 } from "./annotationSpaceModel";
+import { annotationStageViewState } from "./annotationStageState";
 
 interface UseAnnotationSpaceControllerOptions {
   projectId: string | null;
@@ -73,8 +74,12 @@ export function useAnnotationSpaceController({
 }: UseAnnotationSpaceControllerOptions): AnnotationSpaceContent {
   const safeProjectId = projectId ?? "";
   const hasContext = Boolean(projectId);
+  const { folderPaths } = annotationStageViewState.useValue(safeProjectId);
   const workspace = useWorkspace(safeProjectId);
-  const assets = useAssets(safeProjectId, { limit: 7 });
+  const assets = useAssets(safeProjectId, {
+    folderPaths: folderPaths.length ? folderPaths : undefined,
+    limit: 7,
+  });
   const overview = useAnnotationOverview(safeProjectId);
   const jobs = useJobHistory(safeProjectId, 20);
   const systemPresets = useSystemPresets(hasContext);

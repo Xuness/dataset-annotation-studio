@@ -56,6 +56,12 @@ export function createInitialPreprocessForm(): PreprocessFormState {
   };
 }
 
+export function preprocessPreviewFolderPaths(
+  form: PreprocessFormState,
+): readonly string[] | undefined {
+  return form.scope === "folder" && form.folderPaths.length ? form.folderPaths : undefined;
+}
+
 export interface PreprocessWorkbenchView {
   form: PreprocessFormState;
   selectedOperationId: string | null;

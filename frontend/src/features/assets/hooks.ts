@@ -12,14 +12,18 @@ import {
 } from "./api";
 import { annotationTraceKeys, assetKeys, metadataKeys, promptPreviewKeys } from "./queryKeys";
 
-interface InfiniteAssetQueryOptions {
+interface AssetQueryOptions {
   keepPreviousData?: boolean;
 }
 
-export function useAssets(projectId: string, query: AssetQuery) {
+export function useAssets(projectId: string, query: AssetQuery, options: AssetQueryOptions = {}) {
   return useQuery({
     queryKey: assetKeys.list(projectId, query),
     queryFn: () => listAssets(projectId, query),
+    placeholderData: options.keepPreviousData
+      ? (previousData, previousQuery) =>
+          previousQuery?.queryKey[1] === projectId ? previousData : undefined
+      : undefined,
     enabled: Boolean(projectId),
   });
 }
@@ -28,7 +32,7 @@ export function useInfiniteAssets(
   projectId: string,
   query: AssetQuery,
   pageSize = 500,
-  options: InfiniteAssetQueryOptions = {},
+  options: AssetQueryOptions = {},
 ) {
   return useInfiniteQuery({
     queryKey: assetKeys.infinite(projectId, query, pageSize),

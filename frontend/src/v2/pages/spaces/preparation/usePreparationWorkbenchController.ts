@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ConfirmationRequest, ConfirmInteraction } from "../../../../application/interaction";
-import { createInitialPreprocessForm } from "../../../../application/preprocessing/preprocessState";
+import {
+  createInitialPreprocessForm,
+  preprocessPreviewFolderPaths,
+} from "../../../../application/preprocessing/preprocessState";
 import { usePreprocessController } from "../../../../application/preprocessing/usePreprocessController";
 import { thumbnailUrl } from "../../../../features/assets/api";
 import { useAssets } from "../../../../features/assets/hooks";
@@ -88,7 +91,14 @@ export function usePreparationWorkbenchController({
     selectedOperation: sourceSelectedOperation,
     setSelectedOperationId,
   } = controller;
-  const assets = useAssets(projectId, { limit: 5 });
+  const assets = useAssets(
+    projectId,
+    {
+      folderPaths: preprocessPreviewFolderPaths(controller.form),
+      limit: 5,
+    },
+    { keepPreviousData: true },
+  );
   const project = useMemo(
     () => toPreparationProject(controller.workspace.data),
     [controller.workspace.data],
