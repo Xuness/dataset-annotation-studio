@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Sequence
 from pathlib import Path
 
 from dataset_studio.core.sqlite import connect, transaction
@@ -292,11 +293,13 @@ class AssetRepository:
         search: str = "",
         annotation_status: str | None = None,
         folder_path: str = "",
+        folder_paths: Sequence[str] = (),
         offset: int = 0,
         limit: int = 200,
     ) -> tuple[list[AssetSummary], int, dict[str, int]]:
-        where, parameters = self._asset_filter(search, annotation_status, folder_path)
-        scope_where, scope_parameters = self._asset_filter(search, None, folder_path)
+        selected_folders = tuple(dict.fromkeys((*folder_paths, folder_path)))
+        where, parameters = self._asset_filter(search, annotation_status, selected_folders)
+        scope_where, scope_parameters = self._asset_filter(search, None, selected_folders)
         connection = connect(self._database_path)
         try:
             total = int(
@@ -346,7 +349,7 @@ class AssetRepository:
                 review_where, review_parameters = self._asset_filter(
                     search,
                     review_status,
-                    folder_path,
+                    selected_folders,
                 )
                 status_counts[review_status] = int(
                     connection.execute(
@@ -370,8 +373,10 @@ class AssetRepository:
         search: str = "",
         annotation_status: str | None = None,
         folder_path: str = "",
+        folder_paths: Sequence[str] = (),
     ) -> list[str]:
-        where, parameters = self._asset_filter(search, annotation_status, folder_path)
+        selected_folders = tuple(dict.fromkeys((*folder_paths, folder_path)))
+        where, parameters = self._asset_filter(search, annotation_status, selected_folders)
         connection = connect(self._database_path)
         try:
             rows = connection.execute(
@@ -391,16 +396,20 @@ class AssetRepository:
     def _asset_filter(
         search: str,
         annotation_status: str | None,
-        folder_path: str = "",
+        folder_paths: Sequence[str] = (),
     ) -> tuple[str, list[object]]:
         clauses = ["assets.is_present = 1"]
         parameters: list[object] = []
-        if folder_path:
-            escaped_folder = (
-                folder_path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            )
-            clauses.append("assets.relative_path LIKE ? ESCAPE '\\'")
-            parameters.append(f"{escaped_folder}/%")
+        selected_folders = [folder_path for folder_path in folder_paths if folder_path]
+        if selected_folders:
+            folder_clauses: list[str] = []
+            for folder_path in selected_folders:
+                escaped_folder = (
+                    folder_path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                )
+                folder_clauses.append("assets.relative_path LIKE ? ESCAPE '\\'")
+                parameters.append(f"{escaped_folder}/%")
+            clauses.append(f"({' OR '.join(folder_clauses)})")
         if search:
             clauses.append("assets.relative_path LIKE ? ESCAPE '\\'")
             escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

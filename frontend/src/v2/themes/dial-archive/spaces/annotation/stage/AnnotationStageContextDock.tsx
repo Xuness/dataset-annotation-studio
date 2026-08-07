@@ -98,17 +98,25 @@ export function AnnotationStageContextDock({
                     aria-label="当前素材范围摘要"
                   >
                     <span>ACTIVE MATERIAL SCOPE</span>
-                    <h3>{checkedCount ? "显式选取范围" : "当前目录分支"}</h3>
+                    <h3>
+                      {checkedCount
+                        ? "显式选取范围"
+                        : scope.folderPaths.length
+                          ? "多目录素材范围"
+                          : "项目全局范围"}
+                    </h3>
                     <strong>{(checkedCount || totalCount).toLocaleString()}</strong>
                     <small>
                       {checkedCount
                         ? "后续批量施工只处理显式选中的素材。"
-                        : "尚未建立显式范围，批量施工以当前素材为对象。"}
+                        : scope.folderPaths.length
+                          ? `${scope.folderPaths.length.toLocaleString()} 个目录分支已合并为当前素材序列。`
+                          : "当前胶片轨道读取项目中的全部有效素材。"}
                     </small>
                     <dl>
                       <div>
-                        <dt>CURRENT BRANCH</dt>
-                        <dd>{totalCount.toLocaleString()}</dd>
+                        <dt>DIRECTORY SET</dt>
+                        <dd>{scope.folderPaths.length.toLocaleString()}</dd>
                       </div>
                       <div>
                         <dt>EXPLICIT RANGE</dt>
@@ -143,27 +151,51 @@ export function AnnotationStageContextDock({
                     </label>
                   </div>
                   <section className="dial-archive-stage-context-dock__directory">
-                    <div>
+                    <div className="dial-archive-stage-context-dock__directory-intro">
                       <span>DIRECTORY BRANCH</span>
-                      <b>素材子文件夹</b>
-                      <small>切换目录后，胶片轨道、搜索和全选只作用于该目录及其下级目录。</small>
+                      <b>素材目录集合</b>
+                      <small>可同时启用多个分支；胶片、搜索与全选使用合并去重后的素材范围。</small>
                     </div>
-                    <label>
-                      <span>当前目录分支</span>
-                      <select
-                        value={scope.folderPath}
-                        aria-label="素材目录分支"
+                    <div
+                      className="dial-archive-stage-context-dock__directory-choices"
+                      role="group"
+                      aria-label="素材目录分支"
+                    >
+                      <button
+                        className={scope.folderPaths.length === 0 ? "is-active" : undefined}
+                        type="button"
+                        aria-label="使用整个项目素材范围"
+                        aria-pressed={scope.folderPaths.length === 0}
                         disabled={scope.folderLoading}
-                        onChange={(event) => scope.setFolderPath(event.target.value)}
+                        onClick={scope.clearFolderPaths}
                       >
-                        <option value="">整个项目根目录</option>
-                        {scope.folderOptions.map((folder) => (
-                          <option value={folder.id} key={folder.id}>
-                            {folder.detail} · {folder.count.toLocaleString()} 素材
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        <span>
+                          <b>整个项目</b>
+                          <small>ROOT / GLOBAL RANGE</small>
+                        </span>
+                        <strong>ALL</strong>
+                      </button>
+                      {scope.folderOptions.map((folder) => {
+                        const selected = scope.folderPaths.includes(folder.id);
+                        return (
+                          <button
+                            className={selected ? "is-active" : undefined}
+                            type="button"
+                            aria-label={`切换素材目录 ${folder.detail}`}
+                            aria-pressed={selected}
+                            disabled={scope.folderLoading}
+                            onClick={() => scope.toggleFolderPath(folder.id)}
+                            key={folder.id}
+                          >
+                            <span>
+                              <b>{folder.label}</b>
+                              <small>{folder.detail}</small>
+                            </span>
+                            <strong>{folder.count.toLocaleString()}</strong>
+                          </button>
+                        );
+                      })}
+                    </div>
                     <label className="dial-archive-stage-context-dock__recursive">
                       <input
                         type="checkbox"

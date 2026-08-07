@@ -162,11 +162,11 @@ export function useAnnotationProductionController({
     if (newJob.scope === "selected" && checkedAssetIds.length === 0) {
       issues.push("素材范围尚未选择；请在下方胶片轨道标记素材");
     }
-    if (newJob.scope === "folder" && !newJob.folderPath) {
+    if (newJob.scope === "folder" && newJob.folderPaths.length === 0) {
       issues.push("尚未选择工作目录下的素材子文件夹");
     }
-    if (newJob.scope === "folder" && newJob.folderPath && newJob.folderCount === 0) {
-      issues.push("所选子文件夹中没有可处理的素材");
+    if (newJob.scope === "folder" && newJob.folderPaths.length > 0 && newJob.folderCount === 0) {
+      issues.push("所选子文件夹范围中没有可处理的素材");
     }
     if (newJob.scope === "folder" && newJob.folderError) {
       issues.push("无法读取所选子文件夹的素材范围");
@@ -195,7 +195,7 @@ export function useAnnotationProductionController({
     newJob.dictionaryReady,
     newJob.folderCount,
     newJob.folderError,
-    newJob.folderPath,
+    newJob.folderPaths,
     newJob.promptConfigurationIssue,
     newJob.providerModelId,
     newJob.scope,
@@ -220,7 +220,7 @@ export function useAnnotationProductionController({
           newJob.scope === "selected"
             ? "工作台选中项"
             : newJob.scope === "folder"
-              ? newJob.folderPath
+              ? `${newJob.folderPaths.length.toLocaleString()} 个目录分支`
               : "全部素材",
         detail: `${scopeCount.toLocaleString()} MATERIAL`,
       },
@@ -310,7 +310,7 @@ export function useAnnotationProductionController({
     newJob.configuredSystemPreset,
     newJob.configuredTranslationPrompt,
     newJob.dictionaryReady,
-    newJob.folderPath,
+    newJob.folderPaths.length,
     newJob.providerModelId,
     newJob.scope,
     newJob.selectedProvider,
@@ -390,7 +390,7 @@ export function useAnnotationProductionController({
       scopeCount,
       totalCount: workspace?.asset_count ?? 0,
       selectedCount: checkedAssetIds.length,
-      folderPath: newJob.folderPath,
+      folderPaths: newJob.folderPaths,
       folderOptions: newJob.folderOptions,
       folderLoading: newJob.folderLoading,
       backend,
@@ -415,7 +415,8 @@ export function useAnnotationProductionController({
       ready: newJob.ready && blockers.length === 0,
       pending: newJob.createPending,
       setScope: newJob.setScope,
-      setFolderPath: newJob.setFolderPath,
+      toggleFolderPath: newJob.toggleFolderPath,
+      clearFolderPaths: newJob.clearFolderPaths,
       setBackend,
       setProviderProfile: newJob.setProviderProfileId,
       setModel: newJob.setProviderModelId,

@@ -31,7 +31,7 @@ function mockMatchMedia(matches: boolean) {
 function preparationForm(): PreparationWorkbenchContent["form"] {
   return {
     scope: "all",
-    folderPath: "sets/a",
+    folderPaths: ["sets/a"],
     resizeEnabled: true,
     maxEdge: 2048,
     allowUpscale: false,
@@ -145,6 +145,8 @@ function workbenchContent(
     error: null,
     confirmation: null,
     updateForm: vi.fn(),
+    toggleFolderPath: vi.fn(),
+    clearFolderPaths: vi.fn(),
     previewAction: vi.fn().mockResolvedValue(undefined),
     executeAction: vi.fn().mockResolvedValue(undefined),
     selectOperation: vi.fn(),
@@ -296,6 +298,31 @@ describe("dial archive preparation pages", () => {
     expect(content.updateForm).toHaveBeenCalledWith({ scope: "folder" });
     fireEvent.click(screen.getByRole("button", { name: /前往素材施工场选取素材/u }));
     expect(content.openAnnotationStage).toHaveBeenCalledOnce();
+  });
+
+  test("toggles multiple folder nodes in the preparation scope", () => {
+    const content = workbenchContent({
+      initialFocus: "scope",
+      form: { ...preparationForm(), scope: "folder", folderPaths: ["sets/a", "sets/b"] },
+      scopeCount: 13,
+    });
+    const { container } = render(
+      <DialArchiveSpacePage
+        space={getHomeSpace("preparation")}
+        content={content}
+        onNavigateSpace={vi.fn()}
+        onReturnHome={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "切换整备素材目录 sets/a" }));
+    fireEvent.click(screen.getByRole("button", { name: "切换整备素材目录 sets/b" }));
+    expect(content.toggleFolderPath).toHaveBeenNthCalledWith(1, "sets/a");
+    expect(content.toggleFolderPath).toHaveBeenNthCalledWith(2, "sets/b");
+    expect(
+      container.querySelector(".dial-archive-preparation-inspector__scope-summary > strong")
+        ?.textContent,
+    ).toBe("13");
   });
 
   test("keeps the node inspector closed after its canvas occlusion is removed", () => {

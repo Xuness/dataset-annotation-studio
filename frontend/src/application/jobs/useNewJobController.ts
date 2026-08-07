@@ -17,6 +17,11 @@ import type {
   TranslationSourceKind,
   WorkspaceSummary,
 } from "../../shared/api/types";
+import {
+  folderSelectionsEqual,
+  reconcileFolderSelection,
+  toggleFolderSelection,
+} from "../../shared/store/folderSelection";
 import { actionError } from "../interaction";
 
 interface UseNewJobControllerOptions {
@@ -52,7 +57,7 @@ export function useNewJobController({
   const [taggerProfileId, setTaggerProfileId] = useState("");
   const [translationPromptPresetId, setTranslationPromptPresetId] = useState("");
   const [scope, setScope] = useState<NewJobScope>("all");
-  const [folderPath, setFolderPath] = useState("");
+  const [folderPaths, setFolderPaths] = useState<readonly string[]>([]);
   const [targetLanguage, setTargetLanguage] = useState("zh-CN");
   const [translationSourceKind, setTranslationSourceKind] =
     useState<TranslationSourceKind>("description");
@@ -70,14 +75,13 @@ export function useNewJobController({
         })) ?? [],
     [folderLibrary.data?.items],
   );
-  const selectedFolder = folderLibrary.data?.items.find((folder) => folder.path === folderPath);
   const folderAssetIds = useAssetIds(
     projectId,
-    { folderPath },
-    enabled && scope === "folder" && Boolean(folderPath),
+    { folderPaths },
+    enabled && scope === "folder" && folderPaths.length > 0,
   );
   const refetchFolderAssetIds = folderAssetIds.refetch;
-  const folderCount = folderAssetIds.data?.total ?? selectedFolder?.descendant_asset_count ?? 0;
+  const folderCount = folderAssetIds.data?.total ?? 0;
   const executionBackend = kind === "translation" ? translationBackend : annotationBackend;
   const selectedProvider = providerProfiles.data?.find(
     (profile) => profile.id === providerProfileId,
@@ -91,14 +95,18 @@ export function useNewJobController({
   );
 
   useEffect(() => {
-    if (!folderOptions.length) {
-      if (folderPath) setFolderPath("");
-      return;
-    }
-    if (!folderOptions.some((folder) => folder.id === folderPath)) {
-      setFolderPath(folderOptions[0].id);
-    }
-  }, [folderOptions, folderPath]);
+    const reconciled = reconcileFolderSelection(
+      folderPaths,
+      folderOptions.map((folder) => folder.id),
+    );
+    if (!folderSelectionsEqual(folderPaths, reconciled)) setFolderPaths(reconciled);
+  }, [folderOptions, folderPaths]);
+
+  const toggleFolderPath = useCallback(
+    (folderPath: string) => setFolderPaths((current) => toggleFolderSelection(current, folderPath)),
+    [],
+  );
+  const clearFolderPaths = useCallback(() => setFolderPaths([]), []);
 
   useEffect(() => {
     const available = providerProfiles.data;
@@ -188,7 +196,7 @@ export function useNewJobController({
         : providerReady && promptReady) &&
     (scope === "all" ||
       (scope === "selected" && checkedAssetIds.length > 0) ||
-      (scope === "folder" && Boolean(folderPath) && folderCount > 0 && !folderAssetIds.isError)),
+      (scope === "folder" && folderPaths.length > 0 && folderCount > 0 && !folderAssetIds.isError)),
   );
 
   const createJob = useCallback(async () => {
@@ -201,11 +209,11 @@ export function useNewJobController({
       if (scope === "selected") {
         scopedAssetIds = [...checkedAssetIds];
       } else if (scope === "folder") {
-        if (!folderPath) throw new Error("请选择工作目录下的素材子文件夹。");
+        if (!folderPaths.length) throw new Error("请至少选择一个工作目录下的素材子文件夹。");
         const result = await refetchFolderAssetIds();
         if (result.error) throw result.error;
         scopedAssetIds = result.data?.ids ?? [];
-        if (!scopedAssetIds.length) throw new Error("所选子文件夹中没有可处理的素材。");
+        if (!scopedAssetIds.length) throw new Error("所选子文件夹范围中没有可处理的素材。");
       }
       const job = await actions.create.mutateAsync({
         execution_backend: executionBackend,
@@ -229,7 +237,7 @@ export function useNewJobController({
     actions.create,
     checkedAssetIds,
     executionBackend,
-    folderPath,
+    folderPaths,
     kind,
     onCreated,
     providerModelId,
@@ -266,8 +274,9 @@ export function useNewJobController({
     setTranslationPromptPresetId,
     scope,
     setScope,
-    folderPath,
-    setFolderPath,
+    folderPaths,
+    toggleFolderPath,
+    clearFolderPaths,
     folderOptions,
     folderCount,
     folderLoading: folderLibrary.isPending || folderAssetIds.isFetching,

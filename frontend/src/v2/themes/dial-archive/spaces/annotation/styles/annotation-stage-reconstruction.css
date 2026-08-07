@@ -1575,12 +1575,12 @@
   box-shadow: inset 8px 0 var(--dial-archive-yellow);
 }
 
-.dial-archive-stage-context-dock__directory > div {
+.dial-archive-stage-context-dock__directory-intro {
   display: grid;
   gap: 7px;
 }
 
-.dial-archive-stage-context-dock__directory > div > span,
+.dial-archive-stage-context-dock__directory-intro > span,
 .dial-archive-stage-context-dock__directory > label > span:first-child {
   color: #191919;
   font-family: var(--dial-archive-font-mono);
@@ -1588,15 +1588,86 @@
   letter-spacing: 0.13em;
 }
 
-.dial-archive-stage-context-dock__directory > div > b {
+.dial-archive-stage-context-dock__directory-intro > b {
   font-size: 22px;
   letter-spacing: 0.04em;
 }
 
-.dial-archive-stage-context-dock__directory > div > small {
+.dial-archive-stage-context-dock__directory-intro > small {
   color: rgba(25, 25, 25, 0.72);
   font-size: var(--dial-archive-annotation-type-body);
   line-height: 1.55;
+}
+
+.dial-archive-stage-context-dock__directory-choices {
+  display: grid;
+  max-height: 232px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+  padding: 2px 5px 2px 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(25, 25, 25, 0.34) transparent;
+}
+
+.dial-archive-stage-context-dock__directory-choices > button {
+  display: grid;
+  min-width: 0;
+  min-height: 72px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px 11px 16px;
+  border: 0;
+  color: #191919;
+  text-align: left;
+  background: rgba(25, 25, 25, 0.055);
+  cursor: pointer;
+}
+
+.dial-archive-stage-context-dock__directory-choices > button.is-active {
+  color: white;
+  background: #191919;
+  box-shadow: inset 5px 0 var(--dial-archive-yellow);
+}
+
+.dial-archive-stage-context-dock__directory-choices > button:focus-visible {
+  outline: 3px solid var(--dial-archive-yellow);
+  outline-offset: -3px;
+}
+
+.dial-archive-stage-context-dock__directory-choices > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.dial-archive-stage-context-dock__directory-choices > button > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.dial-archive-stage-context-dock__directory-choices b,
+.dial-archive-stage-context-dock__directory-choices small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-stage-context-dock__directory-choices b {
+  font-size: var(--dial-archive-annotation-type-body);
+}
+
+.dial-archive-stage-context-dock__directory-choices small {
+  font-family: var(--dial-archive-font-mono);
+  font-size: var(--dial-archive-annotation-type-meta);
+  opacity: 0.68;
+}
+
+.dial-archive-stage-context-dock__directory-choices strong {
+  font-family: var(--dial-archive-font-display);
+  font-size: 22px;
 }
 
 .dial-archive-stage-context-dock__recursive {

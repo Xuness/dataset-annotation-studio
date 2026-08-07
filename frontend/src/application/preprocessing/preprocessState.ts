@@ -10,7 +10,7 @@ import { createScopedViewState } from "../../shared/store/scopedViewState.ts";
 
 export interface PreprocessFormState {
   scope: "all" | "selected" | "folder";
-  folderPath: string;
+  folderPaths: string[];
   resizeEnabled: boolean;
   maxEdge: number;
   allowUpscale: boolean;
@@ -34,7 +34,7 @@ export interface PreprocessFormState {
 export function createInitialPreprocessForm(): PreprocessFormState {
   return {
     scope: "all",
-    folderPath: "",
+    folderPaths: [],
     resizeEnabled: true,
     maxEdge: 2048,
     allowUpscale: false,

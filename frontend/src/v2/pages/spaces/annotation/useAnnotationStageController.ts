@@ -7,6 +7,11 @@ import { useAnnotationOverview } from "../../../../features/annotations/hooks";
 import { useJob, useJobHistory } from "../../../../features/jobs/hooks";
 import { useUpdateWorkspace, useWorkspace } from "../../../../features/workspaces/hooks";
 import { useWorkspaceSelectionStore } from "../../../../shared/store/workspaceSelectionStore";
+import {
+  folderSelectionsEqual,
+  reconcileFolderSelection,
+  toggleFolderSelection,
+} from "../../../../shared/store/folderSelection";
 import type {
   AnnotationLaneId,
   AnnotationDossierSectionId,
@@ -27,6 +32,7 @@ import {
   stepStageIndex,
   toAnnotationStageAsset,
 } from "./annotationStageModel";
+import { annotationStageViewState } from "./annotationStageState";
 import { useAnnotationDossierController } from "./useAnnotationDossierController";
 import { useAnnotationBatchController } from "./useAnnotationBatchController";
 import { useAnnotationEditController } from "./useAnnotationEditController";
@@ -86,21 +92,21 @@ export function useAnnotationStageController({
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<AnnotationStageFilterId>("all");
-  const [folderPath, setFolderPath] = useState("");
   const [scopeError, setScopeError] = useState<string | null>(null);
   const confirmationRef = useRef<PendingConfirmation | null>(null);
   const rangeAnchorRef = useRef<string | null>(null);
   const workspace = useWorkspace(projectId);
   const updateWorkspace = useUpdateWorkspace(projectId);
   const folderLibrary = useAssetFolders(projectId);
+  const { folderPaths } = annotationStageViewState.useValue(projectId);
   const deferredSearch = useDeferredValue(search.trim());
   const assetQuery = useMemo(
     () => ({
       search: deferredSearch || undefined,
       status: filter === "all" ? null : filter,
-      folderPath: folderPath || undefined,
+      folderPaths: folderPaths.length ? folderPaths : undefined,
     }),
-    [deferredSearch, filter, folderPath],
+    [deferredSearch, filter, folderPaths],
   );
   const assets = useInfiniteAssets(projectId, assetQuery, STAGE_PAGE_SIZE);
   const filteredAssetIds = useAssetIds(projectId, assetQuery);
@@ -169,10 +175,14 @@ export function useAnnotationStageController({
   );
 
   useEffect(() => {
-    if (!folderLibrary.data || !folderPath) return;
-    if (folderLibrary.data.items.some((folder) => folder.path === folderPath)) return;
-    setFolderPath("");
-  }, [folderLibrary.data, folderPath]);
+    if (!folderLibrary.data) return;
+    const reconciled = reconcileFolderSelection(
+      folderPaths,
+      folderLibrary.data.items.map((folder) => folder.path),
+    );
+    if (folderSelectionsEqual(folderPaths, reconciled)) return;
+    annotationStageViewState.patch(projectId, { folderPaths: reconciled });
+  }, [folderLibrary.data, folderPaths, projectId]);
   const pageLoadError = assets.isFetchNextPageError
     ? describeError(assets.error, "无法继续读取素材序列。")
     : null;
@@ -377,9 +387,19 @@ export function useAnnotationStageController({
     }
   }, [filteredAssetIds, setAssetsChecked]);
 
-  const changeFolderPath = useCallback(
-    (nextFolderPath: string) => updateScope(() => setFolderPath(nextFolderPath)),
-    [updateScope],
+  const toggleFolderPath = useCallback(
+    (folderPath: string) =>
+      updateScope(() =>
+        annotationStageViewState.patch(projectId, (current) => ({
+          folderPaths: toggleFolderSelection(current.folderPaths, folderPath),
+        })),
+      ),
+    [projectId, updateScope],
+  );
+
+  const clearFolderPaths = useCallback(
+    () => updateScope(() => annotationStageViewState.patch(projectId, { folderPaths: [] })),
+    [projectId, updateScope],
   );
 
   const changeRecursiveScan = useCallback(
@@ -498,7 +518,7 @@ export function useAnnotationStageController({
         { id: "invalid", label: "校验异常", code: "INVD" },
         { id: "failed", label: "任务失败", code: "FAIL" },
       ],
-      folderPath,
+      folderPaths,
       folderOptions,
       folderLoading: folderLibrary.isPending,
       recursiveScan: workspace.data?.settings.recursive_scan ?? false,
@@ -507,7 +527,8 @@ export function useAnnotationStageController({
       actionError: scopeError,
       setSearch: (value) => updateScope(() => setSearch(value)),
       setFilter: (value) => updateScope(() => setFilter(value)),
-      setFolderPath: changeFolderPath,
+      toggleFolderPath,
+      clearFolderPaths,
       setRecursiveScan: changeRecursiveScan,
       toggleRangeTo,
       clearChecked: clearCheckedAssets,
@@ -582,7 +603,7 @@ export function createNoContextAnnotationStage({
       search: "",
       filter: "all",
       filters: [],
-      folderPath: "",
+      folderPaths: [],
       folderOptions: [],
       folderLoading: false,
       recursiveScan: false,
@@ -591,7 +612,8 @@ export function createNoContextAnnotationStage({
       actionError: null,
       setSearch: () => {},
       setFilter: () => {},
-      setFolderPath: () => {},
+      toggleFolderPath: () => {},
+      clearFolderPaths: () => {},
       setRecursiveScan: () => {},
       toggleRangeTo: () => {},
       clearChecked: () => {},

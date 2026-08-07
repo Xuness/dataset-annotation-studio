@@ -110,6 +110,43 @@ def test_legacy_singular_annotation_api_has_fixed_description_semantics(
         }
 
 
+def test_asset_multi_folder_query_reports_deduplicated_union_total(tmp_path: Path) -> None:
+    project = tmp_path / "dataset"
+    (project / "alpha" / "nested").mkdir(parents=True)
+    (project / "beta").mkdir(parents=True)
+    Image.new("RGB", (32, 32), "white").save(project / "alpha" / "direct.png")
+    Image.new("RGB", (32, 32), "white").save(project / "alpha" / "nested" / "deep.png")
+    Image.new("RGB", (32, 32), "white").save(project / "beta" / "other.png")
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+
+    with TestClient(create_app(settings)) as client:
+        opened = client.post("/api/v1/workspaces/open", json={"path": str(project)})
+        project_id = opened.json()["workspace"]["project_id"]
+        asset_path = f"/api/v1/workspaces/{project_id}/assets"
+
+        union = client.get(
+            asset_path,
+            params=[("folder_path", "alpha"), ("folder_path", "beta")],
+        )
+        union_ids = client.get(
+            f"{asset_path}/ids",
+            params=[("folder_path", "alpha"), ("folder_path", "beta")],
+        )
+        overlapping = client.get(
+            f"{asset_path}/ids",
+            params=[("folder_path", "alpha"), ("folder_path", "alpha/nested")],
+        )
+
+    assert union.status_code == 200
+    assert union.json()["total"] == 3
+    assert union_ids.status_code == 200
+    assert union_ids.json()["total"] == 3
+    assert len(set(union_ids.json()["ids"])) == 3
+    assert overlapping.status_code == 200
+    assert overlapping.json()["total"] == 2
+    assert len(set(overlapping.json()["ids"])) == 2
+
+
 def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> None:
     project = tmp_path / "dataset"
     project.mkdir()

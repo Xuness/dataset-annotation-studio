@@ -9,6 +9,11 @@ import {
 } from "../../features/preprocessing/hooks";
 import { useWorkspace } from "../../features/workspaces/hooks";
 import { useWorkspaceSelectionStore } from "../../shared/store/workspaceSelectionStore";
+import {
+  folderSelectionsEqual,
+  reconcileFolderSelection,
+  toggleFolderSelection,
+} from "../../shared/store/folderSelection";
 import { actionError, type ConfirmInteraction } from "../interaction";
 import {
   ACTIVE_PREPROCESS_STATUSES,
@@ -46,23 +51,22 @@ export function usePreprocessController({
   const { form, selectedOperationId } = preprocessWorkbenchState.useValue(projectId);
   const folderAssetIds = useAssetIds(
     projectId,
-    { folderPath: form.folderPath },
-    form.scope === "folder" && Boolean(form.folderPath),
+    { folderPaths: form.folderPaths },
+    form.scope === "folder" && form.folderPaths.length > 0,
   );
   const folderOptions = useMemo(
     () => folders.data?.items.filter((folder) => Boolean(folder.path)) ?? [],
     [folders.data?.items],
   );
-  const selectedFolder = folderOptions.find((folder) => folder.path === form.folderPath);
-  const folderCount = folderAssetIds.data?.total ?? selectedFolder?.descendant_asset_count ?? 0;
+  const folderCount = folderAssetIds.data?.total ?? 0;
   const folderLoading =
     folders.isPending ||
-    (form.scope === "folder" && Boolean(form.folderPath) && folderAssetIds.isFetching);
+    (form.scope === "folder" && form.folderPaths.length > 0 && folderAssetIds.isFetching);
   const scopeReady =
     form.scope === "all" ||
     (form.scope === "selected" && checkedAssetIds.length > 0) ||
     (form.scope === "folder" &&
-      Boolean(form.folderPath) &&
+      form.folderPaths.length > 0 &&
       folderAssetIds.isSuccess &&
       folderCount > 0);
   const scopeMessage =
@@ -70,12 +74,12 @@ export function usePreprocessController({
       ? "请先前往 03 素材施工场选择需要处理的素材。"
       : form.scope === "folder" && folders.isSuccess && folderOptions.length === 0
         ? "当前项目没有已索引的素材子文件夹。"
-        : form.scope === "folder" && !form.folderPath
-          ? "请选择一个素材子文件夹。"
+        : form.scope === "folder" && form.folderPaths.length === 0
+          ? "请至少选择一个素材子文件夹。"
           : form.scope === "folder" && folderAssetIds.isError
-            ? actionError(folderAssetIds.error, "无法读取所选子文件夹。")
+            ? actionError(folderAssetIds.error, "无法读取所选子文件夹范围。")
             : form.scope === "folder" && !folderLoading && folderCount === 0
-              ? "所选子文件夹中没有可处理的素材。"
+              ? "所选子文件夹范围中没有可处理的素材。"
               : null;
   const [error, setError] = useState<string | null>(null);
   const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
@@ -95,10 +99,20 @@ export function usePreprocessController({
 
   useEffect(() => {
     if (!folders.data) return;
-    if (form.folderPath && folderOptions.some((folder) => folder.path === form.folderPath)) return;
-    const nextFolderPath = folderOptions[0]?.path ?? "";
-    if (nextFolderPath !== form.folderPath) patchForm({ folderPath: nextFolderPath });
-  }, [folderOptions, folders.data, form.folderPath, patchForm]);
+    const reconciled = reconcileFolderSelection(
+      form.folderPaths,
+      folderOptions.map((folder) => folder.path),
+    );
+    if (folderSelectionsEqual(form.folderPaths, reconciled)) return;
+    patchForm({ folderPaths: reconciled });
+  }, [folderOptions, folders.data, form.folderPaths, patchForm]);
+
+  const toggleFolderPath = useCallback(
+    (folderPath: string) =>
+      patchForm({ folderPaths: toggleFolderSelection(form.folderPaths, folderPath) }),
+    [form.folderPaths, patchForm],
+  );
+  const clearFolderPaths = useCallback(() => patchForm({ folderPaths: [] }), [patchForm]);
 
   useEffect(() => {
     setActiveProject(projectId);
@@ -241,6 +255,8 @@ export function usePreprocessController({
     folderOptions,
     folderCount,
     folderLoading,
+    toggleFolderPath,
+    clearFolderPaths,
     scopeReady,
     scopeMessage,
     preview: validPreview,

@@ -242,7 +242,7 @@ function productionContent(
       scopeCount: 3,
       totalCount: 3,
       selectedCount: 1,
-      folderPath: "set-a",
+      folderPaths: ["set-a"],
       folderOptions: [{ id: "set-a", label: "set-a", detail: "2 MATERIAL · set-a" }],
       folderLoading: false,
       backend: "local_tagger",
@@ -267,7 +267,8 @@ function productionContent(
       ready: true,
       pending: false,
       setScope: vi.fn(),
-      setFolderPath: vi.fn(),
+      toggleFolderPath: vi.fn(),
+      clearFolderPaths: vi.fn(),
       setBackend: vi.fn(),
       setProviderProfile: vi.fn(),
       setModel: vi.fn(),
@@ -618,7 +619,7 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
       search: "",
       filter: "all",
       filters: [{ id: "all", label: "全部素材", code: "ALL" }],
-      folderPath: "",
+      folderPaths: [],
       folderOptions: [
         { id: "sets/a", label: "a", detail: "sets/a", count: 2 },
         { id: "sets/b", label: "b", detail: "sets/b", count: 1 },
@@ -630,7 +631,8 @@ function stageContent(overrides: Partial<AnnotationStageContent> = {}): Annotati
       actionError: null,
       setSearch: vi.fn(),
       setFilter: vi.fn(),
-      setFolderPath: vi.fn(),
+      toggleFolderPath: vi.fn(),
+      clearFolderPaths: vi.fn(),
       setRecursiveScan: vi.fn(),
       toggleRangeTo: vi.fn(),
       clearChecked: vi.fn(),
@@ -763,10 +765,12 @@ describe("dial archive annotation stage", () => {
       target: { value: "all" },
     });
     expect(content.scope.setFilter).toHaveBeenCalledWith("all");
-    fireEvent.change(screen.getByRole("combobox", { name: "素材目录分支" }), {
-      target: { value: "sets/a" },
-    });
-    expect(content.scope.setFolderPath).toHaveBeenCalledWith("sets/a");
+    fireEvent.click(screen.getByRole("button", { name: "切换素材目录 sets/a" }));
+    fireEvent.click(screen.getByRole("button", { name: "切换素材目录 sets/b" }));
+    fireEvent.click(screen.getByRole("button", { name: "切换素材目录 sets/a" }));
+    expect(content.scope.toggleFolderPath).toHaveBeenNthCalledWith(1, "sets/a");
+    expect(content.scope.toggleFolderPath).toHaveBeenNthCalledWith(2, "sets/b");
+    expect(content.scope.toggleFolderPath).toHaveBeenNthCalledWith(3, "sets/a");
     fireEvent.click(screen.getByRole("checkbox", { name: /递归索引子文件夹/u }));
     expect(content.scope.setRecursiveScan).toHaveBeenCalledWith(false);
     fireEvent.click(screen.getByRole("button", { name: "选择全部筛选结果" }));
@@ -1107,24 +1111,24 @@ describe("dial archive annotation stage", () => {
     expect(production.configuration.create).toHaveBeenCalledOnce();
   });
 
-  test("configures an actual workspace subfolder from the scope node", () => {
+  test("configures multiple workspace subfolders from the scope node", () => {
     const baseProduction = productionContent({ status: "configure", entryIntent: "lane" });
-    const setFolderPath = vi.fn();
+    const toggleFolderPath = vi.fn();
     const production: AnnotationProductionContent = {
       ...baseProduction,
       configuration: {
         ...baseProduction.configuration,
         scope: "folder",
-        scopeCount: 2,
-        folderPath: "set-a",
+        scopeCount: 3,
+        folderPaths: ["set-a", "set-b"],
         folderOptions: [
           { id: "set-a", label: "set-a", detail: "2 MATERIAL · set-a" },
           { id: "set-b", label: "set-b", detail: "1 MATERIAL · set-b" },
         ],
-        setFolderPath,
+        toggleFolderPath,
       },
     };
-    renderStage(
+    const { container } = renderStage(
       stageContent({
         activeWorkcell: "production",
         productionWorkcell: {
@@ -1136,10 +1140,14 @@ describe("dial archive annotation stage", () => {
     );
 
     fireEvent.click(screen.getByRole("group", { name: "任务素材范围" }));
-    const folder = screen.getByRole("combobox", { name: "素材子文件夹" });
-    expect((folder as HTMLSelectElement).value).toBe("set-a");
-    fireEvent.change(folder, { target: { value: "set-b" } });
-    expect(setFolderPath).toHaveBeenCalledWith("set-b");
+    fireEvent.click(screen.getByRole("button", { name: "切换生产素材目录 set-a" }));
+    fireEvent.click(screen.getByRole("button", { name: "切换生产素材目录 set-b" }));
+    expect(toggleFolderPath).toHaveBeenNthCalledWith(1, "set-a");
+    expect(toggleFolderPath).toHaveBeenNthCalledWith(2, "set-b");
+    expect(
+      container.querySelector(".dial-archive-production-scope__summary > strong")?.textContent,
+    ).toBe("3");
+    expect(screen.getByRole("button", { name: /DIR 2/u })).not.toBeNull();
   });
 
   test("keeps a running operation on the same route topology", () => {

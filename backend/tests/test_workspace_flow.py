@@ -942,8 +942,27 @@ def test_asset_folder_tree_and_filter_use_subtree_boundaries(tmp_path: Path) -> 
     assert in_foo.status_counts["all"] == 2
     assert in_foo.status_counts["missing"] == 2
     assert assets.list_asset_ids(summary.project_id, folder_path="foo").total == 2
+
+    in_multiple_folders = assets.list_assets(
+        summary.project_id,
+        folder_paths=("foo/nested", "foobar", "foo/nested"),
+    )
+    assert [item.relative_path for item in in_multiple_folders.items] == [
+        "foo/nested/deep.png",
+        "foobar/other.png",
+    ]
+    assert in_multiple_folders.status_counts["all"] == 2
+    assert (
+        assets.list_asset_ids(
+            summary.project_id,
+            folder_paths=("foo/nested", "foobar"),
+        ).total
+        == 2
+    )
     with pytest.raises(ValueError, match="当前工作区"):
         assets.list_assets(summary.project_id, folder_path="../outside")
+    with pytest.raises(ValueError, match="当前工作区"):
+        assets.list_assets(summary.project_id, folder_paths=("foo", "../outside"))
 
 
 def test_new_duplicate_does_not_steal_existing_asset_identity(tmp_path: Path) -> None:

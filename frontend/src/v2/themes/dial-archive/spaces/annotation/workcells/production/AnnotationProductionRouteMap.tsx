@@ -523,7 +523,7 @@ export function AnnotationProductionRouteMap({
                 configuration.setScope("folder");
               }}
             >
-              DIR {configuration.folderOptions.length.toLocaleString()}
+              DIR {configuration.folderPaths.length.toLocaleString()}
             </button>
           </span>
           <span className="dial-archive-preparation-node__meter" aria-hidden="true">

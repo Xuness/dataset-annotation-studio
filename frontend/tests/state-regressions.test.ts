@@ -30,6 +30,12 @@ import {
   createInitialPreprocessForm,
 } from "../src/application/preprocessing/preprocessState.ts";
 import {
+  folderSelectionsEqual,
+  reconcileFolderSelection,
+  toggleFolderSelection,
+} from "../src/shared/store/folderSelection.ts";
+import { annotationStageViewState } from "../src/v2/pages/spaces/annotation/annotationStageState.ts";
+import {
   annotationTagsEqual,
   appendManualTags,
   appendVocabularyTag,
@@ -185,13 +191,29 @@ test("preprocessing resolves a folder branch into an explicit immutable request"
   const form = {
     ...createInitialPreprocessForm(),
     scope: "folder" as const,
-    folderPath: "characters/main",
+    folderPaths: ["characters/main", "backgrounds/night"],
   };
   const folderAssetIds = ["asset-3", "asset-8"];
   const request = buildPreprocessRequest(form, ["asset-ignored"], folderAssetIds);
 
   assert.deepEqual(request.asset_ids, folderAssetIds);
   assert.notEqual(request.asset_ids, folderAssetIds);
+});
+
+test("folder selection toggles, reconciles and persists by annotation project", () => {
+  assert.deepEqual(toggleFolderSelection(["sets/a"], "sets/b"), ["sets/a", "sets/b"]);
+  assert.deepEqual(toggleFolderSelection(["sets/a", "sets/b"], "sets/a"), ["sets/b"]);
+  assert.deepEqual(
+    reconcileFolderSelection(["sets/b", "missing", "sets/b"], ["sets/a", "sets/b"]),
+    ["sets/b"],
+  );
+  assert.equal(folderSelectionsEqual(["sets/a"], ["sets/a"]), true);
+
+  const projectId = "annotation-folder-persistence";
+  annotationStageViewState.reset(projectId);
+  annotationStageViewState.patch(projectId, { folderPaths: ["sets/a", "sets/b"] });
+  assert.deepEqual(annotationStageViewState.get(projectId).folderPaths, ["sets/a", "sets/b"]);
+  annotationStageViewState.reset(projectId);
 });
 
 test("export controller freezes selected scope without mutating selection state", () => {

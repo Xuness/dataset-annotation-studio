@@ -1785,56 +1785,108 @@
 
 .dial-archive-production-scope__folder {
   display: grid;
-  min-height: 92px;
-  grid-template-columns: minmax(180px, 0.38fr) minmax(0, 1fr);
-  align-items: stretch;
-  background: var(--dial-archive-stage-plane-muted);
+  gap: 12px;
+  padding: 18px 20px 20px 26px;
+  background: var(--dial-archive-paper);
+  box-shadow: inset 7px 0 var(--dial-archive-yellow);
 }
 
-.dial-archive-production-scope__folder > span:first-child {
-  display: grid;
-  align-content: center;
-  gap: 8px;
-  padding: 17px 20px;
-  color: var(--dial-archive-carbon);
-  background: var(--dial-archive-yellow);
-}
-
-.dial-archive-production-scope__folder > span:last-child {
-  position: relative;
-  display: grid;
-  min-width: 0;
+.dial-archive-production-scope__folder > header {
+  display: flex;
   align-items: center;
-  padding: 14px 54px 14px 18px;
+  justify-content: space-between;
+  gap: 18px;
 }
 
-.dial-archive-production-scope__folder select {
-  width: 100%;
+.dial-archive-production-scope__folder > header > span:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.dial-archive-production-scope__folder > header > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--dial-archive-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.dial-archive-production-scope__folder > header button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 0;
+  color: var(--dial-archive-paper);
+  font-weight: 700;
+  background: var(--dial-archive-carbon);
+  cursor: pointer;
+}
+
+.dial-archive-production-scope__folder > header button:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.dial-archive-production-scope__folder > div {
+  display: grid;
+  max-height: 216px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  overflow: auto;
+  padding-right: 5px;
+  scrollbar-width: thin;
+}
+
+.dial-archive-production-scope__folder > div > button {
+  display: grid;
   min-width: 0;
+  min-height: 72px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px 11px 16px;
   border: 0;
   color: var(--dial-archive-carbon);
-  font-family: var(--dial-archive-font-mono);
-  font-size: 13px;
-  background: transparent;
-  appearance: none;
+  text-align: left;
+  background: var(--dial-archive-stage-plane-soft);
+  cursor: pointer;
 }
 
-.dial-archive-production-scope__folder select:focus-visible {
-  outline: 2px solid var(--dial-archive-carbon);
-  outline-offset: 5px;
+.dial-archive-production-scope__folder > div > button.is-active {
+  color: var(--dial-archive-paper);
+  background: var(--dial-archive-carbon);
+  box-shadow: inset 5px 0 var(--dial-archive-yellow);
 }
 
-.dial-archive-production-scope__folder i {
-  position: absolute;
-  right: 18px;
+.dial-archive-production-scope__folder > div > button:focus-visible {
+  outline: 3px solid var(--dial-archive-yellow);
+  outline-offset: -3px;
+}
+
+.dial-archive-production-scope__folder > div > button > span {
   display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  color: var(--dial-archive-carbon);
-  font-style: normal;
-  background: var(--dial-archive-yellow);
-  pointer-events: none;
+  min-width: 0;
+  gap: 4px;
+}
+
+.dial-archive-production-scope__folder > div > button b,
+.dial-archive-production-scope__folder > div > button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dial-archive-production-scope__folder > div > button strong {
+  font-family: var(--dial-archive-font-display);
+  font-size: 20px;
+}
+
+.dial-archive-production-scope__folder > div > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 20px;
+  color: var(--dial-archive-gray-7);
+  background: var(--dial-archive-stage-plane-soft);
 }
 
 .dial-archive-production-scope__summary {

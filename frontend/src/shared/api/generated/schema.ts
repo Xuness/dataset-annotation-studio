@@ -6946,7 +6946,7 @@ export interface operations {
             query?: {
                 search?: string;
                 status?: string | null;
-                folder_path?: string;
+                folder_path?: string[] | null;
                 offset?: number;
                 limit?: number;
             };
@@ -7014,7 +7014,7 @@ export interface operations {
             query?: {
                 search?: string;
                 status?: string | null;
-                folder_path?: string;
+                folder_path?: string[] | null;
             };
             header?: never;
             path: {

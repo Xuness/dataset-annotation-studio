@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
 from PIL import Image, ImageOps
@@ -49,6 +50,15 @@ def normalize_folder_path(value: str) -> str:
     return folder.as_posix()
 
 
+def normalize_folder_paths(values: Sequence[str]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    for value in values:
+        folder_path = normalize_folder_path(value)
+        if folder_path and folder_path not in normalized:
+            normalized.append(folder_path)
+    return tuple(normalized)
+
+
 class AssetService:
     def __init__(self, workspaces: WorkspaceService) -> None:
         self._workspaces = workspaces
@@ -60,15 +70,16 @@ class AssetService:
         search: str = "",
         annotation_status: str | None = None,
         folder_path: str = "",
+        folder_paths: Sequence[str] = (),
         offset: int = 0,
         limit: int = 200,
     ) -> AssetListResponse:
         paths, _ = self._workspaces.get(project_id)
-        normalized_folder = normalize_folder_path(folder_path)
+        normalized_folders = normalize_folder_paths((*folder_paths, folder_path))
         items, total, status_counts = AssetRepository(paths.database).list_assets(
             search=search,
             annotation_status=annotation_status,
-            folder_path=normalized_folder,
+            folder_paths=normalized_folders,
             offset=max(offset, 0),
             limit=min(max(limit, 1), 10_000),
         )
@@ -87,13 +98,14 @@ class AssetService:
         search: str = "",
         annotation_status: str | None = None,
         folder_path: str = "",
+        folder_paths: Sequence[str] = (),
     ) -> AssetIdListResponse:
         paths, _ = self._workspaces.get(project_id)
-        normalized_folder = normalize_folder_path(folder_path)
+        normalized_folders = normalize_folder_paths((*folder_paths, folder_path))
         ids = AssetRepository(paths.database).list_asset_ids(
             search=search,
             annotation_status=annotation_status,
-            folder_path=normalized_folder,
+            folder_paths=normalized_folders,
         )
         return AssetIdListResponse(ids=ids, total=len(ids))
 

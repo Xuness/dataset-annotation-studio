@@ -26,7 +26,7 @@ def list_assets(
     container: Container,
     search: str = "",
     status: str | None = None,
-    folder_path: str = "",
+    folder_path: Annotated[list[str] | None, Query()] = None,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=200, ge=1, le=10_000),
 ):
@@ -34,7 +34,7 @@ def list_assets(
         project_id,
         search=search,
         annotation_status=status,
-        folder_path=folder_path,
+        folder_paths=folder_path or (),
         offset=offset,
         limit=limit,
     )
@@ -46,13 +46,13 @@ def list_asset_ids(
     container: Container,
     search: str = "",
     status: str | None = None,
-    folder_path: str = "",
+    folder_path: Annotated[list[str] | None, Query()] = None,
 ):
     return container.assets.list_asset_ids(
         project_id,
         search=search,
         annotation_status=status,
-        folder_path=folder_path,
+        folder_paths=folder_path or (),
     )
 
 

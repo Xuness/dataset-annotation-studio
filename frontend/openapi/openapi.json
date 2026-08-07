@@ -12169,9 +12169,18 @@
             "name": "folder_path",
             "required": false,
             "schema": {
-              "default": "",
-              "title": "Folder Path",
-              "type": "string"
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Folder Path"
             }
           },
           {
@@ -12312,9 +12321,18 @@
             "name": "folder_path",
             "required": false,
             "schema": {
-              "default": "",
-              "title": "Folder Path",
-              "type": "string"
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Folder Path"
             }
           }
         ],

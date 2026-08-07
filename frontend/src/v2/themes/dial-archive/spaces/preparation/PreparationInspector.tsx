@@ -156,14 +156,7 @@ export const PreparationInspector = forwardRef<HTMLElement, PreparationInspector
                       name="preparation-scope"
                       checked={form.scope === choice.id}
                       disabled={locked || choice.disabled}
-                      onChange={() =>
-                        content.updateForm({
-                          scope: choice.id,
-                          ...(choice.id === "folder" && !form.folderPath
-                            ? { folderPath: content.folderOptions[0]?.id ?? "" }
-                            : {}),
-                        })
-                      }
+                      onChange={() => content.updateForm({ scope: choice.id })}
                     />
                     <span>
                       <em>{choice.code}</em>
@@ -175,27 +168,52 @@ export const PreparationInspector = forwardRef<HTMLElement, PreparationInspector
                 ))}
               </div>
               {form.scope === "folder" ? (
-                <label className="dial-archive-preparation-inspector__scope-folder">
-                  <span>
-                    <em>DIRECTORY BRANCH</em>
-                    <b>当前素材分支</b>
-                  </span>
-                  <select
-                    value={form.folderPath}
-                    aria-label="整备素材子文件夹"
-                    disabled={locked || content.folderLoading}
-                    onChange={(event) => content.updateForm({ folderPath: event.target.value })}
-                  >
-                    {content.folderOptions.length === 0 ? (
-                      <option value="">当前项目没有素材子文件夹</option>
-                    ) : null}
-                    {content.folderOptions.map((folder) => (
-                      <option value={folder.id} key={folder.id}>
-                        {folder.detail} · {folder.count.toLocaleString()} 素材
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <section
+                  className="dial-archive-preparation-inspector__scope-folder"
+                  aria-label="整备素材子文件夹"
+                >
+                  <header>
+                    <span>
+                      <em>DIRECTORY SET</em>
+                      <b>素材目录集合</b>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={locked || form.folderPaths.length === 0}
+                      onClick={content.clearFolderPaths}
+                    >
+                      清空
+                    </button>
+                  </header>
+                  <p>重复点击可取消；多个目录会合并并去除重复素材。</p>
+                  <div role="group" aria-label="选择整备素材目录">
+                    {content.folderOptions.map((folder) => {
+                      const selected = form.folderPaths.includes(folder.id);
+                      return (
+                        <button
+                          className={selected ? "is-active" : undefined}
+                          type="button"
+                          aria-label={`切换整备素材目录 ${folder.detail}`}
+                          aria-pressed={selected}
+                          disabled={locked || content.folderLoading}
+                          onClick={() => content.toggleFolderPath(folder.id)}
+                          key={folder.id}
+                        >
+                          <span>
+                            <b>{folder.label}</b>
+                            <small>{folder.detail}</small>
+                          </span>
+                          <strong>{folder.count.toLocaleString()}</strong>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {content.folderOptions.length === 0 ? (
+                    <span className="dial-archive-preparation-inspector__scope-folder-empty">
+                      当前项目没有素材子文件夹
+                    </span>
+                  ) : null}
+                </section>
               ) : null}
               <div className="dial-archive-preparation-inspector__scope-summary">
                 <span>
@@ -207,7 +225,9 @@ export const PreparationInspector = forwardRef<HTMLElement, PreparationInspector
                   <small>RANGE EVIDENCE</small>
                   <b>
                     {form.scope === "folder"
-                      ? form.folderPath || "尚未选择目录"
+                      ? form.folderPaths.length
+                        ? `${form.folderPaths.length.toLocaleString()} 个目录分支`
+                        : "尚未选择目录"
                       : form.scope === "selected"
                         ? `${content.checkedCount.toLocaleString()} 项已选`
                         : "项目根目录"}

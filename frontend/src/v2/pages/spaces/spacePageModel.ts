@@ -221,7 +221,7 @@ export interface AnnotationStageScope {
   search: string;
   filter: AnnotationStageFilterId;
   filters: readonly AnnotationStageFilterOption[];
-  folderPath: string;
+  folderPaths: readonly string[];
   folderOptions: readonly AnnotationStageFolderOption[];
   folderLoading: boolean;
   recursiveScan: boolean;
@@ -230,7 +230,8 @@ export interface AnnotationStageScope {
   actionError: string | null;
   setSearch(value: string): void;
   setFilter(filter: AnnotationStageFilterId): void;
-  setFolderPath(folderPath: string): void;
+  toggleFolderPath(folderPath: string): void;
+  clearFolderPaths(): void;
   setRecursiveScan(recursive: boolean): void;
   toggleRangeTo(assetId: string): void;
   clearChecked(): void;
@@ -717,7 +718,7 @@ export interface AnnotationProductionConfiguration {
   scopeCount: number;
   totalCount: number;
   selectedCount: number;
-  folderPath: string;
+  folderPaths: readonly string[];
   folderOptions: readonly AnnotationProductionOption[];
   folderLoading: boolean;
   backend: AnnotationProductionBackendId;
@@ -739,7 +740,8 @@ export interface AnnotationProductionConfiguration {
   ready: boolean;
   pending: boolean;
   setScope(scope: AnnotationProductionScopeId): void;
-  setFolderPath(folderPath: string): void;
+  toggleFolderPath(folderPath: string): void;
+  clearFolderPaths(): void;
   setBackend(backend: AnnotationProductionBackendId): void;
   setProviderProfile(profileId: string): void;
   setModel(modelId: string): void;
@@ -1195,6 +1197,8 @@ export interface PreparationWorkbenchContent {
   error: string | null;
   confirmation: PreparationConfirmation | null;
   updateForm(update: Partial<PreprocessFormState>): void;
+  toggleFolderPath(folderPath: string): void;
+  clearFolderPaths(): void;
   previewAction(): Promise<void>;
   executeAction(): Promise<void>;
   selectOperation(operationId: string | null): void;

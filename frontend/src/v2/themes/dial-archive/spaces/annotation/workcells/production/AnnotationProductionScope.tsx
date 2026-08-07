@@ -36,7 +36,7 @@ export function AnnotationProductionScope({ configuration }: AnnotationProductio
       id: "folder",
       code: "DIR.02",
       title: "工作目录子文件夹",
-      detail: "选择一个目录分支，并包含该分支下的全部下级目录。",
+      detail: "选择一个或多个目录分支，并合并其中的全部下级目录。",
       count: configuration.scope === "folder" ? configuration.scopeCount : 0,
       disabled: !configuration.folderLoading && configuration.folderOptions.length === 0,
     },
@@ -78,31 +78,49 @@ export function AnnotationProductionScope({ configuration }: AnnotationProductio
       </div>
 
       {configuration.scope === "folder" ? (
-        <label className="dial-archive-production-scope__folder">
-          <span>
-            <small>DIRECTORY BRANCH</small>
-            <b>素材子文件夹</b>
-          </span>
-          <span>
-            <select
-              value={configuration.folderPath}
-              aria-label="素材子文件夹"
-              disabled={configuration.pending || configuration.folderLoading}
-              onChange={(event) => configuration.setFolderPath(event.target.value)}
-            >
-              {configuration.folderOptions.length === 0 ? (
-                <option value="">当前工作目录没有素材子文件夹</option>
-              ) : null}
-              {configuration.folderOptions.map((folder) => (
-                <option value={folder.id} key={folder.id}>
-                  {folder.label}
-                  {folder.detail ? ` · ${folder.detail}` : ""}
-                </option>
-              ))}
-            </select>
-            <i aria-hidden="true">⌄</i>
-          </span>
-        </label>
+        <section className="dial-archive-production-scope__folder" aria-label="素材子文件夹">
+          <header>
+            <span>
+              <small>DIRECTORY SET</small>
+              <b>素材目录集合</b>
+            </span>
+            <span>
+              已选 <b>{configuration.folderPaths.length.toLocaleString()}</b>
+              <button
+                type="button"
+                disabled={configuration.pending || configuration.folderPaths.length === 0}
+                onClick={configuration.clearFolderPaths}
+              >
+                清空
+              </button>
+            </span>
+          </header>
+          <div role="group" aria-label="选择生产素材目录">
+            {configuration.folderOptions.map((folder) => {
+              const selected = configuration.folderPaths.includes(folder.id);
+              return (
+                <button
+                  className={selected ? "is-active" : undefined}
+                  type="button"
+                  aria-label={`切换生产素材目录 ${folder.id}`}
+                  aria-pressed={selected}
+                  disabled={configuration.pending || configuration.folderLoading}
+                  onClick={() => configuration.toggleFolderPath(folder.id)}
+                  key={folder.id}
+                >
+                  <span>
+                    <b>{folder.label}</b>
+                    <small>{folder.detail}</small>
+                  </span>
+                  <strong>{selected ? "ON" : "+"}</strong>
+                </button>
+              );
+            })}
+            {configuration.folderOptions.length === 0 ? (
+              <p>当前工作目录没有素材子文件夹。</p>
+            ) : null}
+          </div>
+        </section>
       ) : null}
 
       <div className="dial-archive-production-scope__summary">
@@ -115,7 +133,9 @@ export function AnnotationProductionScope({ configuration }: AnnotationProductio
           <small>SELECTION EVIDENCE</small>
           <b>
             {configuration.scope === "folder"
-              ? configuration.folderPath || "NO DIRECTORY"
+              ? configuration.folderPaths.length
+                ? `${configuration.folderPaths.length.toLocaleString()} DIRECTORIES`
+                : "NO DIRECTORY"
               : configuration.scope === "selected"
                 ? `${configuration.selectedCount.toLocaleString()} CHECKED`
                 : "PROJECT ROOT"}

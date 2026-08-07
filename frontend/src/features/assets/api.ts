@@ -12,15 +12,26 @@ export interface AssetQuery {
   search?: string;
   status?: string | null;
   folderPath?: string;
+  folderPaths?: readonly string[];
   offset?: number;
   limit?: number;
+}
+
+function appendFolderPaths(parameters: URLSearchParams, query: AssetQuery): void {
+  const folderPaths = [
+    ...(query.folderPaths ?? []),
+    ...(query.folderPath ? [query.folderPath] : []),
+  ];
+  for (const folderPath of new Set(folderPaths)) {
+    if (folderPath) parameters.append("folder_path", folderPath);
+  }
 }
 
 export function listAssets(projectId: string, query: AssetQuery): Promise<AssetListResponse> {
   const parameters = new URLSearchParams();
   if (query.search) parameters.set("search", query.search);
   if (query.status) parameters.set("status", query.status);
-  if (query.folderPath) parameters.set("folder_path", query.folderPath);
+  appendFolderPaths(parameters, query);
   parameters.set("offset", String(query.offset ?? 0));
   parameters.set("limit", String(query.limit ?? 10_000));
   return apiRequest(`/api/v1/workspaces/${projectId}/assets?${parameters}`);
@@ -30,7 +41,7 @@ export function listAssetIds(projectId: string, query: AssetQuery): Promise<Asse
   const parameters = new URLSearchParams();
   if (query.search) parameters.set("search", query.search);
   if (query.status) parameters.set("status", query.status);
-  if (query.folderPath) parameters.set("folder_path", query.folderPath);
+  appendFolderPaths(parameters, query);
   return apiRequest(`/api/v1/workspaces/${projectId}/assets/ids?${parameters}`);
 }
 
