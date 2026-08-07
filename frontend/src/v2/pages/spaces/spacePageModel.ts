@@ -44,6 +44,7 @@ export interface ArchiveSpaceContent {
   removingProjectId: string | null;
   registerProject(): Promise<string | null>;
   loadProject(projectId: string): void;
+  openProjectWorkbench(projectId: string): void;
   revealProject(projectId: string): Promise<void>;
   removeProject(projectId: string): Promise<void>;
   clearMessage(): void;

@@ -518,9 +518,17 @@ function CapabilitySystemWorkbenchRoute() {
 }
 
 function ArchiveRoute({ Page, space, themeId, projectId, onProjectIdChange }: ArchiveRouteProps) {
+  const navigate = useNavigate();
   const content = useArchiveSpaceController({
     activeProjectId: projectId,
     onActiveProjectChange: onProjectIdChange,
+    onOpenProjectWorkbench: (nextProjectId) =>
+      navigate(
+        buildFrontendHref("/annotation/stage", {
+          themeId,
+          projectId: nextProjectId,
+        }),
+      ),
   });
   return (
     <SpaceRouteView

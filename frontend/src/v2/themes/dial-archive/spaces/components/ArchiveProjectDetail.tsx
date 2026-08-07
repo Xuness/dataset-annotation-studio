@@ -94,9 +94,14 @@ export function ArchiveProjectDetail({
                 </div>
               </dl>
               <div className="dial-archive-project-detail__actions">
-                <button type="button" disabled title="新的三级工作间尚未接入">
+                <button
+                  type="button"
+                  disabled={!project.exists}
+                  title={project.exists ? undefined : "项目目录当前不可用"}
+                  onClick={() => content.openProjectWorkbench(project.id)}
+                >
                   <b>进入项目工作间</b>
-                  <em>PENDING</em>
+                  <em>{project.exists ? "OPEN" : "OFFLINE"}</em>
                 </button>
                 <button
                   className={active ? "is-loaded" : undefined}

@@ -311,4 +311,44 @@ describe("new frontend routes", () => {
       expect(useWorkspaceSelectionStore.getState().projectId).toBe("project-1");
     });
   });
+
+  test("opens the selected archive project in the material workbench", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            project_id: "project-1",
+            name: "Portraits",
+            root_path: "D:\\datasets\\portraits",
+            exists: true,
+            asset_count: 42,
+            annotated_count: 17,
+            invalid_count: 2,
+            created_at: "2026-08-01T10:00:00Z",
+            last_opened_at: null,
+            settings: {
+              json_fields: [],
+              recursive_scan: true,
+              system_preset_id: null,
+              use_tags_as_context: false,
+              user_prompt: "",
+              validation_mode: "tag_balance",
+            },
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    renderRoutes("/archive?theme=dial-archive");
+
+    fireEvent.click(await screen.findByRole("button", { name: /展开项目档案/u }));
+    fireEvent.click(screen.getByRole("button", { name: /进入项目工作间/u }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current route").textContent).toBe(
+        "/annotation/stage?theme=dial-archive&project=project-1",
+      );
+      expect(useWorkspaceSelectionStore.getState().projectId).toBe("project-1");
+    });
+  });
 });

@@ -42,6 +42,7 @@ function archiveContent(overrides: Partial<ArchiveSpaceContent> = {}): ArchiveSp
     ],
     registerProject: vi.fn().mockResolvedValue(null),
     loadProject: vi.fn(),
+    openProjectWorkbench: vi.fn(),
     revealProject: vi.fn().mockResolvedValue(undefined),
     removeProject: vi.fn().mockResolvedValue(undefined),
     clearMessage: vi.fn(),
@@ -108,12 +109,14 @@ describe("dial archive space page", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /展开项目档案/u }));
-    expect(screen.getByRole("button", { name: /进入项目工作间/u }).hasAttribute("disabled")).toBe(
-      true,
-    );
+    const workbenchButton = screen.getByRole("button", { name: /进入项目工作间/u });
+    expect(workbenchButton.hasAttribute("disabled")).toBe(false);
     expect(screen.getByRole("button", { name: /已装载为当前项目/u }).hasAttribute("disabled")).toBe(
       true,
     );
+
+    fireEvent.click(workbenchButton);
+    expect(content.openProjectWorkbench).toHaveBeenCalledWith("project-1");
 
     fireEvent.click(screen.getByRole("button", { name: /在文件管理器中打开/u }));
     await waitFor(() => expect(content.revealProject).toHaveBeenCalledWith("project-1"));

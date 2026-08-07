@@ -17,11 +17,13 @@ function describeError(reason: unknown): string {
 interface UseArchiveSpaceControllerOptions {
   activeProjectId: string | null;
   onActiveProjectChange(projectId: string | null): void;
+  onOpenProjectWorkbench(projectId: string): void;
 }
 
 export function useArchiveSpaceController({
   activeProjectId,
   onActiveProjectChange,
+  onOpenProjectWorkbench,
 }: UseArchiveSpaceControllerOptions): ArchiveSpaceContent {
   const recent = useRecentWorkspaces();
   const openWorkspace = useOpenWorkspace();
@@ -51,6 +53,23 @@ export function useArchiveSpaceController({
       onActiveProjectChange(projectId);
     },
     [onActiveProjectChange],
+  );
+
+  const openProjectWorkbench = useCallback(
+    (projectId: string) => {
+      setActionMessage(null);
+      const project = projects.find((candidate) => candidate.id === projectId);
+      if (!project) {
+        setActionMessage("项目已不在当前登记索引中。");
+        return;
+      }
+      if (!project.exists) {
+        setActionMessage("项目目录当前不可用，无法进入项目工作间。");
+        return;
+      }
+      onOpenProjectWorkbench(projectId);
+    },
+    [onOpenProjectWorkbench, projects],
   );
 
   const revealProject = useCallback(
@@ -95,6 +114,7 @@ export function useArchiveSpaceController({
     removingProjectId: removeRecent.isPending ? (removeRecent.variables ?? null) : null,
     registerProject,
     loadProject,
+    openProjectWorkbench,
     revealProject,
     removeProject,
     clearMessage: () => setActionMessage(null),
