@@ -162,7 +162,7 @@ function PromptDiagram() {
           <i />
           <i />
         </div>
-        <div className="dial-archive-capability-library-prm__seal">V2</div>
+        <div className="dial-archive-capability-library-prm__seal">PRM</div>
       </div>
     </DiagramFrame>
   );

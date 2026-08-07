@@ -29,7 +29,7 @@ const SECTION_PRESENTATION = {
   appearance: {
     title: "界面外观",
     englishLabel: "Appearance Control",
-    description: "只管理当前 V2 真正生效的设备本地视觉偏好；Legacy 主题字段不会被无条件迁移。",
+    description: "查看当前界面主题与设备本地显示信息，或返回经典界面。",
   },
   announcements: {
     title: "更新公告",
@@ -119,6 +119,7 @@ export function useCapabilitySystemWorkbenchController({
       palette: themeId === "dial-archive" ? "WARM WHITE / CARBON / SIGNAL" : "THEME DEFINED",
       baseline: "2560×1440",
       preferenceScope: "DEVICE LOCAL",
+      classicThemeHref: "/legacy.html",
     },
     diagnostics: {
       frontendVersion: frontendPackage.version,

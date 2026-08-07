@@ -66,7 +66,7 @@ function DomainHeader({ content }: CapabilityCategoryPageProps) {
             key={category.id}
             data-lane={category.lane}
             aria-current={category.id === content.category.id ? "page" : undefined}
-            aria-label={`进入 ${category.code} ${category.label}工作面`}
+            aria-label={`进入 ${category.code} ${category.label}管理页`}
             onClick={() => content.selectCategory(category.id)}
           >
             <span>{category.index}</span>
@@ -526,7 +526,7 @@ export function CapabilityCategoryPage({ content }: CapabilityCategoryPageProps)
       </main>
       <footer className="dial-archive-capability-domain__footer">
         <span>
-          {content.category.code}.{content.activeGroup.code} // DOMAIN WORKSPACE
+          {content.category.code}.{content.activeGroup.code} // RESOURCE REGISTER
         </span>
         <span>{content.activeGroup.englishLabel.toUpperCase()}</span>
         <span>{String(content.resources.length).padStart(2, "0")} RESOURCES</span>

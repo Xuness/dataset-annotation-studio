@@ -126,7 +126,7 @@ function CapabilityStatusPanel({
         onClick={onEnter}
       >
         <span>进入 {category.code} 资源名册</span>
-        <small>OPEN REGISTER // LEVEL 03</small>
+        <small>OPEN RESOURCE REGISTER</small>
         <i aria-hidden="true">↗</i>
       </button>
 
@@ -244,7 +244,7 @@ export function CapabilityLibraryContent({ content }: CapabilityLibraryContentPr
         <footer className="dial-archive-capability-library__focus-foot">
           <span>SELECTED DISTRICT // {activeCategory.code}</span>
           <i aria-hidden="true" />
-          <span>GLOBAL RESOURCE SCOPE</span>
+          <span>AVAILABLE TO ALL PROJECTS</span>
           <b>{activeCategory.stateLabel}</b>
         </footer>
       </section>
@@ -258,7 +258,7 @@ export function CapabilityLibraryContent({ content }: CapabilityLibraryContentPr
       <footer className="dial-archive-capability-library__footer">
         <span>CAPABILITY REGISTER // 06</span>
         <span>
-          <i /> SINGLE CATEGORY FOCUS
+          <i /> ACTIVE CATEGORY
         </span>
         <span>THEME.R2</span>
       </footer>

@@ -177,7 +177,7 @@ describe("classic capability category register", () => {
     fireEvent.click(screen.getByRole("button", { name: /Gemini Edge/u }));
     expect(selectResource).toHaveBeenCalledWith("provider-gemini");
 
-    fireEvent.click(screen.getByRole("button", { name: "进入 TAG 本地打标工作面" }));
+    fireEvent.click(screen.getByRole("button", { name: "进入 TAG 本地打标管理页" }));
     expect(selectCategory).toHaveBeenCalledWith("taggers");
 
     fireEvent.click(screen.getByRole("button", { name: /配置连接与逐模型参数/u }));

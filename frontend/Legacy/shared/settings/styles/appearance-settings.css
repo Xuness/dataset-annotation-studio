@@ -5,6 +5,63 @@
 @import "./surface-transparency.css";
 @import "./scene-clarity.css";
 
+.appearance-new-interface {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  padding: 19px 20px;
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--accent);
+  background: var(--surface-raised);
+}
+
+.appearance-new-interface h3 {
+  margin: 5px 0 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.appearance-new-interface p {
+  max-width: 620px;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+
+.appearance-new-interface > a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 18px;
+  border: 1px solid var(--ink);
+  color: var(--surface-raised);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  background: var(--ink);
+  white-space: nowrap;
+  transition:
+    color var(--transition),
+    background var(--transition),
+    border-color var(--transition),
+    transform var(--transition);
+}
+
+.appearance-new-interface > a:hover,
+.appearance-new-interface > a:focus-visible {
+  border-color: var(--accent-deep);
+  color: var(--accent-contrast, var(--surface-raised));
+  background: var(--accent-deep);
+  outline: none;
+  transform: translateY(-1px);
+}
+
 @media (max-width: 1120px) {
   .home-content-editor {
     grid-template-columns: minmax(210px, 0.72fr) minmax(300px, 1.28fr);
@@ -21,5 +78,15 @@
   .scene-control {
     grid-template-columns: 82px minmax(0, 1fr);
     column-gap: 11px;
+  }
+}
+
+@media (max-width: 760px) {
+  .appearance-new-interface {
+    grid-template-columns: 1fr;
+  }
+
+  .appearance-new-interface > a {
+    justify-self: start;
   }
 }

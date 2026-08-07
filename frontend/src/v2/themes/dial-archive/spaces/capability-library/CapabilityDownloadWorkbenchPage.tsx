@@ -47,10 +47,10 @@ export function CapabilityDownloadWorkbenchPage({ content }: CapabilityDownloadW
         <button type="button" onClick={content.returnCategory}>
           <span aria-hidden="true">←</span>
           <small>{content.code} // PARENT</small>
-          <strong>返回{content.code}工作面</strong>
+          <strong>返回{content.code}资源页</strong>
         </button>
         <div>
-          <span>SPACE 06 // LEVEL 03 MODULE // {content.code}.DLQ</span>
+          <span>SPACE 06 // {content.code}.DLQ</span>
           <h1 id="capability-download-title">{content.label}</h1>
           <p>{content.description}</p>
         </div>
@@ -249,7 +249,7 @@ export function CapabilityDownloadWorkbenchPage({ content }: CapabilityDownloadW
       </div>
 
       <footer className="dial-archive-capability-utility__footer">
-        <span>{content.code}.DLQ // DOMAIN MODULE</span>
+        <span>{content.code}.DLQ // DOWNLOAD CENTER</span>
         <span>RESTART RESUMABLE</span>
         <b>{actionError ?? content.message ?? feedback ?? "CATALOG READY"}</b>
       </footer>

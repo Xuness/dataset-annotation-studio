@@ -196,7 +196,7 @@ export const CAPABILITY_LIBRARY_GROUP_DEFINITIONS = {
       code: "VIS",
       label: "界面外观",
       englishLabel: "Appearance",
-      description: "管理当前 V2 界面真正生效的设备本地视觉偏好。",
+      description: "查看当前界面主题，并可切换回经典界面。",
     },
     {
       id: "announcements",
@@ -392,6 +392,7 @@ export interface CapabilitySystemWorkbenchContent {
     palette: string;
     baseline: string;
     preferenceScope: string;
+    classicThemeHref: string;
   };
   diagnostics: {
     frontendVersion: string;
@@ -492,7 +493,7 @@ function providersCategory(input: CapabilityLibraryOverviewInput): CapabilityLib
     detail: `${profile.provider_type.toUpperCase()} // ${profile.default_model_id || "NO DEFAULT"}`,
     state: profile.models.length > 0 ? "ready" : "attention",
     kindLabel: "PROVIDER PROFILE",
-    summary: `${endpointLabel(profile.base_url)} 上登记了 ${integer(profile.models.length)} 个可调用模型；默认路由为 ${profile.default_model_id || "未指定"}。每个模型的生成参数在四级工作台中独立维护。`,
+    summary: `${endpointLabel(profile.base_url)} 上登记了 ${integer(profile.models.length)} 个可调用模型；默认路由为 ${profile.default_model_id || "未指定"}。每个模型可分别维护生成参数。`,
     facts: [
       { id: "type", label: "PROTOCOL", value: profile.provider_type.toUpperCase() },
       { id: "default", label: "DEFAULT", value: profile.default_model_id || "—" },
@@ -588,7 +589,7 @@ function taggersCategory(input: CapabilityLibraryOverviewInput): CapabilityLibra
       detail: `${installation.model_version} // ${integer(installation.tag_count)} TAGS`,
       state: installation.status === "ready" ? "ready" : "attention",
       kindLabel: "TAGGER INSTALLATION",
-      summary: `${installation.adapter_name} 适配器已索引 ${integer(installation.tag_count)} 个标签，模型版本 ${installation.model_version}。安装档案与执行 Profile 分开管理。`,
+      summary: `${installation.adapter_name} 适配器已索引 ${integer(installation.tag_count)} 个标签，模型版本 ${installation.model_version}。可为该模型分别建立执行配置。`,
       facts: [
         { id: "adapter", label: "ADAPTER", value: installation.adapter_id.toUpperCase() },
         { id: "version", label: "VERSION", value: installation.model_version },
@@ -649,7 +650,7 @@ function taggersCategory(input: CapabilityLibraryOverviewInput): CapabilityLibra
       detail: "CURATED LIBRARY // HUGGING FACE",
       state: "ready",
       kindLabel: "TAGGER DOWNLOAD WORKBENCH",
-      summary: "独立管理内置模型目录、Hugging Face 连接、授权确认与支持暂停／继续的下载任务。",
+      summary: "浏览内置模型目录与 Hugging Face 来源，并管理授权确认及可恢复下载任务。",
       facts: [
         { id: "catalog", label: "CATALOG", value: "CURATED + HF" },
         { id: "license", label: "LICENSE", value: "CONFIRM" },
@@ -759,7 +760,7 @@ function dictionariesCategory(input: CapabilityLibraryOverviewInput): Capability
       detail: "ONLINE CATALOG // LICENSE GATE",
       state: "ready",
       kindLabel: "DICTIONARY DOWNLOAD WORKBENCH",
-      summary: "独立查看在线词典目录、来源授权与支持暂停／继续的安装任务，不与优先级编辑混放。",
+      summary: "查看在线词典目录、来源授权与支持暂停／继续的安装任务。",
       facts: [
         { id: "catalog", label: "CATALOG", value: "ONLINE" },
         { id: "license", label: "LICENSE", value: "CONFIRM" },
@@ -814,15 +815,15 @@ function promptsCategory(input: CapabilityLibraryOverviewInput): CapabilityLibra
     detail: "SYSTEM PROTOCOL",
     state: "ready" as const,
     kindLabel: "SYSTEM PROMPT",
-    summary: `系统协议正文共 ${integer(prompt.system_prompt.length)} 个字符；三级名册仅显示结构信息，不展开敏感提示词。`,
+    summary: `系统协议正文共 ${integer(prompt.system_prompt.length)} 个字符；列表仅显示摘要，正文需打开协议后查看。`,
     facts: [
       { id: "class", label: "CLASS", value: "SYSTEM" },
       { id: "length", label: "LENGTH", value: integer(prompt.system_prompt.length), unit: "CHAR" },
-      { id: "schema", label: "SCHEMA", value: "V2" },
+      { id: "format", label: "FORMAT", value: "TEXT" },
       { id: "updated", label: "UPDATED", value: dateStamp(prompt.updated_at) },
       { id: "created", label: "CREATED", value: dateStamp(prompt.created_at) },
     ],
-    tags: ["SYSTEM", "TEXT PROTOCOL", "LEVEL 04 EDITOR"],
+    tags: ["SYSTEM", "TEXT PROTOCOL", "EDITABLE DOCUMENT"],
     workbenchPath: `/capability/prompts/system/${routeSegment(prompt.id)}`,
     actionLabel: "编辑系统协议正文",
   }));
@@ -835,7 +836,7 @@ function promptsCategory(input: CapabilityLibraryOverviewInput): CapabilityLibra
       detail: "TRANSLATION PROTOCOL",
       state: "ready" as const,
       kindLabel: "TRANSLATION PROMPT",
-      summary: `翻译协议正文共 ${integer(prompt.system_prompt.length)} 个字符；正文将在四级编辑器中按受控权限展开。`,
+      summary: `翻译协议正文共 ${integer(prompt.system_prompt.length)} 个字符；打开协议后可查看和编辑正文。`,
       facts: [
         { id: "class", label: "CLASS", value: "TRANSLATION" },
         {
@@ -844,11 +845,11 @@ function promptsCategory(input: CapabilityLibraryOverviewInput): CapabilityLibra
           value: integer(prompt.system_prompt.length),
           unit: "CHAR",
         },
-        { id: "schema", label: "SCHEMA", value: "V2" },
+        { id: "format", label: "FORMAT", value: "TEXT" },
         { id: "updated", label: "UPDATED", value: dateStamp(prompt.updated_at) },
         { id: "created", label: "CREATED", value: dateStamp(prompt.created_at) },
       ],
-      tags: ["TRANSLATION", "STRUCTURE SAFE", "LEVEL 04 EDITOR"],
+      tags: ["TRANSLATION", "STRUCTURE SAFE", "EDITABLE DOCUMENT"],
       workbenchPath: `/capability/prompts/translation/${routeSegment(prompt.id)}`,
       actionLabel: "编辑翻译协议正文",
     }),
@@ -873,7 +874,7 @@ function promptsCategory(input: CapabilityLibraryOverviewInput): CapabilityLibra
         value: integer(input.translationPrompts.length),
       },
       { id: "total", label: "TOTAL", value: integer(total) },
-      { id: "schema", label: "SCHEMA", value: "V2" },
+      { id: "format", label: "FORMAT", value: "TEXT" },
     ],
     groups: categoryGroups("prompts", inventory),
     defaultGroupId: "system",
@@ -902,7 +903,7 @@ function systemCategory(input: CapabilityLibraryOverviewInput): CapabilityLibrar
       ],
       tags: ["R2", "HARD EDGE", "CONTROLLED YELLOW"],
       workbenchPath: "/capability/system/appearance",
-      actionLabel: "管理 V2 外观偏好",
+      actionLabel: "管理界面外观",
     },
     {
       id: "announcements",

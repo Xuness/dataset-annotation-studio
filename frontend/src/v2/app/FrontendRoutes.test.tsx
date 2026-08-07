@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useLocation, MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -176,7 +176,7 @@ describe("new frontend routes", () => {
   test("keeps downloads and Studio controls as distinct third-level modules", async () => {
     const download = renderRoutes("/capability/taggers/downloads?theme=dial-archive");
     expect(await screen.findByRole("heading", { name: "模型下载中心" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /返回TAG工作面/u }));
+    fireEvent.click(screen.getByRole("button", { name: /返回TAG资源页/u }));
     await waitFor(() => {
       expect(screen.getByLabelText("current route").textContent).toBe(
         "/capability/taggers?theme=dial-archive&view=profiles",
@@ -193,6 +193,25 @@ describe("new frontend routes", () => {
         "/capability/system?theme=dial-archive&view=announcements",
       );
     });
+  });
+
+  test("orders update bulletins newest-first and exposes the classic interface entry", async () => {
+    const bulletins = renderRoutes("/capability/system?theme=dial-archive&view=announcements");
+    const bulletinList = await screen.findByRole("navigation", {
+      name: "版本公告列表，按发布时间由新到旧",
+    });
+    const bulletinButtons = within(bulletinList).getAllByRole("button");
+
+    expect(bulletinButtons[0]?.textContent).toContain("2026-07-30");
+    expect(bulletinButtons[0]?.textContent).toContain("最新");
+    expect(bulletinButtons.at(-1)?.textContent).toContain("2026-07-28");
+    bulletins.unmount();
+
+    renderRoutes("/capability/system?theme=dial-archive&view=appearance");
+    const classicThemeEntry = await screen.findByRole("link", { name: /切换回经典主题/u });
+    expect(classicThemeEntry.getAttribute("href")).toBe("/legacy.html");
+    expect(screen.queryByText(/只迁移真实有效的偏好/u)).toBeNull();
+    expect(screen.queryByText(/不与四大生产能力并列/u)).toBeNull();
   });
 
   test("keeps the annotation stage as an explicit third-level route", async () => {

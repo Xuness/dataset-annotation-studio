@@ -27,6 +27,14 @@ describe("appearance settings", () => {
     expect(useAppPreferences.getState().preferences.themeId).toBe("warm-paper");
   });
 
+  test("provides a direct entry to the new interface", () => {
+    render(<AppearanceSettings onClose={() => undefined} />);
+
+    expect(screen.getByRole("link", { name: /进入新主题/u }).getAttribute("href")).toBe(
+      "/?theme=dial-archive",
+    );
+  });
+
   test("stores scene visibility independently for each theme", async () => {
     const user = userEvent.setup();
     render(<AppearanceSettings onClose={() => undefined} />);

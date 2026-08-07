@@ -48,7 +48,7 @@ export function CapabilityWorkbenchPage({ content }: CapabilityWorkbenchPageProp
     : null;
   const editorPresentation = editor ? EDITOR_PRESENTATION[editor.kind] : null;
   const isModule = editor ? LEVEL_THREE_EDITORS.has(editor.kind) : false;
-  const level = isModule ? "03 MODULE" : "04 OBJECT";
+  const scope = isModule ? "GLOBAL SETTINGS" : "RESOURCE OBJECT";
 
   return (
     <section
@@ -71,13 +71,12 @@ export function CapabilityWorkbenchPage({ content }: CapabilityWorkbenchPageProp
         </button>
         <div className="dial-archive-capability-workbench__title">
           <span>
-            SPACE 06 // LEVEL {level} // {district?.code ?? "CAP"}.
-            {editorPresentation?.code ?? "00"}
+            SPACE 06 // {scope} // {district?.code ?? "CAP"}.{editorPresentation?.code ?? "00"}
           </span>
           <h1 id="capability-workbench-title">
             {object?.name ?? editorPresentation?.label ?? "能力对象不可用"}
           </h1>
-          <p>{object?.summary ?? "当前路由未匹配到仍然存在的能力对象。"}</p>
+          <p>{object?.summary ?? "当前能力对象不可用或已被移除。"}</p>
         </div>
         <div className="dial-archive-capability-workbench__status">
           <small>{object?.englishName ?? district?.english ?? "CAPABILITY"}</small>
@@ -120,11 +119,13 @@ export function CapabilityWorkbenchPage({ content }: CapabilityWorkbenchPageProp
           <div className="dial-archive-capability-workbench__missing" role="status">
             <span>{content.status === "loading" ? "SYNCING OBJECT" : "OBJECT NOT AVAILABLE"}</span>
             <strong>
-              {content.status === "loading" ? "正在读取能力档案" : "对象可能已被删除或路由已经失效"}
+              {content.status === "loading"
+                ? "正在读取能力档案"
+                : "对象可能已被删除或当前地址已经失效"}
             </strong>
-            <p>{content.message ?? "返回上一级工作面重新选择一个有效对象。"}</p>
+            <p>{content.message ?? "返回资源列表并重新选择一个有效对象。"}</p>
             <button type="button" onClick={content.closeObject}>
-              返回上一级工作面
+              返回资源列表
             </button>
           </div>
         )}
@@ -133,7 +134,7 @@ export function CapabilityWorkbenchPage({ content }: CapabilityWorkbenchPageProp
       <footer className="dial-archive-capability-workbench__footer">
         <span>{district?.english.toUpperCase() ?? "CAPABILITY"}</span>
         <span>{editorPresentation?.section ?? "OBJECT RESOLUTION"}</span>
-        <b>{isModule ? "DOMAIN MODULE" : "SCOPED OBJECT EDITOR"}</b>
+        <b>{isModule ? "GLOBAL SETTINGS" : "RESOURCE EDITOR"}</b>
       </footer>
     </section>
   );

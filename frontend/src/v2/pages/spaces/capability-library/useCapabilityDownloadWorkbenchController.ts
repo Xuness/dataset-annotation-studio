@@ -167,8 +167,8 @@ export function useCapabilityDownloadWorkbenchController({
     label: tagger ? "模型下载中心" : "词典下载中心",
     englishLabel: tagger ? "Tagger Download Center" : "Dictionary Download Center",
     description: tagger
-      ? "内置模型目录、Hugging Face 来源与可恢复下载任务在独立工作面中管理。"
-      : "在线词典目录、来源授权与安装任务在独立工作面中管理。",
+      ? "浏览内置模型目录与 Hugging Face 来源，并管理可恢复的下载任务。"
+      : "浏览在线词典目录与来源授权，并管理词典安装任务。",
     offers,
     tasks,
     pending,

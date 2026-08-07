@@ -893,6 +893,27 @@
   line-height: 1.7;
 }
 
+.dial-archive-capability-system__appearance aside a {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18px;
+  padding: 0 20px;
+  color: var(--dial-archive-paper);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  background: var(--dial-archive-carbon);
+}
+
+.dial-archive-capability-system__appearance aside a:hover,
+.dial-archive-capability-system__appearance aside a:focus-visible {
+  color: var(--dial-archive-carbon);
+  background: var(--dial-archive-yellow);
+  outline: none;
+}
+
 .dial-archive-capability-system__bulletins {
   display: grid;
   grid-template-columns: clamp(300px, 18vw, 410px) minmax(0, 1fr);
@@ -934,8 +955,11 @@
 }
 
 .dial-archive-capability-system__bulletins nav {
+  display: flex;
   min-height: 0;
   flex: 1;
+  flex-direction: column;
+  justify-content: flex-start;
   padding: 8px;
   overflow: auto;
 }
@@ -970,6 +994,16 @@
 .dial-archive-capability-system__bulletins nav button small {
   color: var(--dial-archive-gray-8);
   font: 10px var(--dial-archive-font-mono);
+}
+
+.dial-archive-capability-system__bulletins nav button small em {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 5px;
+  color: var(--dial-archive-carbon);
+  font-style: normal;
+  font-weight: 850;
+  background: var(--dial-archive-yellow);
 }
 
 .dial-archive-capability-system__bulletins nav button strong {

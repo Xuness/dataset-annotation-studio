@@ -1,3 +1,5 @@
+import { ArrowUpRight } from "lucide-react";
+
 import { useAppPreferences } from "../../theme/appPreferences";
 import { resolveAppearance } from "../../theme/appearance";
 import { SettingsSectionHeader } from "../components/SettingsSectionHeader";
@@ -24,6 +26,17 @@ export function AppearanceSettings({ onClose }: { onClose: () => void }) {
       />
 
       <div className="appearance-settings">
+        <section className="appearance-new-interface" aria-labelledby="new-interface-title">
+          <div>
+            <span className="eyebrow">New interface</span>
+            <h3 id="new-interface-title">终末地风格新界面</h3>
+            <p>进入暖白、碳黑与工业黄构成的全新管理界面；经典主题偏好仍会保留。</p>
+          </div>
+          <a href="/?theme=dial-archive">
+            <span>进入新主题</span>
+            <ArrowUpRight size={17} aria-hidden="true" />
+          </a>
+        </section>
         <AppearanceBackgroundSection />
         <HomeContentSection />
         <ImmersiveModeSection />

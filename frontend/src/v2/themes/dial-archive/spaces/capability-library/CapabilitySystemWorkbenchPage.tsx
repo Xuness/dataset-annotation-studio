@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type {
   CapabilitySystemSectionId,
@@ -21,21 +21,36 @@ const SYSTEM_SECTIONS: readonly {
 ];
 
 export function CapabilitySystemWorkbenchPage({ content }: CapabilitySystemWorkbenchPageProps) {
+  const announcements = useMemo(
+    () =>
+      [...content.announcements].sort(
+        (left, right) =>
+          right.publishedAt.localeCompare(left.publishedAt) || right.id.localeCompare(left.id),
+      ),
+    [content.announcements],
+  );
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState(
-    content.announcements[0]?.id ?? null,
+    announcements[0]?.id ?? null,
   );
   const [feedback, setFeedback] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const selectedAnnouncement =
-    content.announcements.find((item) => item.id === selectedAnnouncementId) ??
-    content.announcements[0] ??
-    null;
+    announcements.find((item) => item.id === selectedAnnouncementId) ?? announcements[0] ?? null;
   const section = SYSTEM_SECTIONS.find((item) => item.id === content.sectionId)!;
 
   useEffect(() => {
     setFeedback(null);
     setActionError(null);
   }, [content.sectionId]);
+
+  useEffect(() => {
+    if (
+      !selectedAnnouncementId ||
+      !announcements.some((announcement) => announcement.id === selectedAnnouncementId)
+    ) {
+      setSelectedAnnouncementId(announcements[0]?.id ?? null);
+    }
+  }, [announcements, selectedAnnouncementId]);
 
   async function run(action: () => Promise<void>, message: string) {
     setFeedback(null);
@@ -63,12 +78,12 @@ export function CapabilitySystemWorkbenchPage({ content }: CapabilitySystemWorkb
           <strong>返回能力库</strong>
         </button>
         <div>
-          <span>SPACE 06 // LEVEL 03 MODULE // SYS.CONTROL</span>
+          <span>SPACE 06 // SYS.CONTROL</span>
           <h1 id="capability-system-title">Studio 控制中心</h1>
-          <p>外观、公告与诊断属于同一个次级控制面，不与四大生产能力并列。</p>
+          <p>集中管理界面外观、版本信息与本地运行状态。</p>
         </div>
         <div className="dial-archive-capability-system__signal">
-          <span>CURRENT MODULE</span>
+          <span>CURRENT SECTION</span>
           <strong>
             {section.code} // {section.englishLabel.toUpperCase()}
           </strong>
@@ -101,12 +116,9 @@ export function CapabilitySystemWorkbenchPage({ content }: CapabilitySystemWorkb
         {content.sectionId === "appearance" ? (
           <section className="dial-archive-capability-system__appearance">
             <div className="dial-archive-capability-system__appearance-hero">
-              <span>CURRENT V2 APPEARANCE //</span>
+              <span>CURRENT APPEARANCE //</span>
               <h2>暖白经典管理界面</h2>
-              <p>
-                纸面暖白承担内容，碳黑建立结构，工业黄只标示焦点与状态。当前只展示真正生效的 V2
-                外观契约。
-              </p>
+              <p>纸面暖白承担内容，碳黑建立结构，工业黄标示焦点与运行状态。</p>
               <div aria-hidden="true">
                 <i />
                 <i />
@@ -133,12 +145,10 @@ export function CapabilitySystemWorkbenchPage({ content }: CapabilitySystemWorkb
               </div>
             </dl>
             <aside>
-              <span>MIGRATION NOTE</span>
-              <strong>只迁移真实有效的偏好</strong>
-              <p>
-                旧主题的背景、透明度、模糊与沉浸字段，会在建立 V2 中立 Store
-                后逐项接入；未接入字段不会伪装成开关。
-              </p>
+              <span>CLASSIC INTERFACE</span>
+              <strong>返回熟悉的经典界面</strong>
+              <p>继续使用经典主题及其外观设置；项目内容与能力配置保持不变。</p>
+              <a href={content.appearance.classicThemeHref}>切换回经典主题 ↗</a>
             </aside>
           </section>
         ) : content.sectionId === "announcements" ? (
@@ -147,12 +157,12 @@ export function CapabilitySystemWorkbenchPage({ content }: CapabilitySystemWorkb
               <header>
                 <div>
                   <span>LOCAL RELEASE ARCHIVE //</span>
-                  <strong>版本索引</strong>
+                  <strong>版本索引 · 新到旧</strong>
                 </div>
                 <b>{content.hasUnreadAnnouncement ? "NEW" : "READ"}</b>
               </header>
-              <nav aria-label="版本公告列表">
-                {content.announcements.map((announcement, index) => (
+              <nav aria-label="版本公告列表，按发布时间由新到旧">
+                {announcements.map((announcement, index) => (
                   <button
                     className={
                       announcement.id === selectedAnnouncement?.id ? "is-active" : undefined
@@ -165,6 +175,7 @@ export function CapabilitySystemWorkbenchPage({ content }: CapabilitySystemWorkb
                     <div>
                       <small>
                         {announcement.version} // {announcement.publishedAt}
+                        {index === 0 ? <em>最新</em> : null}
                       </small>
                       <strong>{announcement.title}</strong>
                     </div>
@@ -271,7 +282,7 @@ export function CapabilitySystemWorkbenchPage({ content }: CapabilitySystemWorkb
 
       <footer className="dial-archive-capability-utility__footer">
         <span>SYS.{section.code} // STUDIO CONTROL</span>
-        <span>SUBORDINATE MODULE</span>
+        <span>LOCAL SETTINGS</span>
         <b data-tone={actionError || content.message ? "error" : "ok"}>
           {actionError ?? content.message ?? feedback ?? "CONTROL READY"}
         </b>
