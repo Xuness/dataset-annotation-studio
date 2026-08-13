@@ -233,7 +233,7 @@ def test_invalid_and_quarantine_rows_do_not_pollute_the_complete_rating_cdf(
         ScreeningWorker(container)._process_operation(project_id, operation_id)
         listed = client.get(
             f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/items",
-            params={"sort": "path", "limit": 100},
+            params={"sort": "path", "limit": 100, "show_duplicates": "true"},
         ).json()["items"]
 
     items = {Path(item["source_relative_path"]).stem: item for item in listed}
@@ -351,11 +351,15 @@ def test_screening_filters_exact_duplicates_and_danbooru_variants(tmp_path: Path
 
         marked = client.get(
             f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/items",
-            params={"duplicate_variant": "true", "sort": "path"},
+            params={
+                "duplicate_variant": "true",
+                "show_duplicates": "true",
+                "sort": "path",
+            },
         )
         unmarked = client.get(
             f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/asset-ids",
-            params={"duplicate_variant": "false"},
+            params={"duplicate_variant": "false", "show_duplicates": "true"},
         )
 
     assert marked.status_code == 200

@@ -1,5 +1,6 @@
 import type {
   CreateScreeningOperationRequest,
+  CharacterLoraRules,
   ScreeningFlag,
   ScreeningItemQuery,
   ScreeningOperation,
@@ -19,6 +20,7 @@ export interface ScreeningFormState {
   profile: ScreeningProfile;
   strength: ScreeningStrength;
   metadataSnapshotAtFallback: string;
+  taskRules: CharacterLoraRules;
 }
 
 export interface ScreeningFilterState {
@@ -26,6 +28,7 @@ export interface ScreeningFilterState {
   rating: ScreeningRating | null;
   flag: ScreeningFlag | null;
   sort: ScreeningSort;
+  showDuplicates: boolean;
 }
 
 export interface ScreeningWorkbenchView {
@@ -43,6 +46,13 @@ export function createInitialScreeningForm(): ScreeningFormState {
     profile: "character_lora",
     strength: "balanced",
     metadataSnapshotAtFallback: "",
+    taskRules: {
+      comic_panel: true,
+      multiple_views: true,
+      monochrome_greyscale: true,
+      lineart_sketch: true,
+      crowd_3plus: true,
+    },
   };
 }
 
@@ -52,7 +62,8 @@ export const screeningWorkbenchState = createScopedViewState<ScreeningWorkbenchV
     pool: null,
     rating: null,
     flag: null,
-    sort: "priority",
+    sort: "selection",
+    showDuplicates: false,
   },
   selectedOperationId: null,
   selectedAssetId: null,
@@ -75,6 +86,7 @@ export function buildScreeningRequest(
           ? [...folderAssetIds]
           : [...allAssetIds],
     task_profile: form.profile,
+    task_rules: form.taskRules,
     intensity: form.strength,
     metadata_snapshot_at: Number.isFinite(parsedSnapshot)
       ? new Date(parsedSnapshot).toISOString()
@@ -87,6 +99,7 @@ export function buildScreeningItemQuery(filters: ScreeningFilterState): Screenin
     pool: filters.pool,
     rating: filters.rating,
     flag: filters.flag,
+    showDuplicates: filters.showDuplicates,
     sort: filters.sort,
   };
 }

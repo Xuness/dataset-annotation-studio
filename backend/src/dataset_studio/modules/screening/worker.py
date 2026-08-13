@@ -19,9 +19,15 @@ from dataset_studio.modules.screening.metadata import (
     NormalizedMetadata,
     read_metadata,
 )
-from dataset_studio.modules.screening.models import ScreeningIntensity, ScreeningOperation
+from dataset_studio.modules.screening.models import (
+    ScreeningIntensity,
+    ScreeningOperation,
+    ScreeningTaskProfileSelection,
+)
 from dataset_studio.modules.screening.repository import MetadataBatchUpdate, ScreeningRepository
 from dataset_studio.modules.screening.scoring import ScoringInput, score_batch
+from dataset_studio.modules.screening.selection_policy import apply_selection_policy
+from dataset_studio.modules.screening.task_profiles import TaskProfileInput, evaluate_task_profile
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 LOGGER = logging.getLogger("dataset_studio.screening_worker")
@@ -163,6 +169,7 @@ class ScreeningWorker:
             scoring_inputs = [
                 self._scoring_input(row) for row in repository.parsed_rows(operation_id)
             ]
+            existing_task_inputs = repository.task_profile_inputs(operation_id)
             pending_rows = repository.pending_rows(operation_id)
             for start in range(0, len(pending_rows), METADATA_BATCH_SIZE):
                 self._check_stop(repository, operation_id)
@@ -198,6 +205,39 @@ class ScreeningWorker:
             outputs = score_batch(scoring_inputs, intensity=intensity)
             self._check_stop(repository, operation_id)
             repository.save_scores(operation_id, outputs)
+            self._check_stop(repository, operation_id)
+            profile_selection = ScreeningTaskProfileSelection.model_validate(
+                {
+                    "task_profile": config.get("task_profile", "character_lora"),
+                    "task_rules": config.get("task_rules", {}),
+                }
+            )
+            metadata_by_item = {item.item_id: item.metadata for item in scoring_inputs}
+            task_inputs_by_id = {item.item_id: item for item in existing_task_inputs}
+            task_inputs_by_id.update(
+                {
+                    output.item_id: TaskProfileInput(
+                        item_id=output.item_id,
+                        asset_id=output.asset_id,
+                        source_relative_path=output.source_relative_path,
+                        rating=output.rating,
+                        quality_score=output.final_score,
+                        task_tags=metadata_by_item[output.item_id].task_tags,
+                        confidence_pop=output.confidence_pop,
+                        bad_consensus_second=float(
+                            output.score_details.get("bad_consensus_second") or 0.0
+                        ),
+                    )
+                    for output in outputs
+                }
+            )
+            task_inputs = list(task_inputs_by_id.values())
+            task_outputs = evaluate_task_profile(task_inputs, profile_selection.task_rules)
+            repository.save_task_profile(
+                operation_id,
+                profile_selection,
+                apply_selection_policy(task_inputs, task_outputs, intensity=intensity),
+            )
             self._check_stop(repository, operation_id)
             repository.complete(operation_id)
         except ScreeningStopped:
@@ -271,6 +311,13 @@ class ScreeningWorker:
         if not isinstance(snapshot, dict):
             raise ValueError("筛选条目的元数据快照无效。")
         snapshot["warnings"] = tuple(snapshot.get("warnings", []))
+        task_tags = snapshot.get("task_tags")
+        if task_tags is None and row["task_tag_snapshot"] is not None:
+            try:
+                task_tags = json.loads(str(row["task_tag_snapshot"]))
+            except (json.JSONDecodeError, TypeError) as error:
+                raise ValueError("筛选条目的任务标签快照无效。") from error
+        snapshot["task_tags"] = tuple(task_tags) if task_tags is not None else None
         metadata = NormalizedMetadata(**snapshot)
         return ScreeningWorker._scoring_input_from_metadata(row, metadata)
 

@@ -86,12 +86,14 @@ export function ScreeningPage() {
           createPending={controller.createPending}
           stopPending={controller.stopPending}
           resumePending={controller.resumePending}
+          applyTaskProfilePending={controller.applyTaskProfilePending}
           onChange={controller.patchForm}
           onToggleFolder={controller.toggleFolderPath}
           onClearFolders={controller.clearFolderPaths}
           onCreate={() => void controller.createOperation()}
           onStop={() => void controller.stopOperation()}
           onResume={() => void controller.resumeOperation()}
+          onApplyTaskProfile={() => void controller.applyTaskProfile()}
         />
         <ScreeningRunHistory
           operations={controller.operations}

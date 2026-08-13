@@ -221,16 +221,20 @@ test("screening freezes only the current task scope and keeps ranking filters ba
     rating: "s",
     flag: "low_resolution",
     sort: "percentile",
+    showDuplicates: false,
   });
 
   assert.deepEqual(request.asset_ids, folderAssetIds);
   assert.notEqual(request.asset_ids, folderAssetIds);
   assert.equal(request.task_profile, "character_lora");
+  assert.equal(request.task_rules.comic_panel, true);
+  assert.equal(request.task_rules.multiple_views, true);
   assert.equal(request.metadata_snapshot_at, new Date("2026-08-13T12:30").toISOString());
   assert.deepEqual(query, {
     pool: "low_evidence_protected",
     rating: "s",
     flag: "low_resolution",
+    showDuplicates: false,
     sort: "percentile",
   });
 });

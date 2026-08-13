@@ -13,12 +13,13 @@ from dataset_studio.modules.screening.models import (
     ScreeningOperation,
     ScreeningPreview,
     ScreeningRequest,
+    ScreeningTaskProfileSelection,
 )
 
 router = APIRouter(prefix="/workspaces/{project_id}/screening", tags=["screening"])
 Container = Annotated[AppContainer, Depends(get_container)]
 Rating = Literal["g", "s", "q", "e"]
-ItemSort = Literal["priority", "percentile", "score", "path"]
+ItemSort = Literal["selection", "priority", "percentile", "score", "path"]
 
 
 @router.get("/capabilities", response_model=ScreeningCapabilities)
@@ -69,6 +70,16 @@ def resume_screening_operation(project_id: str, operation_id: str, container: Co
         return container.screening.resume(project_id, operation_id)
 
 
+@router.put("/operations/{operation_id}/task-profile", response_model=ScreeningOperation)
+def apply_screening_task_profile(
+    project_id: str,
+    operation_id: str,
+    request: ScreeningTaskProfileSelection,
+    container: Container,
+):
+    return container.screening.apply_task_profile(project_id, operation_id, request)
+
+
 @router.get("/operations/{operation_id}/items", response_model=ScreeningItemList)
 def list_screening_items(
     project_id: str,
@@ -80,7 +91,10 @@ def list_screening_items(
     rating: Rating | None = None,
     low_resolution: bool | None = None,
     duplicate_variant: bool | None = None,
-    sort: ItemSort = "priority",
+    pixel_duplicate: bool | None = None,
+    danbooru_variant: bool | None = None,
+    show_duplicates: bool = False,
+    sort: ItemSort = "selection",
 ):
     return container.screening.list_items(
         project_id,
@@ -91,6 +105,9 @@ def list_screening_items(
         rating=rating,
         low_resolution=low_resolution,
         duplicate_variant=duplicate_variant,
+        pixel_duplicate=pixel_duplicate,
+        danbooru_variant=danbooru_variant,
+        show_duplicates=show_duplicates,
         sort=sort,
     )
 
@@ -114,6 +131,9 @@ def screening_asset_ids(
     rating: Rating | None = None,
     low_resolution: bool | None = None,
     duplicate_variant: bool | None = None,
+    pixel_duplicate: bool | None = None,
+    danbooru_variant: bool | None = None,
+    show_duplicates: bool = False,
 ):
     return container.screening.asset_ids(
         project_id,
@@ -122,4 +142,7 @@ def screening_asset_ids(
         rating=rating,
         low_resolution=low_resolution,
         duplicate_variant=duplicate_variant,
+        pixel_duplicate=pixel_duplicate,
+        danbooru_variant=danbooru_variant,
+        show_duplicates=show_duplicates,
     )

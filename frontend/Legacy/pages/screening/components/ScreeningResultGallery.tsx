@@ -13,6 +13,7 @@ const poolOptions: Array<{ value: ScreeningPool | null; label: string }> = [
   { value: "recommended", label: "推荐" },
   { value: "low_evidence_protected", label: "低证据保护" },
   { value: "review", label: "待审" },
+  { value: "task_mismatch", label: "任务不适配" },
   { value: "low_priority_high_confidence", label: "低优先" },
   { value: "quarantine", label: "隔离" },
   { value: "invalid", label: "元数据异常" },
@@ -23,6 +24,7 @@ const poolLabels: Record<ScreeningPool, string> = {
   recommended: "推荐",
   low_evidence_protected: "保护",
   review: "待审",
+  task_mismatch: "任务不适配",
   low_priority_high_confidence: "低优先",
   quarantine: "隔离",
   invalid: "异常",
@@ -186,8 +188,17 @@ export function ScreeningResultGallery({
             >
               <option value="">全部</option>
               <option value="low_resolution">低分辨率</option>
-              <option value="duplicate_variant">重复 / 变体</option>
+              <option value="pixel_duplicate">完全重复组</option>
+              <option value="danbooru_variant">Danbooru 变体</option>
             </select>
+          </label>
+          <label className="screening-duplicate-toggle">
+            <input
+              type="checkbox"
+              checked={filters.showDuplicates}
+              onChange={(event) => onChangeFilters({ showDuplicates: event.target.checked })}
+            />
+            显示重复图
           </label>
           <label>
             排序
@@ -197,6 +208,7 @@ export function ScreeningResultGallery({
                 onChangeFilters({ sort: event.target.value as ScreeningFilterState["sort"] })
               }
             >
+              <option value="selection">角色任务排序</option>
               <option value="priority">筛选优先级</option>
               <option value="percentile">Rating 内百分位</option>
               <option value="score">最终分数</option>
@@ -304,13 +316,18 @@ export function ScreeningResultGallery({
                         <span className="screening-card-copy">
                           <strong title={filename(item)}>{filename(item)}</strong>
                           <small>
-                            批次百分位 {percent(item.rating_percentile)}
-                            {item.rating_rank ? ` · #${item.rating_rank}` : ""}
+                            {item.selection_percentile !== null ? "任务百分位" : "核心百分位"}{" "}
+                            {percent(item.selection_percentile ?? item.rating_percentile)}
+                            {(item.selection_rank ?? item.rating_rank)
+                              ? ` · #${item.selection_rank ?? item.rating_rank}`
+                              : ""}
                           </small>
                           <span>
                             {item.low_resolution_flag ? <i>低分辨率</i> : null}
-                            {item.pixel_duplicate_group || item.variant_group ? (
-                              <i>重复 / 变体</i>
+                            {item.pixel_duplicate_group ? <i>重复组</i> : null}
+                            {item.variant_group ? <i>Danbooru 变体</i> : null}
+                            {item.task_fit_score !== null && item.task_fit_score < 0.5 ? (
+                              <i>任务不适配</i>
                             ) : null}
                             {item.candidate_pool === "low_evidence_protected" ? (
                               <i>低证据</i>

@@ -9,16 +9,40 @@ export type ScreeningPool =
   | "elite_candidate"
   | "recommended"
   | "review"
+  | "task_mismatch"
   | "low_priority_high_confidence";
 export type ScreeningRating = "g" | "s" | "q" | "e";
-export type ScreeningSort = "priority" | "percentile" | "score" | "path";
-export type ScreeningFlag = "low_resolution" | "duplicate_variant";
+export type ScreeningSort = "selection" | "priority" | "percentile" | "score" | "path";
+export type ScreeningFlag = "low_resolution" | "pixel_duplicate" | "danbooru_variant";
+
+export interface CharacterLoraRules {
+  comic_panel: boolean;
+  multiple_views: boolean;
+  monochrome_greyscale: boolean;
+  lineart_sketch: boolean;
+  crowd_3plus: boolean;
+}
+
+export interface ScreeningTaskProfileSelection {
+  task_profile: ScreeningProfile;
+  task_rules: CharacterLoraRules;
+}
+
+export interface ScreeningTaskProfileSnapshot {
+  profile_id: ScreeningProfile;
+  profile_version: string;
+  rules: CharacterLoraRules;
+  fit_factors: Record<string, number>;
+  selection_policy_version: string;
+}
 
 export interface ScreeningCapabilities {
   score_mode: "batch_only_v0_1";
   score_version: string;
   max_assets_per_operation: number;
   task_profiles: ScreeningProfile[];
+  task_profile_versions: Partial<Record<ScreeningProfile, string>>;
+  selection_policy_version: string;
   intensities: ScreeningStrength[];
   candidate_pools: ScreeningPool[];
   batch_local_only: boolean;
@@ -31,6 +55,7 @@ export interface ScreeningCapabilities {
 export interface CreateScreeningOperationRequest {
   asset_ids: string[];
   task_profile: ScreeningProfile;
+  task_rules: CharacterLoraRules;
   intensity: ScreeningStrength;
   metadata_snapshot_at: string | null;
 }
@@ -46,6 +71,10 @@ export interface ScreeningOperation {
   invalid_items: number;
   current_relative_path: string | null;
   configuration_snapshot: Record<string, unknown>;
+  task_profile_snapshot: ScreeningTaskProfileSnapshot | null;
+  task_evaluated_items: number;
+  task_unavailable_items: number;
+  task_profile_updated_at: string | null;
   pool_counts: Partial<Record<ScreeningPool, number>>;
   rating_counts: Partial<Record<ScreeningRating, number>>;
   created_at: string;
@@ -98,6 +127,13 @@ export interface ScreeningItem {
   final_score: number | null;
   rating_rank: number | null;
   rating_percentile: number | null;
+  task_fit_score: number | null;
+  selection_score: number | null;
+  selection_rank: number | null;
+  selection_percentile: number | null;
+  task_reason_codes: string[];
+  task_matched_tags: string[];
+  quality_candidate_pool: ScreeningPool | null;
   candidate_pool: ScreeningPool | null;
   low_resolution_flag: boolean;
   pixel_duplicate_group: string | null;
@@ -129,5 +165,6 @@ export interface ScreeningItemQuery {
   pool?: ScreeningPool | null;
   rating?: ScreeningRating | null;
   flag?: ScreeningFlag | null;
+  showDuplicates?: boolean;
   sort?: ScreeningSort;
 }

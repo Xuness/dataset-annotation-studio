@@ -7,6 +7,8 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validato
 
 SCORE_VERSION = "metarank-batch-v0.1"
 SCORE_MODE = "batch_only_v0_1"
+CHARACTER_LORA_PROFILE_VERSION = "character-lora-v1"
+SELECTION_POLICY_VERSION = "selection-policy-v1"
 
 
 class ScreeningOperationStatus(StrEnum):
@@ -36,16 +38,39 @@ class ScreeningCandidatePool(StrEnum):
     RECOMMENDED = "recommended"
     LOW_EVIDENCE = "low_evidence_protected"
     REVIEW = "review"
+    TASK_MISMATCH = "task_mismatch"
     LOW_PRIORITY = "low_priority_high_confidence"
     QUARANTINE = "quarantine"
     INVALID = "invalid"
 
 
-class ScreeningRequest(BaseModel):
+class CharacterLoraRules(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    asset_ids: list[str] = Field(min_length=1, max_length=100_000)
+    comic_panel: bool = True
+    multiple_views: bool = True
+    monochrome_greyscale: bool = True
+    lineart_sketch: bool = True
+    crowd_3plus: bool = True
+
+
+class ScreeningTaskProfileSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     task_profile: Literal[ScreeningTaskProfile.CHARACTER_LORA] = ScreeningTaskProfile.CHARACTER_LORA
+    task_rules: CharacterLoraRules = Field(default_factory=CharacterLoraRules)
+
+
+class ScreeningTaskProfileSnapshot(BaseModel):
+    profile_id: Literal[ScreeningTaskProfile.CHARACTER_LORA]
+    profile_version: str
+    rules: CharacterLoraRules
+    fit_factors: dict[str, float]
+    selection_policy_version: str = SELECTION_POLICY_VERSION
+
+
+class ScreeningRequest(ScreeningTaskProfileSelection):
+    asset_ids: list[str] = Field(min_length=1, max_length=100_000)
     intensity: ScreeningIntensity = ScreeningIntensity.BALANCED
     metadata_snapshot_at: AwareDatetime | None = None
 
@@ -77,6 +102,10 @@ class ScreeningOperation(BaseModel):
     invalid_items: int
     current_relative_path: str | None = None
     configuration_snapshot: dict[str, object] = Field(default_factory=dict)
+    task_profile_snapshot: ScreeningTaskProfileSnapshot | None = None
+    task_evaluated_items: int = 0
+    task_unavailable_items: int = 0
+    task_profile_updated_at: str | None = None
     pool_counts: dict[str, int] = Field(default_factory=dict)
     rating_counts: dict[str, int] = Field(default_factory=dict)
     created_at: str
@@ -135,6 +164,13 @@ class ScreeningItem(BaseModel):
     final_score: float | None = None
     rating_rank: int | None = None
     rating_percentile: float | None = None
+    task_fit_score: float | None = None
+    selection_score: float | None = None
+    selection_rank: int | None = None
+    selection_percentile: float | None = None
+    task_reason_codes: list[str] = Field(default_factory=list)
+    task_matched_tags: list[str] = Field(default_factory=list)
+    quality_candidate_pool: ScreeningCandidatePool | None = None
     candidate_pool: ScreeningCandidatePool | None = None
     low_resolution_flag: bool = False
     pixel_duplicate_group: str | None = None
@@ -167,6 +203,12 @@ class ScreeningCapabilities(BaseModel):
     task_profiles: list[ScreeningTaskProfile] = Field(
         default_factory=lambda: [ScreeningTaskProfile.CHARACTER_LORA]
     )
+    task_profile_versions: dict[str, str] = Field(
+        default_factory=lambda: {
+            ScreeningTaskProfile.CHARACTER_LORA.value: CHARACTER_LORA_PROFILE_VERSION
+        }
+    )
+    selection_policy_version: str = SELECTION_POLICY_VERSION
     intensities: list[ScreeningIntensity] = Field(default_factory=lambda: list(ScreeningIntensity))
     candidate_pools: list[ScreeningCandidatePool] = Field(
         default_factory=lambda: list(ScreeningCandidatePool)

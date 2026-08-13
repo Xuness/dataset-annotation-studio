@@ -1,4 +1,4 @@
-import { CircleStop, Filter, Play, RotateCcw } from "lucide-react";
+import { CircleStop, Filter, Play, RefreshCw, RotateCcw } from "lucide-react";
 
 import type {
   AssetFolderSummary,
@@ -39,12 +39,14 @@ interface Props {
   createPending: boolean;
   stopPending: boolean;
   resumePending: boolean;
+  applyTaskProfilePending: boolean;
   onChange: (update: Partial<ScreeningFormState>) => void;
   onToggleFolder: (path: string) => void;
   onClearFolders: () => void;
   onCreate: () => void;
   onStop: () => void;
   onResume: () => void;
+  onApplyTaskProfile: () => void;
 }
 
 export function ScreeningSetupPanel({
@@ -65,12 +67,14 @@ export function ScreeningSetupPanel({
   createPending,
   stopPending,
   resumePending,
+  applyTaskProfilePending,
   onChange,
   onToggleFolder,
   onClearFolders,
   onCreate,
   onStop,
   onResume,
+  onApplyTaskProfile,
 }: Props) {
   const profiles = capabilities?.task_profiles.length
     ? capabilities.task_profiles.map((profile) => ({
@@ -179,6 +183,51 @@ export function ScreeningSetupPanel({
           ))}
         </select>
       </label>
+
+      <fieldset className="screening-task-rules">
+        <legend>角色 LoRA 任务适配</legend>
+        <p>命中已启用类型时只降低任务排序分，不改写 MetaRank 核心质量分。</p>
+        {[
+          ["comic_panel", "降低漫画 / 分镜（适配度 20%）"],
+          ["multiple_views", "降低多视图 / 设定图（20%）"],
+          ["monochrome_greyscale", "降低黑白 / 灰度（30%）"],
+          ["lineart_sketch", "降低线稿 / 草图（20%）"],
+          ["crowd_3plus", "降低三人及以上（55% → 20%）"],
+        ].map(([rule, label]) => {
+          const key = rule as keyof typeof form.taskRules;
+          return (
+            <label key={rule}>
+              <input
+                type="checkbox"
+                checked={form.taskRules[key]}
+                onChange={(event) =>
+                  onChange({
+                    taskRules: { ...form.taskRules, [key]: event.target.checked },
+                  })
+                }
+              />
+              <span>{label}</span>
+            </label>
+          );
+        })}
+        <small>
+          {capabilities?.task_profile_versions.character_lora ?? "character-lora-v1"}
+          ・所有规则均可关闭，未命中时任务适配度为 100%。
+        </small>
+        {selectedOperation?.status === "completed" && selectedOperation.task_profile_snapshot ? (
+          <button
+            type="button"
+            className="screening-apply-profile"
+            disabled={applyTaskProfilePending}
+            onClick={onApplyTaskProfile}
+          >
+            <RefreshCw className={applyTaskProfilePending ? "is-spinning" : ""} size={13} />
+            {applyTaskProfilePending ? "正在重新计算…" : "应用到当前结果"}
+          </button>
+        ) : selectedOperation?.status === "completed" ? (
+          <small>该历史任务没有缓存标签特征，需要重新运行后才能切换适配规则。</small>
+        ) : null}
+      </fieldset>
 
       <fieldset className="screening-strength">
         <legend>筛选力度</legend>

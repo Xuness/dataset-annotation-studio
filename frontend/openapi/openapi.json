@@ -2327,6 +2327,38 @@
         "title": "AssetSummary",
         "type": "object"
       },
+      "CharacterLoraRules": {
+        "additionalProperties": false,
+        "properties": {
+          "comic_panel": {
+            "default": true,
+            "title": "Comic Panel",
+            "type": "boolean"
+          },
+          "crowd_3plus": {
+            "default": true,
+            "title": "Crowd 3Plus",
+            "type": "boolean"
+          },
+          "lineart_sketch": {
+            "default": true,
+            "title": "Lineart Sketch",
+            "type": "boolean"
+          },
+          "monochrome_greyscale": {
+            "default": true,
+            "title": "Monochrome Greyscale",
+            "type": "boolean"
+          },
+          "multiple_views": {
+            "default": true,
+            "title": "Multiple Views",
+            "type": "boolean"
+          }
+        },
+        "title": "CharacterLoraRules",
+        "type": "object"
+      },
       "CodexAccountStatus": {
         "properties": {
           "account_type": {
@@ -5543,6 +5575,7 @@
           "recommended",
           "low_evidence_protected",
           "review",
+          "task_mismatch",
           "low_priority_high_confidence",
           "quarantine",
           "invalid"
@@ -5609,6 +5642,18 @@
             "default": "metarank-batch-v0.1",
             "title": "Score Version",
             "type": "string"
+          },
+          "selection_policy_version": {
+            "default": "selection-policy-v1",
+            "title": "Selection Policy Version",
+            "type": "string"
+          },
+          "task_profile_versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Task Profile Versions",
+            "type": "object"
           },
           "task_profiles": {
             "items": {
@@ -5876,6 +5921,16 @@
             ],
             "title": "Pixel Duplicate Group"
           },
+          "quality_candidate_pool": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScreeningCandidatePool"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "rating": {
             "anyOf": [
               {
@@ -5926,6 +5981,39 @@
               }
             ]
           },
+          "selection_percentile": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Percentile"
+          },
+          "selection_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Rank"
+          },
+          "selection_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Score"
+          },
           "source_relative_path": {
             "title": "Source Relative Path",
             "type": "string"
@@ -5939,6 +6027,31 @@
             ],
             "title": "Status",
             "type": "string"
+          },
+          "task_fit_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Fit Score"
+          },
+          "task_matched_tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Task Matched Tags",
+            "type": "array"
+          },
+          "task_reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Task Reason Codes",
+            "type": "array"
           },
           "technical_score": {
             "anyOf": [
@@ -6116,6 +6229,37 @@
           "status": {
             "$ref": "#/components/schemas/ScreeningOperationStatus"
           },
+          "task_evaluated_items": {
+            "default": 0,
+            "title": "Task Evaluated Items",
+            "type": "integer"
+          },
+          "task_profile_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScreeningTaskProfileSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task_profile_updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Profile Updated At"
+          },
+          "task_unavailable_items": {
+            "default": 0,
+            "title": "Task Unavailable Items",
+            "type": "integer"
+          },
           "total_items": {
             "title": "Total Items",
             "type": "integer"
@@ -6221,6 +6365,9 @@
             "default": "character_lora",
             "title": "Task Profile",
             "type": "string"
+          },
+          "task_rules": {
+            "$ref": "#/components/schemas/CharacterLoraRules"
           }
         },
         "required": [
@@ -6334,6 +6481,58 @@
         ],
         "title": "ScreeningTaskProfile",
         "type": "string"
+      },
+      "ScreeningTaskProfileSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "task_profile": {
+            "const": "character_lora",
+            "default": "character_lora",
+            "title": "Task Profile",
+            "type": "string"
+          },
+          "task_rules": {
+            "$ref": "#/components/schemas/CharacterLoraRules"
+          }
+        },
+        "title": "ScreeningTaskProfileSelection",
+        "type": "object"
+      },
+      "ScreeningTaskProfileSnapshot": {
+        "properties": {
+          "fit_factors": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Fit Factors",
+            "type": "object"
+          },
+          "profile_id": {
+            "const": "character_lora",
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "profile_version": {
+            "title": "Profile Version",
+            "type": "string"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/CharacterLoraRules"
+          },
+          "selection_policy_version": {
+            "default": "selection-policy-v1",
+            "title": "Selection Policy Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "profile_version",
+          "rules",
+          "fit_factors"
+        ],
+        "title": "ScreeningTaskProfileSnapshot",
+        "type": "object"
       },
       "ServiceTier": {
         "enum": [
@@ -15927,6 +16126,48 @@
               ],
               "title": "Duplicate Variant"
             }
+          },
+          {
+            "in": "query",
+            "name": "pixel_duplicate",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pixel Duplicate"
+            }
+          },
+          {
+            "in": "query",
+            "name": "danbooru_variant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Danbooru Variant"
+            }
+          },
+          {
+            "in": "query",
+            "name": "show_duplicates",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Show Duplicates",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -16074,11 +16315,54 @@
           },
           {
             "in": "query",
+            "name": "pixel_duplicate",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pixel Duplicate"
+            }
+          },
+          {
+            "in": "query",
+            "name": "danbooru_variant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Danbooru Variant"
+            }
+          },
+          {
+            "in": "query",
+            "name": "show_duplicates",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Show Duplicates",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
-              "default": "priority",
+              "default": "selection",
               "enum": [
+                "selection",
                 "priority",
                 "percentile",
                 "score",
@@ -16274,6 +16558,67 @@
           }
         },
         "summary": "Stop Screening Operation",
+        "tags": [
+          "screening"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/task-profile": {
+      "put": {
+        "operationId": "apply_screening_task_profile_api_v1_workspaces__project_id__screening_operations__operation_id__task_profile_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreeningTaskProfileSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Screening Task Profile",
         "tags": [
           "screening"
         ]

@@ -1789,6 +1789,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/task-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Apply Screening Task Profile */
+        put: operations["apply_screening_task_profile_api_v1_workspaces__project_id__screening_operations__operation_id__task_profile_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/screening/preview": {
         parameters: {
             query?: never;
@@ -2635,6 +2652,34 @@ export type components = {
             suffix: string;
             /** Width */
             width: number;
+        };
+        /** CharacterLoraRules */
+        CharacterLoraRules: {
+            /**
+             * Comic Panel
+             * @default true
+             */
+            comic_panel: boolean;
+            /**
+             * Crowd 3Plus
+             * @default true
+             */
+            crowd_3plus: boolean;
+            /**
+             * Lineart Sketch
+             * @default true
+             */
+            lineart_sketch: boolean;
+            /**
+             * Monochrome Greyscale
+             * @default true
+             */
+            monochrome_greyscale: boolean;
+            /**
+             * Multiple Views
+             * @default true
+             */
+            multiple_views: boolean;
         };
         /** CodexAccountStatus */
         CodexAccountStatus: {
@@ -3787,7 +3832,7 @@ export type components = {
          * ScreeningCandidatePool
          * @enum {string}
          */
-        ScreeningCandidatePool: "elite_candidate" | "recommended" | "low_evidence_protected" | "review" | "low_priority_high_confidence" | "quarantine" | "invalid";
+        ScreeningCandidatePool: "elite_candidate" | "recommended" | "low_evidence_protected" | "review" | "task_mismatch" | "low_priority_high_confidence" | "quarantine" | "invalid";
         /** ScreeningCapabilities */
         ScreeningCapabilities: {
             /**
@@ -3828,6 +3873,15 @@ export type components = {
              * @default metarank-batch-v0.1
              */
             score_version: string;
+            /**
+             * Selection Policy Version
+             * @default selection-policy-v1
+             */
+            selection_policy_version: string;
+            /** Task Profile Versions */
+            task_profile_versions?: {
+                [key: string]: string;
+            };
             /** Task Profiles */
             task_profiles?: components["schemas"]["ScreeningTaskProfile"][];
         };
@@ -3891,6 +3945,7 @@ export type components = {
             metadata_snapshot_at?: string | null;
             /** Pixel Duplicate Group */
             pixel_duplicate_group?: string | null;
+            quality_candidate_pool?: components["schemas"]["ScreeningCandidatePool"] | null;
             /** Rating */
             rating?: string | null;
             /** Rating Percentile */
@@ -3900,6 +3955,12 @@ export type components = {
             /** Reason Codes */
             reason_codes?: string[];
             score_details?: components["schemas"]["ScreeningScoreDetails"] | null;
+            /** Selection Percentile */
+            selection_percentile?: number | null;
+            /** Selection Rank */
+            selection_rank?: number | null;
+            /** Selection Score */
+            selection_score?: number | null;
             /** Source Relative Path */
             source_relative_path: string;
             /**
@@ -3907,6 +3968,12 @@ export type components = {
              * @enum {string}
              */
             status: "pending" | "parsed" | "scored" | "invalid";
+            /** Task Fit Score */
+            task_fit_score?: number | null;
+            /** Task Matched Tags */
+            task_matched_tags?: string[];
+            /** Task Reason Codes */
+            task_reason_codes?: string[];
             /** Technical Score */
             technical_score?: number | null;
             /** Up Score */
@@ -3964,6 +4031,19 @@ export type components = {
             /** Started At */
             started_at?: string | null;
             status: components["schemas"]["ScreeningOperationStatus"];
+            /**
+             * Task Evaluated Items
+             * @default 0
+             */
+            task_evaluated_items: number;
+            task_profile_snapshot?: components["schemas"]["ScreeningTaskProfileSnapshot"] | null;
+            /** Task Profile Updated At */
+            task_profile_updated_at?: string | null;
+            /**
+             * Task Unavailable Items
+             * @default 0
+             */
+            task_unavailable_items: number;
             /** Total Items */
             total_items: number;
             /** Updated At */
@@ -4001,6 +4081,7 @@ export type components = {
              * @constant
              */
             task_profile: "character_lora";
+            task_rules?: components["schemas"]["CharacterLoraRules"];
         };
         /** ScreeningScoreDetails */
         ScreeningScoreDetails: {
@@ -4036,6 +4117,36 @@ export type components = {
          * @enum {string}
          */
         ScreeningTaskProfile: "character_lora" | "general_aesthetic" | "style_lora";
+        /** ScreeningTaskProfileSelection */
+        ScreeningTaskProfileSelection: {
+            /**
+             * Task Profile
+             * @default character_lora
+             * @constant
+             */
+            task_profile: "character_lora";
+            task_rules?: components["schemas"]["CharacterLoraRules"];
+        };
+        /** ScreeningTaskProfileSnapshot */
+        ScreeningTaskProfileSnapshot: {
+            /** Fit Factors */
+            fit_factors: {
+                [key: string]: number;
+            };
+            /**
+             * Profile Id
+             * @constant
+             */
+            profile_id: "character_lora";
+            /** Profile Version */
+            profile_version: string;
+            rules: components["schemas"]["CharacterLoraRules"];
+            /**
+             * Selection Policy Version
+             * @default selection-policy-v1
+             */
+            selection_policy_version: string;
+        };
         /**
          * ServiceTier
          * @enum {string}
@@ -8986,6 +9097,9 @@ export interface operations {
                 rating?: ("g" | "s" | "q" | "e") | null;
                 low_resolution?: boolean | null;
                 duplicate_variant?: boolean | null;
+                pixel_duplicate?: boolean | null;
+                danbooru_variant?: boolean | null;
+                show_duplicates?: boolean;
             };
             header?: never;
             path: {
@@ -9025,7 +9139,10 @@ export interface operations {
                 rating?: ("g" | "s" | "q" | "e") | null;
                 low_resolution?: boolean | null;
                 duplicate_variant?: boolean | null;
-                sort?: "priority" | "percentile" | "score" | "path";
+                pixel_duplicate?: boolean | null;
+                danbooru_variant?: boolean | null;
+                show_duplicates?: boolean;
+                sort?: "selection" | "priority" | "percentile" | "score" | "path";
             };
             header?: never;
             path: {
@@ -9132,6 +9249,42 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_screening_task_profile_api_v1_workspaces__project_id__screening_operations__operation_id__task_profile_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreeningTaskProfileSelection"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

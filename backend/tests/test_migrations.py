@@ -45,6 +45,7 @@ EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS = {
     16: "9b7e99492fe535f035db23760d3903be63c374abb5f21c3161412542b59fa12b",
     17: "ed30a1d11d3d3cf01a49aee9ee739778d20db94e956f7117190272c2e6c1d6c2",
     18: "5a9307e485bbc72f7092bf7bde8902bd6b383495ba2656329b3e7b1c960244ba",
+    19: "0a1888b731c2e971b12d5a844a2439d0a9ce925472fade121933ac8f5e6d319e",
 }
 
 
@@ -75,6 +76,82 @@ def test_workspace_migrations_are_isolated_and_immutable() -> None:
             value for value in vars(module).values() if isinstance(value, Migration)
         ]
         assert migration_instances == [migration]
+
+
+def test_screening_task_profile_migration_preserves_existing_results(tmp_path: Path) -> None:
+    database = tmp_path / "workspace.sqlite3"
+    migrate_database(database, WORKSPACE_MIGRATIONS[:18])
+    now = "2026-08-13T00:00:00Z"
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            INSERT INTO assets (
+                id, relative_path, filename, stem, suffix, content_hash,
+                byte_size, modified_ns, width, height, annotation_relative_path,
+                annotation_status, image_metadata_version, created_at, updated_at
+            ) VALUES (
+                'asset', 'sample.png', 'sample.png', 'sample', '.png', 'hash',
+                1, 1, 32, 32, 'sample.txt', 'missing', 1, ?, ?
+            )
+            """,
+            (now, now),
+        )
+        connection.execute(
+            """
+            INSERT INTO screening_operations (
+                id, status, score_mode, score_version, total_items,
+                processed_items, scored_items, configuration_snapshot,
+                created_at, updated_at, completed_at
+            ) VALUES (
+                'operation', 'completed', 'batch_only_v0_1',
+                'metarank-batch-v0.1', 1, 1, 1, '{}', ?, ?, ?
+            )
+            """,
+            (now, now, now),
+        )
+        connection.execute(
+            """
+            INSERT INTO screening_items (
+                id, operation_id, position, asset_id, source_relative_path,
+                image_hash, image_size, image_modified_ns, image_width,
+                image_height, status, rating, final_score, candidate_pool,
+                created_at, updated_at
+            ) VALUES (
+                'item', 'operation', 0, 'asset', 'sample.png', 'hash', 1, 1,
+                32, 32, 'scored', 'g', 0.9, 'elite_candidate', ?, ?
+            )
+            """,
+            (now, now),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    initialize_workspace_database(database)
+
+    connection = connect(database)
+    try:
+        operation = connection.execute(
+            """
+            SELECT task_profile_snapshot, task_evaluated_items
+            FROM screening_operations WHERE id = 'operation'
+            """
+        ).fetchone()
+        item = connection.execute(
+            """
+            SELECT candidate_pool, quality_candidate_pool, task_fit_score
+            FROM screening_items WHERE id = 'item'
+            """
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert operation["task_profile_snapshot"] is None
+    assert operation["task_evaluated_items"] == 0
+    assert item["candidate_pool"] == "elite_candidate"
+    assert item["quality_candidate_pool"] == "elite_candidate"
+    assert item["task_fit_score"] is None
 
 
 @pytest.mark.parametrize(

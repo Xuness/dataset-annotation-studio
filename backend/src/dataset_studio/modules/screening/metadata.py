@@ -45,6 +45,7 @@ class NormalizedMetadata:
     has_children: bool
     pixel_hash: str | None
     warnings: tuple[str, ...]
+    task_tags: tuple[str, ...] | None = None
 
     def snapshot(self) -> dict[str, object]:
         return {
@@ -239,6 +240,9 @@ def normalize_metadata(
     parent_id = _optional_identifier(_find(sources, "parent_id"))
     has_children = _bool(_find(sources, "has_children"), default=False)
     pixel_hash = _optional_identifier(_find(sources, "media_asset_pixel_hash", "pixel_hash"))
+    task_tags = _task_tags(sources)
+    if task_tags is None:
+        warnings.append("TASK_TAGS_UNAVAILABLE")
     if snapshot_source == "pipeline_plan":
         warnings.append("SNAPSHOT_FROM_PIPELINE_PLAN_PROXY")
     elif snapshot_source == "operation":
@@ -263,6 +267,7 @@ def normalize_metadata(
         has_children=has_children,
         pixel_hash=pixel_hash,
         warnings=tuple(warnings),
+        task_tags=task_tags,
     )
 
 
@@ -301,6 +306,28 @@ def _find(sources: list[dict[str, Any]], *names: str) -> Any:
             if name in source and source[name] is not None:
                 return source[name]
     return None
+
+
+def _task_tags(sources: list[dict[str, Any]]) -> tuple[str, ...] | None:
+    general = _find(sources, "tag_string_general")
+    meta = _find(sources, "tag_string_meta")
+    raw_values = [value for value in (general, meta) if value is not None]
+    if not raw_values:
+        fallback = _find(sources, "tag_string", "tags")
+        if fallback is None:
+            return None
+        raw_values = [fallback]
+
+    tags: set[str] = set()
+    for raw in raw_values:
+        if isinstance(raw, str):
+            candidates = raw.split()
+        elif isinstance(raw, (list, tuple, set)):
+            candidates = [str(value) for value in raw]
+        else:
+            return None
+        tags.update(tag.strip().casefold() for tag in candidates if tag.strip())
+    return tuple(sorted(tags))
 
 
 def _integer(value: Any, field: str) -> int:

@@ -10,13 +10,17 @@ from dataset_studio.modules.screening.models import (
     ScreeningAssetIds,
     ScreeningCandidatePool,
     ScreeningCapabilities,
+    ScreeningIntensity,
     ScreeningItem,
     ScreeningItemList,
     ScreeningOperation,
     ScreeningPreview,
     ScreeningRequest,
+    ScreeningTaskProfileSelection,
 )
 from dataset_studio.modules.screening.repository import ScreeningRepository
+from dataset_studio.modules.screening.selection_policy import apply_selection_policy
+from dataset_studio.modules.screening.task_profiles import evaluate_task_profile
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
@@ -132,6 +136,36 @@ class ScreeningService:
         self._workspaces.mark_worker_activity(project_id, "screening")
         return self.get(project_id, operation_id)
 
+    def apply_task_profile(
+        self,
+        project_id: str,
+        operation_id: str,
+        selection: ScreeningTaskProfileSelection,
+    ) -> ScreeningOperation:
+        operation = self.get(project_id, operation_id)
+        if operation.status != "completed":
+            raise ValueError("只有已完成的筛选任务可以切换任务适配预设。")
+        repository = self._repository(project_id)
+        inputs = repository.task_profile_inputs(operation_id)
+        if (
+            inputs
+            and all(item.task_tags is None for item in inputs)
+            and any(selection.task_rules.model_dump().values())
+        ):
+            raise ValueError("该历史任务没有缓存标签特征，请重新运行一次筛选后再切换预设。")
+        intensity = operation.configuration_snapshot.get("intensity", "balanced")
+        task_outputs = evaluate_task_profile(inputs, selection.task_rules)
+        repository.save_task_profile(
+            operation_id,
+            selection,
+            apply_selection_policy(
+                inputs,
+                task_outputs,
+                intensity=ScreeningIntensity(str(intensity)),
+            ),
+        )
+        return self.get(project_id, operation_id)
+
     def list_items(
         self,
         project_id: str,
@@ -143,6 +177,9 @@ class ScreeningService:
         rating: str | None,
         low_resolution: bool | None,
         duplicate_variant: bool | None,
+        pixel_duplicate: bool | None,
+        danbooru_variant: bool | None,
+        show_duplicates: bool,
         sort: str,
     ) -> ScreeningItemList:
         self.get(project_id, operation_id)
@@ -154,6 +191,9 @@ class ScreeningService:
             rating=rating,
             low_resolution=low_resolution,
             duplicate_variant=duplicate_variant,
+            pixel_duplicate=pixel_duplicate,
+            danbooru_variant=danbooru_variant,
+            show_duplicates=show_duplicates,
             sort=sort,
         )
 
@@ -173,6 +213,9 @@ class ScreeningService:
         rating: str | None,
         low_resolution: bool | None,
         duplicate_variant: bool | None,
+        pixel_duplicate: bool | None,
+        danbooru_variant: bool | None,
+        show_duplicates: bool,
     ) -> ScreeningAssetIds:
         self.get(project_id, operation_id)
         ids = self._repository(project_id).asset_ids(
@@ -181,6 +224,9 @@ class ScreeningService:
             rating=rating,
             low_resolution=low_resolution,
             duplicate_variant=duplicate_variant,
+            pixel_duplicate=pixel_duplicate,
+            danbooru_variant=danbooru_variant,
+            show_duplicates=show_duplicates,
         )
         return ScreeningAssetIds(ids=ids, total=len(ids))
 

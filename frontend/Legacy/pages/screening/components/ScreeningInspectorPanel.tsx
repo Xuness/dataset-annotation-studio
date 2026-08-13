@@ -13,6 +13,7 @@ const poolLabels: Record<ScreeningPool, string> = {
   recommended: "推荐",
   low_evidence_protected: "低证据保护",
   review: "待人工复核",
+  task_mismatch: "角色任务不适配",
   low_priority_high_confidence: "高置信低优先",
   quarantine: "隔离复核",
   invalid: "元数据异常",
@@ -23,6 +24,16 @@ const ratingLabels: Record<ScreeningRating, string> = {
   s: "Sensitive (s)",
   q: "Questionable (q)",
   e: "Explicit (e)",
+};
+
+const taskReasonLabels: Record<string, string> = {
+  TASK_COMIC_PANEL: "漫画 / 分镜",
+  TASK_MULTIPLE_VIEWS: "多视图 / 设定图",
+  TASK_MONOCHROME_GREYSCALE: "黑白 / 灰度",
+  TASK_LINEART_SKETCH: "线稿 / 草图",
+  TASK_CROWD_3PLUS: "三人及以上",
+  TASK_TAGS_UNAVAILABLE: "缺少任务适配标签",
+  TASK_MISMATCH_STRONG_PENALTY: "强任务惩罚：进入任务不适配池",
 };
 
 function score(value: number | null): string {
@@ -116,6 +127,10 @@ export function ScreeningInspectorPanel({
             <dd>{count(operation, "low_priority_high_confidence")}</dd>
           </div>
           <div>
+            <dt>任务不适配</dt>
+            <dd>{count(operation, "task_mismatch")}</dd>
+          </div>
+          <div>
             <dt>隔离</dt>
             <dd>{count(operation, "quarantine")}</dd>
           </div>
@@ -128,6 +143,22 @@ export function ScreeningInspectorPanel({
           <h3>附加标记</h3>
           <p>低分辨率 {operation.low_resolution_count ?? "按结果过滤查看"}</p>
           <p>重复 / 变体 {operation.duplicate_variant_count ?? "按结果过滤查看"}</p>
+        </section>
+        <section className="screening-inspector-section">
+          <h3>任务适配层</h3>
+          {operation.task_profile_snapshot ? (
+            <>
+              <p>
+                {operation.task_profile_snapshot.profile_version} · 已评估{" "}
+                {operation.task_evaluated_items}张
+              </p>
+              {operation.task_unavailable_items ? (
+                <p>{operation.task_unavailable_items} 张缺少可用标签，未伪造任务分。</p>
+              ) : null}
+            </>
+          ) : (
+            <p>该历史任务尚未生成独立任务适配分。</p>
+          )}
         </section>
         <section className="screening-inspector-section">
           <h3>运行边界</h3>
@@ -162,8 +193,20 @@ export function ScreeningInspectorPanel({
 
       <dl className="screening-score-grid">
         <div>
-          <dt>最终分</dt>
+          <dt>核心质量</dt>
           <dd>{score(item.final_score)}</dd>
+        </div>
+        <div>
+          <dt>任务适配</dt>
+          <dd>{score(item.task_fit_score)}</dd>
+        </div>
+        <div>
+          <dt>角色排序分</dt>
+          <dd>{score(item.selection_score)}</dd>
+        </div>
+        <div>
+          <dt>证据置信</dt>
+          <dd>{score(evidenceConfidence(item))}%</dd>
         </div>
         <div>
           <dt>Keep</dt>
@@ -172,10 +215,6 @@ export function ScreeningInspectorPanel({
         <div>
           <dt>Elite</dt>
           <dd>{score(item.elite_score)}</dd>
-        </div>
-        <div>
-          <dt>证据置信</dt>
-          <dd>{score(evidenceConfidence(item))}%</dd>
         </div>
       </dl>
 
@@ -186,8 +225,32 @@ export function ScreeningInspectorPanel({
           {item.rating_rank ?? "—"} · 百分位 {score(item.rating_percentile)}%
         </p>
         <p>
+          角色任务排名 #{item.selection_rank ?? "—"} · 百分位 {score(item.selection_percentile)}%
+        </p>
+        {item.quality_candidate_pool ? (
+          <p>核心质量池：{poolLabels[item.quality_candidate_pool]}</p>
+        ) : null}
+        <p>
           {item.image_width ?? "—"} × {item.image_height ?? "—"}
         </p>
+      </section>
+
+      <section className="screening-inspector-section">
+        <h3>角色 LoRA 适配</h3>
+        {item.task_reason_codes.length ? (
+          <div className="screening-reason-list">
+            {item.task_reason_codes.map((reason) => (
+              <span key={reason}>{taskReasonLabels[reason] ?? reason}</span>
+            ))}
+          </div>
+        ) : item.task_fit_score !== null ? (
+          <p>未命中已启用的任务惩罚规则。</p>
+        ) : (
+          <p>缺少缓存标签，任务适配分不可用。</p>
+        )}
+        {item.task_matched_tags.length ? (
+          <p>命中标签：{item.task_matched_tags.join(", ")}</p>
+        ) : null}
       </section>
 
       <section className="screening-inspector-section">
@@ -230,7 +293,7 @@ export function ScreeningInspectorPanel({
               {item.duplicate_of_asset_id
                 ? `；代表素材 ${item.duplicate_of_asset_id}`
                 : "；当前为代表素材"}
-              ，仅折叠提示。
+              ；结果页默认隐藏非代表重复项。
             </p>
           ) : null}
           {item.variant_group ? <p>Danbooru 变体组：{item.variant_group}，不参与扣分。</p> : null}

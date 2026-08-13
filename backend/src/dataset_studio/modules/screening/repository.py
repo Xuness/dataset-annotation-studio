@@ -12,13 +12,20 @@ from dataset_studio.modules.screening.metadata import MetadataReadResult
 from dataset_studio.modules.screening.models import (
     SCORE_MODE,
     SCORE_VERSION,
+    SELECTION_POLICY_VERSION,
     ScreeningItem,
     ScreeningItemList,
     ScreeningOperation,
     ScreeningOperationStatus,
     ScreeningRequest,
+    ScreeningTaskProfileSelection,
 )
 from dataset_studio.modules.screening.scoring import ScoringOutput
+from dataset_studio.modules.screening.task_profiles import (
+    TaskProfileInput,
+    TaskProfileOutput,
+    profile_snapshot,
+)
 
 ACTIVE_STATUSES = ("queued", "running", "stopping")
 ITEM_SORTS = {
@@ -28,13 +35,22 @@ ITEM_SORTS = {
             WHEN 'recommended' THEN 1
             WHEN 'low_evidence_protected' THEN 2
             WHEN 'review' THEN 3
-            WHEN 'low_priority_high_confidence' THEN 4
-            WHEN 'quarantine' THEN 5
-            ELSE 6
-        END, rating, rating_percentile DESC, source_relative_path COLLATE NOCASE
+            WHEN 'task_mismatch' THEN 4
+            WHEN 'low_priority_high_confidence' THEN 5
+            WHEN 'quarantine' THEN 6
+            ELSE 7
+        END, rating, selection_percentile DESC, rating_percentile DESC,
+        source_relative_path COLLATE NOCASE
     """,
     "percentile": "rating, rating_percentile DESC, source_relative_path COLLATE NOCASE",
     "score": "rating, final_score DESC, source_relative_path COLLATE NOCASE",
+    "selection": """
+        rating,
+        CASE WHEN selection_score IS NULL THEN 1 ELSE 0 END,
+        selection_score DESC,
+        final_score DESC,
+        source_relative_path COLLATE NOCASE
+    """,
     "path": "source_relative_path COLLATE NOCASE",
 }
 
@@ -65,11 +81,13 @@ class ScreeningRepository:
             "score_mode": SCORE_MODE,
             "score_version": SCORE_VERSION,
             "task_profile": request.task_profile.value,
+            "task_rules": request.task_rules.model_dump(),
             "intensity": request.intensity.value,
             "metadata_snapshot_at": (
                 request.metadata_snapshot_at.isoformat() if request.metadata_snapshot_at else None
             ),
             "reference_mode": "batch_only",
+            "selection_policy_version": SELECTION_POLICY_VERSION,
             "disabled_signals": [
                 "global_archive_cdf",
                 "character_copyright_debias",
@@ -78,13 +96,15 @@ class ScreeningRepository:
                 "historical_trend",
             ],
         }
+        task_snapshot = profile_snapshot(request)
         with transaction(self._database_path) as connection:
             connection.execute(
                 """
                 INSERT INTO screening_operations (
                     id, status, score_mode, score_version, total_items,
-                    configuration_snapshot, created_at, updated_at
-                ) VALUES (?, 'queued', ?, ?, ?, ?, ?, ?)
+                    configuration_snapshot, task_profile_id, task_profile_version,
+                    task_profile_snapshot, task_profile_updated_at, created_at, updated_at
+                ) VALUES (?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     operation_id,
@@ -92,6 +112,10 @@ class ScreeningRepository:
                     SCORE_VERSION,
                     len(assets),
                     _json(configuration),
+                    task_snapshot.profile_id.value,
+                    task_snapshot.profile_version,
+                    _json(task_snapshot.model_dump(mode="json")),
+                    now,
                     now,
                     now,
                 ),
@@ -264,6 +288,7 @@ class ScreeningRepository:
                     metadata.downvote_count,
                     metadata.evidence_mass,
                     _json(metadata.snapshot()),
+                    _json(list(metadata.task_tags)) if metadata.task_tags is not None else None,
                     update.candidate_pool,
                     _json(reasons),
                     _json(list(warnings)),
@@ -284,7 +309,8 @@ class ScreeningRepository:
                         metadata_hash = ?, rating = ?, created_at_source = ?,
                         metadata_snapshot_at = ?, age_hours = ?, age_bucket = ?,
                         fav_count = ?, up_score = ?, downvote_count = ?,
-                        evidence_mass = ?, normalized_snapshot = ?, candidate_pool = ?,
+                        evidence_mass = ?, normalized_snapshot = ?, task_tag_snapshot = ?,
+                        candidate_pool = ?,
                         reason_codes = ?, warnings = ?, error_code = ?, error_message = ?,
                         updated_at = ?
                     WHERE id = ? AND operation_id = ? AND status = 'pending'
@@ -345,6 +371,7 @@ class ScreeningRepository:
                 output.rating_rank,
                 output.rating_percentile,
                 output.candidate_pool,
+                output.candidate_pool,
                 int(output.low_resolution_flag),
                 output.pixel_duplicate_group,
                 output.variant_group,
@@ -366,7 +393,7 @@ class ScreeningRepository:
                 SET status = 'scored', confidence_pop = ?, confidence_depth = ?,
                     confidence_vote = ?, technical_score = ?, keep_score = ?,
                     elite_score = ?, final_score = ?, rating_rank = ?,
-                    rating_percentile = ?, candidate_pool = ?,
+                    rating_percentile = ?, quality_candidate_pool = ?, candidate_pool = ?,
                     low_resolution_flag = ?, pixel_duplicate_group = ?,
                     variant_group = ?, duplicate_representative = ?,
                     duplicate_of_asset_id = ?,
@@ -385,6 +412,127 @@ class ScreeningRepository:
                 WHERE id = ?
                 """,
                 (scored, now, operation_id),
+            )
+
+    def task_profile_inputs(self, operation_id: str) -> list[TaskProfileInput]:
+        connection = connect(self._database_path)
+        try:
+            rows = connection.execute(
+                """
+                SELECT id, asset_id, source_relative_path, rating, final_score,
+                       task_tag_snapshot, confidence_pop, score_details
+                FROM screening_items
+                WHERE operation_id = ? AND status = 'scored'
+                ORDER BY position
+                """,
+                (operation_id,),
+            ).fetchall()
+            return [
+                TaskProfileInput(
+                    item_id=str(row["id"]),
+                    asset_id=str(row["asset_id"]),
+                    source_relative_path=str(row["source_relative_path"]),
+                    rating=str(row["rating"]),
+                    quality_score=float(row["final_score"]),
+                    task_tags=(
+                        tuple(_array(row["task_tag_snapshot"]))
+                        if row["task_tag_snapshot"] is not None
+                        else None
+                    ),
+                    confidence_pop=float(row["confidence_pop"]),
+                    bad_consensus_second=float(
+                        _object(row["score_details"]).get("bad_consensus_second", 0.0)
+                    ),
+                )
+                for row in rows
+            ]
+        finally:
+            connection.close()
+
+    def save_task_profile(
+        self,
+        operation_id: str,
+        selection: ScreeningTaskProfileSelection,
+        outputs: list[TaskProfileOutput],
+    ) -> None:
+        now = utc_now_iso()
+        snapshot = profile_snapshot(selection)
+        rows = [
+            (
+                output.task_fit_score,
+                output.selection_score,
+                output.selection_rank,
+                output.selection_percentile,
+                output.candidate_pool,
+                _json(list(output.reason_codes)),
+                _json(list(output.matched_tags)),
+                now,
+                output.item_id,
+                operation_id,
+            )
+            for output in outputs
+        ]
+        with transaction(self._database_path) as connection:
+            scored_count = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM screening_items
+                    WHERE operation_id = ? AND status = 'scored'
+                    """,
+                    (operation_id,),
+                ).fetchone()[0]
+            )
+            if scored_count != len(outputs):
+                raise RuntimeError(
+                    f"任务适配评分应覆盖 {scored_count} 项，实际收到 {len(outputs)} 项。"
+                )
+            changes_before = connection.total_changes
+            connection.executemany(
+                """
+                UPDATE screening_items
+                SET task_fit_score = ?, selection_score = ?, selection_rank = ?,
+                    selection_percentile = ?, candidate_pool = ?, task_reason_codes = ?,
+                    task_matched_tags = ?, updated_at = ?
+                WHERE id = ? AND operation_id = ? AND status = 'scored'
+                """,
+                rows,
+            )
+            changed = connection.total_changes - changes_before
+            if changed != len(outputs):
+                raise RuntimeError(f"任务适配评分应更新 {len(outputs)} 项，实际更新 {changed} 项。")
+            evaluated = sum(output.task_fit_score is not None for output in outputs)
+            unavailable = len(outputs) - evaluated
+            pool_counts = {
+                str(row["candidate_pool"]): int(row["count"])
+                for row in connection.execute(
+                    """
+                    SELECT candidate_pool, COUNT(*) AS count
+                    FROM screening_items WHERE operation_id = ?
+                    GROUP BY candidate_pool
+                    """,
+                    (operation_id,),
+                ).fetchall()
+            }
+            connection.execute(
+                """
+                UPDATE screening_operations
+                SET task_profile_id = ?, task_profile_version = ?,
+                    task_profile_snapshot = ?, task_evaluated_items = ?,
+                    task_unavailable_items = ?, task_profile_updated_at = ?,
+                    updated_at = ?, pool_counts_snapshot = ?
+                WHERE id = ?
+                """,
+                (
+                    snapshot.profile_id.value,
+                    snapshot.profile_version,
+                    _json(snapshot.model_dump(mode="json")),
+                    evaluated,
+                    unavailable,
+                    now,
+                    now,
+                    _json(pool_counts),
+                    operation_id,
+                ),
             )
 
     def complete(self, operation_id: str) -> None:
@@ -586,10 +734,20 @@ class ScreeningRepository:
         rating: str | None,
         low_resolution: bool | None,
         duplicate_variant: bool | None,
+        pixel_duplicate: bool | None,
+        danbooru_variant: bool | None,
+        show_duplicates: bool,
         sort: str,
     ) -> ScreeningItemList:
         where, params = self._item_filter(
-            operation_id, candidate_pool, rating, low_resolution, duplicate_variant
+            operation_id,
+            candidate_pool,
+            rating,
+            low_resolution,
+            duplicate_variant,
+            pixel_duplicate,
+            danbooru_variant,
+            show_duplicates,
         )
         order = ITEM_SORTS.get(sort, ITEM_SORTS["priority"])
         connection = connect(self._database_path)
@@ -631,9 +789,19 @@ class ScreeningRepository:
         rating: str | None,
         low_resolution: bool | None,
         duplicate_variant: bool | None,
+        pixel_duplicate: bool | None,
+        danbooru_variant: bool | None,
+        show_duplicates: bool,
     ) -> list[str]:
         where, params = self._item_filter(
-            operation_id, candidate_pool, rating, low_resolution, duplicate_variant
+            operation_id,
+            candidate_pool,
+            rating,
+            low_resolution,
+            duplicate_variant,
+            pixel_duplicate,
+            danbooru_variant,
+            show_duplicates,
         )
         connection = connect(self._database_path)
         try:
@@ -645,7 +813,16 @@ class ScreeningRepository:
             connection.close()
 
     @staticmethod
-    def _item_filter(operation_id, candidate_pool, rating, low_resolution, duplicate_variant):
+    def _item_filter(
+        operation_id,
+        candidate_pool,
+        rating,
+        low_resolution,
+        duplicate_variant,
+        pixel_duplicate,
+        danbooru_variant,
+        show_duplicates,
+    ):
         clauses = ["operation_id = ?"]
         params: list[object] = [operation_id]
         if candidate_pool:
@@ -660,6 +837,14 @@ class ScreeningRepository:
         if duplicate_variant is not None:
             clauses.append("(pixel_duplicate_group IS NOT NULL OR variant_group IS NOT NULL) = ?")
             params.append(int(duplicate_variant))
+        if pixel_duplicate is not None:
+            clauses.append("(pixel_duplicate_group IS NOT NULL) = ?")
+            params.append(int(pixel_duplicate))
+        if danbooru_variant is not None:
+            clauses.append("(variant_group IS NOT NULL) = ?")
+            params.append(int(danbooru_variant))
+        if not show_duplicates:
+            clauses.append("duplicate_of_asset_id IS NULL")
         return " AND ".join(clauses), params
 
     @staticmethod
@@ -675,6 +860,12 @@ class ScreeningRepository:
             invalid_items=int(row["invalid_items"]),
             current_relative_path=row["current_relative_path"],
             configuration_snapshot=_object(row["configuration_snapshot"]),
+            task_profile_snapshot=(
+                _object(row["task_profile_snapshot"]) if row["task_profile_snapshot"] else None
+            ),
+            task_evaluated_items=int(row["task_evaluated_items"]),
+            task_unavailable_items=int(row["task_unavailable_items"]),
+            task_profile_updated_at=row["task_profile_updated_at"],
             pool_counts={k: int(v) for k, v in _object(row["pool_counts_snapshot"]).items()},
             rating_counts={k: int(v) for k, v in _object(row["rating_counts_snapshot"]).items()},
             created_at=str(row["created_at"]),
@@ -720,6 +911,13 @@ class ScreeningRepository:
             final_score=row["final_score"],
             rating_rank=row["rating_rank"],
             rating_percentile=row["rating_percentile"],
+            task_fit_score=row["task_fit_score"],
+            selection_score=row["selection_score"],
+            selection_rank=row["selection_rank"],
+            selection_percentile=row["selection_percentile"],
+            task_reason_codes=_array(row["task_reason_codes"]),
+            task_matched_tags=_array(row["task_matched_tags"]),
+            quality_candidate_pool=row["quality_candidate_pool"],
             candidate_pool=row["candidate_pool"],
             low_resolution_flag=bool(row["low_resolution_flag"]),
             pixel_duplicate_group=row["pixel_duplicate_group"],

@@ -97,12 +97,16 @@ export function useScreeningController({
     [projectId],
   );
   const setSelectedOperationId = useCallback(
-    (operationId: string | null) =>
-      screeningWorkbenchState.patch(projectId, {
+    (operationId: string | null) => {
+      const operation = operations.data?.find((candidate) => candidate.id === operationId);
+      const rules = operation?.task_profile_snapshot?.rules;
+      screeningWorkbenchState.patch(projectId, (current) => ({
         selectedOperationId: operationId,
         selectedAssetId: null,
-      }),
-    [projectId],
+        ...(rules ? { form: { ...current.form, taskRules: rules } } : {}),
+      }));
+    },
+    [operations.data, projectId],
   );
   const setSelectedAssetId = useCallback(
     (assetId: string | null) =>
@@ -222,6 +226,22 @@ export function useScreeningController({
     }
   }, [actions.resume, selectedOperation]);
 
+  const applyTaskProfile = useCallback(async () => {
+    if (!selectedOperation || selectedOperation.status !== "completed") return;
+    setError(null);
+    try {
+      await actions.applyTaskProfile.mutateAsync({
+        operationId: selectedOperation.id,
+        selection: {
+          task_profile: form.profile,
+          task_rules: form.taskRules,
+        },
+      });
+    } catch (reason) {
+      setError(actionError(reason, "无法应用角色 LoRA 任务适配配置。"));
+    }
+  }, [actions.applyTaskProfile, form.profile, form.taskRules, selectedOperation]);
+
   const selectCurrentResult = useCallback(async () => {
     if (!selectedOperationId || !itemTotal) return;
     setError(null);
@@ -278,10 +298,12 @@ export function useScreeningController({
     createPending: actions.create.isPending || folderLoading || allAssetsLoading,
     stopPending: actions.stop.isPending,
     resumePending: actions.resume.isPending,
+    applyTaskProfilePending: actions.applyTaskProfile.isPending,
     selectCurrentPending: actions.resolveAssetIds.isPending,
     createOperation,
     stopOperation,
     resumeOperation,
+    applyTaskProfile,
     selectCurrentResult,
     workspaceBusy: rescanPending,
   };

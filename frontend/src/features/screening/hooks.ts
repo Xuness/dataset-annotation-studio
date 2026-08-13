@@ -1,7 +1,12 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { CreateScreeningOperationRequest, ScreeningItemQuery } from "../../shared/api/types";
+import type {
+  CreateScreeningOperationRequest,
+  ScreeningItemQuery,
+  ScreeningTaskProfileSelection,
+} from "../../shared/api/types";
 import {
+  applyScreeningTaskProfile,
   createScreeningOperation,
   getScreeningCapabilities,
   listScreeningAssetIds,
@@ -79,6 +84,21 @@ export function useScreeningActions(projectId: string) {
     resume: useMutation({
       mutationFn: (operationId: string) => resumeScreeningOperation(projectId, operationId),
       onSuccess: refreshOperations,
+    }),
+    applyTaskProfile: useMutation({
+      mutationFn: ({
+        operationId,
+        selection,
+      }: {
+        operationId: string;
+        selection: ScreeningTaskProfileSelection;
+      }) => applyScreeningTaskProfile(projectId, operationId, selection),
+      onSuccess: (operation) => {
+        refreshOperations();
+        void queryClient.invalidateQueries({
+          queryKey: screeningKeys.operationItems(projectId, operation.id),
+        });
+      },
     }),
     resolveAssetIds: useMutation({
       mutationFn: ({ operationId, query }: { operationId: string; query: ScreeningItemQuery }) =>

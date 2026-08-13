@@ -6,6 +6,7 @@ import type {
   ScreeningItemListResponse,
   ScreeningItemQuery,
   ScreeningOperation,
+  ScreeningTaskProfileSelection,
 } from "../../shared/api/types";
 
 const path = (projectId: string) => `/api/v1/workspaces/${projectId}/screening`;
@@ -17,7 +18,9 @@ function itemParameters(query: ScreeningItemQuery): URLSearchParams {
   if (query.pool) parameters.set("pool", query.pool);
   if (query.rating) parameters.set("rating", query.rating);
   if (query.flag === "low_resolution") parameters.set("low_resolution", "true");
-  if (query.flag === "duplicate_variant") parameters.set("duplicate_variant", "true");
+  if (query.flag === "pixel_duplicate") parameters.set("pixel_duplicate", "true");
+  if (query.flag === "danbooru_variant") parameters.set("danbooru_variant", "true");
+  parameters.set("show_duplicates", String(Boolean(query.showDuplicates)));
   if (query.sort) parameters.set("sort", query.sort);
   return parameters;
 }
@@ -52,6 +55,17 @@ export function resumeScreeningOperation(
   operationId: string,
 ): Promise<ScreeningOperation> {
   return apiRequest(`${path(projectId)}/operations/${operationId}/resume`, { method: "POST" });
+}
+
+export function applyScreeningTaskProfile(
+  projectId: string,
+  operationId: string,
+  request: ScreeningTaskProfileSelection,
+): Promise<ScreeningOperation> {
+  return apiRequest(`${path(projectId)}/operations/${operationId}/task-profile`, {
+    method: "PUT",
+    body: JSON.stringify(request),
+  });
 }
 
 export function listScreeningItems(

@@ -6,12 +6,13 @@ export const screeningKeys = {
     [...workspaceQueryKeys.scope(projectId, "screening"), "capabilities"] as const,
   operations: (projectId: string) =>
     [...workspaceQueryKeys.scope(projectId, "screening"), "operations"] as const,
-  items: (projectId: string, operationId: string, query: ScreeningItemQuery) =>
+  operationItems: (projectId: string, operationId: string) =>
     [
       ...workspaceQueryKeys.scope(projectId, "screening"),
       "operations",
       operationId,
       "items",
-      query,
     ] as const,
+  items: (projectId: string, operationId: string, query: ScreeningItemQuery) =>
+    [...screeningKeys.operationItems(projectId, operationId), query] as const,
 };

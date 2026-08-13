@@ -46,6 +46,13 @@ const item: ScreeningItem = {
   elite_score: 0.96,
   rating_rank: 1,
   rating_percentile: 0.99,
+  task_fit_score: 1,
+  selection_score: 0.94,
+  selection_rank: 1,
+  selection_percentile: 0.99,
+  task_reason_codes: [],
+  task_matched_tags: [],
+  quality_candidate_pool: "elite_candidate",
   candidate_pool: "elite_candidate",
   low_resolution_flag: false,
   pixel_duplicate_group: null,
@@ -108,7 +115,13 @@ describe("legacy screening workspace", () => {
         operationId="operation-1"
         items={[item]}
         total={1}
-        filters={{ pool: null, rating: null, flag: null, sort: "priority" }}
+        filters={{
+          pool: null,
+          rating: null,
+          flag: null,
+          sort: "selection",
+          showDuplicates: false,
+        }}
         density="comfortable"
         selectedAssetId={null}
         checkedAssetIds={[]}
@@ -128,15 +141,18 @@ describe("legacy screening workspace", () => {
     );
 
     expect(screen.getByText("hero.png")).toBeTruthy();
-    expect(screen.getByText("批次百分位 99.0% · #1")).toBeTruthy();
+    expect(screen.getByText("任务百分位 99.0% · #1")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "精选" }));
     expect(changeFilters).toHaveBeenCalledWith({ pool: "elite_candidate" });
 
     await user.selectOptions(screen.getByLabelText("排序"), "percentile");
     expect(changeFilters).toHaveBeenCalledWith({ sort: "percentile" });
 
-    await user.selectOptions(screen.getByLabelText("标记"), "duplicate_variant");
-    expect(changeFilters).toHaveBeenCalledWith({ flag: "duplicate_variant" });
+    await user.selectOptions(screen.getByLabelText("标记"), "pixel_duplicate");
+    expect(changeFilters).toHaveBeenCalledWith({ flag: "pixel_duplicate" });
+
+    await user.click(screen.getByRole("checkbox", { name: "显示重复图" }));
+    expect(changeFilters).toHaveBeenCalledWith({ showDuplicates: true });
 
     await user.click(screen.getByRole("checkbox", { name: "勾选 hero.png" }));
     expect(setChecked).toHaveBeenCalledWith(["asset-1"], true);
@@ -152,7 +168,13 @@ describe("legacy screening workspace", () => {
         operationId="operation-1"
         items={[]}
         total={0}
-        filters={{ pool: null, rating: null, flag: null, sort: "priority" }}
+        filters={{
+          pool: null,
+          rating: null,
+          flag: null,
+          sort: "selection",
+          showDuplicates: false,
+        }}
         density="comfortable"
         selectedAssetId={null}
         checkedAssetIds={[]}
