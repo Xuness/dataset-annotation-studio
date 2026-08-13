@@ -42,3 +42,6 @@ src-tauri/binaries/dataset-studio-service-*
 
 # Local Tag dictionary library
 /dictionaries/
+
+# Local design documents and analysis artifacts
+/设计文档/
