@@ -590,7 +590,32 @@ ON local_tag_dictionary_downloads(offer_id)
 WHERE status IN ('queued', 'downloading', 'verifying', 'installing');
 """
 
-GLOBAL_SCHEMA_VERSION = 15
+SCREENING_WORKER_ACTIVITY_MIGRATION = """
+CREATE TABLE worker_workspace_activity_v016 (
+    project_id TEXT PRIMARY KEY,
+    jobs_requested_at TEXT,
+    exports_requested_at TEXT,
+    screening_requested_at TEXT,
+    FOREIGN KEY (project_id)
+        REFERENCES recent_workspaces(project_id) ON DELETE CASCADE,
+    CHECK (
+        jobs_requested_at IS NOT NULL
+        OR exports_requested_at IS NOT NULL
+        OR screening_requested_at IS NOT NULL
+    )
+);
+
+INSERT INTO worker_workspace_activity_v016 (
+    project_id, jobs_requested_at, exports_requested_at, screening_requested_at
+)
+SELECT project_id, jobs_requested_at, exports_requested_at, NULL
+FROM worker_workspace_activity;
+
+DROP TABLE worker_workspace_activity;
+ALTER TABLE worker_workspace_activity_v016 RENAME TO worker_workspace_activity;
+"""
+
+GLOBAL_SCHEMA_VERSION = 16
 GLOBAL_MIGRATIONS = (
     Migration(1, "initial_global_schema", GLOBAL_SCHEMA),
     Migration(2, "provider_request_options", PROVIDER_REQUEST_OPTIONS_MIGRATION),
@@ -638,6 +663,12 @@ GLOBAL_MIGRATIONS = (
         15,
         "segmented_translation_prompt",
         SEGMENTED_TRANSLATION_PROMPT_MIGRATION,
+    ),
+    Migration(
+        16,
+        "screening_worker_activity",
+        SCREENING_WORKER_ACTIVITY_MIGRATION,
+        foreign_keys_off=True,
     ),
 )
 

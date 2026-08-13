@@ -13,6 +13,7 @@ from dataset_studio.modules.preprocessing.service import PreprocessService
 from dataset_studio.modules.presets.repository import PresetRepository
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.providers.codex_runtime import CodexRuntime
+from dataset_studio.modules.screening.service import ScreeningService
 from dataset_studio.modules.statistics.service import StatisticsService
 from dataset_studio.modules.tag_dictionaries.downloads.repository import (
     TagDictionaryDownloadRepository,
@@ -49,6 +50,7 @@ class AppContainer:
     preprocessing: PreprocessService
     exports: ExportService
     statistics: StatisticsService
+    screening: ScreeningService
     codex: CodexRuntime
     taggers: TaggerService
     tag_dictionaries: TagDictionaryService
@@ -96,11 +98,13 @@ class AppContainer:
         codex = CodexRuntime()
         tagger_runtime = TaggerRuntime(taggers)
         exports = ExportService(workspaces)
+        screening = ScreeningService(workspaces)
         preprocessing = PreprocessService(
             workspaces,
             has_active_jobs=jobs.has_active,
             has_active_exports=exports.has_active,
             has_active_asset_deletions=asset_deletions.has_active,
+            has_active_screening=screening.has_active,
         )
         exports.set_activity_checks(
             has_active_jobs=jobs.has_active,
@@ -122,6 +126,7 @@ class AppContainer:
             preprocessing=preprocessing,
             exports=exports,
             statistics=StatisticsService(workspaces),
+            screening=screening,
             codex=codex,
             taggers=taggers,
             tag_dictionaries=tag_dictionaries,

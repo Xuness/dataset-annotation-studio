@@ -1652,6 +1652,160 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/screening/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Screening Capabilities */
+        get: operations["screening_capabilities_api_v1_workspaces__project_id__screening_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/screening/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Screening Operations */
+        get: operations["list_screening_operations_api_v1_workspaces__project_id__screening_operations_get"];
+        put?: never;
+        /** Create Screening */
+        post: operations["create_screening_api_v1_workspaces__project_id__screening_operations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Screening Operation */
+        get: operations["get_screening_operation_api_v1_workspaces__project_id__screening_operations__operation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/asset-ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Screening Asset Ids */
+        get: operations["screening_asset_ids_api_v1_workspaces__project_id__screening_operations__operation_id__asset_ids_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Screening Items */
+        get: operations["list_screening_items_api_v1_workspaces__project_id__screening_operations__operation_id__items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/items/{asset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Screening Item */
+        get: operations["get_screening_item_api_v1_workspaces__project_id__screening_operations__operation_id__items__asset_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume Screening Operation */
+        post: operations["resume_screening_operation_api_v1_workspaces__project_id__screening_operations__operation_id__resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop Screening Operation */
+        post: operations["stop_screening_operation_api_v1_workspaces__project_id__screening_operations__operation_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/screening/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Screening */
+        post: operations["preview_screening_api_v1_workspaces__project_id__screening_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/statistics/tag-frequency": {
         parameters: {
             query?: never;
@@ -1716,6 +1870,11 @@ export type components = {
             preprocessing_count: number;
             /** Project Count */
             project_count: number;
+            /**
+             * Screening Count
+             * @default 0
+             */
+            screening_count: number;
             /**
              * Tag Dictionary Download Count
              * @default 0
@@ -3617,6 +3776,266 @@ export type components = {
             /** Updated */
             updated: number;
         };
+        /** ScreeningAssetIds */
+        ScreeningAssetIds: {
+            /** Ids */
+            ids: string[];
+            /** Total */
+            total: number;
+        };
+        /**
+         * ScreeningCandidatePool
+         * @enum {string}
+         */
+        ScreeningCandidatePool: "elite_candidate" | "recommended" | "low_evidence_protected" | "review" | "low_priority_high_confidence" | "quarantine" | "invalid";
+        /** ScreeningCapabilities */
+        ScreeningCapabilities: {
+            /**
+             * Batch Local Only
+             * @default true
+             */
+            batch_local_only: boolean;
+            /** Candidate Pools */
+            candidate_pools?: components["schemas"]["ScreeningCandidatePool"][];
+            /** Disabled Signals */
+            disabled_signals?: string[];
+            /** Enabled Signals */
+            enabled_signals?: string[];
+            /** Intensities */
+            intensities?: components["schemas"]["ScreeningIntensity"][];
+            /**
+             * Max Assets Per Operation
+             * @default 100000
+             */
+            max_assets_per_operation: number;
+            /**
+             * Modifies Assets
+             * @default false
+             */
+            modifies_assets: boolean;
+            /**
+             * Reads Global Archive
+             * @default false
+             */
+            reads_global_archive: boolean;
+            /**
+             * Score Mode
+             * @default batch_only_v0_1
+             */
+            score_mode: string;
+            /**
+             * Score Version
+             * @default metarank-batch-v0.1
+             */
+            score_version: string;
+            /** Task Profiles */
+            task_profiles?: components["schemas"]["ScreeningTaskProfile"][];
+        };
+        /**
+         * ScreeningIntensity
+         * @enum {string}
+         */
+        ScreeningIntensity: "conservative" | "balanced" | "aggressive";
+        /** ScreeningItem */
+        ScreeningItem: {
+            /** Age Bucket */
+            age_bucket?: string | null;
+            /** Age Hours */
+            age_hours?: number | null;
+            /** Asset Id */
+            asset_id: string;
+            candidate_pool?: components["schemas"]["ScreeningCandidatePool"] | null;
+            /** Confidence Depth */
+            confidence_depth?: number | null;
+            /** Confidence Pop */
+            confidence_pop?: number | null;
+            /** Confidence Vote */
+            confidence_vote?: number | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Downvote Count */
+            downvote_count?: number | null;
+            /** Duplicate Of Asset Id */
+            duplicate_of_asset_id?: string | null;
+            /**
+             * Duplicate Representative
+             * @default true
+             */
+            duplicate_representative: boolean;
+            /** Elite Score */
+            elite_score?: number | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Error Message */
+            error_message?: string | null;
+            /** Evidence Mass */
+            evidence_mass?: number | null;
+            /** Fav Count */
+            fav_count?: number | null;
+            /** Final Score */
+            final_score?: number | null;
+            /** Image Height */
+            image_height?: number | null;
+            /** Image Width */
+            image_width?: number | null;
+            /** Keep Score */
+            keep_score?: number | null;
+            /**
+             * Low Resolution Flag
+             * @default false
+             */
+            low_resolution_flag: boolean;
+            /** Metadata Relative Path */
+            metadata_relative_path?: string | null;
+            /** Metadata Snapshot At */
+            metadata_snapshot_at?: string | null;
+            /** Pixel Duplicate Group */
+            pixel_duplicate_group?: string | null;
+            /** Rating */
+            rating?: string | null;
+            /** Rating Percentile */
+            rating_percentile?: number | null;
+            /** Rating Rank */
+            rating_rank?: number | null;
+            /** Reason Codes */
+            reason_codes?: string[];
+            score_details?: components["schemas"]["ScreeningScoreDetails"] | null;
+            /** Source Relative Path */
+            source_relative_path: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "parsed" | "scored" | "invalid";
+            /** Technical Score */
+            technical_score?: number | null;
+            /** Up Score */
+            up_score?: number | null;
+            /** Variant Group */
+            variant_group?: string | null;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /** ScreeningItemList */
+        ScreeningItemList: {
+            /** Items */
+            items: components["schemas"]["ScreeningItem"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** ScreeningOperation */
+        ScreeningOperation: {
+            /** Completed At */
+            completed_at?: string | null;
+            /** Configuration Snapshot */
+            configuration_snapshot?: {
+                [key: string]: unknown;
+            };
+            /** Created At */
+            created_at: string;
+            /** Current Relative Path */
+            current_relative_path?: string | null;
+            /** Error Message */
+            error_message?: string | null;
+            /** Id */
+            id: string;
+            /** Invalid Items */
+            invalid_items: number;
+            /** Pool Counts */
+            pool_counts?: {
+                [key: string]: number;
+            };
+            /** Processed Items */
+            processed_items: number;
+            /** Rating Counts */
+            rating_counts?: {
+                [key: string]: number;
+            };
+            /** Score Mode */
+            score_mode: string;
+            /** Score Version */
+            score_version: string;
+            /** Scored Items */
+            scored_items: number;
+            /** Started At */
+            started_at?: string | null;
+            status: components["schemas"]["ScreeningOperationStatus"];
+            /** Total Items */
+            total_items: number;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * ScreeningOperationStatus
+         * @enum {string}
+         */
+        ScreeningOperationStatus: "queued" | "running" | "stopping" | "stopped" | "interrupted" | "completed" | "failed";
+        /** ScreeningPreview */
+        ScreeningPreview: {
+            /** Available Count */
+            available_count: number;
+            /** Metadata Available Count */
+            metadata_available_count: number;
+            /** Metadata Missing Count */
+            metadata_missing_count: number;
+            /** Missing Asset Ids */
+            missing_asset_ids?: string[];
+            /** Requested Count */
+            requested_count: number;
+        };
+        /** ScreeningRequest */
+        ScreeningRequest: {
+            /** Asset Ids */
+            asset_ids: string[];
+            /** @default balanced */
+            intensity: components["schemas"]["ScreeningIntensity"];
+            /** Metadata Snapshot At */
+            metadata_snapshot_at?: string | null;
+            /**
+             * Task Profile
+             * @default character_lora
+             * @constant
+             */
+            task_profile: "character_lora";
+        };
+        /** ScreeningScoreDetails */
+        ScreeningScoreDetails: {
+            /** Bad Consensus Second */
+            bad_consensus_second: number;
+            /** Bad Depth */
+            bad_depth: number;
+            /** Bad Pop */
+            bad_pop: number;
+            /** Bad Vote */
+            bad_vote: number;
+            /** Depth Percentile Final */
+            depth_percentile_final: number;
+            /** Depth Percentile Raw */
+            depth_percentile_raw: number;
+            /** Popularity Percentile Final */
+            popularity_percentile_final: number;
+            /** Popularity Percentile Raw */
+            popularity_percentile_raw: number;
+            /** Vote Keep Signal */
+            vote_keep_signal: number;
+            /** Vote Percentile Lower */
+            vote_percentile_lower?: number | null;
+            /** Vote Percentile Mean */
+            vote_percentile_mean?: number | null;
+            /** Vote Posterior Lower 95 */
+            vote_posterior_lower_95?: number | null;
+            /** Vote Posterior Mean */
+            vote_posterior_mean?: number | null;
+        };
+        /**
+         * ScreeningTaskProfile
+         * @enum {string}
+         */
+        ScreeningTaskProfile: "character_lora" | "general_aesthetic" | "style_lora";
         /**
          * ServiceTier
          * @enum {string}
@@ -8416,6 +8835,346 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScanResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screening_capabilities_api_v1_workspaces__project_id__screening_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningCapabilities"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_screening_operations_api_v1_workspaces__project_id__screening_operations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningOperation"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_screening_api_v1_workspaces__project_id__screening_operations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreeningRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_screening_operation_api_v1_workspaces__project_id__screening_operations__operation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screening_asset_ids_api_v1_workspaces__project_id__screening_operations__operation_id__asset_ids_get: {
+        parameters: {
+            query?: {
+                pool?: components["schemas"]["ScreeningCandidatePool"] | null;
+                rating?: ("g" | "s" | "q" | "e") | null;
+                low_resolution?: boolean | null;
+                duplicate_variant?: boolean | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningAssetIds"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_screening_items_api_v1_workspaces__project_id__screening_operations__operation_id__items_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+                pool?: components["schemas"]["ScreeningCandidatePool"] | null;
+                rating?: ("g" | "s" | "q" | "e") | null;
+                low_resolution?: boolean | null;
+                duplicate_variant?: boolean | null;
+                sort?: "priority" | "percentile" | "score" | "path";
+            };
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningItemList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_screening_item_api_v1_workspaces__project_id__screening_operations__operation_id__items__asset_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_screening_operation_api_v1_workspaces__project_id__screening_operations__operation_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_screening_operation_api_v1_workspaces__project_id__screening_operations__operation_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_screening_api_v1_workspaces__project_id__screening_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreeningRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningPreview"];
                 };
             };
             /** @description Validation Error */

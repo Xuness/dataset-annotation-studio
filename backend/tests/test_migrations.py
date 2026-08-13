@@ -44,6 +44,7 @@ EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS = {
     15: "75e040ea6904594889def8a785ceecd13a6b4e5cddd17b234e96ee9dd70afdd5",
     16: "9b7e99492fe535f035db23760d3903be63c374abb5f21c3161412542b59fa12b",
     17: "ed30a1d11d3d3cf01a49aee9ee739778d20db94e956f7117190272c2e6c1d6c2",
+    18: "5a9307e485bbc72f7092bf7bde8902bd6b383495ba2656329b3e7b1c960244ba",
 }
 
 
@@ -190,7 +191,7 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     assert "Protocol A: description segment JSON" in translation_prompt["system_prompt"]
     assert "Protocol B: Tags XML envelope" in translation_prompt["system_prompt"]
     assert "application appends" not in translation_prompt["system_prompt"]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert versions == list(range(1, 17))
 
 
 def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> None:
@@ -224,7 +225,7 @@ def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> 
 
     assert {"local_tagger_hf_settings", "local_tagger_downloads"}.issubset(tables)
     assert "idx_local_tagger_downloads_active_plan" in indexes
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert versions == list(range(1, 17))
 
 
 def test_translation_prompt_structure_lock_migration_preserves_custom_default(
@@ -498,8 +499,60 @@ def test_recent_workspace_activity_migration_hides_duplicate_roots(
         "project_id",
         "jobs_requested_at",
         "exports_requested_at",
+        "screening_requested_at",
     }
     assert activity_projects == ["newer"]
+
+
+def test_screening_worker_activity_migration_preserves_existing_activity(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "global.sqlite3"
+    migrate_database(database, GLOBAL_MIGRATIONS[:15])
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            INSERT INTO recent_workspaces (
+                project_id, name, root_path, root_path_key, created_at, last_opened_at
+            ) VALUES ('project', 'Dataset', 'E:/dataset', ?, ?, ?)
+            """,
+            (
+                filesystem_path_key(Path("E:/dataset"), case_sensitive=False),
+                utc_now_iso(),
+                utc_now_iso(),
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO worker_workspace_activity (
+                project_id, jobs_requested_at, exports_requested_at
+            ) VALUES ('project', ?, NULL)
+            """,
+            (utc_now_iso(),),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    initialize_global_database(database)
+
+    connection = connect(database)
+    try:
+        row = connection.execute(
+            """
+            SELECT jobs_requested_at, exports_requested_at, screening_requested_at
+            FROM worker_workspace_activity WHERE project_id = 'project'
+            """
+        ).fetchone()
+        foreign_key_violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+    finally:
+        connection.close()
+
+    assert row["jobs_requested_at"] is not None
+    assert row["exports_requested_at"] is None
+    assert row["screening_requested_at"] is None
+    assert foreign_key_violations == []
 
 
 def test_recent_workspace_identity_can_preserve_posix_case(tmp_path: Path) -> None:

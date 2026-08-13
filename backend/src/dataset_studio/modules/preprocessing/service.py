@@ -57,12 +57,14 @@ class PreprocessService:
         has_active_jobs: Callable[[str], bool] | None = None,
         has_active_exports: Callable[[str], bool] | None = None,
         has_active_asset_deletions: Callable[[str], bool] | None = None,
+        has_active_screening: Callable[[str], bool] | None = None,
         backend_registry: ImageBackendRegistry | None = None,
     ) -> None:
         self._workspaces = workspaces
         self._has_active_jobs = has_active_jobs or (lambda _project_id: False)
         self._has_active_exports = has_active_exports or (lambda _project_id: False)
         self._has_active_asset_deletions = has_active_asset_deletions or (lambda _project_id: False)
+        self._has_active_screening = has_active_screening or (lambda _project_id: False)
         self._scanner = AssetScanner()
         self._backend_registry = backend_registry or ImageBackendRegistry()
         self._recovery = PreprocessRecoveryCoordinator(
@@ -671,6 +673,8 @@ class PreprocessService:
             raise ValueError("当前工作区正在导出数据，请先停止导出任务再修改图片文件。")
         if self._has_active_asset_deletions(project_id):
             raise ValueError("当前工作区正在删除或恢复素材，请等待操作完成。")
+        if self._has_active_screening(project_id):
+            raise ValueError("当前工作区正在筛选图片，请先停止筛选任务再修改图片文件。")
 
     @contextmanager
     def guard_workspace(self, project_id: str, operation_id: str):

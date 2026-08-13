@@ -9,10 +9,11 @@ from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.workspaces.models import WorkspaceManifest
 
-WorkerActivityKind = Literal["jobs", "exports"]
+WorkerActivityKind = Literal["jobs", "exports", "screening"]
 _ACTIVITY_COLUMNS: dict[WorkerActivityKind, str] = {
     "jobs": "jobs_requested_at",
     "exports": "exports_requested_at",
+    "screening": "screening_requested_at",
 }
 
 
@@ -197,7 +198,11 @@ class WorkspaceRegistry:
         requested_at: str | None = None,
     ) -> bool:
         column = _ACTIVITY_COLUMNS[kind]
-        other_column = _ACTIVITY_COLUMNS["exports" if kind == "jobs" else "jobs"]
+        other_columns = [
+            activity_column
+            for activity_kind, activity_column in _ACTIVITY_COLUMNS.items()
+            if activity_kind != kind
+        ]
         with transaction(self._database_path) as connection:
             if requested_at is None:
                 parameters = (project_id,)
@@ -207,7 +212,7 @@ class WorkspaceRegistry:
                 condition = f"project_id = ? AND {column} = ?"
             row = connection.execute(
                 f"""
-                SELECT {other_column}
+                SELECT {", ".join(other_columns)}
                 FROM worker_workspace_activity
                 WHERE {condition}
                 """,
@@ -215,7 +220,7 @@ class WorkspaceRegistry:
             ).fetchone()
             if row is None:
                 return False
-            if row[other_column] is None:
+            if all(row[other_column] is None for other_column in other_columns):
                 changed = connection.execute(
                     f"""
                     DELETE FROM worker_workspace_activity

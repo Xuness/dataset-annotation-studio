@@ -2,6 +2,7 @@ import {
   Bot,
   FolderOutput,
   Images,
+  ListFilter,
   ListChecks,
   Settings,
   SlidersHorizontal,
@@ -14,7 +15,7 @@ import { UpdateAnnouncementIndicator } from "../../legacy/components/UpdateAnnou
 import { useLegacyUnsavedChangesGuard } from "../../legacy/hooks/useLegacyUnsavedChangesGuard";
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 
-export type WorkspaceSection = "assets" | "preprocess" | "jobs" | "review" | "export";
+export type WorkspaceSection = "assets" | "screening" | "preprocess" | "jobs" | "review" | "export";
 
 interface NavigationItem {
   id: WorkspaceSection;
@@ -24,6 +25,7 @@ interface NavigationItem {
 
 const items: readonly NavigationItem[] = [
   { id: "assets", icon: Images, label: "素材" },
+  { id: "screening", icon: ListFilter, label: "筛选" },
   { id: "preprocess", icon: SlidersHorizontal, label: "预处理" },
   { id: "jobs", icon: Bot, label: "任务" },
   { id: "review", icon: ListChecks, label: "审核" },
@@ -32,6 +34,7 @@ const items: readonly NavigationItem[] = [
 
 const sectionPath: Record<WorkspaceSection, (projectId: string) => string> = {
   assets: (projectId) => `/workspace/${projectId}`,
+  screening: (projectId) => `/workspace/${projectId}/screening`,
   preprocess: (projectId) => `/workspace/${projectId}/preprocess`,
   jobs: (projectId) => `/workspace/${projectId}/jobs`,
   review: (projectId) => `/workspace/${projectId}/review`,

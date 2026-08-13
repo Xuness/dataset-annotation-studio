@@ -30,6 +30,13 @@ import {
   createInitialPreprocessForm,
 } from "../src/application/preprocessing/preprocessState.ts";
 import {
+  buildScreeningItemQuery,
+  buildScreeningRequest,
+  createInitialScreeningForm,
+  reconcileSelectedScreeningOperationId,
+  screeningResultsReady,
+} from "../src/application/screening/screeningState.ts";
+import {
   folderSelectionsEqual,
   reconcileFolderSelection,
   toggleFolderSelection,
@@ -198,6 +205,55 @@ test("preprocessing resolves a folder branch into an explicit immutable request"
 
   assert.deepEqual(request.asset_ids, folderAssetIds);
   assert.notEqual(request.asset_ids, folderAssetIds);
+});
+
+test("screening freezes only the current task scope and keeps ranking filters batch-local", () => {
+  const form = {
+    ...createInitialScreeningForm(),
+    scope: "folder" as const,
+    folderPaths: ["characters/hero"],
+    metadataSnapshotAtFallback: "2026-08-13T12:30",
+  };
+  const folderAssetIds = ["asset-3", "asset-8"];
+  const request = buildScreeningRequest(form, ["asset-ignored"], folderAssetIds);
+  const query = buildScreeningItemQuery({
+    pool: "low_evidence_protected",
+    rating: "s",
+    flag: "low_resolution",
+    sort: "percentile",
+  });
+
+  assert.deepEqual(request.asset_ids, folderAssetIds);
+  assert.notEqual(request.asset_ids, folderAssetIds);
+  assert.equal(request.task_profile, "character_lora");
+  assert.equal(request.metadata_snapshot_at, new Date("2026-08-13T12:30").toISOString());
+  assert.deepEqual(query, {
+    pool: "low_evidence_protected",
+    rating: "s",
+    flag: "low_resolution",
+    sort: "percentile",
+  });
+});
+
+test("screening restores active or newest task without inventing a global result", () => {
+  const operations = [
+    { id: "completed", status: "completed" },
+    { id: "running", status: "running" },
+  ] as never;
+  assert.equal(reconcileSelectedScreeningOperationId("completed", operations), "completed");
+  assert.equal(reconcileSelectedScreeningOperationId("missing", operations), "running");
+  assert.equal(reconcileSelectedScreeningOperationId(null, []), null);
+});
+
+test("screening loads result pages only for the selected terminal task", () => {
+  const operations = [
+    { id: "completed", status: "completed" },
+    { id: "running", status: "running" },
+  ] as never;
+
+  assert.equal(screeningResultsReady(operations[0]), true);
+  assert.equal(screeningResultsReady(operations[1]), false);
+  assert.equal(screeningResultsReady(null), false);
 });
 
 test("folder selection toggles, reconciles and persists by annotation project", () => {
@@ -1449,6 +1505,7 @@ function desktopJobs(overrides: Partial<ActiveDesktopJobs> = {}): ActiveDesktopJ
     translation_job_count: 0,
     preprocessing_count: 0,
     export_count: 0,
+    screening_count: 0,
     asset_deletion_count: 0,
     tagger_download_count: 0,
     tag_dictionary_download_count: 0,
@@ -1613,6 +1670,7 @@ test("desktop exit blocks while preprocessing is writing files", async () => {
 
 test("desktop exit safely stops resumable jobs before terminating the application", async () => {
   const calls: string[] = [];
+  let confirmationMessage = "";
   let activeChecks = 0;
   const result = await runDesktopExit(
     false,
@@ -1624,11 +1682,13 @@ test("desktop exit safely stops resumable jobs before terminating the applicatio
           ? desktopJobs({
               annotation_job_count: 1,
               export_count: 1,
+              screening_count: 1,
               tagger_download_count: 1,
             })
           : desktopJobs();
       },
-      confirm: async () => {
+      confirm: async (message) => {
+        confirmationMessage = message;
         calls.push("confirm-stop");
         return true;
       },
@@ -1645,6 +1705,7 @@ test("desktop exit safely stops resumable jobs before terminating the applicatio
   );
 
   assert.equal(result, "exiting");
+  assert.match(confirmationMessage, /4 个.*筛选/u);
   assert.deepEqual(calls, [
     "get-active:1",
     "confirm-stop",

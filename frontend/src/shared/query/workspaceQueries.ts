@@ -12,6 +12,7 @@ export const WORKSPACE_QUERY_SCOPES = [
   "statistics",
   "jobs",
   "preprocessing",
+  "screening",
   "exports",
   "asset-deletions",
 ] as const;

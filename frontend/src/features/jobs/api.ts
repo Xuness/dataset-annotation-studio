@@ -75,6 +75,7 @@ export function getActiveJobs(): Promise<{
   translation_job_count: number;
   preprocessing_count: number;
   export_count: number;
+  screening_count: number;
   asset_deletion_count: number;
   tagger_download_count: number;
   tag_dictionary_download_count: number;

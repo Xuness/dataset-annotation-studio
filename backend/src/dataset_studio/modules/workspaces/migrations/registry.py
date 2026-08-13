@@ -54,6 +54,9 @@ from dataset_studio.modules.workspaces.migrations.v016_translation_variants impo
 from dataset_studio.modules.workspaces.migrations.v017_local_dictionary_jobs import (
     MIGRATION as V017_LOCAL_DICTIONARY_JOBS,
 )
+from dataset_studio.modules.workspaces.migrations.v018_screening_operations import (
+    MIGRATION as V018_SCREENING_OPERATIONS,
+)
 
 WORKSPACE_MIGRATIONS: Final[tuple[Migration, ...]] = (
     V001_INITIAL_WORKSPACE_SCHEMA,
@@ -73,5 +76,6 @@ WORKSPACE_MIGRATIONS: Final[tuple[Migration, ...]] = (
     V015_PREPROCESS_EXECUTION_RUNTIME,
     V016_TRANSLATION_VARIANTS,
     V017_LOCAL_DICTIONARY_JOBS,
+    V018_SCREENING_OPERATIONS,
 )
 WORKSPACE_SCHEMA_VERSION: Final = WORKSPACE_MIGRATIONS[-1].version

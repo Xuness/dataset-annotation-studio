@@ -27,6 +27,11 @@ const PreprocessPage = lazy(() =>
     default: module.PreprocessPage,
   })),
 );
+const ScreeningPage = lazy(() =>
+  import("../pages/screening/ScreeningPage").then((module) => ({
+    default: module.ScreeningPage,
+  })),
+);
 const ExportPage = lazy(() =>
   import("../pages/export/ExportPage").then((module) => ({
     default: module.ExportPage,
@@ -67,6 +72,7 @@ export function LegacyApp() {
             <Route path="/workspace/:projectId" element={<WorkspacePage />} />
             <Route path="/workspace/:projectId/review" element={<WorkspacePage mode="review" />} />
             <Route path="/workspace/:projectId/jobs" element={<JobsPage />} />
+            <Route path="/workspace/:projectId/screening" element={<ScreeningPage />} />
             <Route path="/workspace/:projectId/preprocess" element={<PreprocessPage />} />
             <Route path="/workspace/:projectId/export" element={<ExportPage />} />
             <Route path="/presets" element={<PresetsPage />} />

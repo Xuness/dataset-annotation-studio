@@ -38,6 +38,7 @@ def execute_deletion(
         container.exports.ensure_inactive(project_id)
         container.jobs.ensure_inactive(project_id)
         container.asset_deletions.ensure_persisted_inactive(project_id)
+        container.screening.ensure_inactive(project_id)
         return container.asset_deletions.execute(project_id, execution)
 
 
@@ -67,4 +68,5 @@ def undo_deletion(
         container.exports.ensure_inactive(project_id)
         container.jobs.ensure_inactive(project_id)
         container.asset_deletions.ensure_persisted_inactive(project_id)
+        container.screening.ensure_inactive(project_id)
         return container.asset_deletions.undo(project_id, operation_id)

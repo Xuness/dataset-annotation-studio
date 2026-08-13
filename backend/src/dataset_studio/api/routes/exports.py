@@ -27,6 +27,7 @@ def create_export(
     container: Container,
 ):
     with container.preprocessing.guard_workspace(project_id, "create-export"):
+        container.screening.ensure_inactive(project_id)
         return container.exports.create(project_id, execution)
 
 
@@ -52,4 +53,5 @@ def stop_export(project_id: str, operation_id: str, container: Container):
 @router.post("/{operation_id}/resume", response_model=ExportOperation)
 def resume_export(project_id: str, operation_id: str, container: Container):
     with container.preprocessing.guard_workspace(project_id, f"resume-export:{operation_id}"):
+        container.screening.ensure_inactive(project_id)
         return container.exports.resume(project_id, operation_id)

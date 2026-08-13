@@ -112,12 +112,23 @@ def test_remove_recent_clears_idle_worker_candidates(tmp_path: Path) -> None:
     workspace, _ = workspaces.open(str(project))
     workspaces.mark_worker_activity(workspace.project_id, "jobs")
     workspaces.mark_worker_activity(workspace.project_id, "exports")
+    workspaces.mark_worker_activity(workspace.project_id, "screening")
+
+    assert workspaces.clear_worker_activity(workspace.project_id, "screening") is True
+    assert [candidate.project_id for candidate in workspaces.worker_candidates("jobs")] == [
+        workspace.project_id
+    ]
+    assert [candidate.project_id for candidate in workspaces.worker_candidates("exports")] == [
+        workspace.project_id
+    ]
+    workspaces.mark_worker_activity(workspace.project_id, "screening")
 
     workspaces.remove_recent(workspace.project_id)
 
     assert workspaces.list_recent() == []
     assert workspaces.worker_candidates("jobs") == []
     assert workspaces.worker_candidates("exports") == []
+    assert workspaces.worker_candidates("screening") == []
     assert workspaces.get(workspace.project_id)[0].database.is_file()
     assert (project / "sample.png").is_file()
 

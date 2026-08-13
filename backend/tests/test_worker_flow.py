@@ -44,6 +44,7 @@ from dataset_studio.modules.providers.config import (
     ProviderModelConfig,
 )
 from dataset_studio.modules.providers.models import ProviderResponse
+from dataset_studio.modules.screening.service import ScreeningService
 from dataset_studio.modules.statistics.service import StatisticsService
 from dataset_studio.modules.tag_dictionaries.downloads.repository import (
     TagDictionaryDownloadRepository,
@@ -223,6 +224,7 @@ def _runtime(tmp_path: Path):
         preprocessing=PreprocessService(workspaces),
         exports=ExportService(workspaces),
         statistics=StatisticsService(workspaces),
+        screening=ScreeningService(workspaces),
         codex=CodexRuntime(),
         taggers=taggers,
         tag_dictionaries=tag_dictionaries,

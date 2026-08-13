@@ -33,11 +33,13 @@ def _scan_guard(
             container.exports.ensure_inactive(project_id)
             container.jobs.ensure_inactive(project_id)
             container.asset_deletions.ensure_persisted_inactive(project_id)
+            container.screening.ensure_inactive(project_id)
         else:
             container.preprocessing.ensure_database_inactive(database_path)
             container.exports.ensure_database_inactive(database_path)
             container.jobs.ensure_database_inactive(database_path)
             container.asset_deletions.ensure_database_inactive(database_path)
+            container.screening.ensure_database_inactive(database_path)
         yield
 
 
@@ -49,6 +51,7 @@ def _open_scan_guard(container: AppContainer, project_id: str, database_path: Pa
             or container.exports.has_active_database(database_path)
             or container.jobs.has_active_database(database_path)
             or container.asset_deletions.has_active_database(database_path)
+            or container.screening.has_active_database(database_path)
         )
         yield not active
 

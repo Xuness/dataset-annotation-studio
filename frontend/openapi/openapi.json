@@ -31,6 +31,11 @@
             "title": "Project Count",
             "type": "integer"
           },
+          "screening_count": {
+            "default": 0,
+            "title": "Screening Count",
+            "type": "integer"
+          },
           "tag_dictionary_download_count": {
             "default": 0,
             "title": "Tag Dictionary Download Count",
@@ -5510,6 +5515,825 @@
         ],
         "title": "ScanResult",
         "type": "object"
+      },
+      "ScreeningAssetIds": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ids",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ids",
+          "total"
+        ],
+        "title": "ScreeningAssetIds",
+        "type": "object"
+      },
+      "ScreeningCandidatePool": {
+        "enum": [
+          "elite_candidate",
+          "recommended",
+          "low_evidence_protected",
+          "review",
+          "low_priority_high_confidence",
+          "quarantine",
+          "invalid"
+        ],
+        "title": "ScreeningCandidatePool",
+        "type": "string"
+      },
+      "ScreeningCapabilities": {
+        "properties": {
+          "batch_local_only": {
+            "default": true,
+            "title": "Batch Local Only",
+            "type": "boolean"
+          },
+          "candidate_pools": {
+            "items": {
+              "$ref": "#/components/schemas/ScreeningCandidatePool"
+            },
+            "title": "Candidate Pools",
+            "type": "array"
+          },
+          "disabled_signals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Disabled Signals",
+            "type": "array"
+          },
+          "enabled_signals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Enabled Signals",
+            "type": "array"
+          },
+          "intensities": {
+            "items": {
+              "$ref": "#/components/schemas/ScreeningIntensity"
+            },
+            "title": "Intensities",
+            "type": "array"
+          },
+          "max_assets_per_operation": {
+            "default": 100000,
+            "title": "Max Assets Per Operation",
+            "type": "integer"
+          },
+          "modifies_assets": {
+            "default": false,
+            "title": "Modifies Assets",
+            "type": "boolean"
+          },
+          "reads_global_archive": {
+            "default": false,
+            "title": "Reads Global Archive",
+            "type": "boolean"
+          },
+          "score_mode": {
+            "default": "batch_only_v0_1",
+            "title": "Score Mode",
+            "type": "string"
+          },
+          "score_version": {
+            "default": "metarank-batch-v0.1",
+            "title": "Score Version",
+            "type": "string"
+          },
+          "task_profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ScreeningTaskProfile"
+            },
+            "title": "Task Profiles",
+            "type": "array"
+          }
+        },
+        "title": "ScreeningCapabilities",
+        "type": "object"
+      },
+      "ScreeningIntensity": {
+        "enum": [
+          "conservative",
+          "balanced",
+          "aggressive"
+        ],
+        "title": "ScreeningIntensity",
+        "type": "string"
+      },
+      "ScreeningItem": {
+        "properties": {
+          "age_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Bucket"
+          },
+          "age_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Hours"
+          },
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "candidate_pool": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScreeningCandidatePool"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence_depth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Depth"
+          },
+          "confidence_pop": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Pop"
+          },
+          "confidence_vote": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Vote"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "downvote_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Downvote Count"
+          },
+          "duplicate_of_asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of Asset Id"
+          },
+          "duplicate_representative": {
+            "default": true,
+            "title": "Duplicate Representative",
+            "type": "boolean"
+          },
+          "elite_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elite Score"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "evidence_mass": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Mass"
+          },
+          "fav_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fav Count"
+          },
+          "final_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Score"
+          },
+          "image_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Height"
+          },
+          "image_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Width"
+          },
+          "keep_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keep Score"
+          },
+          "low_resolution_flag": {
+            "default": false,
+            "title": "Low Resolution Flag",
+            "type": "boolean"
+          },
+          "metadata_relative_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Relative Path"
+          },
+          "metadata_snapshot_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Snapshot At"
+          },
+          "pixel_duplicate_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pixel Duplicate Group"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "rating_percentile": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Percentile"
+          },
+          "rating_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Rank"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reason Codes",
+            "type": "array"
+          },
+          "score_details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScreeningScoreDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_relative_path": {
+            "title": "Source Relative Path",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "parsed",
+              "scored",
+              "invalid"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "technical_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Technical Score"
+          },
+          "up_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Up Score"
+          },
+          "variant_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Group"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "asset_id",
+          "source_relative_path",
+          "status"
+        ],
+        "title": "ScreeningItem",
+        "type": "object"
+      },
+      "ScreeningItemList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScreeningItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "ScreeningItemList",
+        "type": "object"
+      },
+      "ScreeningOperation": {
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "configuration_snapshot": {
+            "additionalProperties": true,
+            "title": "Configuration Snapshot",
+            "type": "object"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_relative_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Relative Path"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "invalid_items": {
+            "title": "Invalid Items",
+            "type": "integer"
+          },
+          "pool_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Pool Counts",
+            "type": "object"
+          },
+          "processed_items": {
+            "title": "Processed Items",
+            "type": "integer"
+          },
+          "rating_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Rating Counts",
+            "type": "object"
+          },
+          "score_mode": {
+            "title": "Score Mode",
+            "type": "string"
+          },
+          "score_version": {
+            "title": "Score Version",
+            "type": "string"
+          },
+          "scored_items": {
+            "title": "Scored Items",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ScreeningOperationStatus"
+          },
+          "total_items": {
+            "title": "Total Items",
+            "type": "integer"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "score_mode",
+          "score_version",
+          "total_items",
+          "processed_items",
+          "scored_items",
+          "invalid_items",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ScreeningOperation",
+        "type": "object"
+      },
+      "ScreeningOperationStatus": {
+        "enum": [
+          "queued",
+          "running",
+          "stopping",
+          "stopped",
+          "interrupted",
+          "completed",
+          "failed"
+        ],
+        "title": "ScreeningOperationStatus",
+        "type": "string"
+      },
+      "ScreeningPreview": {
+        "properties": {
+          "available_count": {
+            "title": "Available Count",
+            "type": "integer"
+          },
+          "metadata_available_count": {
+            "title": "Metadata Available Count",
+            "type": "integer"
+          },
+          "metadata_missing_count": {
+            "title": "Metadata Missing Count",
+            "type": "integer"
+          },
+          "missing_asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Asset Ids",
+            "type": "array"
+          },
+          "requested_count": {
+            "title": "Requested Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requested_count",
+          "available_count",
+          "metadata_available_count",
+          "metadata_missing_count"
+        ],
+        "title": "ScreeningPreview",
+        "type": "object"
+      },
+      "ScreeningRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100000,
+            "minItems": 1,
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "intensity": {
+            "$ref": "#/components/schemas/ScreeningIntensity",
+            "default": "balanced"
+          },
+          "metadata_snapshot_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Snapshot At"
+          },
+          "task_profile": {
+            "const": "character_lora",
+            "default": "character_lora",
+            "title": "Task Profile",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_ids"
+        ],
+        "title": "ScreeningRequest",
+        "type": "object"
+      },
+      "ScreeningScoreDetails": {
+        "properties": {
+          "bad_consensus_second": {
+            "title": "Bad Consensus Second",
+            "type": "number"
+          },
+          "bad_depth": {
+            "title": "Bad Depth",
+            "type": "number"
+          },
+          "bad_pop": {
+            "title": "Bad Pop",
+            "type": "number"
+          },
+          "bad_vote": {
+            "title": "Bad Vote",
+            "type": "number"
+          },
+          "depth_percentile_final": {
+            "title": "Depth Percentile Final",
+            "type": "number"
+          },
+          "depth_percentile_raw": {
+            "title": "Depth Percentile Raw",
+            "type": "number"
+          },
+          "popularity_percentile_final": {
+            "title": "Popularity Percentile Final",
+            "type": "number"
+          },
+          "popularity_percentile_raw": {
+            "title": "Popularity Percentile Raw",
+            "type": "number"
+          },
+          "vote_keep_signal": {
+            "title": "Vote Keep Signal",
+            "type": "number"
+          },
+          "vote_percentile_lower": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vote Percentile Lower"
+          },
+          "vote_percentile_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vote Percentile Mean"
+          },
+          "vote_posterior_lower_95": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vote Posterior Lower 95"
+          },
+          "vote_posterior_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vote Posterior Mean"
+          }
+        },
+        "required": [
+          "popularity_percentile_raw",
+          "popularity_percentile_final",
+          "depth_percentile_raw",
+          "depth_percentile_final",
+          "vote_keep_signal",
+          "bad_pop",
+          "bad_depth",
+          "bad_vote",
+          "bad_consensus_second"
+        ],
+        "title": "ScreeningScoreDetails",
+        "type": "object"
+      },
+      "ScreeningTaskProfile": {
+        "enum": [
+          "character_lora",
+          "general_aesthetic",
+          "style_lora"
+        ],
+        "title": "ScreeningTaskProfile",
+        "type": "string"
       },
       "ServiceTier": {
         "enum": [
@@ -14808,6 +15632,702 @@
         "summary": "Scan Workspace",
         "tags": [
           "workspaces"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/screening/capabilities": {
+      "get": {
+        "operationId": "screening_capabilities_api_v1_workspaces__project_id__screening_capabilities_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningCapabilities"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Screening Capabilities",
+        "tags": [
+          "screening"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/screening/operations": {
+      "get": {
+        "operationId": "list_screening_operations_api_v1_workspaces__project_id__screening_operations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScreeningOperation"
+                  },
+                  "title": "Response List Screening Operations Api V1 Workspaces  Project Id  Screening Operations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Screening Operations",
+        "tags": [
+          "screening"
+        ]
+      },
+      "post": {
+        "operationId": "create_screening_api_v1_workspaces__project_id__screening_operations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreeningRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Screening",
+        "tags": [
+          "screening"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}": {
+      "get": {
+        "operationId": "get_screening_operation_api_v1_workspaces__project_id__screening_operations__operation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Screening Operation",
+        "tags": [
+          "screening"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/asset-ids": {
+      "get": {
+        "operationId": "screening_asset_ids_api_v1_workspaces__project_id__screening_operations__operation_id__asset_ids_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pool",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ScreeningCandidatePool"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pool"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rating",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "g",
+                    "s",
+                    "q",
+                    "e"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rating"
+            }
+          },
+          {
+            "in": "query",
+            "name": "low_resolution",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Low Resolution"
+            }
+          },
+          {
+            "in": "query",
+            "name": "duplicate_variant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Duplicate Variant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningAssetIds"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Screening Asset Ids",
+        "tags": [
+          "screening"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/items": {
+      "get": {
+        "operationId": "list_screening_items_api_v1_workspaces__project_id__screening_operations__operation_id__items_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pool",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ScreeningCandidatePool"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pool"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rating",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "g",
+                    "s",
+                    "q",
+                    "e"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rating"
+            }
+          },
+          {
+            "in": "query",
+            "name": "low_resolution",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Low Resolution"
+            }
+          },
+          {
+            "in": "query",
+            "name": "duplicate_variant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Duplicate Variant"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "priority",
+              "enum": [
+                "priority",
+                "percentile",
+                "score",
+                "path"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningItemList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Screening Items",
+        "tags": [
+          "screening"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/items/{asset_id}": {
+      "get": {
+        "operationId": "get_screening_item_api_v1_workspaces__project_id__screening_operations__operation_id__items__asset_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Screening Item",
+        "tags": [
+          "screening"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/resume": {
+      "post": {
+        "operationId": "resume_screening_operation_api_v1_workspaces__project_id__screening_operations__operation_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Screening Operation",
+        "tags": [
+          "screening"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/stop": {
+      "post": {
+        "operationId": "stop_screening_operation_api_v1_workspaces__project_id__screening_operations__operation_id__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Screening Operation",
+        "tags": [
+          "screening"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/screening/preview": {
+      "post": {
+        "operationId": "preview_screening_api_v1_workspaces__project_id__screening_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreeningRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Screening",
+        "tags": [
+          "screening"
         ]
       }
     },

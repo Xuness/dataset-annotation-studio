@@ -180,6 +180,7 @@ class ActiveJobsOverview(BaseModel):
     translation_job_count: int = 0
     preprocessing_count: int = 0
     export_count: int = 0
+    screening_count: int = 0
     asset_deletion_count: int = 0
     tagger_download_count: int = 0
     tag_dictionary_download_count: int = 0
