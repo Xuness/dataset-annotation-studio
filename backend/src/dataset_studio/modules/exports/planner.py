@@ -14,6 +14,11 @@ from dataset_studio.modules.annotations.projection import (
     resolve_annotation_state,
     translation_dependency_revision_sql,
 )
+from dataset_studio.modules.assets.candidates import (
+    candidate_scope_clause,
+    ensure_assets_in_effective_scope,
+)
+from dataset_studio.modules.assets.models import CandidateScope
 from dataset_studio.modules.exports.models import (
     ExportChannelSelection,
     ExportFormat,
@@ -220,11 +225,18 @@ def _validate_destination(
 
 
 def _select_assets(database_path: Path, request: ExportRequest):
+    if request.scope != ExportScope.ALL:
+        ensure_assets_in_effective_scope(database_path, request.asset_ids)
     connection = connect(database_path)
     try:
         if request.scope == ExportScope.ALL:
             rows = connection.execute(
-                "SELECT * FROM assets WHERE is_present = 1 ORDER BY relative_path COLLATE NOCASE"
+                f"""
+                SELECT * FROM assets
+                WHERE is_present = 1
+                  AND {candidate_scope_clause(CandidateScope.AUTO, asset_alias="assets")}
+                ORDER BY relative_path COLLATE NOCASE
+                """
             ).fetchall()
             return rows, []
 

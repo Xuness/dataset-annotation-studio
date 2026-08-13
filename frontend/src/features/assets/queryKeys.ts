@@ -1,4 +1,5 @@
 import type { AssetQuery } from "./api";
+import type { CandidateScope } from "../../shared/api/types";
 import { workspaceQueryKeys } from "../../shared/query/workspaceQueries";
 
 export const assetKeys = {
@@ -9,8 +10,12 @@ export const assetKeys = {
     [...workspaceQueryKeys.scope(projectId, "assets"), "infinite", query, pageSize] as const,
   ids: (projectId: string, query: AssetQuery) =>
     [...workspaceQueryKeys.scope(projectId, "assets"), "ids", query] as const,
-  folders: (projectId: string) =>
-    [...workspaceQueryKeys.scope(projectId, "assets"), "folders"] as const,
+  folders: (projectId: string, candidateScope: CandidateScope) =>
+    [...workspaceQueryKeys.scope(projectId, "assets"), "folders", candidateScope] as const,
+  candidates: (projectId: string) =>
+    [...workspaceQueryKeys.scope(projectId, "assets"), "candidates"] as const,
+  candidateIds: (projectId: string) =>
+    [...workspaceQueryKeys.scope(projectId, "assets"), "candidates", "ids"] as const,
 };
 
 export const promptPreviewKeys = {

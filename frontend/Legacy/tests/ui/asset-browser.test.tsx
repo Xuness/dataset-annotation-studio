@@ -27,6 +27,7 @@ const asset: AssetSummary = {
   annotation_relative_path: "portraits/sample.txt",
   annotation_status: "valid",
   metadata_relative_path: null,
+  is_candidate: true,
   generation_status: null,
   generation_error: null,
   annotation_channels: {
@@ -72,6 +73,10 @@ describe("asset browser rows", () => {
           },
         ]}
         selectedFolderPath=""
+        candidateScope="auto"
+        candidateActive
+        candidateCount={1}
+        totalAssetCount={2}
         foldersLoading={false}
         recursive={false}
         hasMore={false}
@@ -84,6 +89,7 @@ describe("asset browser rows", () => {
         onSearchChange={() => undefined}
         onStatusChange={() => undefined}
         onFolderSelect={async () => true}
+        onCandidateScopeChange={async () => true}
         onSelect={onSelect}
         onSetChecked={onSetChecked}
         onToggleAll={() => undefined}
@@ -103,6 +109,8 @@ describe("asset browser rows", () => {
     expect(openButton.contains(checkbox)).toBe(false);
     expect(screen.getByTitle("LLM 描述：已复核").textContent).toBe("L");
     expect(screen.getByTitle("zh-CN 译文：已过期").textContent).toBe("zh-CN");
+    expect(screen.getByTitle("已加入持久候选集").textContent).toBe("候选");
+    expect(screen.getByRole("button", { name: "全部 2" })).toBeTruthy();
 
     await user.click(checkbox);
     expect(onSetChecked).toHaveBeenCalledWith(["asset-1"], false);

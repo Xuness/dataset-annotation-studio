@@ -1,8 +1,9 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { matchPath, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { SettingsCenter } from "../app/settings/SettingsCenter";
 import { useCloseGuard } from "../../src/application/useCloseGuard";
+import { useCandidateSelectionHydration } from "../../src/application/workspace/useCandidateSelectionHydration";
 import { isDesktopRuntime } from "../../src/shared/desktop/runtime";
 import { useClipboardHistoryBridge } from "../../src/shared/desktop/useClipboardHistoryBridge";
 import { useDesktopWindowBehavior } from "../../src/shared/desktop/useDesktopWindowBehavior";
@@ -50,6 +51,9 @@ export function LegacyApp() {
   useApplyInterfaceScale();
   const desktopRuntime = isDesktopRuntime();
   const location = useLocation();
+  const workspaceProjectId =
+    matchPath("/workspace/:projectId/*", location.pathname)?.params.projectId ?? null;
+  useCandidateSelectionHydration(workspaceProjectId);
   const desktopSceneTarget = location.pathname === "/" ? "home" : "workspace";
 
   return (

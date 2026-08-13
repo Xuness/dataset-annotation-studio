@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from dataset_studio.modules.annotations.models import AnnotationStatus
 
@@ -43,6 +44,7 @@ class AssetSummary(BaseModel):
     annotation_relative_path: str
     annotation_status: AnnotationStatus
     metadata_relative_path: str | None = None
+    is_candidate: bool = False
     generation_status: Literal["failed"] | None = None
     generation_error: str | None = None
     annotation_channels: dict[str, str] = Field(default_factory=dict)
@@ -71,6 +73,67 @@ class AssetFolderSummary(BaseModel):
 
 class AssetFolderListResponse(BaseModel):
     items: list[AssetFolderSummary]
+
+
+class CandidateScope(StrEnum):
+    AUTO = "auto"
+    CANDIDATES = "candidates"
+    ALL = "all"
+
+
+class CandidateUpdateAction(StrEnum):
+    ADD = "add"
+    REMOVE = "remove"
+    REPLACE = "replace"
+    CLEAR = "clear"
+
+
+class CandidateSourceKind(StrEnum):
+    MANUAL = "manual"
+    SCREENING = "screening"
+
+
+class CandidateSetSummary(BaseModel):
+    total_assets: int = Field(ge=0)
+    candidate_count: int = Field(ge=0)
+    effective_count: int = Field(ge=0)
+    active: bool
+
+
+class CandidateUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: CandidateUpdateAction
+    asset_ids: list[str] = Field(default_factory=list, max_length=100_000)
+    source_kind: CandidateSourceKind = CandidateSourceKind.MANUAL
+    source_operation_id: str | None = Field(default=None, min_length=1, max_length=200)
+
+    @field_validator("asset_ids")
+    @classmethod
+    def normalize_asset_ids(cls, value: list[str]) -> list[str]:
+        normalized = list(dict.fromkeys(asset_id.strip() for asset_id in value if asset_id.strip()))
+        if len(normalized) != len(value):
+            raise ValueError("候选图片 ID 不能为空或重复。")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_action(self):
+        if self.action == CandidateUpdateAction.CLEAR:
+            if self.asset_ids:
+                raise ValueError("清空候选集时不能同时提交图片 ID。")
+        elif not self.asset_ids:
+            raise ValueError("当前候选集操作至少需要一张图片。")
+
+        records_provenance = self.action in {
+            CandidateUpdateAction.ADD,
+            CandidateUpdateAction.REPLACE,
+        }
+        if records_provenance and self.source_kind == CandidateSourceKind.SCREENING:
+            if not self.source_operation_id:
+                raise ValueError("从筛选结果写入候选集时必须提供筛选任务 ID。")
+        elif self.source_kind == CandidateSourceKind.MANUAL and self.source_operation_id:
+            raise ValueError("手动候选操作不能关联筛选任务。")
+        return self
 
 
 class MetadataDocument(BaseModel):

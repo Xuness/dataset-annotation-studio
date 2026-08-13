@@ -6,6 +6,7 @@ import {
   CircleAlert,
   FileQuestion,
   History,
+  ListChecks,
   Search,
   Tags,
   Trash2,
@@ -17,6 +18,7 @@ import type {
   AssetFilterStatus,
   AssetFolderSummary,
   AssetSummary,
+  CandidateScope,
 } from "../../../../src/shared/api/types";
 import { formatBytes } from "../../../../src/shared/format/bytes";
 import { Spinner } from "../../../shared/ui/Spinner";
@@ -37,6 +39,10 @@ interface AssetBrowserProps {
   statusCounts: Record<string, number>;
   folders: AssetFolderSummary[];
   selectedFolderPath: string;
+  candidateScope: Extract<CandidateScope, "auto" | "all">;
+  candidateActive: boolean;
+  candidateCount: number;
+  totalAssetCount: number;
   foldersLoading: boolean;
   recursive: boolean;
   hasMore: boolean;
@@ -49,6 +55,7 @@ interface AssetBrowserProps {
   onSearchChange: (value: string) => void;
   onStatusChange: (value: StatusFilter) => void;
   onFolderSelect: (path: string) => Promise<boolean>;
+  onCandidateScopeChange: (scope: Extract<CandidateScope, "auto" | "all">) => Promise<boolean>;
   onSelect: (assetId: string) => Promise<boolean>;
   onSetChecked: (assetIds: string[], checked: boolean) => void;
   onToggleAll: () => void;
@@ -133,6 +140,10 @@ export function AssetBrowser({
   statusCounts,
   folders,
   selectedFolderPath,
+  candidateScope,
+  candidateActive,
+  candidateCount,
+  totalAssetCount,
   foldersLoading,
   recursive,
   hasMore,
@@ -145,6 +156,7 @@ export function AssetBrowser({
   onSearchChange,
   onStatusChange,
   onFolderSelect,
+  onCandidateScopeChange,
   onSelect,
   onSetChecked,
   onToggleAll,
@@ -177,7 +189,7 @@ export function AssetBrowser({
 
   useEffect(() => {
     rangeAnchorIdRef.current = null;
-  }, [mode, projectId, search, selectedFolderPath, statusFilter]);
+  }, [candidateScope, mode, projectId, search, selectedFolderPath, statusFilter]);
 
   function toggleChecked(assetId: string, shiftKey: boolean) {
     const targetIndex = assets.findIndex((asset) => asset.id === assetId);
@@ -282,6 +294,31 @@ export function AssetBrowser({
         <div>
           <span className="eyebrow">{mode === "review" ? "Review Queue" : "Dataset"}</span>
           <strong>{total} 张图片</strong>
+          <div className="asset-candidate-scope" role="group" aria-label="素材范围">
+            <button
+              type="button"
+              className={candidateScope === "auto" ? "is-active" : ""}
+              title={
+                candidateActive
+                  ? "候选集存在时，素材页与后续流程默认只使用候选图片"
+                  : "候选集为空，当前自动使用项目内全部图片"
+              }
+              onClick={() => void onCandidateScopeChange("auto")}
+            >
+              <ListChecks size={12} />
+              {candidateActive ? `候选 ${candidateCount}` : `自动范围 ${totalAssetCount}`}
+            </button>
+            {candidateActive ? (
+              <button
+                type="button"
+                className={candidateScope === "all" ? "is-active" : ""}
+                title="临时查看项目内全部素材；不会改变候选集"
+                onClick={() => void onCandidateScopeChange("all")}
+              >
+                全部 {totalAssetCount}
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="asset-browser__header-actions">
           <button
@@ -449,6 +486,11 @@ export function AssetBrowser({
                       <strong title={asset.filename}>{asset.filename}</strong>
                       <small>
                         {asset.width} × {asset.height} · {formatBytes(asset.byte_size, "KB")}
+                        {asset.is_candidate ? (
+                          <i className="asset-row__candidate" title="已加入持久候选集">
+                            候选
+                          </i>
+                        ) : null}
                         <span className="asset-row__channels" aria-label="标注通道状态">
                           {Object.entries(asset.annotation_channels ?? {})
                             .filter(([, status]) => status !== "missing")

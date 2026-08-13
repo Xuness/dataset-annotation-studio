@@ -100,7 +100,11 @@ export function useScreeningActions(projectId: string) {
         });
       },
     }),
-    resolveAssetIds: useMutation({
+    resolveCurrentAssetIds: useMutation({
+      mutationFn: ({ operationId, query }: { operationId: string; query: ScreeningItemQuery }) =>
+        listScreeningAssetIds(projectId, operationId, query),
+    }),
+    resolveCandidateAssetIds: useMutation({
       mutationFn: ({ operationId, query }: { operationId: string; query: ScreeningItemQuery }) =>
         listScreeningAssetIds(projectId, operationId, query),
     }),

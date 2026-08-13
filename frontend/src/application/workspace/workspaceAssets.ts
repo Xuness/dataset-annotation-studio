@@ -58,13 +58,14 @@ export function areAllAssetsChecked(
   return matchingAssetIds.every((assetId) => checked.has(assetId));
 }
 
-export function editorDiscardMessage(kind: EditorDirtyKind, destination: "asset" | "folder") {
+export function editorDiscardMessage(
+  kind: EditorDirtyKind,
+  destination: "asset" | "folder" | "scope",
+) {
+  const action =
+    destination === "asset" ? "切换图片" : destination === "folder" ? "切换目录" : "切换素材范围";
   if (kind === "tags") {
-    return destination === "asset"
-      ? "当前 Tags 修改尚未保存，切换图片会丢弃这些修改。"
-      : "当前 Tags 修改尚未保存，切换目录会丢弃这些修改。";
+    return `当前 Tags 修改尚未保存，${action}会丢弃这些修改。`;
   }
-  return destination === "asset"
-    ? "当前标注尚未保存，切换图片会丢弃未保存的修改。"
-    : "当前标注尚未保存，切换目录会丢弃未保存的修改。";
+  return `当前标注尚未保存，${action}会丢弃未保存的修改。`;
 }

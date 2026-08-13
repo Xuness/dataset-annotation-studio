@@ -20,6 +20,7 @@ interface Props {
   form: PreprocessFormState;
   onChange: (update: Partial<PreprocessFormState>) => void;
   assetCount: number;
+  candidateActive: boolean;
   checkedCount: number;
   preview: PreprocessPreview | undefined;
   previewPending: boolean;
@@ -37,6 +38,7 @@ export function PreprocessSettingsPanel({
   form,
   onChange,
   assetCount,
+  candidateActive,
   checkedCount,
   preview,
   previewPending,
@@ -103,7 +105,8 @@ export function PreprocessSettingsPanel({
           className={form.scope === "all" ? "is-active" : ""}
           onClick={() => onChange({ scope: "all" })}
         >
-          当前项目<small>{assetCount} 张</small>
+          {candidateActive ? "候选工作集" : "当前项目"}
+          <small>{assetCount} 张</small>
         </button>
         <button
           className={form.scope === "selected" ? "is-active" : ""}

@@ -1,15 +1,19 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   getAnnotationTrace,
   getAnnotationTraces,
+  getCandidateSummary,
   getMetadata,
   getPromptPreview,
   listAssetIds,
   listAssetFolders,
   listAssets,
+  listCandidateIds,
+  updateCandidates,
   type AssetQuery,
 } from "./api";
+import type { CandidateScope, CandidateUpdateRequest } from "../../shared/api/types";
 import { annotationTraceKeys, assetKeys, metadataKeys, promptPreviewKeys } from "./queryKeys";
 
 interface AssetQueryOptions {
@@ -60,12 +64,42 @@ export function useAssetIds(projectId: string, query: AssetQuery, enabled = fals
   });
 }
 
-export function useAssetFolders(projectId: string, enabled = true) {
+export function useAssetFolders(
+  projectId: string,
+  enabled = true,
+  candidateScope: CandidateScope = "auto",
+) {
   return useQuery({
-    queryKey: assetKeys.folders(projectId),
-    queryFn: () => listAssetFolders(projectId),
+    queryKey: assetKeys.folders(projectId, candidateScope),
+    queryFn: () => listAssetFolders(projectId, candidateScope),
     enabled: Boolean(projectId) && enabled,
   });
+}
+
+export function useCandidateSummary(projectId: string) {
+  return useQuery({
+    queryKey: assetKeys.candidates(projectId),
+    queryFn: () => getCandidateSummary(projectId),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useCandidateIds(projectId: string, enabled = false) {
+  return useQuery({
+    queryKey: assetKeys.candidateIds(projectId),
+    queryFn: () => listCandidateIds(projectId),
+    enabled: Boolean(projectId) && enabled,
+  });
+}
+
+export function useCandidateActions(projectId: string) {
+  const queryClient = useQueryClient();
+  return {
+    update: useMutation({
+      mutationFn: (request: CandidateUpdateRequest) => updateCandidates(projectId, request),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) }),
+    }),
+  };
 }
 
 export function usePromptPreview(projectId: string, assetId: string | null, enabled = true) {

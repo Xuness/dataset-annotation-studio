@@ -46,6 +46,7 @@ EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS = {
     17: "ed30a1d11d3d3cf01a49aee9ee739778d20db94e956f7117190272c2e6c1d6c2",
     18: "5a9307e485bbc72f7092bf7bde8902bd6b383495ba2656329b3e7b1c960244ba",
     19: "0a1888b731c2e971b12d5a844a2439d0a9ce925472fade121933ac8f5e6d319e",
+    20: "f2475fc69e1472cafd52243bc5b71202cb1d86023f0f1b37a344e251f55a566c",
 }
 
 
@@ -152,6 +153,45 @@ def test_screening_task_profile_migration_preserves_existing_results(tmp_path: P
     assert item["candidate_pool"] == "elite_candidate"
     assert item["quality_candidate_pool"] == "elite_candidate"
     assert item["task_fit_score"] is None
+
+
+def test_candidate_migration_preserves_assets_and_adds_empty_membership(tmp_path: Path) -> None:
+    database = tmp_path / "workspace.sqlite3"
+    migrate_database(database, WORKSPACE_MIGRATIONS[:19])
+    now = "2026-08-14T00:00:00Z"
+    connection = connect(database)
+    try:
+        connection.execute(
+            """
+            INSERT INTO assets (
+                id, relative_path, filename, stem, suffix, content_hash,
+                byte_size, modified_ns, width, height, annotation_relative_path,
+                annotation_status, image_metadata_version, created_at, updated_at
+            ) VALUES (
+                'asset', 'sample.png', 'sample.png', 'sample', '.png', 'hash',
+                1, 1, 32, 32, 'sample.txt', 'missing', 1, ?, ?
+            )
+            """,
+            (now, now),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    migrate_database(database, WORKSPACE_MIGRATIONS)
+
+    connection = connect(database)
+    try:
+        asset_count = connection.execute("SELECT COUNT(*) FROM assets").fetchone()[0]
+        candidate_count = connection.execute("SELECT COUNT(*) FROM asset_candidates").fetchone()[0]
+        foreign_keys = connection.execute("PRAGMA foreign_key_list('asset_candidates')").fetchall()
+    finally:
+        connection.close()
+    assert asset_count == 1
+    assert candidate_count == 0
+    assert [(row["table"], row["from"], row["to"], row["on_delete"]) for row in foreign_keys] == [
+        ("assets", "asset_id", "id", "CASCADE")
+    ]
 
 
 @pytest.mark.parametrize(
@@ -943,6 +983,7 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
         "annotation_revision_inputs",
         "job_item_annotation_inputs",
         "legacy_annotation_imports",
+        "asset_candidates",
     }.issubset(tables)
     assert preprocess_item_columns["phase"]["notnull"] == 1
     assert preprocess_item_columns["phase"]["dflt_value"] == "'committed'"

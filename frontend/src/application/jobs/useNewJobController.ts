@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useAssetFolders, useAssetIds } from "../../features/assets/hooks";
+import { useAssetFolders, useAssetIds, useCandidateSummary } from "../../features/assets/hooks";
 import { useJobActions } from "../../features/jobs/hooks";
 import {
   useProviderProfiles,
@@ -46,6 +46,7 @@ export function useNewJobController({
   const providerProfiles = useProviderProfiles(enabled);
   const taggerLibrary = useTaggerLibrary(enabled);
   const tagDictionaryLibrary = useTagDictionaryLibrary(enabled);
+  const candidateSummary = useCandidateSummary(projectId);
   const actions = useJobActions(projectId);
   const [kind, setKind] = useState<JobKind>("annotation");
   const [annotationBackend, setAnnotationBackend] = useState<ExecutionBackend>("provider");
@@ -281,6 +282,8 @@ export function useNewJobController({
     folderCount,
     folderLoading: folderLibrary.isPending || folderAssetIds.isFetching,
     folderError: folderLibrary.error ?? folderAssetIds.error,
+    candidateActive: Boolean(candidateSummary.data?.active),
+    effectiveAssetCount: candidateSummary.data?.effective_count ?? workspace?.asset_count ?? 0,
     targetLanguage,
     setTargetLanguage,
     translationSourceKind,

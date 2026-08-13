@@ -407,8 +407,8 @@ export function NewJobPanel({
       <div className="scope-selector">
         <span>处理范围</span>
         <button className={scope === "all" ? "is-active" : ""} onClick={() => setScope("all")}>
-          全项目范围
-          <small>{workspace.asset_count}</small>
+          {controller.candidateActive ? "候选工作集" : "全项目范围"}
+          <small>{controller.effectiveAssetCount}</small>
         </button>
         <button
           className={scope === "selected" ? "is-active" : ""}

@@ -11,7 +11,8 @@ from dataset_studio.modules.annotations.projection import (
     resolve_document_row_state,
     translation_dependency_stale_sql,
 )
-from dataset_studio.modules.assets.models import AssetRecord, AssetSummary
+from dataset_studio.modules.assets.candidates import candidate_scope_clause
+from dataset_studio.modules.assets.models import AssetRecord, AssetSummary, CandidateScope
 
 
 def _latest_unresolved_generation_failure_sql(column: str) -> str:
@@ -294,12 +295,23 @@ class AssetRepository:
         annotation_status: str | None = None,
         folder_path: str = "",
         folder_paths: Sequence[str] = (),
+        candidate_scope: CandidateScope = CandidateScope.AUTO,
         offset: int = 0,
         limit: int = 200,
     ) -> tuple[list[AssetSummary], int, dict[str, int]]:
         selected_folders = tuple(dict.fromkeys((*folder_paths, folder_path)))
-        where, parameters = self._asset_filter(search, annotation_status, selected_folders)
-        scope_where, scope_parameters = self._asset_filter(search, None, selected_folders)
+        where, parameters = self._asset_filter(
+            search,
+            annotation_status,
+            selected_folders,
+            candidate_scope,
+        )
+        scope_where, scope_parameters = self._asset_filter(
+            search,
+            None,
+            selected_folders,
+            candidate_scope,
+        )
         connection = connect(self._database_path)
         try:
             total = int(
@@ -312,6 +324,9 @@ class AssetRepository:
                 SELECT id, relative_path, filename, suffix,
                        content_hash AS content_version, byte_size, width, height,
                        annotation_relative_path, annotation_status, metadata_relative_path,
+                       EXISTS (
+                           SELECT 1 FROM asset_candidates c WHERE c.asset_id = assets.id
+                       ) AS is_candidate,
                        CASE
                            WHEN {UNRESOLVED_GENERATION_FAILURE_SQL} THEN 'failed'
                            ELSE NULL
@@ -350,6 +365,7 @@ class AssetRepository:
                     search,
                     review_status,
                     selected_folders,
+                    candidate_scope,
                 )
                 status_counts[review_status] = int(
                     connection.execute(
@@ -374,9 +390,15 @@ class AssetRepository:
         annotation_status: str | None = None,
         folder_path: str = "",
         folder_paths: Sequence[str] = (),
+        candidate_scope: CandidateScope = CandidateScope.AUTO,
     ) -> list[str]:
         selected_folders = tuple(dict.fromkeys((*folder_paths, folder_path)))
-        where, parameters = self._asset_filter(search, annotation_status, selected_folders)
+        where, parameters = self._asset_filter(
+            search,
+            annotation_status,
+            selected_folders,
+            candidate_scope,
+        )
         connection = connect(self._database_path)
         try:
             rows = connection.execute(
@@ -397,8 +419,12 @@ class AssetRepository:
         search: str,
         annotation_status: str | None,
         folder_paths: Sequence[str] = (),
+        candidate_scope: CandidateScope = CandidateScope.AUTO,
     ) -> tuple[str, list[object]]:
-        clauses = ["assets.is_present = 1"]
+        clauses = [
+            "assets.is_present = 1",
+            candidate_scope_clause(candidate_scope, asset_alias="assets"),
+        ]
         parameters: list[object] = []
         selected_folders = [folder_path for folder_path in folder_paths if folder_path]
         if selected_folders:
@@ -491,14 +517,18 @@ class AssetRepository:
         finally:
             connection.close()
 
-    def list_present_paths(self) -> list[str]:
+    def list_present_paths(
+        self,
+        candidate_scope: CandidateScope = CandidateScope.ALL,
+    ) -> list[str]:
         connection = connect(self._database_path)
         try:
             rows = connection.execute(
-                """
+                f"""
                 SELECT relative_path
                 FROM assets
                 WHERE is_present = 1
+                  AND {candidate_scope_clause(candidate_scope, asset_alias="assets")}
                 ORDER BY relative_path COLLATE NOCASE
                 """
             ).fetchall()

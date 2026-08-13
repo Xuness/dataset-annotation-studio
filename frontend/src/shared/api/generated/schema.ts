@@ -1005,6 +1005,41 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/assets/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Candidate Summary */
+        get: operations["get_candidate_summary_api_v1_workspaces__project_id__assets_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Candidates */
+        patch: operations["update_candidates_api_v1_workspaces__project_id__assets_candidates_patch"];
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/assets/candidates/ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Candidate Ids */
+        get: operations["list_candidate_ids_api_v1_workspaces__project_id__assets_candidates_ids_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/assets/folders": {
         parameters: {
             query?: never;
@@ -2644,6 +2679,11 @@ export type components = {
             height: number;
             /** Id */
             id: string;
+            /**
+             * Is Candidate
+             * @default false
+             */
+            is_candidate: boolean;
             /** Metadata Relative Path */
             metadata_relative_path?: string | null;
             /** Relative Path */
@@ -2652,6 +2692,42 @@ export type components = {
             suffix: string;
             /** Width */
             width: number;
+        };
+        /**
+         * CandidateScope
+         * @enum {string}
+         */
+        CandidateScope: "auto" | "candidates" | "all";
+        /** CandidateSetSummary */
+        CandidateSetSummary: {
+            /** Active */
+            active: boolean;
+            /** Candidate Count */
+            candidate_count: number;
+            /** Effective Count */
+            effective_count: number;
+            /** Total Assets */
+            total_assets: number;
+        };
+        /**
+         * CandidateSourceKind
+         * @enum {string}
+         */
+        CandidateSourceKind: "manual" | "screening";
+        /**
+         * CandidateUpdateAction
+         * @enum {string}
+         */
+        CandidateUpdateAction: "add" | "remove" | "replace" | "clear";
+        /** CandidateUpdateRequest */
+        CandidateUpdateRequest: {
+            action: components["schemas"]["CandidateUpdateAction"];
+            /** Asset Ids */
+            asset_ids?: string[];
+            /** @default manual */
+            source_kind: components["schemas"]["CandidateSourceKind"];
+            /** Source Operation Id */
+            source_operation_id?: string | null;
         };
         /** CharacterLoraRules */
         CharacterLoraRules: {
@@ -7477,6 +7553,7 @@ export interface operations {
                 search?: string;
                 status?: string | null;
                 folder_path?: string[] | null;
+                candidate_scope?: components["schemas"]["CandidateScope"];
                 offset?: number;
                 limit?: number;
             };
@@ -7508,9 +7585,108 @@ export interface operations {
             };
         };
     };
-    list_asset_folders_api_v1_workspaces__project_id__assets_folders_get: {
+    get_candidate_summary_api_v1_workspaces__project_id__assets_candidates_get: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateSetSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_candidates_api_v1_workspaces__project_id__assets_candidates_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateSetSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_candidate_ids_api_v1_workspaces__project_id__assets_candidates_ids_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetIdListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_asset_folders_api_v1_workspaces__project_id__assets_folders_get: {
+        parameters: {
+            query?: {
+                candidate_scope?: components["schemas"]["CandidateScope"];
+            };
             header?: never;
             path: {
                 project_id: string;
@@ -7545,6 +7721,7 @@ export interface operations {
                 search?: string;
                 status?: string | null;
                 folder_path?: string[] | null;
+                candidate_scope?: components["schemas"]["CandidateScope"];
             };
             header?: never;
             path: {

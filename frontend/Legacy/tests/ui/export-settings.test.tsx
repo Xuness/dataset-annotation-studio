@@ -32,6 +32,7 @@ describe("export channel settings", () => {
         <ExportSettingsPanel
           form={form}
           assetCount={2}
+          candidateActive={false}
           checkedCount={0}
           preview={undefined}
           previewPending={false}

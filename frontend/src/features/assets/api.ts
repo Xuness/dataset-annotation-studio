@@ -4,6 +4,9 @@ import type {
   AssetFolderListResponse,
   AssetIdListResponse,
   AssetListResponse,
+  CandidateScope,
+  CandidateSetSummary,
+  CandidateUpdateRequest,
   MetadataDocument,
   PromptPreview,
 } from "../../shared/api/types";
@@ -13,6 +16,7 @@ export interface AssetQuery {
   status?: string | null;
   folderPath?: string;
   folderPaths?: readonly string[];
+  candidateScope?: CandidateScope;
   offset?: number;
   limit?: number;
 }
@@ -31,6 +35,7 @@ export function listAssets(projectId: string, query: AssetQuery): Promise<AssetL
   const parameters = new URLSearchParams();
   if (query.search) parameters.set("search", query.search);
   if (query.status) parameters.set("status", query.status);
+  if (query.candidateScope) parameters.set("candidate_scope", query.candidateScope);
   appendFolderPaths(parameters, query);
   parameters.set("offset", String(query.offset ?? 0));
   parameters.set("limit", String(query.limit ?? 10_000));
@@ -41,12 +46,35 @@ export function listAssetIds(projectId: string, query: AssetQuery): Promise<Asse
   const parameters = new URLSearchParams();
   if (query.search) parameters.set("search", query.search);
   if (query.status) parameters.set("status", query.status);
+  if (query.candidateScope) parameters.set("candidate_scope", query.candidateScope);
   appendFolderPaths(parameters, query);
   return apiRequest(`/api/v1/workspaces/${projectId}/assets/ids?${parameters}`);
 }
 
-export function listAssetFolders(projectId: string): Promise<AssetFolderListResponse> {
-  return apiRequest(`/api/v1/workspaces/${projectId}/assets/folders`);
+export function listAssetFolders(
+  projectId: string,
+  candidateScope: CandidateScope = "auto",
+): Promise<AssetFolderListResponse> {
+  const parameters = new URLSearchParams({ candidate_scope: candidateScope });
+  return apiRequest(`/api/v1/workspaces/${projectId}/assets/folders?${parameters}`);
+}
+
+export function getCandidateSummary(projectId: string): Promise<CandidateSetSummary> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/assets/candidates`);
+}
+
+export function listCandidateIds(projectId: string): Promise<AssetIdListResponse> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/assets/candidates/ids`);
+}
+
+export function updateCandidates(
+  projectId: string,
+  request: CandidateUpdateRequest,
+): Promise<CandidateSetSummary> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/assets/candidates`, {
+    method: "PATCH",
+    body: JSON.stringify(request),
+  });
 }
 
 export function getMetadata(projectId: string, assetId: string): Promise<MetadataDocument> {

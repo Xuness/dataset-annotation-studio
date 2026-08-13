@@ -262,6 +262,20 @@ def test_api_reapplies_cached_task_profile_and_hides_duplicate_nonrepresentative
             f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/asset-ids",
             params={"pool": "invalid", "rating": "g"},
         ).json()
+        candidate_update = client.patch(
+            f"/api/v1/workspaces/{project_id}/assets/candidates",
+            json={
+                "action": "replace",
+                "asset_ids": collapsed_duplicate_pool_ids["ids"],
+                "source_kind": "screening",
+                "source_operation_id": operation_id,
+            },
+        )
+        candidate_scope_ids = client.get(f"/api/v1/workspaces/{project_id}/assets/ids").json()
+        all_scope_ids = client.get(
+            f"/api/v1/workspaces/{project_id}/assets/ids",
+            params={"candidate_scope": "all"},
+        ).json()
         before = client.get(
             f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/items/"
             f"{by_name['duplicate-high.png']}"
@@ -296,6 +310,9 @@ def test_api_reapplies_cached_task_profile_and_hides_duplicate_nonrepresentative
         by_name["duplicate-low.png"],
     }
     assert empty_intersection == {"ids": [], "total": 0}
+    assert candidate_update.status_code == 200
+    assert candidate_scope_ids["ids"] == [by_name["duplicate-high.png"]]
+    assert set(all_scope_ids["ids"]) == set(by_name.values())
     collapsed_names = {Path(item["source_relative_path"]).name for item in collapsed["items"]}
     assert collapsed_names == {"duplicate-high.png", "unique.png"}
     assert before["task_fit_score"] == pytest.approx(0.2)

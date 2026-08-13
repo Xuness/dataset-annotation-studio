@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useAssetFolders, useAssetIds, useAssets } from "../../features/assets/hooks";
+import {
+  useAssetFolders,
+  useAssetIds,
+  useAssets,
+  useCandidateActions,
+  useCandidateSummary,
+} from "../../features/assets/hooks";
 import {
   useScreeningActions,
   useScreeningCapabilities,
@@ -8,17 +14,20 @@ import {
   useScreeningOperations,
 } from "../../features/screening/hooks";
 import { useWorkspace } from "../../features/workspaces/hooks";
+import type { CandidateUpdateRequest } from "../../shared/api/types";
 import {
   folderSelectionsEqual,
   reconcileFolderSelection,
   toggleFolderSelection,
 } from "../../shared/store/folderSelection";
 import { useWorkspaceSelectionStore } from "../../shared/store/workspaceSelectionStore";
-import { actionError } from "../interaction";
+import { actionError, type ConfirmInteraction } from "../interaction";
 import {
   ACTIVE_SCREENING_STATUSES,
+  buildScreeningCandidateHandoffQuery,
   buildScreeningItemQuery,
   buildScreeningRequest,
+  checkedScreeningResultIds,
   clampScreeningThumbnailSize,
   reconcileSelectedScreeningOperationId,
   screeningResultsReady,
@@ -31,17 +40,21 @@ import {
 interface UseScreeningControllerOptions {
   projectId: string;
   rescanPending: boolean;
+  confirm: ConfirmInteraction;
 }
 
 export function useScreeningController({
   projectId,
   rescanPending,
+  confirm,
 }: UseScreeningControllerOptions) {
   const workspace = useWorkspace(projectId);
-  const assets = useAssets(projectId, { limit: 1 });
-  const folders = useAssetFolders(projectId);
+  const assets = useAssets(projectId, { candidateScope: "all", limit: 1 });
+  const folders = useAssetFolders(projectId, true, "all");
   const capabilities = useScreeningCapabilities(projectId);
   const actions = useScreeningActions(projectId);
+  const candidateSummary = useCandidateSummary(projectId);
+  const candidateActions = useCandidateActions(projectId);
   const checkedAssetIds = useWorkspaceSelectionStore((state) => state.checkedAssetIds);
   const setActiveProject = useWorkspaceSelectionStore((state) => state.setActiveProject);
   const setAssetsChecked = useWorkspaceSelectionStore((state) => state.setAssetsChecked);
@@ -49,10 +62,10 @@ export function useScreeningController({
     screeningWorkbenchState.useValue(projectId);
   const folderAssetIds = useAssetIds(
     projectId,
-    { folderPaths: form.folderPaths },
+    { folderPaths: form.folderPaths, candidateScope: "all" },
     form.scope === "folder" && form.folderPaths.length > 0,
   );
-  const allAssetIds = useAssetIds(projectId, {}, form.scope === "all");
+  const allAssetIds = useAssetIds(projectId, { candidateScope: "all" }, form.scope === "all");
   const folderOptions = useMemo(
     () => folders.data?.items.filter((folder) => Boolean(folder.path)) ?? [],
     [folders.data?.items],
@@ -63,7 +76,12 @@ export function useScreeningController({
     (form.scope === "folder" && form.folderPaths.length > 0 && folderAssetIds.isFetching);
   const allAssetsLoading = form.scope === "all" && allAssetIds.isFetching;
   const [error, setError] = useState<string | null>(null);
+  const [candidateMessage, setCandidateMessage] = useState<string | null>(null);
   const [resolvedSelectionScope, setResolvedSelectionScope] = useState<{
+    key: string;
+    ids: string[];
+  } | null>(null);
+  const [resolvedCandidateScope, setResolvedCandidateScope] = useState<{
     key: string;
     ids: string[];
   } | null>(null);
@@ -78,6 +96,10 @@ export function useScreeningController({
     ACTIVE_SCREENING_STATUSES.has(operation.status),
   );
   const itemQuery = useMemo(() => buildScreeningItemQuery(filters), [filters]);
+  const candidateHandoffQuery = useMemo(
+    () => buildScreeningCandidateHandoffQuery(filters.showDuplicates),
+    [filters.showDuplicates],
+  );
   const selectionScopeKey = useMemo(
     () =>
       JSON.stringify([
@@ -105,6 +127,9 @@ export function useScreeningController({
   const selectedItem = items.find((item) => item.asset_id === selectedAssetId) ?? null;
   const resolvedCurrentResultIds =
     resolvedSelectionScope?.key === selectionScopeKey ? resolvedSelectionScope.ids : null;
+  const candidateScopeKey = `${selectedOperationId ?? ""}:${String(filters.showDuplicates)}`;
+  const resolvedCandidateResultIds =
+    resolvedCandidateScope?.key === candidateScopeKey ? resolvedCandidateScope.ids : null;
   const allCurrentResultsChecked = Boolean(
     resolvedCurrentResultIds?.length &&
     !shouldCheckScreeningResult(resolvedCurrentResultIds, checkedAssetIds),
@@ -274,31 +299,117 @@ export function useScreeningController({
     }
   }, [actions.applyTaskProfile, form.profile, form.taskRules, selectedOperation]);
 
+  const resolveCurrentResultIds = useCallback(async (): Promise<string[]> => {
+    if (!selectedOperationId || !itemTotal) return [];
+    if (resolvedCurrentResultIds) return resolvedCurrentResultIds;
+    const result = await actions.resolveCurrentAssetIds.mutateAsync({
+      operationId: selectedOperationId,
+      query: itemQuery,
+    });
+    setResolvedSelectionScope({ key: selectionScopeKey, ids: result.ids });
+    return result.ids;
+  }, [
+    actions.resolveCurrentAssetIds,
+    itemQuery,
+    itemTotal,
+    resolvedCurrentResultIds,
+    selectedOperationId,
+    selectionScopeKey,
+  ]);
+
   const selectCurrentResult = useCallback(async () => {
     if (!selectedOperationId || !itemTotal) return;
     setError(null);
     try {
-      const result = await actions.resolveAssetIds.mutateAsync({
-        operationId: selectedOperationId,
-        query: itemQuery,
-      });
+      const resultIds = await resolveCurrentResultIds();
       const shouldCheck = shouldCheckScreeningResult(
-        result.ids,
+        resultIds,
         useWorkspaceSelectionStore.getState().checkedAssetIds,
       );
-      setAssetsChecked(result.ids, shouldCheck);
-      setResolvedSelectionScope({ key: selectionScopeKey, ids: result.ids });
+      setAssetsChecked(resultIds, shouldCheck);
     } catch (reason) {
       setError(actionError(reason, "无法切换当前筛选结果的勾选状态。"));
     }
+  }, [itemTotal, resolveCurrentResultIds, selectedOperationId, setAssetsChecked]);
+
+  const resolveCandidateResultIds = useCallback(async (): Promise<string[]> => {
+    if (!selectedOperationId || !resultsReady) return [];
+    if (resolvedCandidateResultIds) return resolvedCandidateResultIds;
+    const result = await actions.resolveCandidateAssetIds.mutateAsync({
+      operationId: selectedOperationId,
+      query: candidateHandoffQuery,
+    });
+    setResolvedCandidateScope({ key: candidateScopeKey, ids: result.ids });
+    return result.ids;
   }, [
-    actions.resolveAssetIds,
-    itemQuery,
-    itemTotal,
+    actions.resolveCandidateAssetIds,
+    candidateHandoffQuery,
+    candidateScopeKey,
+    resolvedCandidateResultIds,
+    resultsReady,
     selectedOperationId,
-    selectionScopeKey,
-    setAssetsChecked,
   ]);
+
+  const updateCandidateSet = useCallback(
+    async (action: CandidateUpdateRequest["action"]) => {
+      setError(null);
+      setCandidateMessage(null);
+      try {
+        let assetIds: string[] = [];
+        if (action !== "clear") {
+          const currentResultIds = await resolveCandidateResultIds();
+          assetIds = checkedScreeningResultIds(
+            currentResultIds,
+            useWorkspaceSelectionStore.getState().checkedAssetIds,
+          );
+          if (!assetIds.length) {
+            setError("当前筛选任务中没有可写入的已勾选图片；隐藏的重复图不会进入候选集。");
+            return;
+          }
+        }
+
+        if (action === "replace") {
+          const accepted = await confirm({
+            message: `用当前筛选任务中累计勾选的 ${assetIds.length} 张图片替换整个候选集？隐藏的重复图不会写入。`,
+            title: "替换候选集",
+            tone: "danger",
+            confirmLabel: "替换",
+          });
+          if (!accepted) return;
+        } else if (action === "remove") {
+          const accepted = await confirm({
+            message: `从候选集中移出当前筛选任务累计勾选的 ${assetIds.length} 张图片？候选集变空后，后续流程会恢复使用全部素材。`,
+            title: "移出候选集",
+            confirmLabel: "移出",
+          });
+          if (!accepted) return;
+        } else if (action === "clear") {
+          const accepted = await confirm({
+            message: "清空候选集？清空后素材页和后续流程会恢复使用项目内全部图片。",
+            title: "清空候选集",
+            tone: "danger",
+            confirmLabel: "清空",
+          });
+          if (!accepted) return;
+        }
+
+        const summary = await candidateActions.update.mutateAsync({
+          action,
+          asset_ids: assetIds,
+          source_kind: action === "clear" ? "manual" : "screening",
+          source_operation_id: action === "clear" ? null : selectedOperationId,
+        });
+        setCandidateMessage(
+          summary.active
+            ? `候选集已更新，本次处理 ${assetIds.length} 张，当前共 ${summary.candidate_count} 张；累计勾选已保留。`
+            : "候选集已清空；累计勾选仍保留，素材页和后续流程已恢复全部素材范围。",
+        );
+      } catch (reason) {
+        setError(actionError(reason, "无法更新候选集。"));
+      }
+    },
+    [candidateActions.update, confirm, resolveCandidateResultIds, selectedOperationId],
+  );
 
   return {
     workspace,
@@ -310,6 +421,8 @@ export function useScreeningController({
     galleryThumbnailSize,
     setGalleryThumbnailSize,
     assetCount: assets.data?.total ?? workspace.data?.asset_count ?? 0,
+    candidateSummary,
+    candidateMessage,
     checkedAssetIds,
     setAssetsChecked,
     folderOptions,
@@ -343,13 +456,16 @@ export function useScreeningController({
     stopPending: actions.stop.isPending,
     resumePending: actions.resume.isPending,
     applyTaskProfilePending: actions.applyTaskProfile.isPending,
-    selectCurrentPending: actions.resolveAssetIds.isPending,
+    selectCurrentPending: actions.resolveCurrentAssetIds.isPending,
+    candidateUpdatePending:
+      actions.resolveCandidateAssetIds.isPending || candidateActions.update.isPending,
     allCurrentResultsChecked,
     createOperation,
     stopOperation,
     resumeOperation,
     applyTaskProfile,
     selectCurrentResult,
+    updateCandidateSet,
     workspaceBusy: rescanPending,
   };
 }

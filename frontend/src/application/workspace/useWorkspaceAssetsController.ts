@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useAssetFolders, useAssetIds, useInfiniteAssets } from "../../features/assets/hooks";
+import {
+  useAssetFolders,
+  useAssetIds,
+  useCandidateSummary,
+  useInfiniteAssets,
+} from "../../features/assets/hooks";
 import { useUpdateWorkspace, useWorkspace } from "../../features/workspaces/hooks";
-import type { AnnotationChannelTarget, AssetFilterStatus } from "../../shared/api/types";
+import type {
+  AnnotationChannelTarget,
+  AssetFilterStatus,
+  CandidateScope,
+} from "../../shared/api/types";
 import { useWorkspaceSelectionStore } from "../../shared/store/workspaceSelectionStore";
 import type { AlertInteraction, ConfirmInteraction } from "../interaction";
 import type { AnnotationBulkAction } from "../annotations/annotationBulk";
@@ -41,8 +50,9 @@ export function useWorkspaceAssetsController({
   const setAssetsChecked = useWorkspaceSelectionStore((state) => state.setAssetsChecked);
   const setActiveProject = useWorkspaceSelectionStore((state) => state.setActiveProject);
   const browserScope = browserScopeKey(projectId, mode);
-  const { search, statusFilter, folderPath, selectedAssetId } =
+  const { search, statusFilter, folderPath, candidateScope, selectedAssetId } =
     assetBrowserViewState.useValue(browserScope);
+  const candidateSummary = useCandidateSummary(projectId);
   const [editorDirty, setEditorDirty] = useState(false);
   const [editorDirtyKind, setEditorDirtyKind] = useState<EditorDirtyKind>(null);
   const [editorTarget, setEditorTarget] = useState<AnnotationChannelTarget>(DEFAULT_EDITOR_TARGET);
@@ -68,14 +78,23 @@ export function useWorkspaceAssetsController({
     (value: string) => assetBrowserViewState.patch(browserScope, { folderPath: value }),
     [browserScope],
   );
+  const setCandidateScope = useCallback(
+    (value: Extract<CandidateScope, "auto" | "all">) =>
+      assetBrowserViewState.patch(browserScope, {
+        candidateScope: value,
+        folderPath: "",
+        selectedAssetId: null,
+      }),
+    [browserScope],
+  );
 
   const assetQuery = useMemo(
-    () => ({ search, status: statusFilter, folderPath }),
-    [folderPath, search, statusFilter],
+    () => ({ search, status: statusFilter, folderPath, candidateScope }),
+    [candidateScope, folderPath, search, statusFilter],
   );
   const assets = useInfiniteAssets(projectId, assetQuery);
   const matchingAssetIds = useAssetIds(projectId, assetQuery);
-  const folders = useAssetFolders(projectId);
+  const folders = useAssetFolders(projectId, true, candidateScope);
   const discardEditorDraft = useCallback(() => {
     setEditorDirty(false);
     setEditorDirtyKind(null);
@@ -199,6 +218,26 @@ export function useWorkspaceAssetsController({
     [confirm, discardEditorDraft, editorDirty, editorDirtyKind, folderPath, setFolderPath],
   );
 
+  const requestCandidateScopeChange = useCallback(
+    async (nextScope: Extract<CandidateScope, "auto" | "all">): Promise<boolean> => {
+      if (nextScope === candidateScope) return true;
+      if (editorDirty) {
+        const accepted = await confirm({
+          message: editorDiscardMessage(editorDirtyKind, "scope"),
+          title: "尚未保存",
+          tone: "danger",
+          confirmLabel: "丢弃并切换",
+          cancelLabel: "继续编辑",
+        });
+        if (!accepted) return false;
+        discardEditorDraft();
+      }
+      setCandidateScope(nextScope);
+      return true;
+    },
+    [candidateScope, confirm, discardEditorDraft, editorDirty, editorDirtyKind, setCandidateScope],
+  );
+
   const toggleAllMatchingAssets = useCallback(async () => {
     let assetIds = knownMatchingAssetIds;
     if (!assetIds) {
@@ -277,6 +316,8 @@ export function useWorkspaceAssetsController({
     search,
     statusFilter,
     folderPath,
+    candidateScope,
+    candidateSummary,
     editorRevision,
     annotationDialog,
     tagBatchDialog,
@@ -288,6 +329,7 @@ export function useWorkspaceAssetsController({
     setSearch,
     setStatusFilter,
     requestFolderSelect,
+    requestCandidateScopeChange,
     requestSelectAsset,
     loadMoreAssets,
     toggleAllMatchingAssets,

@@ -38,6 +38,23 @@ export function shouldCheckScreeningResult(
   return resultAssetIds.some((assetId) => !checked.has(assetId));
 }
 
+export function checkedScreeningResultIds(
+  resultAssetIds: readonly string[],
+  checkedAssetIds: readonly string[],
+): string[] {
+  const checked = new Set(checkedAssetIds);
+  return resultAssetIds.filter((assetId) => checked.has(assetId));
+}
+
+export function buildScreeningCandidateHandoffQuery(showDuplicates: boolean): ScreeningItemQuery {
+  return {
+    pool: null,
+    rating: null,
+    flag: null,
+    showDuplicates,
+  };
+}
+
 export interface ScreeningFormState {
   scope: ScreeningScope;
   folderPaths: string[];

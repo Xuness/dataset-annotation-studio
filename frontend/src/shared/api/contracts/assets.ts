@@ -1,4 +1,4 @@
-import type { ApiOutput } from "../schema";
+import type { ApiOutput, ApiSchema } from "../schema";
 import type { AnnotationStatus } from "./annotations";
 
 export type AssetFilterStatus =
@@ -9,6 +9,9 @@ export type AssetListResponse = ApiOutput<"AssetListResponse">;
 export type AssetIdListResponse = ApiOutput<"AssetIdListResponse">;
 export type AssetFolderSummary = ApiOutput<"AssetFolderSummary">;
 export type AssetFolderListResponse = ApiOutput<"AssetFolderListResponse">;
+export type CandidateScope = ApiSchema<"CandidateScope">;
+export type CandidateSetSummary = ApiOutput<"CandidateSetSummary">;
+export type CandidateUpdateRequest = ApiSchema<"CandidateUpdateRequest">;
 export type MetadataDocument = ApiOutput<"MetadataDocument">;
 export type PromptPreview = ApiOutput<"RequestPromptPreview">;
 export type AnnotationTraceRequestParameters = ApiOutput<"TraceRequestParameters">;

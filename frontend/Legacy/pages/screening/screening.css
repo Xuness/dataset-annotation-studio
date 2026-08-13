@@ -1,4 +1,9 @@
 .screening-workspace-body {
+  --screening-glass: color-mix(in srgb, var(--surface) 38%, transparent);
+  --screening-glass-soft: color-mix(in srgb, var(--surface-soft) 30%, transparent);
+  --screening-glass-raised: color-mix(in srgb, var(--surface-raised) 46%, transparent);
+  --screening-glass-hover: color-mix(in srgb, var(--surface-raised) 62%, transparent);
+
   grid-template-columns: var(--workspace-rail-width) 320px minmax(560px, 1fr) 330px;
 }
 
@@ -7,7 +12,7 @@
 .screening-inspector {
   min-width: 0;
   min-height: 0;
-  background: color-mix(in srgb, var(--surface) 97%, transparent);
+  background: transparent;
 }
 
 .screening-control-column {
@@ -41,6 +46,7 @@
 
 .screening-panel-heading h2,
 .screening-inspector h2 {
+  color: var(--ink-soft);
   margin: 2px 0 0;
   font-family: var(--font-display);
   font-size: 16px;
@@ -65,7 +71,8 @@
   padding: 10px 11px;
   border-left: 2px solid var(--accent);
   color: var(--muted);
-  background: color-mix(in srgb, var(--accent-soft) 34%, var(--surface-soft));
+  background: color-mix(in srgb, var(--accent-soft) 26%, transparent);
+  backdrop-filter: blur(10px) saturate(0.9);
   font-size: var(--text-xs);
   line-height: 1.45;
 }
@@ -93,11 +100,26 @@
 .screening-pool-tabs button,
 .screening-rating-filter button,
 .screening-thumbnail-zoom button {
-  border: 1px solid var(--line);
-  color: var(--muted);
-  background: var(--surface-soft);
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  color: var(--ink-soft);
+  background: var(--screening-glass-soft);
+  backdrop-filter: blur(10px) saturate(0.9);
   font: inherit;
   cursor: pointer;
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background var(--transition);
+}
+
+.screening-scope button:hover,
+.screening-strength button:hover,
+.screening-pool-tabs button:hover,
+.screening-rating-filter button:hover,
+.screening-thumbnail-zoom button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: var(--screening-glass-hover);
 }
 
 .screening-scope button {
@@ -121,14 +143,15 @@
 .screening-rating-filter button.is-active {
   border-color: var(--accent);
   color: var(--ink);
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent-soft) 66%, transparent);
 }
 
 .screening-folder-picker {
   margin: -3px 0 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--surface-soft);
+  background: var(--screening-glass-soft);
+  backdrop-filter: blur(10px) saturate(0.9);
 }
 
 .screening-folder-picker > header {
@@ -167,7 +190,7 @@
 }
 
 .screening-folder-picker label:hover {
-  background: var(--surface-raised);
+  background: var(--screening-glass-hover);
 }
 
 .screening-folder-picker label span {
@@ -225,7 +248,8 @@
   padding: 9px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--surface-soft);
+  background: var(--screening-glass-soft);
+  backdrop-filter: blur(10px) saturate(0.9);
 }
 
 .screening-task-rules legend {
@@ -286,7 +310,8 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--ink-soft);
-  background: var(--surface-soft);
+  background: var(--screening-glass-soft);
+  backdrop-filter: blur(10px) saturate(0.9);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -295,7 +320,12 @@
 .screening-history-list > button.is-selected {
   border-color: color-mix(in srgb, var(--accent) 64%, var(--line));
   box-shadow: inset 2px 0 var(--accent);
-  background: color-mix(in srgb, var(--accent-soft) 36%, var(--surface-raised));
+  background: color-mix(in srgb, var(--accent-soft) 44%, transparent);
+}
+
+.screening-history-list > button:hover {
+  border-color: var(--line-strong);
+  background: var(--screening-glass-hover);
 }
 
 .screening-history-list button > span {
@@ -338,7 +368,8 @@
   gap: 8px;
   padding: 11px 13px 9px;
   border-bottom: 1px solid var(--workspace-divider-strong);
-  background: color-mix(in srgb, var(--surface-sunken) 65%, transparent);
+  background: color-mix(in srgb, var(--surface-sunken) 30%, transparent);
+  backdrop-filter: blur(16px) saturate(0.88);
 }
 
 .screening-pool-tabs,
@@ -377,20 +408,126 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  color: var(--faint);
+  color: var(--muted);
   font-size: var(--text-2xs);
 }
 
 .screening-filter-row select {
+  appearance: none;
   min-height: 28px;
   max-width: 145px;
   padding: 3px 23px 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: var(--radius-sm);
+  outline: none;
+  color: var(--ink-soft);
+  background-color: var(--screening-glass-soft);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 12px) 50%,
+    calc(100% - 8px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  backdrop-filter: blur(10px) saturate(0.9);
+  cursor: pointer;
   font-size: var(--text-2xs);
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.screening-filter-row select:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background-color: var(--screening-glass-hover);
+}
+
+.screening-filter-row select:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-soft) 58%, transparent);
+}
+
+.screening-filter-row select option {
+  color: var(--ink);
+  background: var(--surface-raised);
 }
 
 .screening-filter-row .screening-duplicate-toggle {
-  color: var(--muted);
+  min-height: 28px;
+  padding: 3px 8px 3px 6px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: var(--screening-glass-soft);
+  backdrop-filter: blur(10px) saturate(0.9);
+  cursor: pointer;
+  user-select: none;
   white-space: nowrap;
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background var(--transition),
+    box-shadow var(--transition);
+}
+
+.screening-duplicate-toggle:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: var(--screening-glass-hover);
+}
+
+.screening-duplicate-toggle input {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  place-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  outline: none;
+  background: color-mix(in srgb, var(--surface-sunken) 34%, transparent);
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    background var(--transition),
+    box-shadow var(--transition);
+}
+
+.screening-duplicate-toggle input::after {
+  width: 4px;
+  height: 7px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  content: "";
+  transform: translateY(-1px) rotate(45deg) scale(0);
+  transition: transform var(--transition);
+}
+
+.screening-duplicate-toggle input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.screening-duplicate-toggle input:checked::after {
+  transform: translateY(-1px) rotate(45deg) scale(1);
+}
+
+.screening-duplicate-toggle:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--line));
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent-soft) 48%, transparent);
+}
+
+.screening-duplicate-toggle:has(input:focus-visible) {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-soft) 58%, transparent);
 }
 
 .screening-thumbnail-zoom {
@@ -419,7 +556,7 @@
 
 .screening-result-summary {
   gap: 14px;
-  color: var(--faint);
+  color: var(--muted);
   font-size: var(--text-2xs);
 }
 
@@ -430,10 +567,11 @@
   gap: 5px;
   margin-left: auto;
   padding: 4px 9px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
   border-radius: var(--radius-sm);
   color: var(--ink-soft);
-  background: var(--surface-raised);
+  background: var(--screening-glass-raised);
+  backdrop-filter: blur(10px) saturate(0.9);
   font: inherit;
   cursor: pointer;
 }
@@ -441,6 +579,87 @@
 .screening-result-summary button:disabled {
   cursor: default;
   opacity: 0.45;
+}
+
+.screening-candidate-bar {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(190px, 1fr) auto;
+  align-items: center;
+  gap: 7px 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.screening-candidate-bar__summary {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.screening-candidate-bar__summary strong {
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.screening-candidate-bar__summary span,
+.screening-candidate-bar > p {
+  color: var(--faint);
+  font-size: var(--text-2xs);
+}
+
+.screening-candidate-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.screening-candidate-bar__actions button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: var(--screening-glass-raised);
+  backdrop-filter: blur(10px) saturate(0.9);
+  font-size: var(--text-2xs);
+  cursor: pointer;
+}
+
+.screening-candidate-bar__actions button.is-danger {
+  color: var(--danger);
+}
+
+.screening-result-summary button:hover:not(:disabled),
+.screening-candidate-bar__actions button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: var(--screening-glass-hover);
+}
+
+.screening-candidate-bar__actions button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.screening-candidate-bar > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--sage);
+}
+
+@media (max-width: 980px) {
+  .screening-candidate-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .screening-candidate-bar__actions {
+    justify-content: flex-start;
+  }
 }
 
 .screening-gallery-scroll {
@@ -474,18 +693,24 @@
   position: relative;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: transparent;
+  transition:
+    border-color var(--transition),
+    background var(--transition),
+    box-shadow var(--transition);
 }
 
 .screening-card:hover,
 .screening-card.is-selected {
   border-color: color-mix(in srgb, var(--accent) 68%, var(--line));
+  background: color-mix(in srgb, var(--surface-raised) 18%, transparent);
 }
 
 .screening-card.is-selected {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent-soft) 18%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
 }
 
 .screening-card-open {
@@ -503,9 +728,13 @@
 .screening-card-image {
   position: relative;
   display: block;
+  width: 100%;
   aspect-ratio: 1;
   overflow: hidden;
-  background: var(--surface-sunken);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
 }
 
 .screening-card-image img {
@@ -522,8 +751,9 @@
   top: 7px;
   padding: 3px 6px;
   color: var(--ink);
-  background: color-mix(in srgb, var(--surface-sunken) 88%, transparent);
-  backdrop-filter: blur(8px);
+  border: 1px solid color-mix(in srgb, var(--line) 58%, transparent);
+  background: color-mix(in srgb, var(--surface-sunken) 58%, transparent);
+  backdrop-filter: blur(12px) saturate(0.85);
   font-size: var(--text-2xs);
   font-style: normal;
   font-weight: 600;
@@ -540,8 +770,15 @@
 
 .screening-card-copy {
   display: grid;
+  width: 100%;
   gap: 3px;
   padding: 7px 8px 8px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .screening-card-copy strong,
@@ -552,6 +789,7 @@
 }
 
 .screening-card-copy strong {
+  color: var(--ink-soft);
   padding-right: 20px;
   font-size: var(--text-xs);
   font-weight: 600;
@@ -573,7 +811,8 @@
   flex: 0 0 auto;
   padding: 2px 4px;
   color: var(--muted);
-  background: var(--surface-soft);
+  background: color-mix(in srgb, var(--surface-soft) 42%, transparent);
+  backdrop-filter: blur(8px);
   font-size: 9px;
   font-style: normal;
 }
@@ -589,7 +828,8 @@
   border: 1px solid var(--line-strong);
   border-radius: 3px;
   color: var(--surface-sunken);
-  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 58%, transparent);
+  backdrop-filter: blur(10px) saturate(0.9);
   cursor: pointer;
   font-size: 11px;
 }
@@ -621,7 +861,10 @@
   margin: 0 auto;
   padding: 5px 9px;
   color: var(--muted);
-  background: var(--surface-sunken);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-sunken) 56%, transparent);
+  backdrop-filter: blur(12px) saturate(0.88);
   font-size: var(--text-2xs);
 }
 
@@ -651,7 +894,9 @@
   gap: 5px;
   margin-bottom: 14px;
   padding: 11px;
-  background: var(--surface-soft);
+  border: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
+  background: var(--screening-glass-soft);
+  backdrop-filter: blur(10px) saturate(0.9);
 }
 
 .screening-operation-status strong {
@@ -681,7 +926,8 @@
 .screening-score-grid > div {
   padding: 9px;
   border: 1px solid var(--line);
-  background: var(--surface-soft);
+  background: var(--screening-glass-soft);
+  backdrop-filter: blur(10px) saturate(0.9);
 }
 
 .screening-summary-grid dt,
@@ -735,7 +981,7 @@
   width: 100%;
   height: 210px;
   object-fit: contain;
-  background: var(--surface-sunken);
+  background: transparent;
 }
 
 .screening-inspector-item-heading > div {
@@ -749,6 +995,260 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.screening-lightbox-backdrop {
+  --surface-sunken: var(--work-sunken);
+  --surface: var(--work-surface);
+  --surface-soft: var(--work-surface-soft);
+  --surface-raised: var(--work-surface-raised);
+  --canvas: var(--work-canvas);
+  --ink: var(--work-ink);
+  --ink-soft: var(--work-ink-soft);
+  --muted: var(--work-muted);
+  --faint: var(--work-faint);
+  --line: var(--work-line);
+  --line-strong: var(--work-line-strong);
+  --accent: var(--work-accent);
+  --accent-soft: var(--work-accent-soft);
+  --danger: var(--work-danger);
+
+  position: fixed;
+  z-index: 1950;
+  inset: 0;
+  display: grid;
+  padding: clamp(8px, 1.8vw, 24px);
+  place-items: center;
+  background: color-mix(in srgb, var(--work-backdrop) 24%, transparent);
+  backdrop-filter: blur(26px) saturate(0.78);
+}
+
+.screening-lightbox {
+  width: min(100%, 1900px);
+  height: min(100%, 1260px);
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.screening-lightbox:focus-visible {
+  box-shadow: none;
+}
+
+.screening-lightbox__layout {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  gap: clamp(5px, 0.8vw, 10px);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.screening-lightbox__header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: min(100%, 1180px);
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 auto;
+  padding: 8px 9px 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 64%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 46%, transparent);
+  backdrop-filter: blur(18px) saturate(0.92);
+  box-shadow:
+    inset 0 1px color-mix(in srgb, white 13%, transparent),
+    0 12px 34px color-mix(in srgb, var(--work-backdrop) 34%, transparent);
+}
+
+.screening-lightbox__header > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.screening-lightbox__header strong,
+.screening-lightbox__header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screening-lightbox__header strong {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 620;
+}
+
+.screening-lightbox__header span {
+  color: var(--faint);
+  font-size: var(--text-2xs);
+}
+
+.screening-lightbox__controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+}
+
+.screening-lightbox__controls button {
+  display: grid;
+  width: 32px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background var(--transition);
+}
+
+.screening-lightbox__controls button:hover,
+.screening-lightbox__controls button:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--line));
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent-soft) 58%, transparent);
+}
+
+.screening-lightbox__controls button.is-text {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.screening-lightbox__controls output {
+  min-width: 52px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-align: center;
+}
+
+.screening-lightbox__viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+  border-radius: var(--radius-md);
+  background: radial-gradient(
+    circle at 50% 45%,
+    color-mix(in srgb, var(--surface-raised) 10%, transparent),
+    transparent 58%
+  );
+  user-select: none;
+}
+
+.screening-lightbox__viewport.is-pannable {
+  cursor: grab;
+}
+
+.screening-lightbox__viewport.is-panning {
+  cursor: grabbing;
+}
+
+.screening-lightbox__viewport > img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  max-width: none;
+  max-height: none;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 50%, transparent);
+  border-radius: 2px;
+  object-fit: fill;
+  box-shadow:
+    0 18px 64px rgb(0 0 0 / 42%),
+    0 0 0 1px rgb(255 255 255 / 5%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+  will-change: width, height, transform;
+}
+
+.screening-lightbox__viewport > img.is-loaded {
+  opacity: 1;
+}
+
+.screening-lightbox__loading {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  place-items: center;
+  gap: 8px;
+  color: var(--faint);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
+
+.screening-lightbox__loading > span {
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 68%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 42%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.screening-lightbox__loading svg {
+  animation: screening-lightbox-pulse 1.4s ease-in-out infinite;
+}
+
+.screening-lightbox__loading.is-error {
+  color: var(--danger);
+}
+
+.screening-lightbox__pan-hint {
+  position: absolute;
+  right: 12px;
+  bottom: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 68%, transparent);
+  border-radius: 999px;
+  color: var(--faint);
+  background: color-mix(in srgb, var(--surface-sunken) 52%, transparent);
+  backdrop-filter: blur(12px) saturate(0.86);
+  font-size: var(--text-2xs);
+  pointer-events: none;
+}
+
+@keyframes screening-lightbox-pulse {
+  50% {
+    opacity: 0.4;
+    transform: scale(0.94);
+  }
+}
+
+@media (max-width: 720px) {
+  .screening-lightbox-backdrop {
+    padding: 6px;
+  }
+
+  .screening-lightbox__header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .screening-lightbox__controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 .screening-inspector-item-heading small {
@@ -776,7 +1276,7 @@
   display: flex;
   justify-content: space-between;
   padding: 5px 7px;
-  background: var(--surface-soft);
+  background: var(--screening-glass-soft);
   font-size: var(--text-xs);
 }
 
@@ -798,7 +1298,7 @@
 .screening-reason-list span {
   padding: 3px 5px;
   color: var(--muted);
-  background: var(--surface-soft);
+  background: var(--screening-glass-soft);
   font-family: var(--font-mono);
   font-size: 9px;
 }

@@ -13,6 +13,11 @@ from dataset_studio.core.errors import (
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.annotations.models import AnnotationChannel
 from dataset_studio.modules.annotations.service import AnnotationService
+from dataset_studio.modules.assets.candidates import (
+    candidate_scope_clause,
+    ensure_assets_in_effective_scope,
+)
+from dataset_studio.modules.assets.models import CandidateScope
 from dataset_studio.modules.jobs.execution_repository import JobExecutionRepository
 from dataset_studio.modules.jobs.lifecycle_repository import JobLifecycleRepository
 from dataset_studio.modules.jobs.models import (
@@ -632,11 +637,15 @@ class JobService:
             if not selected_ids:
                 return []
             unique_ids = list(dict.fromkeys(selected_ids))
+            ensure_assets_in_effective_scope(database_path, unique_ids)
         else:
             unique_ids = []
         connection = connect(database_path)
         try:
-            clauses = ["a.is_present = 1"]
+            clauses = [
+                "a.is_present = 1",
+                candidate_scope_clause(CandidateScope.AUTO, asset_alias="a"),
+            ]
             parameters: list[object] = []
             if not overwrite_existing:
                 clauses.append(
@@ -700,6 +709,8 @@ class JobService:
         unique_ids = list(dict.fromkeys(selected_ids)) if scope == JobScope.SELECTED else []
         if scope == JobScope.SELECTED and not unique_ids:
             return []
+        if unique_ids:
+            ensure_assets_in_effective_scope(database_path, unique_ids)
 
         connection = connect(database_path)
         try:
@@ -720,10 +731,11 @@ class JobService:
                     )
             else:
                 rows = connection.execute(
-                    """
+                    f"""
                     SELECT id, relative_path
                     FROM assets
                     WHERE is_present = 1
+                      AND {candidate_scope_clause(CandidateScope.AUTO, asset_alias="assets")}
                     ORDER BY relative_path COLLATE NOCASE
                     """
                 ).fetchall()

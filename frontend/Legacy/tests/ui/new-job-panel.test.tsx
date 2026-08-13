@@ -99,6 +99,14 @@ describe("new local tagger job summary", () => {
             scan_issues: [],
           });
         }
+        if (url.endsWith("/api/v1/workspaces/project-1/assets/candidates")) {
+          return jsonResponse({
+            total_assets: 12,
+            candidate_count: 0,
+            effective_count: 12,
+            active: false,
+          });
+        }
         throw new Error(`Unexpected request: ${url}`);
       }),
     );

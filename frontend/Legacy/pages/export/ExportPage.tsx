@@ -26,6 +26,7 @@ export function ExportPage() {
     form,
     patchForm,
     assetCount,
+    candidateActive,
     checkedCount,
     preview,
     previewPending,
@@ -80,6 +81,7 @@ export function ExportPage() {
       <ExportSettingsPanel
         form={form}
         assetCount={assetCount}
+        candidateActive={candidateActive}
         checkedCount={checkedCount}
         preview={preview}
         previewPending={previewPending}

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useScreeningController } from "../../../src/application/screening/useScreeningController";
 import { useLegacyRescanWorkspace } from "../../legacy/hooks/useLegacyRescanWorkspace";
+import { legacyConfirm } from "../../legacy/legacyInteractions";
 import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
 import { Button } from "../../shared/ui/Button";
 import { Spinner } from "../../shared/ui/Spinner";
@@ -16,7 +17,11 @@ export function ScreeningPage() {
   const { projectId = "" } = useParams();
   const navigate = useNavigate();
   const rescan = useLegacyRescanWorkspace(projectId);
-  const controller = useScreeningController({ projectId, rescanPending: rescan.isPending });
+  const controller = useScreeningController({
+    projectId,
+    rescanPending: rescan.isPending,
+    confirm: legacyConfirm,
+  });
 
   if (controller.workspace.isLoading) {
     return (
@@ -57,6 +62,7 @@ export function ScreeningPage() {
           <span>筛选 · 当前任务内部按 Rating 排名</span>
           <span>{controller.selectedOperation?.total_items ?? 0} 张任务图片</span>
           <span>工作台已勾选 {controller.checkedAssetIds.length}</span>
+          <span>候选集 {controller.candidateSummary.data?.candidate_count ?? 0} 张</span>
           <span className="workspace-statusbar__path">
             Batch-only · 不读取 Danbooru 全站归档 · 不改写素材
           </span>
@@ -117,6 +123,9 @@ export function ScreeningPage() {
         error={controller.itemsError}
         hasMore={controller.hasMoreItems}
         selectCurrentPending={controller.selectCurrentPending}
+        candidateUpdatePending={controller.candidateUpdatePending}
+        candidateCount={controller.candidateSummary.data?.candidate_count ?? 0}
+        candidateMessage={controller.candidateMessage}
         allCurrentResultsChecked={controller.allCurrentResultsChecked}
         onChangeFilters={controller.patchFilters}
         onThumbnailSizeChange={controller.setGalleryThumbnailSize}
@@ -124,6 +133,7 @@ export function ScreeningPage() {
         onSetChecked={controller.setAssetsChecked}
         onLoadMore={controller.loadMoreItems}
         onSelectCurrent={() => void controller.selectCurrentResult()}
+        onUpdateCandidates={(action) => void controller.updateCandidateSet(action)}
       />
       <ScreeningInspectorPanel
         projectId={projectId}

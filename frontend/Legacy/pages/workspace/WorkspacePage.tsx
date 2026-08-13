@@ -57,6 +57,8 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     search,
     statusFilter,
     folderPath,
+    candidateScope,
+    candidateSummary,
     editorRevision,
     annotationDialog,
     tagBatchDialog,
@@ -68,6 +70,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     setSearch,
     setStatusFilter,
     requestFolderSelect,
+    requestCandidateScopeChange,
     requestSelectAsset,
     loadMoreAssets,
     toggleAllMatchingAssets,
@@ -138,6 +141,9 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
             {mode === "review" ? "审核" : "素材"} · {assetResult?.total ?? 0} 张图片
           </span>
           <span>已标注 {workspace.data.annotated_count}</span>
+          <span>
+            候选 {candidateSummary.data?.candidate_count ?? 0} / {workspace.data.asset_count}
+          </span>
           <span>异常 {workspace.data.invalid_count}</span>
           <span className="workspace-statusbar__path">
             SQLite 主存储 · Tags / LLM 描述 / 译文独立修订 · 导出时物化
@@ -157,6 +163,10 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         statusCounts={assetResult?.status_counts ?? {}}
         folders={folders.data?.items ?? []}
         selectedFolderPath={folderPath}
+        candidateScope={candidateScope}
+        candidateActive={Boolean(candidateSummary.data?.active)}
+        candidateCount={candidateSummary.data?.candidate_count ?? 0}
+        totalAssetCount={candidateSummary.data?.total_assets ?? workspace.data.asset_count}
         foldersLoading={folders.isLoading}
         hasMore={Boolean(assets.hasNextPage)}
         loading={assets.isLoading}
@@ -170,6 +180,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         onSearchChange={setSearch}
         onStatusChange={setStatusFilter}
         onFolderSelect={requestFolderSelect}
+        onCandidateScopeChange={requestCandidateScopeChange}
         onSelect={requestSelectAsset}
         onSetChecked={setAssetsChecked}
         onToggleAll={() => void toggleAllMatchingAssets()}

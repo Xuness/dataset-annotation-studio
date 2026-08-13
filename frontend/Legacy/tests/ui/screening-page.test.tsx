@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -117,6 +117,7 @@ describe("legacy screening workspace", () => {
     const changeThumbnailSize = vi.fn();
     const setChecked = vi.fn();
     const selectCurrent = vi.fn();
+    const updateCandidates = vi.fn();
 
     render(
       <ScreeningResultGallery
@@ -140,6 +141,9 @@ describe("legacy screening workspace", () => {
         error={null}
         hasMore={false}
         selectCurrentPending={false}
+        candidateUpdatePending={false}
+        candidateCount={0}
+        candidateMessage={null}
         allCurrentResultsChecked={false}
         onChangeFilters={changeFilters}
         onThumbnailSizeChange={changeThumbnailSize}
@@ -147,6 +151,7 @@ describe("legacy screening workspace", () => {
         onSetChecked={setChecked}
         onLoadMore={() => undefined}
         onSelectCurrent={selectCurrent}
+        onUpdateCandidates={updateCandidates}
       />,
     );
 
@@ -178,6 +183,40 @@ describe("legacy screening workspace", () => {
     await user.click(screen.getByRole("checkbox", { name: "勾选 hero.png" }));
     expect(setChecked).toHaveBeenCalledWith(["asset-1"], true);
 
+    await user.click(screen.getByRole("button", { name: "查看 hero.png 大图" }));
+    const lightbox = screen.getByRole("dialog", { name: "hero.png" });
+    expect(lightbox).toBeTruthy();
+    expect(screen.getByRole("img", { name: "hero.png" }).getAttribute("src")).toContain(
+      "/assets/asset-1/image",
+    );
+    expect(setChecked).toHaveBeenCalledTimes(1);
+
+    const largeImageViewport = screen.getByLabelText("大图查看区域");
+    const zoomReadout = screen.getByLabelText("大图缩放比例");
+    const initialZoom = zoomReadout.textContent;
+    fireEvent.wheel(largeImageViewport, { clientX: 640, clientY: 360, deltaY: -240 });
+    await waitFor(() => expect(zoomReadout.textContent).not.toBe(initialZoom));
+
+    for (let index = 0; index < 5; index += 1) {
+      await user.click(screen.getByRole("button", { name: "放大大图" }));
+    }
+    const largeImage = screen.getByRole("img", { name: "hero.png" });
+    const transformBeforePan = largeImage.style.transform;
+    fireEvent.pointerDown(largeImageViewport, {
+      button: 0,
+      pointerId: 1,
+      clientX: 300,
+      clientY: 300,
+    });
+    fireEvent.pointerMove(largeImageViewport, { pointerId: 1, clientX: 340, clientY: 360 });
+    fireEvent.pointerUp(largeImageViewport, { pointerId: 1, clientX: 340, clientY: 360 });
+    await waitFor(() => expect(largeImage.style.transform).not.toBe(transformBeforePan));
+
+    await user.click(screen.getByRole("button", { name: "适应窗口" }));
+    expect(zoomReadout.textContent).toBe(initialZoom);
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "hero.png" })).toBeNull());
+
     await user.click(screen.getByRole("button", { name: "勾选当前结果" }));
     expect(selectCurrent).toHaveBeenCalledOnce();
   });
@@ -205,6 +244,9 @@ describe("legacy screening workspace", () => {
         error={null}
         hasMore={false}
         selectCurrentPending={false}
+        candidateUpdatePending={false}
+        candidateCount={0}
+        candidateMessage={null}
         allCurrentResultsChecked={false}
         onChangeFilters={() => undefined}
         onThumbnailSizeChange={() => undefined}
@@ -212,10 +254,66 @@ describe("legacy screening workspace", () => {
         onSetChecked={() => undefined}
         onLoadMore={() => undefined}
         onSelectCurrent={() => undefined}
+        onUpdateCandidates={() => undefined}
       />,
     );
 
     expect(screen.getByText("筛选运行中；完成后将一次性载入首批排序结果。")).toBeTruthy();
     expect(document.querySelector("img")).toBeNull();
+  });
+
+  test("offers persistent candidate actions for accumulated cross-filter checks", async () => {
+    const user = userEvent.setup();
+    const updateCandidates = vi.fn();
+    render(
+      <ScreeningResultGallery
+        projectId="project-1"
+        operationId="operation-1"
+        items={[item]}
+        total={1}
+        filters={{
+          pool: "elite_candidate",
+          rating: "g",
+          flag: null,
+          sort: "selection",
+          showDuplicates: false,
+        }}
+        thumbnailSize={240}
+        selectedAssetId={null}
+        checkedAssetIds={["asset-1", "checked-in-another-rating"]}
+        loading={false}
+        fetching={false}
+        processing={false}
+        error={null}
+        hasMore={false}
+        selectCurrentPending={false}
+        candidateUpdatePending={false}
+        candidateCount={1}
+        candidateMessage="候选集已更新"
+        allCurrentResultsChecked
+        onChangeFilters={() => undefined}
+        onThumbnailSizeChange={() => undefined}
+        onSelectAsset={() => undefined}
+        onSetChecked={() => undefined}
+        onLoadMore={() => undefined}
+        onSelectCurrent={() => undefined}
+        onUpdateCandidates={updateCandidates}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "加入候选" }));
+    await user.click(screen.getByRole("button", { name: "移出候选" }));
+    await user.click(screen.getByRole("button", { name: "替换候选集" }));
+    await user.click(screen.getByRole("button", { name: "清空" }));
+    expect(updateCandidates.mock.calls.map(([action]) => action)).toEqual([
+      "add",
+      "remove",
+      "replace",
+      "clear",
+    ]);
+    expect(screen.getByText("候选集已更新")).toBeTruthy();
+    expect(
+      screen.getByText(/已有候选会在打开项目时恢复勾选.*提交汇总当前任务全部分组/),
+    ).toBeTruthy();
   });
 });

@@ -43,6 +43,7 @@ describe("annotation stage model", () => {
         relative_path: "images/portrait.png",
         annotation_relative_path: "annotations/portrait.json",
         metadata_relative_path: null,
+        is_candidate: false,
         width: 1536,
         height: 2048,
         byte_size: 4_194_304,

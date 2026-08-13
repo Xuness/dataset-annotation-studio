@@ -27,6 +27,7 @@ export function PreprocessPage() {
     form,
     patchForm,
     assetCount,
+    candidateActive,
     checkedCount,
     preview,
     previewPending,
@@ -89,6 +90,7 @@ export function PreprocessPage() {
         form={form}
         onChange={patchForm}
         assetCount={assetCount}
+        candidateActive={candidateActive}
         checkedCount={checkedCount}
         preview={preview}
         previewPending={previewPending}

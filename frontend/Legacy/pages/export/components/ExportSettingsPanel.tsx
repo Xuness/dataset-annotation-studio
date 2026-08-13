@@ -13,6 +13,7 @@ import type { ExportFormState } from "../../../../src/application/exports/export
 interface Props {
   form: ExportFormState;
   assetCount: number;
+  candidateActive: boolean;
   checkedCount: number;
   preview: ExportPreview | undefined;
   previewPending: boolean;
@@ -36,6 +37,7 @@ const defaultTranslationLanguages = ["zh-CN", "zh-TW", "en", "ja", "ko"];
 export function ExportSettingsPanel({
   form,
   assetCount,
+  candidateActive,
   checkedCount,
   preview,
   previewPending,
@@ -154,7 +156,8 @@ export function ExportSettingsPanel({
           className={form.scope === "all" ? "is-active" : ""}
           onClick={() => onChange({ scope: "all" })}
         >
-          当前项目<small>{assetCount} 张</small>
+          {candidateActive ? "候选工作集" : "当前项目"}
+          <small>{assetCount} 张</small>
         </button>
         <button
           className={form.scope === "selected" ? "is-active" : ""}

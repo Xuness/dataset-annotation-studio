@@ -9,11 +9,15 @@ from pathlib import Path, PurePosixPath
 from PIL import Image, ImageOps
 
 from dataset_studio.core.errors import AssetNotFoundError
+from dataset_studio.modules.assets.candidates import CandidateRepository
 from dataset_studio.modules.assets.models import (
     AssetFolderListResponse,
     AssetFolderSummary,
     AssetIdListResponse,
     AssetListResponse,
+    CandidateScope,
+    CandidateSetSummary,
+    CandidateUpdateRequest,
     MetadataDocument,
 )
 from dataset_studio.modules.assets.repository import AssetRepository
@@ -71,6 +75,7 @@ class AssetService:
         annotation_status: str | None = None,
         folder_path: str = "",
         folder_paths: Sequence[str] = (),
+        candidate_scope: CandidateScope = CandidateScope.AUTO,
         offset: int = 0,
         limit: int = 200,
     ) -> AssetListResponse:
@@ -80,6 +85,7 @@ class AssetService:
             search=search,
             annotation_status=annotation_status,
             folder_paths=normalized_folders,
+            candidate_scope=candidate_scope,
             offset=max(offset, 0),
             limit=min(max(limit, 1), 10_000),
         )
@@ -99,6 +105,7 @@ class AssetService:
         annotation_status: str | None = None,
         folder_path: str = "",
         folder_paths: Sequence[str] = (),
+        candidate_scope: CandidateScope = CandidateScope.AUTO,
     ) -> AssetIdListResponse:
         paths, _ = self._workspaces.get(project_id)
         normalized_folders = normalize_folder_paths((*folder_paths, folder_path))
@@ -106,12 +113,18 @@ class AssetService:
             search=search,
             annotation_status=annotation_status,
             folder_paths=normalized_folders,
+            candidate_scope=candidate_scope,
         )
         return AssetIdListResponse(ids=ids, total=len(ids))
 
-    def list_folders(self, project_id: str) -> AssetFolderListResponse:
+    def list_folders(
+        self,
+        project_id: str,
+        *,
+        candidate_scope: CandidateScope = CandidateScope.AUTO,
+    ) -> AssetFolderListResponse:
         paths, manifest = self._workspaces.get(project_id)
-        relative_paths = AssetRepository(paths.database).list_present_paths()
+        relative_paths = AssetRepository(paths.database).list_present_paths(candidate_scope)
         direct_counts: dict[str, int] = {"": 0}
         descendant_counts: dict[str, int] = {"": 0}
 
@@ -154,6 +167,23 @@ class AssetService:
                 )
             )
         return AssetFolderListResponse(items=items)
+
+    def candidate_summary(self, project_id: str) -> CandidateSetSummary:
+        paths, _ = self._workspaces.get(project_id)
+        return CandidateRepository(paths.database).summary()
+
+    def candidate_ids(self, project_id: str) -> AssetIdListResponse:
+        paths, _ = self._workspaces.get(project_id)
+        ids = CandidateRepository(paths.database).list_ids()
+        return AssetIdListResponse(ids=ids, total=len(ids))
+
+    def update_candidates(
+        self,
+        project_id: str,
+        request: CandidateUpdateRequest,
+    ) -> CandidateSetSummary:
+        paths, _ = self._workspaces.get(project_id)
+        return CandidateRepository(paths.database).update(request)
 
     def image_path(self, project_id: str, asset_id: str) -> Path:
         paths, _ = self._workspaces.get(project_id)

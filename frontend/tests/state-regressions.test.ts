@@ -31,14 +31,21 @@ import {
 } from "../src/application/preprocessing/preprocessState.ts";
 import {
   adjustScreeningThumbnailSize,
+  buildScreeningCandidateHandoffQuery,
   buildScreeningItemQuery,
   buildScreeningRequest,
+  checkedScreeningResultIds,
   clampScreeningThumbnailSize,
   createInitialScreeningForm,
   reconcileSelectedScreeningOperationId,
   screeningResultsReady,
   shouldCheckScreeningResult,
 } from "../src/application/screening/screeningState.ts";
+import {
+  clampScreeningViewerOffset,
+  screeningViewerFitScale,
+  zoomScreeningViewerAt,
+} from "../src/application/screening/imageViewerState.ts";
 import {
   folderSelectionsEqual,
   reconcileFolderSelection,
@@ -175,6 +182,7 @@ test("workspace selection and discard policy stay independent from presentation"
   assert.equal(areAllAssetsChecked([], []), false);
   assert.match(editorDiscardMessage("tags", "folder"), /Tags/);
   assert.match(editorDiscardMessage("annotation", "asset"), /标注/);
+  assert.match(editorDiscardMessage("annotation", "scope"), /切换素材范围/);
 });
 
 test("preprocessing controller maps form state into request and execution contracts", () => {
@@ -277,6 +285,68 @@ test("screening result thumbnails preserve the full composition", () => {
     "utf8",
   );
   assert.match(styles, /\.screening-card-image img\s*\{[^}]*object-fit:\s*contain;/s);
+  assert.match(
+    styles,
+    /\.screening-card\s*\{[^}]*border:\s*1px solid transparent;[^}]*background:\s*transparent;/s,
+  );
+  assert.match(styles, /\.screening-card-image\s*\{[^}]*background:\s*transparent;/s);
+});
+
+test("screening large-image viewer uses the workspace glass material", () => {
+  const styles = readFileSync(
+    new URL("../Legacy/pages/screening/screening.css", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    styles,
+    /\.screening-lightbox-backdrop\s*\{[^}]*background:\s*color-mix\([^;]+transparent\);[^}]*backdrop-filter:\s*blur\(26px\)/s,
+  );
+  assert.match(styles, /\.screening-lightbox\s*\{[^}]*background:\s*transparent;/s);
+  assert.match(
+    styles,
+    /\.screening-lightbox__header\s*\{[^}]*background:\s*color-mix\([^;]+transparent\);[^}]*backdrop-filter:\s*blur\(18px\)/s,
+  );
+});
+
+test("screening filter selects and duplicate toggle use themed glass controls", () => {
+  const styles = readFileSync(
+    new URL("../Legacy/pages/screening/screening.css", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    styles,
+    /\.screening-filter-row select\s*\{[^}]*appearance:\s*none;[^}]*background-color:\s*var\(--screening-glass-soft\);/s,
+  );
+  assert.match(
+    styles,
+    /\.screening-filter-row \.screening-duplicate-toggle\s*\{[^}]*background:\s*var\(--screening-glass-soft\);/s,
+  );
+  assert.match(
+    styles,
+    /\.screening-duplicate-toggle input\s*\{[^}]*appearance:\s*none;[^}]*background:\s*color-mix\([^}]+transparent\);/s,
+  );
+  assert.match(
+    styles,
+    /\.screening-duplicate-toggle input:checked\s*\{[^}]*background:\s*var\(--accent\);/s,
+  );
+});
+
+test("screening large-image viewer fits, zooms around the pointer, and clamps drag pan", () => {
+  const viewport = { width: 1280, height: 720 };
+  const image = { width: 1024, height: 1536 };
+  const fitScale = screeningViewerFitScale(viewport, image);
+  assert.ok(Math.abs(fitScale - 656 / 1536) < 1e-9);
+
+  const anchor = { x: 240, y: -120 };
+  const current = { zoom: 1, offset: { x: 0, y: 0 } };
+  const zoomed = zoomScreeningViewerAt(current, 2, anchor, viewport, image, fitScale);
+  assert.equal(zoomed.zoom, 2);
+  assert.deepEqual(zoomed.offset, { x: 0, y: 120 });
+
+  assert.deepEqual(
+    clampScreeningViewerOffset({ x: 10_000, y: -10_000 }, viewport, image, fitScale, 4),
+    { x: 266.66666666666663, y: -984 },
+  );
 });
 
 test("screening current-result selection fills partial subsets and clears complete subsets", () => {
@@ -287,6 +357,34 @@ test("screening current-result selection fills partial subsets and clears comple
     false,
   );
   assert.equal(shouldCheckScreeningResult([], ["g-review"]), false);
+});
+
+test("screening candidate handoff spans rating and pool while excluding hidden and unrelated ids", () => {
+  const operationVisibleIds = ["g-elite-representative", "s-review", "q-recommended"];
+  const globallyChecked = [
+    "g-elite-representative",
+    "s-review",
+    "q-recommended",
+    "hidden-duplicate",
+    "other-operation",
+  ];
+  assert.deepEqual(checkedScreeningResultIds(operationVisibleIds, globallyChecked), [
+    "g-elite-representative",
+    "s-review",
+    "q-recommended",
+  ]);
+  assert.deepEqual(buildScreeningCandidateHandoffQuery(false), {
+    pool: null,
+    rating: null,
+    flag: null,
+    showDuplicates: false,
+  });
+  assert.deepEqual(buildScreeningCandidateHandoffQuery(true), {
+    pool: null,
+    rating: null,
+    flag: null,
+    showDuplicates: true,
+  });
 });
 
 test("folder selection toggles, reconciles and persists by annotation project", () => {

@@ -10,6 +10,9 @@ from dataset_studio.modules.assets.models import (
     AssetFolderListResponse,
     AssetIdListResponse,
     AssetListResponse,
+    CandidateScope,
+    CandidateSetSummary,
+    CandidateUpdateRequest,
     MetadataDocument,
 )
 from dataset_studio.modules.jobs.models import AssetRelatedJob
@@ -27,6 +30,7 @@ def list_assets(
     search: str = "",
     status: str | None = None,
     folder_path: Annotated[list[str] | None, Query()] = None,
+    candidate_scope: Annotated[CandidateScope, Query()] = CandidateScope.AUTO,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=200, ge=1, le=10_000),
 ):
@@ -35,6 +39,7 @@ def list_assets(
         search=search,
         annotation_status=status,
         folder_paths=folder_path or (),
+        candidate_scope=candidate_scope,
         offset=offset,
         limit=limit,
     )
@@ -47,18 +52,43 @@ def list_asset_ids(
     search: str = "",
     status: str | None = None,
     folder_path: Annotated[list[str] | None, Query()] = None,
+    candidate_scope: Annotated[CandidateScope, Query()] = CandidateScope.AUTO,
 ):
     return container.assets.list_asset_ids(
         project_id,
         search=search,
         annotation_status=status,
         folder_paths=folder_path or (),
+        candidate_scope=candidate_scope,
     )
 
 
 @router.get("/folders", response_model=AssetFolderListResponse)
-def list_asset_folders(project_id: str, container: Container):
-    return container.assets.list_folders(project_id)
+def list_asset_folders(
+    project_id: str,
+    container: Container,
+    candidate_scope: Annotated[CandidateScope, Query()] = CandidateScope.AUTO,
+):
+    return container.assets.list_folders(project_id, candidate_scope=candidate_scope)
+
+
+@router.get("/candidates", response_model=CandidateSetSummary)
+def get_candidate_summary(project_id: str, container: Container):
+    return container.assets.candidate_summary(project_id)
+
+
+@router.get("/candidates/ids", response_model=AssetIdListResponse)
+def list_candidate_ids(project_id: str, container: Container):
+    return container.assets.candidate_ids(project_id)
+
+
+@router.patch("/candidates", response_model=CandidateSetSummary)
+def update_candidates(
+    project_id: str,
+    request: CandidateUpdateRequest,
+    container: Container,
+):
+    return container.assets.update_candidates(project_id, request)
 
 
 @router.get("/{asset_id}/image")

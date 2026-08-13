@@ -2288,6 +2288,11 @@
             "title": "Id",
             "type": "string"
           },
+          "is_candidate": {
+            "default": false,
+            "title": "Is Candidate",
+            "type": "boolean"
+          },
           "metadata_relative_path": {
             "anyOf": [
               {
@@ -2325,6 +2330,102 @@
           "annotation_status"
         ],
         "title": "AssetSummary",
+        "type": "object"
+      },
+      "CandidateScope": {
+        "enum": [
+          "auto",
+          "candidates",
+          "all"
+        ],
+        "title": "CandidateScope",
+        "type": "string"
+      },
+      "CandidateSetSummary": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "candidate_count": {
+            "minimum": 0.0,
+            "title": "Candidate Count",
+            "type": "integer"
+          },
+          "effective_count": {
+            "minimum": 0.0,
+            "title": "Effective Count",
+            "type": "integer"
+          },
+          "total_assets": {
+            "minimum": 0.0,
+            "title": "Total Assets",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_assets",
+          "candidate_count",
+          "effective_count",
+          "active"
+        ],
+        "title": "CandidateSetSummary",
+        "type": "object"
+      },
+      "CandidateSourceKind": {
+        "enum": [
+          "manual",
+          "screening"
+        ],
+        "title": "CandidateSourceKind",
+        "type": "string"
+      },
+      "CandidateUpdateAction": {
+        "enum": [
+          "add",
+          "remove",
+          "replace",
+          "clear"
+        ],
+        "title": "CandidateUpdateAction",
+        "type": "string"
+      },
+      "CandidateUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/CandidateUpdateAction"
+          },
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100000,
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "source_kind": {
+            "$ref": "#/components/schemas/CandidateSourceKind",
+            "default": "manual"
+          },
+          "source_operation_id": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Operation Id"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "CandidateUpdateRequest",
         "type": "object"
       },
       "CharacterLoraRules": {
@@ -13208,6 +13309,15 @@
           },
           {
             "in": "query",
+            "name": "candidate_scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CandidateScope",
+              "default": "auto"
+            }
+          },
+          {
+            "in": "query",
             "name": "offset",
             "required": false,
             "schema": {
@@ -13258,6 +13368,140 @@
         ]
       }
     },
+    "/api/v1/workspaces/{project_id}/assets/candidates": {
+      "get": {
+        "operationId": "get_candidate_summary_api_v1_workspaces__project_id__assets_candidates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateSetSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Candidate Summary",
+        "tags": [
+          "assets"
+        ]
+      },
+      "patch": {
+        "operationId": "update_candidates_api_v1_workspaces__project_id__assets_candidates_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateSetSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Candidates",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/assets/candidates/ids": {
+      "get": {
+        "operationId": "list_candidate_ids_api_v1_workspaces__project_id__assets_candidates_ids_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetIdListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Candidate Ids",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
     "/api/v1/workspaces/{project_id}/assets/folders": {
       "get": {
         "operationId": "list_asset_folders_api_v1_workspaces__project_id__assets_folders_get",
@@ -13269,6 +13513,15 @@
             "schema": {
               "title": "Project Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "candidate_scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CandidateScope",
+              "default": "auto"
             }
           }
         ],
@@ -13356,6 +13609,15 @@
                 }
               ],
               "title": "Folder Path"
+            }
+          },
+          {
+            "in": "query",
+            "name": "candidate_scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CandidateScope",
+              "default": "auto"
             }
           }
         ],

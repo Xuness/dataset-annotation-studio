@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useAssets } from "../../features/assets/hooks";
+import { useAssets, useCandidateSummary } from "../../features/assets/hooks";
 import { useExportActions, useExportOperations } from "../../features/exports/hooks";
 import { useWorkspace } from "../../features/workspaces/hooks";
 import { openLocalFolder } from "../../shared/desktop/openLocalFolder";
@@ -24,6 +24,7 @@ interface UseExportControllerOptions {
 export function useExportController({ projectId, confirm, alert }: UseExportControllerOptions) {
   const workspace = useWorkspace(projectId);
   const assets = useAssets(projectId, { limit: 1 });
+  const candidateSummary = useCandidateSummary(projectId);
   const operations = useExportOperations(projectId);
   const actions = useExportActions(projectId);
   const checkedAssetIds = useWorkspaceSelectionStore((state) => state.checkedAssetIds);
@@ -182,6 +183,7 @@ export function useExportController({ projectId, confirm, alert }: UseExportCont
     form,
     patchForm,
     assetCount: assets.data?.total ?? workspace.data?.asset_count ?? 0,
+    candidateActive: Boolean(candidateSummary.data?.active),
     checkedCount: checkedAssetIds.length,
     preview: validPreview,
     previewPending: actions.preview.isPending,

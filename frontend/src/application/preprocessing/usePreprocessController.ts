@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useAssetFolders, useAssetIds, useAssets } from "../../features/assets/hooks";
+import {
+  useAssetFolders,
+  useAssetIds,
+  useAssets,
+  useCandidateSummary,
+} from "../../features/assets/hooks";
 import {
   useImageProcessingBackends,
   usePreprocessExecutionPlan,
@@ -39,6 +44,7 @@ export function usePreprocessController({
 }: UsePreprocessControllerOptions) {
   const workspace = useWorkspace(projectId);
   const assets = useAssets(projectId, { limit: 1 });
+  const candidateSummary = useCandidateSummary(projectId);
   const folders = useAssetFolders(projectId);
   const imageBackends = useImageProcessingBackends();
   const actions = usePreprocessingActions(projectId);
@@ -251,6 +257,7 @@ export function usePreprocessController({
     form,
     patchForm,
     assetCount: assets.data?.total ?? 0,
+    candidateActive: Boolean(candidateSummary.data?.active),
     checkedCount: checkedAssetIds.length,
     folderOptions,
     folderCount,

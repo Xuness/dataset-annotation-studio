@@ -12,6 +12,11 @@ from dataset_studio.core.files import file_sha256
 from dataset_studio.core.languages import LANGUAGE_PATTERN
 from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.core.sqlite import connect
+from dataset_studio.modules.assets.candidates import (
+    candidate_scope_clause,
+    ensure_assets_in_effective_scope,
+)
+from dataset_studio.modules.assets.models import CandidateScope
 from dataset_studio.modules.preprocessing.models import OutputFormat, PreprocessRequest
 
 _RENAME_FIELD_PATTERN = re.compile(r"\{(name|index)\}")
@@ -154,11 +159,18 @@ def preview_token(request: PreprocessRequest, plan: list[PlanItem]) -> str:
 
 
 def _select_assets(database_path: Path, asset_ids: list[str]):
+    if asset_ids:
+        ensure_assets_in_effective_scope(database_path, asset_ids)
     connection = connect(database_path)
     try:
         if not asset_ids:
             return connection.execute(
-                "SELECT * FROM assets WHERE is_present = 1 ORDER BY relative_path"
+                f"""
+                SELECT * FROM assets
+                WHERE is_present = 1
+                  AND {candidate_scope_clause(CandidateScope.AUTO, asset_alias="assets")}
+                ORDER BY relative_path
+                """
             ).fetchall()
         unique_ids = list(dict.fromkeys(asset_ids))
         rows = []

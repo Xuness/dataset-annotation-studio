@@ -8,7 +8,18 @@ import {
   type KeyboardEvent,
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { CheckSquare, CircleAlert, ImageOff, LoaderCircle, Minus, Plus } from "lucide-react";
+import {
+  CheckSquare,
+  CircleAlert,
+  ImageOff,
+  ListMinus,
+  ListPlus,
+  LoaderCircle,
+  Minus,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 
 import { thumbnailUrl } from "../../../../src/features/assets/api";
 import {
@@ -17,8 +28,13 @@ import {
   SCREENING_THUMBNAIL_SIZE_MIN,
   type ScreeningFilterState,
 } from "../../../../src/application/screening/screeningState";
-import type { ScreeningItem, ScreeningPool } from "../../../../src/shared/api/types";
+import type {
+  CandidateUpdateRequest,
+  ScreeningItem,
+  ScreeningPool,
+} from "../../../../src/shared/api/types";
 import { Spinner } from "../../../shared/ui/Spinner";
+import { ScreeningImageLightbox } from "./ScreeningImageLightbox";
 
 const poolOptions: Array<{ value: ScreeningPool | null; label: string }> = [
   { value: null, label: "全部" },
@@ -67,6 +83,9 @@ interface Props {
   error: string | null;
   hasMore: boolean;
   selectCurrentPending: boolean;
+  candidateUpdatePending: boolean;
+  candidateCount: number;
+  candidateMessage: string | null;
   allCurrentResultsChecked: boolean;
   onChangeFilters: (update: Partial<ScreeningFilterState>) => void;
   onThumbnailSizeChange: (size: number) => void;
@@ -74,6 +93,7 @@ interface Props {
   onSetChecked: (assetIds: string[], checked: boolean) => void;
   onLoadMore: () => void;
   onSelectCurrent: () => void;
+  onUpdateCandidates: (action: CandidateUpdateRequest["action"]) => void;
 }
 
 export function ScreeningResultGallery({
@@ -91,6 +111,9 @@ export function ScreeningResultGallery({
   error,
   hasMore,
   selectCurrentPending,
+  candidateUpdatePending,
+  candidateCount,
+  candidateMessage,
   allCurrentResultsChecked,
   onChangeFilters,
   onThumbnailSizeChange,
@@ -98,10 +121,12 @@ export function ScreeningResultGallery({
   onSetChecked,
   onLoadMore,
   onSelectCurrent,
+  onUpdateCandidates,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const rangeAnchorRef = useRef<string | null>(null);
   const zoomAnchorAssetIndexRef = useRef<number | null>(null);
+  const [previewItem, setPreviewItem] = useState<ScreeningItem | null>(null);
   const [viewportWidth, setViewportWidth] = useState(900);
   const checkedSet = useMemo(() => new Set(checkedAssetIds), [checkedAssetIds]);
   const galleryContentWidth = Math.max(1, viewportWidth - 20);
@@ -171,6 +196,8 @@ export function ScreeningResultGallery({
   useEffect(() => {
     rangeAnchorRef.current = null;
   }, [filters]);
+
+  useEffect(() => setPreviewItem(null), [operationId]);
 
   function toggleChecked(assetId: string, shiftKey: boolean) {
     const index = items.findIndex((item) => item.asset_id === assetId);
@@ -314,6 +341,58 @@ export function ScreeningResultGallery({
                 : "勾选当前结果"}
           </button>
         </div>
+        <div className="screening-candidate-bar">
+          <div className="screening-candidate-bar__summary">
+            <strong>候选集 {candidateCount} 张</strong>
+            <span>已有候选会在打开项目时恢复勾选；提交汇总当前任务全部分组，隐藏重复图除外</span>
+          </div>
+          <div className="screening-candidate-bar__actions">
+            <button
+              type="button"
+              disabled={
+                !operationId || processing || !checkedAssetIds.length || candidateUpdatePending
+              }
+              onClick={() => onUpdateCandidates("add")}
+            >
+              <ListPlus size={13} />
+              加入候选
+            </button>
+            <button
+              type="button"
+              disabled={
+                !operationId || processing || !checkedAssetIds.length || candidateUpdatePending
+              }
+              onClick={() => onUpdateCandidates("remove")}
+            >
+              <ListMinus size={13} />
+              移出候选
+            </button>
+            <button
+              type="button"
+              disabled={
+                !operationId || processing || !checkedAssetIds.length || candidateUpdatePending
+              }
+              onClick={() => onUpdateCandidates("replace")}
+            >
+              <RefreshCw size={13} />
+              替换候选集
+            </button>
+            <button
+              type="button"
+              className="is-danger"
+              disabled={!candidateCount || candidateUpdatePending}
+              onClick={() => onUpdateCandidates("clear")}
+            >
+              {candidateUpdatePending ? (
+                <LoaderCircle className="is-spinning" size={13} />
+              ) : (
+                <Trash2 size={13} />
+              )}
+              清空
+            </button>
+          </div>
+          {candidateMessage ? <p>{candidateMessage}</p> : null}
+        </div>
       </header>
 
       <div
@@ -364,15 +443,21 @@ export function ScreeningResultGallery({
                         selectedAssetId === item.asset_id ? "is-selected" : ""
                       }`.trim()}
                     >
-                      <button
-                        type="button"
-                        className="screening-card-open"
-                        onClick={(event) => {
-                          if (event.shiftKey) toggleChecked(item.asset_id, true);
-                          else onSelectAsset(item.asset_id);
-                        }}
-                      >
-                        <span className="screening-card-image">
+                      <div className="screening-card-open">
+                        <button
+                          type="button"
+                          className="screening-card-image"
+                          aria-label={`查看 ${filename(item)} 大图`}
+                          title="点击查看原图"
+                          onClick={(event) => {
+                            if (event.shiftKey) {
+                              toggleChecked(item.asset_id, true);
+                              return;
+                            }
+                            onSelectAsset(item.asset_id);
+                            setPreviewItem(item);
+                          }}
+                        >
                           <img
                             src={thumbnailUrl(
                               projectId,
@@ -385,8 +470,16 @@ export function ScreeningResultGallery({
                           />
                           <i>{item.candidate_pool ? poolLabels[item.candidate_pool] : "处理中"}</i>
                           {item.rating ? <b>Rating {item.rating}</b> : null}
-                        </span>
-                        <span className="screening-card-copy">
+                        </button>
+                        <button
+                          type="button"
+                          className="screening-card-copy"
+                          aria-label={`选择 ${filename(item)} 查看筛选详情`}
+                          onClick={(event) => {
+                            if (event.shiftKey) toggleChecked(item.asset_id, true);
+                            else onSelectAsset(item.asset_id);
+                          }}
+                        >
                           <strong title={filename(item)}>{filename(item)}</strong>
                           <small>
                             {item.selection_percentile !== null ? "任务百分位" : "核心百分位"}{" "}
@@ -406,8 +499,8 @@ export function ScreeningResultGallery({
                               <i>低证据</i>
                             ) : null}
                           </span>
-                        </span>
-                      </button>
+                        </button>
+                      </div>
                       <button
                         type="button"
                         className={`screening-card-check ${
@@ -436,6 +529,12 @@ export function ScreeningResultGallery({
           <div className="screening-gallery-loading">正在载入更多…</div>
         ) : null}
       </div>
+      <ScreeningImageLightbox
+        projectId={projectId}
+        operationId={operationId}
+        item={previewItem}
+        onClose={() => setPreviewItem(null)}
+      />
     </section>
   );
 }
