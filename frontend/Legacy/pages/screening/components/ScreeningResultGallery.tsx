@@ -1,9 +1,22 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { CheckSquare, CircleAlert, Columns3, Grid2X2, ImageOff, LoaderCircle } from "lucide-react";
+import { CheckSquare, CircleAlert, ImageOff, LoaderCircle, Minus, Plus } from "lucide-react";
 
 import { thumbnailUrl } from "../../../../src/features/assets/api";
-import type { ScreeningFilterState } from "../../../../src/application/screening/screeningState";
+import {
+  adjustScreeningThumbnailSize,
+  SCREENING_THUMBNAIL_SIZE_MAX,
+  SCREENING_THUMBNAIL_SIZE_MIN,
+  type ScreeningFilterState,
+} from "../../../../src/application/screening/screeningState";
 import type { ScreeningItem, ScreeningPool } from "../../../../src/shared/api/types";
 import { Spinner } from "../../../shared/ui/Spinner";
 
@@ -45,7 +58,7 @@ interface Props {
   items: ScreeningItem[];
   total: number;
   filters: ScreeningFilterState;
-  density: "comfortable" | "compact";
+  thumbnailSize: number;
   selectedAssetId: string | null;
   checkedAssetIds: string[];
   loading: boolean;
@@ -54,8 +67,9 @@ interface Props {
   error: string | null;
   hasMore: boolean;
   selectCurrentPending: boolean;
+  allCurrentResultsChecked: boolean;
   onChangeFilters: (update: Partial<ScreeningFilterState>) => void;
-  onDensityChange: (density: "comfortable" | "compact") => void;
+  onThumbnailSizeChange: (size: number) => void;
   onSelectAsset: (assetId: string) => void;
   onSetChecked: (assetIds: string[], checked: boolean) => void;
   onLoadMore: () => void;
@@ -68,7 +82,7 @@ export function ScreeningResultGallery({
   items,
   total,
   filters,
-  density,
+  thumbnailSize,
   selectedAssetId,
   checkedAssetIds,
   loading,
@@ -77,8 +91,9 @@ export function ScreeningResultGallery({
   error,
   hasMore,
   selectCurrentPending,
+  allCurrentResultsChecked,
   onChangeFilters,
-  onDensityChange,
+  onThumbnailSizeChange,
   onSelectAsset,
   onSetChecked,
   onLoadMore,
@@ -86,12 +101,15 @@ export function ScreeningResultGallery({
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const rangeAnchorRef = useRef<string | null>(null);
+  const zoomAnchorAssetIndexRef = useRef<number | null>(null);
   const [viewportWidth, setViewportWidth] = useState(900);
   const checkedSet = useMemo(() => new Set(checkedAssetIds), [checkedAssetIds]);
-  const minimumCardWidth = density === "compact" ? 132 : 176;
-  const columns = Math.max(1, Math.floor((viewportWidth - 20) / minimumCardWidth));
+  const galleryContentWidth = Math.max(1, viewportWidth - 20);
+  const renderedThumbnailSize = Math.min(thumbnailSize, galleryContentWidth);
+  const columns = Math.max(1, Math.floor((galleryContentWidth + 9) / (thumbnailSize + 9)));
   const rowCount = Math.ceil(items.length / columns);
-  const estimatedRowHeight = density === "compact" ? 184 : 224;
+  const estimatedRowHeight = renderedThumbnailSize + 80;
+  const thumbnailRequestSize = thumbnailSize > 320 ? 512 : 360;
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
@@ -99,6 +117,27 @@ export function ScreeningResultGallery({
     overscan: 3,
   });
   const virtualRows = virtualizer.getVirtualItems();
+
+  const requestThumbnailSize = useCallback(
+    (nextSize: number) => {
+      if (nextSize === thumbnailSize) return;
+      const scrollTop = scrollRef.current?.scrollTop ?? 0;
+      const firstVisibleRow = virtualizer
+        .getVirtualItems()
+        .find((virtualRow) => virtualRow.end > scrollTop);
+      zoomAnchorAssetIndexRef.current = firstVisibleRow ? firstVisibleRow.index * columns : null;
+      onThumbnailSizeChange(nextSize);
+    },
+    [columns, onThumbnailSizeChange, thumbnailSize, virtualizer],
+  );
+
+  useLayoutEffect(() => {
+    virtualizer.measure();
+    const anchorAssetIndex = zoomAnchorAssetIndexRef.current;
+    if (anchorAssetIndex === null) return;
+    zoomAnchorAssetIndexRef.current = null;
+    virtualizer.scrollToIndex(Math.floor(anchorAssetIndex / columns), { align: "start" });
+  }, [columns, renderedThumbnailSize, virtualizer]);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -110,6 +149,19 @@ export function ScreeningResultGallery({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const handleWheel = (event: globalThis.WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      if (event.deltaY === 0) return;
+      requestThumbnailSize(adjustScreeningThumbnailSize(thumbnailSize, event.deltaY < 0 ? 1 : -1));
+    };
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleWheel);
+  }, [requestThumbnailSize, thumbnailSize]);
 
   useEffect(() => {
     const last = virtualRows.at(-1);
@@ -215,37 +267,51 @@ export function ScreeningResultGallery({
               <option value="path">文件路径</option>
             </select>
           </label>
-          <div className="screening-density" role="group" aria-label="画廊密度">
+          <div
+            className="screening-thumbnail-zoom"
+            role="group"
+            aria-label="缩略图大小（Ctrl 加滚轮）"
+          >
             <button
               type="button"
-              className={density === "comfortable" ? "is-active" : ""}
-              title="舒适视图"
-              aria-label="舒适视图"
-              onClick={() => onDensityChange("comfortable")}
+              title="缩小缩略图"
+              aria-label="缩小缩略图"
+              disabled={thumbnailSize <= SCREENING_THUMBNAIL_SIZE_MIN}
+              onClick={() => requestThumbnailSize(adjustScreeningThumbnailSize(thumbnailSize, -1))}
             >
-              <Grid2X2 size={14} />
+              <Minus size={14} />
             </button>
+            <output title="在画廊内按 Ctrl + 滚轮也可以缩放">{thumbnailSize}px</output>
             <button
               type="button"
-              className={density === "compact" ? "is-active" : ""}
-              title="紧凑视图"
-              aria-label="紧凑视图"
-              onClick={() => onDensityChange("compact")}
+              title="放大缩略图"
+              aria-label="放大缩略图"
+              disabled={thumbnailSize >= SCREENING_THUMBNAIL_SIZE_MAX}
+              onClick={() => requestThumbnailSize(adjustScreeningThumbnailSize(thumbnailSize, 1))}
             >
-              <Columns3 size={14} />
+              <Plus size={14} />
             </button>
           </div>
         </div>
         <div className="screening-result-summary">
-          <span>当前结果 {total} 张</span>
+          <span>当前筛选子集 {total} 张</span>
           <span>已勾选 {checkedAssetIds.length} 张</span>
-          <button type="button" disabled={!total || selectCurrentPending} onClick={onSelectCurrent}>
+          <button
+            type="button"
+            title="仅切换当前 Rating、结果池、标记及重复图显示条件下的全部结果"
+            disabled={!total || selectCurrentPending}
+            onClick={onSelectCurrent}
+          >
             {selectCurrentPending ? (
               <LoaderCircle className="is-spinning" size={13} />
             ) : (
               <CheckSquare size={13} />
             )}
-            {selectCurrentPending ? "正在勾选…" : "勾选当前结果"}
+            {selectCurrentPending
+              ? "正在切换…"
+              : allCurrentResultsChecked
+                ? "取消勾选当前结果"
+                : "勾选当前结果"}
           </button>
         </div>
       </header>
@@ -283,9 +349,11 @@ export function ScreeningResultGallery({
               return (
                 <div
                   key={virtualRow.index}
-                  className={`screening-gallery-row is-${density}`}
+                  ref={virtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  className="screening-gallery-row"
                   style={{
-                    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                    gridTemplateColumns: `repeat(${columns}, minmax(0, ${renderedThumbnailSize}px))`,
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
@@ -306,7 +374,12 @@ export function ScreeningResultGallery({
                       >
                         <span className="screening-card-image">
                           <img
-                            src={thumbnailUrl(projectId, item.asset_id, operationId, 360)}
+                            src={thumbnailUrl(
+                              projectId,
+                              item.asset_id,
+                              operationId,
+                              thumbnailRequestSize,
+                            )}
                             alt=""
                             loading="lazy"
                           />

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -7,7 +7,15 @@ vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
     getTotalSize: () => count * 224,
     getVirtualItems: () =>
-      Array.from({ length: count }, (_, index) => ({ index, start: index * 224 })),
+      Array.from({ length: count }, (_, index) => ({
+        index,
+        start: index * 224,
+        end: (index + 1) * 224,
+        size: 224,
+      })),
+    measureElement: vi.fn(),
+    measure: vi.fn(),
+    scrollToIndex: vi.fn(),
   }),
 }));
 
@@ -106,6 +114,7 @@ describe("legacy screening workspace", () => {
   test("renders batch-only result cards and forwards current-result selection", async () => {
     const user = userEvent.setup();
     const changeFilters = vi.fn();
+    const changeThumbnailSize = vi.fn();
     const setChecked = vi.fn();
     const selectCurrent = vi.fn();
 
@@ -122,7 +131,7 @@ describe("legacy screening workspace", () => {
           sort: "selection",
           showDuplicates: false,
         }}
-        density="comfortable"
+        thumbnailSize={240}
         selectedAssetId={null}
         checkedAssetIds={[]}
         loading={false}
@@ -131,8 +140,9 @@ describe("legacy screening workspace", () => {
         error={null}
         hasMore={false}
         selectCurrentPending={false}
+        allCurrentResultsChecked={false}
         onChangeFilters={changeFilters}
-        onDensityChange={() => undefined}
+        onThumbnailSizeChange={changeThumbnailSize}
         onSelectAsset={() => undefined}
         onSetChecked={setChecked}
         onLoadMore={() => undefined}
@@ -142,6 +152,17 @@ describe("legacy screening workspace", () => {
 
     expect(screen.getByText("hero.png")).toBeTruthy();
     expect(screen.getByText("任务百分位 99.0% · #1")).toBeTruthy();
+    expect(screen.getByText("240px")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "放大缩略图" }));
+    expect(changeThumbnailSize).toHaveBeenCalledWith(280);
+
+    const gallery = screen.getByRole("region", { name: "筛选结果画廊" });
+    fireEvent.wheel(gallery, { deltaY: 100 });
+    expect(changeThumbnailSize).toHaveBeenCalledTimes(1);
+    fireEvent.wheel(gallery, { ctrlKey: true, deltaY: 100 });
+    expect(changeThumbnailSize).toHaveBeenLastCalledWith(200);
+
     await user.click(screen.getByRole("button", { name: "精选" }));
     expect(changeFilters).toHaveBeenCalledWith({ pool: "elite_candidate" });
 
@@ -175,7 +196,7 @@ describe("legacy screening workspace", () => {
           sort: "selection",
           showDuplicates: false,
         }}
-        density="comfortable"
+        thumbnailSize={240}
         selectedAssetId={null}
         checkedAssetIds={[]}
         loading={false}
@@ -184,8 +205,9 @@ describe("legacy screening workspace", () => {
         error={null}
         hasMore={false}
         selectCurrentPending={false}
+        allCurrentResultsChecked={false}
         onChangeFilters={() => undefined}
-        onDensityChange={() => undefined}
+        onThumbnailSizeChange={() => undefined}
         onSelectAsset={() => undefined}
         onSetChecked={() => undefined}
         onLoadMore={() => undefined}

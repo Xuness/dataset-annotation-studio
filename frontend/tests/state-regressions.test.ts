@@ -30,11 +30,14 @@ import {
   createInitialPreprocessForm,
 } from "../src/application/preprocessing/preprocessState.ts";
 import {
+  adjustScreeningThumbnailSize,
   buildScreeningItemQuery,
   buildScreeningRequest,
+  clampScreeningThumbnailSize,
   createInitialScreeningForm,
   reconcileSelectedScreeningOperationId,
   screeningResultsReady,
+  shouldCheckScreeningResult,
 } from "../src/application/screening/screeningState.ts";
 import {
   folderSelectionsEqual,
@@ -258,6 +261,32 @@ test("screening loads result pages only for the selected terminal task", () => {
   assert.equal(screeningResultsReady(operations[0]), true);
   assert.equal(screeningResultsReady(operations[1]), false);
   assert.equal(screeningResultsReady(null), false);
+});
+
+test("screening thumbnail zoom uses a bounded 40px scale", () => {
+  assert.equal(adjustScreeningThumbnailSize(240, 1), 280);
+  assert.equal(adjustScreeningThumbnailSize(240, -1), 200);
+  assert.equal(adjustScreeningThumbnailSize(400, 1), 400);
+  assert.equal(adjustScreeningThumbnailSize(160, -1), 160);
+  assert.equal(clampScreeningThumbnailSize(Number.NaN), 240);
+});
+
+test("screening result thumbnails preserve the full composition", () => {
+  const styles = readFileSync(
+    new URL("../Legacy/pages/screening/screening.css", import.meta.url),
+    "utf8",
+  );
+  assert.match(styles, /\.screening-card-image img\s*\{[^}]*object-fit:\s*contain;/s);
+});
+
+test("screening current-result selection fills partial subsets and clears complete subsets", () => {
+  const currentVisibleSubset = ["g-elite-a", "g-elite-b"];
+  assert.equal(shouldCheckScreeningResult(currentVisibleSubset, ["g-review", "g-elite-a"]), true);
+  assert.equal(
+    shouldCheckScreeningResult(currentVisibleSubset, ["g-review", ...currentVisibleSubset]),
+    false,
+  );
+  assert.equal(shouldCheckScreeningResult([], ["g-review"]), false);
 });
 
 test("folder selection toggles, reconciles and persists by annotation project", () => {

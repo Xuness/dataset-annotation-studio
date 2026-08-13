@@ -108,7 +108,7 @@ export function ScreeningPage() {
         items={controller.items}
         total={controller.itemTotal}
         filters={controller.filters}
-        density={controller.galleryDensity}
+        thumbnailSize={controller.galleryThumbnailSize}
         selectedAssetId={controller.selectedAssetId}
         checkedAssetIds={controller.checkedAssetIds}
         loading={controller.itemsPending}
@@ -117,8 +117,9 @@ export function ScreeningPage() {
         error={controller.itemsError}
         hasMore={controller.hasMoreItems}
         selectCurrentPending={controller.selectCurrentPending}
+        allCurrentResultsChecked={controller.allCurrentResultsChecked}
         onChangeFilters={controller.patchFilters}
-        onDensityChange={controller.setGalleryDensity}
+        onThumbnailSizeChange={controller.setGalleryThumbnailSize}
         onSelectAsset={controller.setSelectedAssetId}
         onSetChecked={controller.setAssetsChecked}
         onLoadMore={controller.loadMoreItems}

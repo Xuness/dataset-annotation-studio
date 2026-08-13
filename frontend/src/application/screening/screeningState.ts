@@ -14,6 +14,30 @@ import { createScopedViewState } from "../../shared/store/scopedViewState.ts";
 
 export type ScreeningScope = "all" | "folder" | "selected";
 
+export const SCREENING_THUMBNAIL_SIZE_MIN = 160;
+export const SCREENING_THUMBNAIL_SIZE_MAX = 400;
+export const SCREENING_THUMBNAIL_SIZE_STEP = 40;
+export const SCREENING_THUMBNAIL_SIZE_DEFAULT = 240;
+
+export function clampScreeningThumbnailSize(size: number): number {
+  if (!Number.isFinite(size)) return SCREENING_THUMBNAIL_SIZE_DEFAULT;
+  const stepped = Math.round(size / SCREENING_THUMBNAIL_SIZE_STEP) * SCREENING_THUMBNAIL_SIZE_STEP;
+  return Math.min(SCREENING_THUMBNAIL_SIZE_MAX, Math.max(SCREENING_THUMBNAIL_SIZE_MIN, stepped));
+}
+
+export function adjustScreeningThumbnailSize(size: number, direction: -1 | 1): number {
+  return clampScreeningThumbnailSize(size + direction * SCREENING_THUMBNAIL_SIZE_STEP);
+}
+
+export function shouldCheckScreeningResult(
+  resultAssetIds: readonly string[],
+  checkedAssetIds: readonly string[],
+): boolean {
+  if (!resultAssetIds.length) return false;
+  const checked = new Set(checkedAssetIds);
+  return resultAssetIds.some((assetId) => !checked.has(assetId));
+}
+
 export interface ScreeningFormState {
   scope: ScreeningScope;
   folderPaths: string[];
@@ -36,7 +60,7 @@ export interface ScreeningWorkbenchView {
   filters: ScreeningFilterState;
   selectedOperationId: string | null;
   selectedAssetId: string | null;
-  galleryDensity: "comfortable" | "compact";
+  galleryThumbnailSize: number;
 }
 
 export function createInitialScreeningForm(): ScreeningFormState {
@@ -67,7 +91,7 @@ export const screeningWorkbenchState = createScopedViewState<ScreeningWorkbenchV
   },
   selectedOperationId: null,
   selectedAssetId: null,
-  galleryDensity: "comfortable",
+  galleryThumbnailSize: SCREENING_THUMBNAIL_SIZE_DEFAULT,
 }));
 
 export function buildScreeningRequest(

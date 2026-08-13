@@ -238,6 +238,30 @@ def test_api_reapplies_cached_task_profile_and_hides_duplicate_nonrepresentative
         collapsed_ids = client.get(
             f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/asset-ids"
         ).json()
+        expanded_ids = client.get(
+            f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/asset-ids",
+            params={"show_duplicates": "true"},
+        ).json()
+        filtered_ids = client.get(
+            f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/asset-ids",
+            params={"pool": "review", "rating": "g"},
+        ).json()
+        collapsed_duplicate_pool_ids = client.get(
+            f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/asset-ids",
+            params={"pool": "task_mismatch", "rating": "g"},
+        ).json()
+        expanded_duplicate_pool_ids = client.get(
+            f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/asset-ids",
+            params={
+                "pool": "task_mismatch",
+                "rating": "g",
+                "show_duplicates": "true",
+            },
+        ).json()
+        empty_intersection = client.get(
+            f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/asset-ids",
+            params={"pool": "invalid", "rating": "g"},
+        ).json()
         before = client.get(
             f"/api/v1/workspaces/{project_id}/screening/operations/{operation_id}/items/"
             f"{by_name['duplicate-high.png']}"
@@ -263,6 +287,15 @@ def test_api_reapplies_cached_task_profile_and_hides_duplicate_nonrepresentative
     assert collapsed["total"] == 2
     assert expanded["total"] == 3
     assert collapsed_ids["total"] == 2
+    assert set(collapsed_ids["ids"]) == {by_name["duplicate-high.png"], by_name["unique.png"]}
+    assert expanded_ids["total"] == 3
+    assert filtered_ids["ids"] == [by_name["unique.png"]]
+    assert collapsed_duplicate_pool_ids["ids"] == [by_name["duplicate-high.png"]]
+    assert set(expanded_duplicate_pool_ids["ids"]) == {
+        by_name["duplicate-high.png"],
+        by_name["duplicate-low.png"],
+    }
+    assert empty_intersection == {"ids": [], "total": 0}
     collapsed_names = {Path(item["source_relative_path"]).name for item in collapsed["items"]}
     assert collapsed_names == {"duplicate-high.png", "unique.png"}
     assert before["task_fit_score"] == pytest.approx(0.2)

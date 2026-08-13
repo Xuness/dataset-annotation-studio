@@ -19,9 +19,11 @@ import {
   ACTIVE_SCREENING_STATUSES,
   buildScreeningItemQuery,
   buildScreeningRequest,
+  clampScreeningThumbnailSize,
   reconcileSelectedScreeningOperationId,
   screeningResultsReady,
   screeningWorkbenchState,
+  shouldCheckScreeningResult,
   type ScreeningFilterState,
   type ScreeningFormState,
 } from "./screeningState";
@@ -43,7 +45,7 @@ export function useScreeningController({
   const checkedAssetIds = useWorkspaceSelectionStore((state) => state.checkedAssetIds);
   const setActiveProject = useWorkspaceSelectionStore((state) => state.setActiveProject);
   const setAssetsChecked = useWorkspaceSelectionStore((state) => state.setAssetsChecked);
-  const { form, filters, selectedOperationId, selectedAssetId, galleryDensity } =
+  const { form, filters, selectedOperationId, selectedAssetId, galleryThumbnailSize } =
     screeningWorkbenchState.useValue(projectId);
   const folderAssetIds = useAssetIds(
     projectId,
@@ -61,6 +63,10 @@ export function useScreeningController({
     (form.scope === "folder" && form.folderPaths.length > 0 && folderAssetIds.isFetching);
   const allAssetsLoading = form.scope === "all" && allAssetIds.isFetching;
   const [error, setError] = useState<string | null>(null);
+  const [resolvedSelectionScope, setResolvedSelectionScope] = useState<{
+    key: string;
+    ids: string[];
+  } | null>(null);
 
   const operations = useScreeningOperations(
     projectId,
@@ -72,6 +78,23 @@ export function useScreeningController({
     ACTIVE_SCREENING_STATUSES.has(operation.status),
   );
   const itemQuery = useMemo(() => buildScreeningItemQuery(filters), [filters]);
+  const selectionScopeKey = useMemo(
+    () =>
+      JSON.stringify([
+        selectedOperationId,
+        itemQuery.pool ?? null,
+        itemQuery.rating ?? null,
+        itemQuery.flag ?? null,
+        Boolean(itemQuery.showDuplicates),
+      ]),
+    [
+      itemQuery.flag,
+      itemQuery.pool,
+      itemQuery.rating,
+      itemQuery.showDuplicates,
+      selectedOperationId,
+    ],
+  );
   const resultsReady = screeningResultsReady(selectedOperation);
   const itemPages = useScreeningItems(projectId, selectedOperationId, itemQuery, resultsReady);
   const items = useMemo(
@@ -80,6 +103,12 @@ export function useScreeningController({
   );
   const itemTotal = resultsReady ? (itemPages.data?.pages[0]?.total ?? 0) : 0;
   const selectedItem = items.find((item) => item.asset_id === selectedAssetId) ?? null;
+  const resolvedCurrentResultIds =
+    resolvedSelectionScope?.key === selectionScopeKey ? resolvedSelectionScope.ids : null;
+  const allCurrentResultsChecked = Boolean(
+    resolvedCurrentResultIds?.length &&
+    !shouldCheckScreeningResult(resolvedCurrentResultIds, checkedAssetIds),
+  );
 
   const patchForm = useCallback(
     (update: Partial<ScreeningFormState>) =>
@@ -113,9 +142,11 @@ export function useScreeningController({
       screeningWorkbenchState.patch(projectId, { selectedAssetId: assetId }),
     [projectId],
   );
-  const setGalleryDensity = useCallback(
-    (density: "comfortable" | "compact") =>
-      screeningWorkbenchState.patch(projectId, { galleryDensity: density }),
+  const setGalleryThumbnailSize = useCallback(
+    (size: number) =>
+      screeningWorkbenchState.patch(projectId, {
+        galleryThumbnailSize: clampScreeningThumbnailSize(size),
+      }),
     [projectId],
   );
   const toggleFolderPath = useCallback(
@@ -237,6 +268,7 @@ export function useScreeningController({
           task_rules: form.taskRules,
         },
       });
+      setResolvedSelectionScope(null);
     } catch (reason) {
       setError(actionError(reason, "无法应用角色 LoRA 任务适配配置。"));
     }
@@ -250,11 +282,23 @@ export function useScreeningController({
         operationId: selectedOperationId,
         query: itemQuery,
       });
-      setAssetsChecked(result.ids, true);
+      const shouldCheck = shouldCheckScreeningResult(
+        result.ids,
+        useWorkspaceSelectionStore.getState().checkedAssetIds,
+      );
+      setAssetsChecked(result.ids, shouldCheck);
+      setResolvedSelectionScope({ key: selectionScopeKey, ids: result.ids });
     } catch (reason) {
-      setError(actionError(reason, "无法勾选当前筛选结果。"));
+      setError(actionError(reason, "无法切换当前筛选结果的勾选状态。"));
     }
-  }, [actions.resolveAssetIds, itemQuery, itemTotal, selectedOperationId, setAssetsChecked]);
+  }, [
+    actions.resolveAssetIds,
+    itemQuery,
+    itemTotal,
+    selectedOperationId,
+    selectionScopeKey,
+    setAssetsChecked,
+  ]);
 
   return {
     workspace,
@@ -263,8 +307,8 @@ export function useScreeningController({
     patchForm,
     filters,
     patchFilters,
-    galleryDensity,
-    setGalleryDensity,
+    galleryThumbnailSize,
+    setGalleryThumbnailSize,
     assetCount: assets.data?.total ?? workspace.data?.asset_count ?? 0,
     checkedAssetIds,
     setAssetsChecked,
@@ -300,6 +344,7 @@ export function useScreeningController({
     resumePending: actions.resume.isPending,
     applyTaskProfilePending: actions.applyTaskProfile.isPending,
     selectCurrentPending: actions.resolveAssetIds.isPending,
+    allCurrentResultsChecked,
     createOperation,
     stopOperation,
     resumeOperation,
