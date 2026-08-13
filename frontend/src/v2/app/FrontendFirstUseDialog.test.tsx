@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { FrontendFirstUseDialog } from "./FrontendFirstUseDialog";
 import {
   FRONTEND_FIRST_USE_CHOICE_KEY,
-  FRONTEND_FIRST_USE_DEFERRED_KEY,
+  FRONTEND_FIRST_USE_SEEN_KEY,
 } from "./frontendFirstUseState";
 
 describe("new theme first-use dialog", () => {
@@ -19,16 +19,25 @@ describe("new theme first-use dialog", () => {
     window.sessionStorage.clear();
   });
 
-  test("offers classic, V2, and remind-later choices on the first visit", () => {
+  test("offers classic, V2, and dismiss choices on the first visit", () => {
     render(<FrontendFirstUseDialog />);
 
     expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("true");
+    expect(window.localStorage.getItem(FRONTEND_FIRST_USE_SEEN_KEY)).toBe("1");
     expect(screen.getByRole("heading", { name: "第一次使用新版主题吗？" })).toBeTruthy();
     expect(screen.getByRole("link", { name: /先去旧版熟悉/u }).getAttribute("href")).toBe(
       "/legacy.html",
     );
     expect(screen.getByRole("button", { name: /直接使用新版/u })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /稍后再提醒/u })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /不再重复提醒/u })).toBeTruthy();
+  });
+
+  test("appears only on the first entry even when no choice is made", () => {
+    const first = render(<FrontendFirstUseDialog />);
+    first.unmount();
+
+    render(<FrontendFirstUseDialog />);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   test("remembers a decision to continue in V2 across later mounts", () => {
@@ -53,28 +62,25 @@ describe("new theme first-use dialog", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  test("defers only for the current session and returns after a new session", () => {
+  test("dismisses permanently without recording a theme choice", () => {
     const first = render(<FrontendFirstUseDialog />);
-    fireEvent.click(screen.getByRole("button", { name: /稍后再提醒/u }));
+    fireEvent.click(screen.getByRole("button", { name: /不再重复提醒/u }));
 
     expect(window.localStorage.getItem(FRONTEND_FIRST_USE_CHOICE_KEY)).toBeNull();
-    expect(window.sessionStorage.getItem(FRONTEND_FIRST_USE_DEFERRED_KEY)).toBe("1");
+    expect(window.localStorage.getItem(FRONTEND_FIRST_USE_SEEN_KEY)).toBe("1");
     first.unmount();
 
-    const sameSession = render(<FrontendFirstUseDialog />);
-    expect(screen.queryByRole("dialog")).toBeNull();
-    sameSession.unmount();
-
     window.sessionStorage.clear();
-    render(<FrontendFirstUseDialog />);
-    expect(screen.getByRole("dialog")).toBeTruthy();
+    const laterVisit = render(<FrontendFirstUseDialog />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    laterVisit.unmount();
   });
 
-  test("treats Escape as remind later", () => {
+  test("treats Escape as a permanent dismissal", () => {
     render(<FrontendFirstUseDialog />);
     fireEvent.keyDown(window, { key: "Escape" });
 
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(window.sessionStorage.getItem(FRONTEND_FIRST_USE_DEFERRED_KEY)).toBe("1");
+    expect(window.localStorage.getItem(FRONTEND_FIRST_USE_SEEN_KEY)).toBe("1");
   });
 });

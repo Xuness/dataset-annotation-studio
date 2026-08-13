@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-  deferFrontendFirstUseForSession,
   rememberFrontendFirstUseChoice,
+  rememberFrontendFirstUseSeen,
   shouldShowFrontendFirstUseDialog,
   type FrontendFirstUseChoice,
 } from "./frontendFirstUseState";
@@ -12,8 +12,7 @@ export function FrontendFirstUseDialog() {
   const dialogRef = useRef<HTMLElement>(null);
   const recommendedActionRef = useRef<HTMLAnchorElement>(null);
 
-  const defer = useCallback(() => {
-    deferFrontendFirstUseForSession();
+  const dismiss = useCallback(() => {
     setVisible(false);
   }, []);
 
@@ -24,6 +23,7 @@ export function FrontendFirstUseDialog() {
 
   useEffect(() => {
     if (!visible) return;
+    rememberFrontendFirstUseSeen();
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     recommendedActionRef.current?.focus({ preventScroll: true });
@@ -31,7 +31,7 @@ export function FrontendFirstUseDialog() {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        defer();
+        dismiss();
         return;
       }
       if (event.key !== "Tab") return;
@@ -56,7 +56,7 @@ export function FrontendFirstUseDialog() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [defer, visible]);
+  }, [dismiss, visible]);
 
   if (!visible) return null;
 
@@ -114,9 +114,9 @@ export function FrontendFirstUseDialog() {
             </button>
           </div>
 
-          <button className="frontend-first-use__defer" type="button" onClick={defer}>
-            <span>暂时还不确定</span>
-            <b>这次先关闭，稍后再提醒</b>
+          <button className="frontend-first-use__defer" type="button" onClick={dismiss}>
+            <span>先浏览一下</span>
+            <b>关闭提示，不再重复提醒</b>
           </button>
         </div>
       </section>

@@ -5,7 +5,7 @@
 
 ## 术语与命名
 
-- **新前端**：当前产品默认入口承载的新一代表现层，可同时容纳多个完整且独立的视觉主题。
+- **新前端**：通过外观设置或显式主题 URL 进入的新一代表现层，可同时容纳多个完整且独立的视觉主题。
 - **`src/v2`**：新前端的代码代际目录，只表示依赖边界；不得用 `V2` 代称某个视觉方案。
 - **`dial-archive`**：当前默认主题 ID，由已确认的断环档案仪首页与终末地 / 莱茵档案空间演进而来；
   主题私有实现使用 `dial-archive-*` 类名和 `--dial-archive-*` CSS 变量。
@@ -13,12 +13,12 @@
 
 ## 双入口策略
 
-- `index.html -> src/main.tsx -> src/frontend-main.tsx` 是新前端的产品默认入口，加载视觉中立的
-  `FrontendApp`、数据 Provider、路由与主题宿主。
+- `index.html -> src/main.tsx` 是产品启动入口：无显式 `theme` / `home` 参数时加载 Legacy，携带主题
+  参数时加载 `src/frontend-main.tsx`、视觉中立的 `FrontendApp`、数据 Provider、路由与主题宿主。
 - `legacy.html -> Legacy/main.tsx` 是稳定的旧界面入口，路径与 HashRouter 可以组合为
   `/legacy.html#/workspace/<project-id>`。
 - 只有 `Legacy/main.tsx` 可以加载 `Legacy/styles/global.css`、旧主题初始化与旧界面根组件。
-  新前端入口不得导入这条链，因此构建时不会继承旧 CSS。
+  启动选择器每次只加载一条表现层链路，因此新前端运行时不会继承旧 CSS。
 - 两个 HTML 都由 Vite 构建并进入 Tauri 的 `frontendDist`；切换界面体系应执行整页导航，
   不在同一个 DOM 中热切换全局样式。
 
@@ -29,7 +29,7 @@ frontend/
 ├─ Legacy/              # 旧页面、布局、设置、主题、UI、样式与 UI 测试
 ├─ legacy.html          # 稳定兼容入口
 └─ src/
-   ├─ main.tsx          # 默认入口桥接到 frontend-main
+   ├─ main.tsx          # 默认加载 Legacy，显式主题参数加载 frontend-main
    ├─ frontend-main.tsx # 新前端挂载、通用 reset 与宿主样式
    ├─ application/      # UI 无关的工作流编排
    ├─ features/         # API 与查询适配
@@ -82,7 +82,7 @@ Provider、加载、错误恢复与稳定信息架构，不提供配色、字体
 `FrontendRoutes.tsx` 消费 `navigation/spaceRegistry.ts` 的稳定路径：首页只负责选择空间并播放离场，
 路由完成后由同一主题的空间页接手。项目档案使用真实最近工作区数据；数据整备已接入真实项目、素材样本、
 预演、执行计划、任务进度与安全恢复能力；03–06 在各自业务控制器完成前只呈现主题内的明确待接入页，
-不伪造任务或项目数据。Legacy 只能通过独立 `legacy.html` 入口访问；主题不得为了临时可用而内嵌旧页面。
+不伪造任务或项目数据。Legacy 由默认启动入口或独立 `legacy.html` 访问；主题不得为了临时可用而内嵌旧页面。
 
 ### URL 项目上下文
 
