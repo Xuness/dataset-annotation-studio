@@ -4,6 +4,8 @@ export type ExportScope = ApiSchema<"ExportScope">;
 export type ExportRevisionMode = ApiSchema<"ExportRevisionMode">;
 export type ExportFormat = ApiSchema<"ExportFormat">;
 export type ExportPackaging = ApiSchema<"ExportPackaging">;
+export type ExportDirectoryMode = ApiSchema<"ExportDirectoryMode">;
+export type ExportDirectoryLayout = ApiSchema<"ExportDirectoryLayout">;
 export type ExportChannelSelection = ApiSchema<"ExportChannelSelection">;
 export type ExportRequest = ApiSchema<"ExportRequest">;
 export type ExportPreviewItem = ApiOutput<"ExportPreviewItem">;
@@ -15,5 +17,6 @@ export type ExportOperation = Omit<GeneratedExportOperation, "configuration_snap
     channels?: ExportChannelSelection[];
     formats?: ExportFormat[];
     packaging?: ExportPackaging;
+    directory_layout?: ExportDirectoryLayout;
   };
 };

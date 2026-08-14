@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from pathlib import PurePosixPath
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -43,6 +44,49 @@ class ExportFormat(StrEnum):
 class ExportPackaging(StrEnum):
     DIRECTORY = "directory"
     ZIP = "zip"
+
+
+class ExportDirectoryMode(StrEnum):
+    FLAT = "flat"
+    PRESERVE = "preserve"
+    CUSTOM = "custom"
+
+
+class ExportDirectoryLayout(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: ExportDirectoryMode = ExportDirectoryMode.FLAT
+    merge_into_parent_paths: list[str] = Field(default_factory=list, max_length=10_000)
+
+    @field_validator("merge_into_parent_paths")
+    @classmethod
+    def normalize_merge_paths(cls, value: list[str]) -> list[str]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for raw_path in value:
+            candidate = raw_path.strip()
+            parts = candidate.split("/")
+            pure = PurePosixPath(candidate)
+            if (
+                not candidate
+                or pure.is_absolute()
+                or "\\" in candidate
+                or "\x00" in candidate
+                or any(part in {"", ".", ".."} for part in parts)
+            ):
+                raise ValueError("合并目录必须是工作区内的安全相对路径。")
+            path = pure.as_posix()
+            key = path.casefold()
+            if key not in seen:
+                seen.add(key)
+                normalized.append(path)
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_mode(self) -> ExportDirectoryLayout:
+        if self.mode != ExportDirectoryMode.CUSTOM and self.merge_into_parent_paths:
+            raise ValueError("只有自定义目录模式可以指定并入父级的目录。")
+        return self
 
 
 class ExportChannelSelection(BaseModel):
@@ -130,6 +174,7 @@ class ExportRequest(BaseModel):
         max_length=2,
     )
     packaging: ExportPackaging = ExportPackaging.DIRECTORY
+    directory_layout: ExportDirectoryLayout = Field(default_factory=ExportDirectoryLayout)
 
     @field_validator("asset_ids")
     @classmethod

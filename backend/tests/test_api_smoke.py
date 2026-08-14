@@ -294,6 +294,12 @@ def test_health_open_workspace_and_list_assets(tmp_path: Path, monkeypatch) -> N
                 "descendant_asset_count": 1,
             }
         ]
+        selected_folders = client.post(
+            f"/api/v1/workspaces/{project_id}/assets/folders/selection",
+            json={"asset_ids": [asset_id]},
+        )
+        assert selected_folders.status_code == 200
+        assert selected_folders.json() == folders.json()
 
         saved_annotation = client.put(
             f"/api/v1/workspaces/{project_id}/assets/{asset_id}/annotation",

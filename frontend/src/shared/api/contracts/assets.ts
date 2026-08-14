@@ -9,6 +9,7 @@ export type AssetListResponse = ApiOutput<"AssetListResponse">;
 export type AssetIdListResponse = ApiOutput<"AssetIdListResponse">;
 export type AssetFolderSummary = ApiOutput<"AssetFolderSummary">;
 export type AssetFolderListResponse = ApiOutput<"AssetFolderListResponse">;
+export type AssetFolderSelectionRequest = ApiSchema<"AssetFolderSelectionRequest">;
 export type CandidateScope = ApiSchema<"CandidateScope">;
 export type CandidateSetSummary = ApiOutput<"CandidateSetSummary">;
 export type CandidateUpdateRequest = ApiSchema<"CandidateUpdateRequest">;

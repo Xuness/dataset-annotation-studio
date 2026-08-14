@@ -49,6 +49,7 @@ class ExportRepository:
                 "channels": [selection.model_dump(mode="json") for selection in request.channels],
                 "formats": [format_.value for format_ in request.formats],
                 "packaging": request.packaging.value,
+                "directory_layout": request.directory_layout.model_dump(mode="json"),
             },
             ensure_ascii=False,
             separators=(",", ":"),

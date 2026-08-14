@@ -2083,6 +2083,25 @@
         "title": "AssetFolderListResponse",
         "type": "object"
       },
+      "AssetFolderSelectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100000,
+            "minItems": 1,
+            "title": "Asset Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "asset_ids"
+        ],
+        "title": "AssetFolderSelectionRequest",
+        "type": "object"
+      },
       "AssetFolderSummary": {
         "properties": {
           "descendant_asset_count": {
@@ -2706,6 +2725,34 @@
         "title": "ExportCreateRequest",
         "type": "object"
       },
+      "ExportDirectoryLayout": {
+        "additionalProperties": false,
+        "properties": {
+          "merge_into_parent_paths": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "title": "Merge Into Parent Paths",
+            "type": "array"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ExportDirectoryMode",
+            "default": "flat"
+          }
+        },
+        "title": "ExportDirectoryLayout",
+        "type": "object"
+      },
+      "ExportDirectoryMode": {
+        "enum": [
+          "flat",
+          "preserve",
+          "custom"
+        ],
+        "title": "ExportDirectoryMode",
+        "type": "string"
+      },
       "ExportFormat": {
         "enum": [
           "txt",
@@ -3062,6 +3109,9 @@
             "minLength": 1,
             "title": "Destination Path",
             "type": "string"
+          },
+          "directory_layout": {
+            "$ref": "#/components/schemas/ExportDirectoryLayout"
           },
           "formats": {
             "items": {
@@ -13598,6 +13648,58 @@
           }
         },
         "summary": "List Asset Folders",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/assets/folders/selection": {
+      "post": {
+        "operationId": "list_selected_asset_folders_api_v1_workspaces__project_id__assets_folders_selection_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetFolderSelectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetFolderListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Selected Asset Folders",
         "tags": [
           "assets"
         ]

@@ -154,6 +154,10 @@ function workbenchContent(
       selections: [{ channel: "tags", language: "", revision: "current" }],
       formats: ["txt"],
       packaging: "directory",
+      directoryLayout: {
+        mode: "flat",
+        merge_into_parent_paths: [],
+      },
     },
     manifest: manifest(),
     assetCount: 82,

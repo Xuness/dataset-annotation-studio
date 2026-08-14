@@ -12,6 +12,8 @@ export const assetKeys = {
     [...workspaceQueryKeys.scope(projectId, "assets"), "ids", query] as const,
   folders: (projectId: string, candidateScope: CandidateScope) =>
     [...workspaceQueryKeys.scope(projectId, "assets"), "folders", candidateScope] as const,
+  selectedFolders: (projectId: string, assetIds: readonly string[]) =>
+    [...workspaceQueryKeys.scope(projectId, "assets"), "folders", "selected", assetIds] as const,
   candidates: (projectId: string) =>
     [...workspaceQueryKeys.scope(projectId, "assets"), "candidates"] as const,
   candidateIds: (projectId: string) =>

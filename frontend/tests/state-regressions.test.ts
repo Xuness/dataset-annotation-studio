@@ -416,6 +416,26 @@ test("export controller freezes selected scope without mutating selection state"
   assert.deepEqual(request.asset_ids, checked);
   assert.notEqual(request.asset_ids, checked);
   assert.equal(request.packaging, "zip");
+  assert.deepEqual(request.directory_layout, {
+    mode: "flat",
+    merge_into_parent_paths: [],
+  });
+  const mergePaths = ["characters/alice"];
+  const customRequest = buildExportRequest(
+    {
+      ...form,
+      directoryLayout: {
+        mode: "custom",
+        merge_into_parent_paths: mergePaths,
+      },
+    },
+    checked,
+  );
+  assert.deepEqual(customRequest.directory_layout, {
+    mode: "custom",
+    merge_into_parent_paths: ["characters/alice"],
+  });
+  assert.notEqual(customRequest.directory_layout?.merge_into_parent_paths, mergePaths);
   assert.equal(hasActiveExport([{ status: "running" }] as never), true);
   assert.equal(hasActiveExport([{ status: "completed" }] as never), false);
 });

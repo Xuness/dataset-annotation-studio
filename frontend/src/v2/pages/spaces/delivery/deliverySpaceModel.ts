@@ -103,7 +103,8 @@ export function hasDeliveryDraft(form: Readonly<ExportFormState>): boolean {
     !defaultSelection ||
     form.formats.length !== 1 ||
     form.formats[0] !== "txt" ||
-    form.packaging !== "directory",
+    form.packaging !== "directory" ||
+    form.directoryLayout.mode !== "flat",
   );
 }
 
@@ -140,6 +141,10 @@ function operationManifest(operation: ExportOperation): DeliveryManifestSummary 
     selections: snapshot.channels ?? [],
     formats: snapshot.formats ?? ["txt"],
     packaging: snapshot.packaging ?? "directory",
+    directoryLayout: snapshot.directory_layout ?? {
+      mode: "flat",
+      merge_into_parent_paths: [],
+    },
   };
   return projectDeliveryManifest(form, operation.total_items, operation.total_items, {
     source: "operation",

@@ -20,6 +20,8 @@ from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.exports.models import (
     ExportChannelSelection,
     ExportCreateRequest,
+    ExportDirectoryLayout,
+    ExportDirectoryMode,
     ExportFormat,
     ExportOperationStatus,
     ExportPackaging,
@@ -82,6 +84,25 @@ def test_idle_export_worker_does_not_scan_recent_workspaces(
     assert ExportWorker(container)._claim_next() is None
 
 
+def test_export_directory_layout_validates_safe_custom_paths() -> None:
+    layout = ExportDirectoryLayout(
+        mode=ExportDirectoryMode.CUSTOM,
+        merge_into_parent_paths=[" characters/alice ", "characters/ALICE"],
+    )
+    assert layout.merge_into_parent_paths == ["characters/alice"]
+
+    with pytest.raises(ValueError, match="安全相对路径"):
+        ExportDirectoryLayout(
+            mode=ExportDirectoryMode.CUSTOM,
+            merge_into_parent_paths=["characters/../outside"],
+        )
+    with pytest.raises(ValueError, match="只有自定义目录模式"):
+        ExportDirectoryLayout(
+            mode=ExportDirectoryMode.PRESERVE,
+            merge_into_parent_paths=["characters"],
+        )
+
+
 def test_export_materializes_multiple_database_channels_as_variants_and_json(
     tmp_path: Path,
 ) -> None:
@@ -116,6 +137,7 @@ def test_export_materializes_multiple_database_channels_as_variants_and_json(
             ExportChannelSelection(channel=AnnotationChannel.DESCRIPTION),
         ],
         formats=[ExportFormat.TXT, ExportFormat.JSON],
+        directory_layout=ExportDirectoryLayout(mode=ExportDirectoryMode.PRESERVE),
     )
     preview = exports.preview(workspace.project_id, request)
 
@@ -138,21 +160,140 @@ def test_export_materializes_multiple_database_channels_as_variants_and_json(
     completed = exports.get(workspace.project_id, operation.id)
     assert completed.status == ExportOperationStatus.COMPLETED
     assert completed.configuration_snapshot["formats"] == ["txt", "json"]
-    assert (destination / "tags" / "first.png").read_bytes() == (
+    assert (destination / "tags" / "a" / "first.png").read_bytes() == (
         project / "a" / "first.png"
     ).read_bytes()
-    assert (destination / "tags" / "first.txt").read_text(encoding="utf-8") == ("character, first")
-    assert (destination / "description" / "first.txt").read_text(encoding="utf-8") == (
+    assert (destination / "tags" / "a" / "first.txt").read_text(encoding="utf-8") == (
+        "character, first"
+    )
+    assert (destination / "description" / "a" / "first.txt").read_text(encoding="utf-8") == (
         "<caption>first.png</caption>"
     )
     metadata = json.loads(
-        (destination / "metadata" / "first.annotations.json").read_text(encoding="utf-8")
+        (destination / "metadata" / "a" / "first.annotations.json").read_text(encoding="utf-8")
     )
     assert [tag["name"] for tag in metadata["annotations"]["tags"]["tags"]] == [
         "character",
         "first",
     ]
     assert metadata["annotations"]["description"]["content"] == "<caption>first.png</caption>"
+
+
+def test_export_preserves_workspace_directories_for_directory_and_zip_outputs(
+    tmp_path: Path,
+) -> None:
+    workspaces, _, _, exports = _services(tmp_path)
+    project = tmp_path / "preserved-dataset"
+    _write_image(project / "characters" / "alice" / "image.png")
+    (project / "characters" / "alice" / "image.txt").write_text("ready", encoding="utf-8")
+    workspace, _ = workspaces.open(str(project))
+    layout = ExportDirectoryLayout(mode=ExportDirectoryMode.PRESERVE)
+
+    directory_destination = tmp_path / "preserved-directory"
+    directory_destination.mkdir()
+    directory_request = ExportRequest(
+        destination_path=str(directory_destination),
+        directory_layout=layout,
+    )
+    directory_preview = exports.preview(workspace.project_id, directory_request)
+    assert set(directory_preview.items[0].target_outputs) == {
+        "characters/alice/image.png",
+        "characters/alice/image.txt",
+    }
+    directory_operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(
+            request=directory_request,
+            preview_token=directory_preview.preview_token,
+        ),
+    )
+    _run_export(workspaces, workspace.project_id, directory_operation.id)
+    assert (directory_destination / "characters" / "alice" / "image.png").is_file()
+    assert (directory_destination / "characters" / "alice" / "image.txt").read_text(
+        encoding="utf-8"
+    ) == "ready"
+
+    zip_destination = tmp_path / "preserved-zip"
+    zip_destination.mkdir()
+    zip_request = ExportRequest(
+        destination_path=str(zip_destination),
+        directory_layout=layout,
+        packaging=ExportPackaging.ZIP,
+    )
+    zip_preview = exports.preview(workspace.project_id, zip_request)
+    zip_operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(request=zip_request, preview_token=zip_preview.preview_token),
+    )
+    _run_export(workspaces, workspace.project_id, zip_operation.id)
+    with zipfile.ZipFile(zip_destination / "preserved-zip.zip") as archive:
+        assert set(archive.namelist()) == {
+            "characters/alice/image.png",
+            "characters/alice/image.txt",
+        }
+
+
+def test_export_custom_layout_removes_only_selected_original_directory_levels(
+    tmp_path: Path,
+) -> None:
+    workspaces, _, _, exports = _services(tmp_path)
+    project = tmp_path / "custom-layout"
+    image = project / "characters" / "alice" / "set-1" / "image.png"
+    _write_image(image)
+    image.with_suffix(".txt").write_text("ready", encoding="utf-8")
+    workspace, _ = workspaces.open(str(project))
+    destination = tmp_path / "custom-layout-export"
+    destination.mkdir()
+    request = ExportRequest(
+        destination_path=str(destination),
+        directory_layout=ExportDirectoryLayout(
+            mode=ExportDirectoryMode.CUSTOM,
+            merge_into_parent_paths=["characters", "characters/alice"],
+        ),
+    )
+
+    preview = exports.preview(workspace.project_id, request)
+
+    assert set(preview.items[0].target_outputs) == {"set-1/image.png", "set-1/image.txt"}
+    operation = exports.create(
+        workspace.project_id,
+        ExportCreateRequest(request=request, preview_token=preview.preview_token),
+    )
+    assert operation.configuration_snapshot["directory_layout"] == {
+        "mode": "custom",
+        "merge_into_parent_paths": ["characters", "characters/alice"],
+    }
+    _run_export(workspaces, workspace.project_id, operation.id)
+    assert (destination / "set-1" / "image.png").is_file()
+    assert (destination / "set-1" / "image.txt").is_file()
+
+
+def test_export_custom_layout_blocks_file_and_directory_mapping_collisions(
+    tmp_path: Path,
+) -> None:
+    workspaces, _, _, exports = _services(tmp_path)
+    project = tmp_path / "custom-layout-collision"
+    _write_image(project / "file-source" / "foo.png")
+    _write_image(project / "folder-source" / "foo.png" / "nested.jpg")
+    workspace, _ = workspaces.open(str(project))
+    destination = tmp_path / "custom-layout-collision-export"
+    destination.mkdir()
+    request = ExportRequest(
+        destination_path=str(destination),
+        formats=[ExportFormat.JSON],
+        directory_layout=ExportDirectoryLayout(
+            mode=ExportDirectoryMode.CUSTOM,
+            merge_into_parent_paths=["file-source", "folder-source"],
+        ),
+    )
+
+    preview = exports.preview(workspace.project_id, request)
+
+    assert preview.blocking_issue_count == 2
+    assert all(
+        item.blocking_issue and "目标文件与目录发生冲突" in item.blocking_issue
+        for item in preview.items
+    )
 
 
 def test_export_streams_frozen_artifacts_into_a_zip_archive(tmp_path: Path) -> None:
@@ -773,6 +914,10 @@ def test_export_api_uses_persistent_active_state_and_blocks_annotation_edits(
         assert created.status_code == 201
         assert created.json()["status"] == "queued"
         assert created.json()["configuration_snapshot"]["packaging"] == "directory"
+        assert created.json()["configuration_snapshot"]["directory_layout"] == {
+            "mode": "flat",
+            "merge_into_parent_paths": [],
+        }
         active = client.get("/api/v1/jobs/active")
         assert active.json()["export_count"] == 1
 

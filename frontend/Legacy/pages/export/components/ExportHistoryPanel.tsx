@@ -58,6 +58,13 @@ export function ExportHistoryPanel({
               .join(" · ") ?? "旧版导出";
           const formats = operation.configuration_snapshot.formats?.join(" + ") ?? "txt";
           const packaging = operation.configuration_snapshot.packaging === "zip" ? "ZIP" : "文件夹";
+          const directoryLayout = operation.configuration_snapshot.directory_layout;
+          const directoryLabel =
+            !directoryLayout || directoryLayout.mode === "flat"
+              ? "扁平化"
+              : directoryLayout.mode === "preserve"
+                ? "保留原目录"
+                : `自定义合并 ${directoryLayout.merge_into_parent_paths?.length ?? 0} 个目录`;
           return (
             <article key={operation.id} className={active ? "is-active" : ""}>
               <header>
@@ -74,7 +81,7 @@ export function ExportHistoryPanel({
                 {formatBytes(operation.total_bytes, "KB")}
               </small>
               <small title={channels}>
-                {packaging} · {formats.toUpperCase()} · {channels}
+                {packaging} · {directoryLabel} · {formats.toUpperCase()} · {channels}
               </small>
               {operation.current_relative_path ? (
                 <small title={operation.current_relative_path}>

@@ -1,5 +1,6 @@
 import type {
   ExportChannelSelection,
+  ExportDirectoryLayout,
   ExportFormat,
   ExportOperation,
   ExportPackaging,
@@ -14,6 +15,7 @@ export interface ExportFormState {
   selections: ExportChannelSelection[];
   formats: ExportFormat[];
   packaging: ExportPackaging;
+  directoryLayout: ExportDirectoryLayout;
 }
 
 export function createInitialExportForm(): ExportFormState {
@@ -29,6 +31,10 @@ export function createInitialExportForm(): ExportFormState {
     ],
     formats: ["txt"],
     packaging: "directory",
+    directoryLayout: {
+      mode: "flat",
+      merge_into_parent_paths: [],
+    },
   };
 }
 
@@ -57,6 +63,13 @@ export function buildExportRequest(
     channels: form.selections,
     formats: form.formats,
     packaging: form.packaging,
+    directory_layout: {
+      mode: form.directoryLayout.mode,
+      merge_into_parent_paths:
+        form.directoryLayout.mode === "custom"
+          ? [...(form.directoryLayout.merge_into_parent_paths ?? [])]
+          : [],
+    },
   };
 }
 

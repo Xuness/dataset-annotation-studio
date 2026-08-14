@@ -8,6 +8,7 @@ from dataset_studio.api.dependencies import get_container
 from dataset_studio.core.errors import PresetNotFoundError
 from dataset_studio.modules.assets.models import (
     AssetFolderListResponse,
+    AssetFolderSelectionRequest,
     AssetIdListResponse,
     AssetListResponse,
     CandidateScope,
@@ -70,6 +71,15 @@ def list_asset_folders(
     candidate_scope: Annotated[CandidateScope, Query()] = CandidateScope.AUTO,
 ):
     return container.assets.list_folders(project_id, candidate_scope=candidate_scope)
+
+
+@router.post("/folders/selection", response_model=AssetFolderListResponse)
+def list_selected_asset_folders(
+    project_id: str,
+    request: AssetFolderSelectionRequest,
+    container: Container,
+):
+    return container.assets.list_selected_folders(project_id, request)
 
 
 @router.get("/candidates", response_model=CandidateSetSummary)

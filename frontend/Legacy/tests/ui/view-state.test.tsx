@@ -135,6 +135,10 @@ describe("session-scoped workspace view state", () => {
           destinationPath: "D:\\exports\\dataset",
           formats: ["txt", "json"],
           packaging: "zip",
+          directoryLayout: {
+            mode: "custom",
+            merge_into_parent_paths: ["characters/alice"],
+          },
         },
       }));
     });
@@ -152,6 +156,10 @@ describe("session-scoped workspace view state", () => {
       destinationPath: "D:\\exports\\dataset",
       formats: ["txt", "json"],
       packaging: "zip",
+      directoryLayout: {
+        mode: "custom",
+        merge_into_parent_paths: ["characters/alice"],
+      },
     });
 
     expect(jobCenterViewState.get(PROJECT_B).selectedJobId).toBeNull();

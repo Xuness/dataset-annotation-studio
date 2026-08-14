@@ -14,6 +14,7 @@ from dataset_studio.modules.annotations.models import (
     AnnotationTag,
 )
 from dataset_studio.modules.annotations.service import AnnotationService
+from dataset_studio.modules.assets.models import AssetFolderSelectionRequest
 from dataset_studio.modules.assets.repository import AssetRepository
 from dataset_studio.modules.assets.service import AssetService
 from dataset_studio.modules.jobs.repository import JobCreationRepository
@@ -953,6 +954,26 @@ def test_asset_folder_tree_and_filter_use_subtree_boundaries(tmp_path: Path) -> 
     assert in_foo.status_counts["all"] == 2
     assert in_foo.status_counts["missing"] == 2
     assert assets.list_asset_ids(summary.project_id, folder_path="foo").total == 2
+
+    assets_by_path = {
+        item.relative_path: item.id for item in assets.list_assets(summary.project_id).items
+    }
+    selected_folders = {
+        item.path: item
+        for item in assets.list_selected_folders(
+            summary.project_id,
+            AssetFolderSelectionRequest(
+                asset_ids=[
+                    assets_by_path["foo/nested/deep.png"],
+                    assets_by_path["foobar/other.png"],
+                ]
+            ),
+        ).items
+    }
+    assert set(selected_folders) == {"", "foo", "foo/nested", "foobar"}
+    assert selected_folders[""].descendant_asset_count == 2
+    assert selected_folders["foo"].direct_asset_count == 0
+    assert selected_folders["foo"].descendant_asset_count == 1
 
     in_multiple_folders = assets.list_assets(
         summary.project_id,

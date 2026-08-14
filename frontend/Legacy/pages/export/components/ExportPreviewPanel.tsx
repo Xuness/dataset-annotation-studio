@@ -72,7 +72,8 @@ export function ExportPreviewPanel({ preview }: { preview: ExportPreview | undef
             >
               <span title={item.source_relative_path}>{item.source_relative_path}</span>
               <span title={item.target_outputs.join("\n")}>
-                {item.target_outputs.length} 个输出
+                {item.target_outputs[0] ?? "无输出"}
+                {item.target_outputs.length > 1 ? ` +${item.target_outputs.length - 1}` : ""}
               </span>
               <span>{statusLabels[item.annotation_status] ?? item.annotation_status}</span>
               <span

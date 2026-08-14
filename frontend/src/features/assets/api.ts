@@ -2,6 +2,7 @@ import { apiAssetUrl, apiRequest } from "../../shared/api/client";
 import type {
   AssetAnnotationTrace,
   AssetFolderListResponse,
+  AssetFolderSelectionRequest,
   AssetIdListResponse,
   AssetListResponse,
   CandidateScope,
@@ -57,6 +58,16 @@ export function listAssetFolders(
 ): Promise<AssetFolderListResponse> {
   const parameters = new URLSearchParams({ candidate_scope: candidateScope });
   return apiRequest(`/api/v1/workspaces/${projectId}/assets/folders?${parameters}`);
+}
+
+export function listSelectedAssetFolders(
+  projectId: string,
+  request: AssetFolderSelectionRequest,
+): Promise<AssetFolderListResponse> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/assets/folders/selection`, {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
 }
 
 export function getCandidateSummary(projectId: string): Promise<CandidateSetSummary> {

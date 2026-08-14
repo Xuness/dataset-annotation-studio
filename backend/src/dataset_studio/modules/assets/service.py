@@ -12,6 +12,7 @@ from dataset_studio.core.errors import AssetNotFoundError
 from dataset_studio.modules.assets.candidates import CandidateRepository
 from dataset_studio.modules.assets.models import (
     AssetFolderListResponse,
+    AssetFolderSelectionRequest,
     AssetFolderSummary,
     AssetIdListResponse,
     AssetListResponse,
@@ -61,6 +62,54 @@ def normalize_folder_paths(values: Sequence[str]) -> tuple[str, ...]:
         if folder_path and folder_path not in normalized:
             normalized.append(folder_path)
     return tuple(normalized)
+
+
+def _folder_list_response(
+    workspace_name: str,
+    relative_paths: Sequence[str],
+) -> AssetFolderListResponse:
+    direct_counts: dict[str, int] = {"": 0}
+    descendant_counts: dict[str, int] = {"": 0}
+
+    for relative_path in relative_paths:
+        parent = PurePosixPath(relative_path).parent
+        folder_path = "" if parent == PurePosixPath(".") else parent.as_posix()
+        direct_counts[folder_path] = direct_counts.get(folder_path, 0) + 1
+        descendant_counts[""] += 1
+        if not folder_path:
+            continue
+        current = PurePosixPath(folder_path)
+        while current != PurePosixPath("."):
+            key = current.as_posix()
+            descendant_counts[key] = descendant_counts.get(key, 0) + 1
+            direct_counts.setdefault(key, 0)
+            current = current.parent
+
+    items = [
+        AssetFolderSummary(
+            path="",
+            parent_path=None,
+            name=workspace_name,
+            direct_asset_count=direct_counts[""],
+            descendant_asset_count=descendant_counts[""],
+        )
+    ]
+    for folder_path in sorted(
+        (path for path in descendant_counts if path),
+        key=lambda value: (value.casefold(), value),
+    ):
+        folder = PurePosixPath(folder_path)
+        parent = folder.parent
+        items.append(
+            AssetFolderSummary(
+                path=folder_path,
+                parent_path="" if parent == PurePosixPath(".") else parent.as_posix(),
+                name=folder.name,
+                direct_asset_count=direct_counts.get(folder_path, 0),
+                descendant_asset_count=descendant_counts[folder_path],
+            )
+        )
+    return AssetFolderListResponse(items=items)
 
 
 class AssetService:
@@ -125,48 +174,21 @@ class AssetService:
     ) -> AssetFolderListResponse:
         paths, manifest = self._workspaces.get(project_id)
         relative_paths = AssetRepository(paths.database).list_present_paths(candidate_scope)
-        direct_counts: dict[str, int] = {"": 0}
-        descendant_counts: dict[str, int] = {"": 0}
+        return _folder_list_response(manifest.name, relative_paths)
 
-        for relative_path in relative_paths:
-            parent = PurePosixPath(relative_path).parent
-            folder_path = "" if parent == PurePosixPath(".") else parent.as_posix()
-            direct_counts[folder_path] = direct_counts.get(folder_path, 0) + 1
-            descendant_counts[""] += 1
-            if not folder_path:
-                continue
-            current = PurePosixPath(folder_path)
-            while current != PurePosixPath("."):
-                key = current.as_posix()
-                descendant_counts[key] = descendant_counts.get(key, 0) + 1
-                direct_counts.setdefault(key, 0)
-                current = current.parent
-
-        items = [
-            AssetFolderSummary(
-                path="",
-                parent_path=None,
-                name=manifest.name,
-                direct_asset_count=direct_counts[""],
-                descendant_asset_count=descendant_counts[""],
-            )
+    def list_selected_folders(
+        self,
+        project_id: str,
+        request: AssetFolderSelectionRequest,
+    ) -> AssetFolderListResponse:
+        paths, manifest = self._workspaces.get(project_id)
+        records = AssetRepository(paths.database).get_assets(request.asset_ids)
+        relative_paths = [
+            str(records[asset_id]["relative_path"])
+            for asset_id in request.asset_ids
+            if asset_id in records
         ]
-        for folder_path in sorted(
-            (path for path in descendant_counts if path),
-            key=lambda value: (value.casefold(), value),
-        ):
-            folder = PurePosixPath(folder_path)
-            parent = folder.parent
-            items.append(
-                AssetFolderSummary(
-                    path=folder_path,
-                    parent_path="" if parent == PurePosixPath(".") else parent.as_posix(),
-                    name=folder.name,
-                    direct_asset_count=direct_counts.get(folder_path, 0),
-                    descendant_asset_count=descendant_counts[folder_path],
-                )
-            )
-        return AssetFolderListResponse(items=items)
+        return _folder_list_response(manifest.name, relative_paths)
 
     def candidate_summary(self, project_id: str) -> CandidateSetSummary:
         paths, _ = self._workspaces.get(project_id)

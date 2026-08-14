@@ -10,6 +10,7 @@ import {
   listAssetFolders,
   listAssets,
   listCandidateIds,
+  listSelectedAssetFolders,
   updateCandidates,
   type AssetQuery,
 } from "./api";
@@ -74,6 +75,18 @@ export function useAssetFolders(
     queryKey: assetKeys.folders(projectId, candidateScope),
     queryFn: () => listAssetFolders(projectId, candidateScope),
     enabled: Boolean(projectId) && enabled,
+  });
+}
+
+export function useSelectedAssetFolders(
+  projectId: string,
+  assetIds: readonly string[],
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: assetKeys.selectedFolders(projectId, assetIds),
+    queryFn: () => listSelectedAssetFolders(projectId, { asset_ids: [...assetIds] }),
+    enabled: Boolean(projectId) && enabled && assetIds.length > 0,
   });
 }
 

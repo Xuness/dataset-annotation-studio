@@ -1,20 +1,27 @@
+import { useState } from "react";
 import { Eye, FileArchive, FolderOpen, FolderTree, PackageOpen } from "lucide-react";
 
 import type {
   AnnotationChannel,
+  AssetFolderSummary,
   ExportChannelSelection,
+  ExportDirectoryMode,
   ExportFormat,
   ExportPreview,
 } from "../../../../src/shared/api/types";
 import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 import type { ExportFormState } from "../../../../src/application/exports/exportState";
+import { ExportDirectoryRulesDialog } from "./ExportDirectoryRulesDialog";
 
 interface Props {
   form: ExportFormState;
   assetCount: number;
   candidateActive: boolean;
   checkedCount: number;
+  folders: AssetFolderSummary[];
+  foldersError: string | null;
+  foldersPending: boolean;
   preview: ExportPreview | undefined;
   previewPending: boolean;
   exportPending: boolean;
@@ -39,6 +46,9 @@ export function ExportSettingsPanel({
   assetCount,
   candidateActive,
   checkedCount,
+  folders,
+  foldersError,
+  foldersPending,
   preview,
   previewPending,
   exportPending,
@@ -49,6 +59,7 @@ export function ExportSettingsPanel({
   onPreview,
   onExport,
 }: Props) {
+  const [directoryRulesOpen, setDirectoryRulesOpen] = useState(false);
   const validScope = form.scope === "all" || checkedCount > 0;
   const readyToPreview = Boolean(
     form.destinationPath &&
@@ -137,6 +148,28 @@ export function ExportSettingsPanel({
         : [...form.formats, format],
     });
   }
+
+  function selectDirectoryMode(mode: ExportDirectoryMode) {
+    onChange({
+      directoryLayout: {
+        ...form.directoryLayout,
+        mode,
+      },
+    });
+    if (mode === "custom") setDirectoryRulesOpen(true);
+  }
+
+  const mergedDirectoryCount = form.directoryLayout.merge_into_parent_paths?.length ?? 0;
+  const directoryRuleLabel =
+    form.directoryLayout.mode === "flat"
+      ? form.selections.length > 1 && form.formats.includes("txt")
+        ? "按通道分目录，其余扁平"
+        : "扁平化"
+      : form.directoryLayout.mode === "preserve"
+        ? form.selections.length > 1 && form.formats.includes("txt")
+          ? "按通道保留原目录"
+          : "保留原目录"
+        : `自定义合并 ${mergedDirectoryCount} 个目录`;
 
   return (
     <aside className="export-settings" data-surface-region="primary-sidebar">
@@ -285,6 +318,55 @@ export function ExportSettingsPanel({
       </section>
 
       <section className="export-option">
+        <span className="export-option__title">目录结构</span>
+        <div className="export-directory-mode-selector" role="group" aria-label="目录结构">
+          {(
+            [
+              ["flat", "扁平化"],
+              ["preserve", "保留原目录"],
+              ["custom", "自定义合并"],
+            ] as Array<[ExportDirectoryMode, string]>
+          ).map(([mode, label]) => (
+            <button
+              type="button"
+              key={mode}
+              className={form.directoryLayout.mode === mode ? "is-active" : ""}
+              aria-pressed={form.directoryLayout.mode === mode}
+              disabled={activeExport}
+              onClick={() => selectDirectoryMode(mode)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {form.directoryLayout.mode === "custom" ? (
+          <button
+            type="button"
+            className="export-directory-configure"
+            disabled={activeExport}
+            onClick={() => setDirectoryRulesOpen(true)}
+          >
+            <span>
+              <strong>合并规则</strong>
+              <small>
+                {mergedDirectoryCount
+                  ? `已选择 ${mergedDirectoryCount} 个目录层级`
+                  : "尚未选择目录，当前效果等同于保留原目录"}
+              </small>
+            </span>
+            <span>配置…</span>
+          </button>
+        ) : null}
+        <small>
+          {form.directoryLayout.mode === "flat"
+            ? "兼容现有导出；不会保留素材在工作区中的父目录。"
+            : form.directoryLayout.mode === "preserve"
+              ? "按照图片相对于工作区根目录的当前路径输出。"
+              : "从保留结构开始，将选中的目录内容上提到父级。"}
+        </small>
+      </section>
+
+      <section className="export-option">
         <span className="export-option__title">输出方式</span>
         <div className="export-packaging-selector" role="group" aria-label="输出方式">
           <button
@@ -348,11 +430,7 @@ export function ExportSettingsPanel({
           </div>
           <div>
             <dt>目录结构</dt>
-            <dd>
-              {form.selections.length > 1 && form.formats.includes("txt")
-                ? "按通道分目录"
-                : "单通道扁平"}
-            </dd>
+            <dd>{directoryRuleLabel}</dd>
           </div>
           <div>
             <dt>覆盖文件</dt>
@@ -400,6 +478,31 @@ export function ExportSettingsPanel({
           开始导出
         </Button>
       </div>
+
+      <ExportDirectoryRulesDialog
+        open={directoryRulesOpen}
+        folders={folders}
+        error={foldersError}
+        loading={foldersPending}
+        scopeDescription={
+          form.scope === "selected"
+            ? `工作台选中的 ${checkedCount} 张图片`
+            : candidateActive
+              ? `候选工作集中的 ${assetCount} 张图片`
+              : `当前项目中的 ${assetCount} 张图片`
+        }
+        value={form.directoryLayout.merge_into_parent_paths ?? []}
+        onClose={() => setDirectoryRulesOpen(false)}
+        onApply={(paths) => {
+          onChange({
+            directoryLayout: {
+              mode: "custom",
+              merge_into_parent_paths: paths,
+            },
+          });
+          setDirectoryRulesOpen(false);
+        }}
+      />
     </aside>
   );
 }

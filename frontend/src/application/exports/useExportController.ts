@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useAssets, useCandidateSummary } from "../../features/assets/hooks";
+import {
+  useAssetFolders,
+  useAssets,
+  useCandidateSummary,
+  useSelectedAssetFolders,
+} from "../../features/assets/hooks";
 import { useExportActions, useExportOperations } from "../../features/exports/hooks";
 import { useWorkspace } from "../../features/workspaces/hooks";
 import { openLocalFolder } from "../../shared/desktop/openLocalFolder";
@@ -22,16 +27,25 @@ interface UseExportControllerOptions {
 }
 
 export function useExportController({ projectId, confirm, alert }: UseExportControllerOptions) {
-  const workspace = useWorkspace(projectId);
-  const assets = useAssets(projectId, { limit: 1 });
-  const candidateSummary = useCandidateSummary(projectId);
-  const operations = useExportOperations(projectId);
-  const actions = useExportActions(projectId);
   const checkedAssetIds = useWorkspaceSelectionStore((state) => state.checkedAssetIds);
   const setActiveProject = useWorkspaceSelectionStore((state) => state.setActiveProject);
   const { form } = exportWorkbenchState.useValue(projectId);
+  const workspace = useWorkspace(projectId);
+  const assets = useAssets(projectId, { limit: 1 });
+  const candidateFolders = useAssetFolders(projectId, form.scope === "all", "auto");
+  const selectedFolders = useSelectedAssetFolders(
+    projectId,
+    checkedAssetIds,
+    form.scope === "selected",
+  );
+  const candidateSummary = useCandidateSummary(projectId);
+  const operations = useExportOperations(projectId);
+  const actions = useExportActions(projectId);
   const [error, setError] = useState<string | null>(null);
   const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
+  const folderQuery = form.scope === "selected" ? selectedFolders : candidateFolders;
+  const emptySelectedScope = form.scope === "selected" && checkedAssetIds.length === 0;
+  const folderItems = folderQuery.data?.items;
 
   const patchForm = useCallback(
     (update: Partial<ExportFormState>) =>
@@ -46,6 +60,32 @@ export function useExportController({ projectId, confirm, alert }: UseExportCont
     setError(null);
     setPreviewFingerprint(null);
   }, [projectId, setActiveProject]);
+
+  useEffect(() => {
+    if (!folderItems && !emptySelectedScope) return;
+    const canonicalByKey = new Map(
+      (folderItems ?? [])
+        .filter((folder) => Boolean(folder.path))
+        .map((folder) => [folder.path.toLowerCase(), folder.path]),
+    );
+    const current = form.directoryLayout.merge_into_parent_paths ?? [];
+    const reconciled = current.flatMap((path) => {
+      const canonical = canonicalByKey.get(path.toLowerCase());
+      return canonical ? [canonical] : [];
+    });
+    if (
+      reconciled.length === current.length &&
+      reconciled.every((path, index) => path === current[index])
+    ) {
+      return;
+    }
+    patchForm({
+      directoryLayout: {
+        ...form.directoryLayout,
+        merge_into_parent_paths: reconciled,
+      },
+    });
+  }, [emptySelectedScope, folderItems, form.directoryLayout, patchForm]);
 
   const request = useMemo(() => buildExportRequest(form, checkedAssetIds), [checkedAssetIds, form]);
   const requestFingerprint = useMemo(
@@ -184,6 +224,11 @@ export function useExportController({ projectId, confirm, alert }: UseExportCont
     patchForm,
     assetCount: assets.data?.total ?? workspace.data?.asset_count ?? 0,
     candidateActive: Boolean(candidateSummary.data?.active),
+    folders: folderItems ?? [],
+    foldersPending: !emptySelectedScope && folderQuery.isPending,
+    foldersError: folderQuery.error
+      ? `无法读取当前导出范围的目录：${actionError(folderQuery.error, "请求失败")}`
+      : null,
     checkedCount: checkedAssetIds.length,
     preview: validPreview,
     previewPending: actions.preview.isPending,

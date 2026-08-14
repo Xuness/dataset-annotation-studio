@@ -75,6 +75,20 @@ class AssetFolderListResponse(BaseModel):
     items: list[AssetFolderSummary]
 
 
+class AssetFolderSelectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_ids: list[str] = Field(min_length=1, max_length=100_000)
+
+    @field_validator("asset_ids")
+    @classmethod
+    def normalize_asset_ids(cls, value: list[str]) -> list[str]:
+        normalized = list(dict.fromkeys(asset_id.strip() for asset_id in value if asset_id.strip()))
+        if not normalized:
+            raise ValueError("请先在素材工作台中选择图片。")
+        return normalized
+
+
 class CandidateScope(StrEnum):
     AUTO = "auto"
     CANDIDATES = "candidates"

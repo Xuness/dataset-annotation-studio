@@ -28,6 +28,9 @@ export function ExportPage() {
     assetCount,
     candidateActive,
     checkedCount,
+    folders,
+    foldersError,
+    foldersPending,
     preview,
     previewPending,
     exportPending,
@@ -83,6 +86,9 @@ export function ExportPage() {
         assetCount={assetCount}
         candidateActive={candidateActive}
         checkedCount={checkedCount}
+        folders={folders}
+        foldersError={foldersError}
+        foldersPending={foldersPending}
         preview={preview}
         previewPending={previewPending}
         exportPending={exportPending}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path, PurePosixPath
 
 from dataset_studio.core.files import file_sha256
@@ -21,6 +21,8 @@ from dataset_studio.modules.assets.candidates import (
 from dataset_studio.modules.assets.models import CandidateScope
 from dataset_studio.modules.exports.models import (
     ExportChannelSelection,
+    ExportDirectoryLayout,
+    ExportDirectoryMode,
     ExportFormat,
     ExportPackaging,
     ExportPreview,
@@ -461,6 +463,10 @@ def _plan_item(
 
     source_name = PurePosixPath(source_relative_path).name
     stem = PurePosixPath(source_name).stem
+    source_directory = _mapped_source_directory(
+        source_relative_path,
+        request.directory_layout,
+    )
     artifacts: list[ExportArtifact] = []
     statuses = {key: _selection_status(selected) for key, selected in annotations.items()}
     multiple_txt_channels = ExportFormat.TXT in request.formats and len(request.channels) > 1
@@ -469,17 +475,17 @@ def _plan_item(
         for selection in request.channels:
             selected = annotations[selection.key]
             directory = _channel_directory(selection) if multiple_txt_channels else ""
-            image_target = _join_target(directory, source_name)
+            image_target = _join_target(directory, source_directory, source_name)
             artifacts.append(_image_artifact(row, image_target))
             if selected.revision_id is not None:
-                annotation_target = _join_target(directory, f"{stem}.txt")
+                annotation_target = _join_target(directory, source_directory, f"{stem}.txt")
                 artifacts.append(_annotation_artifact(selected, annotation_target))
     elif ExportFormat.JSON in request.formats:
-        artifacts.append(_image_artifact(row, source_name))
+        artifacts.append(_image_artifact(row, _join_target(source_directory, source_name)))
 
     if ExportFormat.JSON in request.formats:
         directory = "metadata" if multiple_txt_channels else ""
-        target = _join_target(directory, f"{stem}.annotations.json")
+        target = _join_target(directory, source_directory, f"{stem}.annotations.json")
         payload = {
             "schema_version": 1,
             "image": source_name,
@@ -535,7 +541,15 @@ def _plan_item(
     )
     first_annotation = next(
         (artifact.target_relative_path for artifact in artifacts if artifact.kind != "image"),
-        f"{stem}.txt",
+        _join_target(
+            (
+                _channel_directory(request.channels[0])
+                if multiple_txt_channels and request.channels
+                else ""
+            ),
+            source_directory,
+            f"{stem}.txt",
+        ),
     )
     combined_hash = (
         hashlib.sha256(
@@ -646,29 +660,90 @@ def _channel_directory(selection: ExportChannelSelection) -> str:
     )
 
 
-def _join_target(directory: str, name: str) -> str:
-    return f"{directory}/{name}" if directory else name
+def _mapped_source_directory(
+    source_relative_path: str,
+    layout: ExportDirectoryLayout,
+) -> str:
+    if layout.mode == ExportDirectoryMode.FLAT:
+        return ""
+
+    parent = PurePosixPath(source_relative_path).parent
+    if parent == PurePosixPath("."):
+        return ""
+    if layout.mode == ExportDirectoryMode.PRESERVE:
+        return parent.as_posix()
+
+    merged = {path.casefold() for path in layout.merge_into_parent_paths}
+    original_parts: list[str] = []
+    target_parts: list[str] = []
+    for part in parent.parts:
+        original_parts.append(part)
+        original_path = PurePosixPath(*original_parts).as_posix()
+        if original_path.casefold() not in merged:
+            target_parts.append(part)
+    return PurePosixPath(*target_parts).as_posix() if target_parts else ""
+
+
+def _join_target(*parts: str) -> str:
+    return PurePosixPath(*(part for part in parts if part)).as_posix()
 
 
 def _mark_target_collisions(items: list[ExportPlanItem]) -> list[ExportPlanItem]:
+    def source_summary(indices: list[int] | set[int]) -> str:
+        sources = list(
+            dict.fromkeys(items[index].source_relative_path for index in sorted(indices))
+        )
+        visible = "、".join(sources[:3])
+        return f"{visible} 等 {len(sources)} 项" if len(sources) > 3 else visible
+
     owners: dict[str, list[int]] = {}
+    display_paths: dict[str, str] = {}
     for index, item in enumerate(items):
         for artifact in item.artifacts:
-            owners.setdefault(artifact.target_relative_path.casefold(), []).append(index)
-    collided = {index for indices in owners.values() if len(indices) > 1 for index in indices}
-    if not collided:
+            key = artifact.target_relative_path.casefold()
+            owners.setdefault(key, []).append(index)
+            display_paths.setdefault(key, artifact.target_relative_path)
+
+    issues_by_item: dict[int, list[str]] = {}
+    for key, indices in owners.items():
+        if len(indices) <= 1:
+            continue
+        message = (
+            f"目录映射后多个输出会写入同一个目标文件：{display_paths[key]}"
+            f"（来源：{source_summary(indices)}）"
+        )
+        for index in indices:
+            issues_by_item.setdefault(index, []).append(message)
+
+    for key, indices in owners.items():
+        parts = key.split("/")
+        for end in range(1, len(parts)):
+            prefix = "/".join(parts[:end])
+            if prefix not in owners:
+                continue
+            involved = {*indices, *owners[prefix]}
+            message = (
+                "目录映射后目标文件与目录发生冲突："
+                f"{display_paths[prefix]} / {display_paths[key]}"
+                f"（来源：{source_summary(involved)}）"
+            )
+            for index in involved:
+                issues_by_item.setdefault(index, []).append(message)
+
+    if not issues_by_item:
         return items
     return [
-        ExportPlanItem(
-            **{
-                **asdict(item),
-                "artifacts": item.artifacts,
-                "blocking_issue": (
-                    "扁平化后多个素材会写入同一个目标文件，请重命名源文件。"
-                    if index in collided
-                    else item.blocking_issue
-                ),
-            }
+        replace(
+            item,
+            blocking_issue="；".join(
+                dict.fromkeys(
+                    [
+                        *([item.blocking_issue] if item.blocking_issue else []),
+                        *issues_by_item.get(index, []),
+                    ]
+                )
+            )
+            or None,
         )
         for index, item in enumerate(items)
     ]

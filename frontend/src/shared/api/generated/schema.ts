@@ -1057,6 +1057,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/assets/folders/selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** List Selected Asset Folders */
+        post: operations["list_selected_asset_folders_api_v1_workspaces__project_id__assets_folders_selection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/assets/ids": {
         parameters: {
             query?: never;
@@ -2601,6 +2618,11 @@ export type components = {
             /** Items */
             items: components["schemas"]["AssetFolderSummary"][];
         };
+        /** AssetFolderSelectionRequest */
+        AssetFolderSelectionRequest: {
+            /** Asset Ids */
+            asset_ids: string[];
+        };
         /** AssetFolderSummary */
         AssetFolderSummary: {
             /** Descendant Asset Count */
@@ -2852,6 +2874,18 @@ export type components = {
             preview_token: string;
             request: components["schemas"]["ExportRequest"];
         };
+        /** ExportDirectoryLayout */
+        ExportDirectoryLayout: {
+            /** Merge Into Parent Paths */
+            merge_into_parent_paths?: string[];
+            /** @default flat */
+            mode: components["schemas"]["ExportDirectoryMode"];
+        };
+        /**
+         * ExportDirectoryMode
+         * @enum {string}
+         */
+        ExportDirectoryMode: "flat" | "preserve" | "custom";
         /**
          * ExportFormat
          * @enum {string}
@@ -2987,6 +3021,7 @@ export type components = {
             channels?: components["schemas"]["ExportChannelSelection"][];
             /** Destination Path */
             destination_path: string;
+            directory_layout?: components["schemas"]["ExportDirectoryLayout"];
             /** Formats */
             formats?: components["schemas"]["ExportFormat"][];
             /** @default directory */
@@ -7715,6 +7750,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetFolderListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_selected_asset_folders_api_v1_workspaces__project_id__assets_folders_selection_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetFolderSelectionRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
