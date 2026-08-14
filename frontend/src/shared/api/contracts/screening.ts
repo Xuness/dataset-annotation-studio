@@ -102,6 +102,12 @@ export interface ScreeningScoreDetails {
   bad_consensus_second: number;
 }
 
+export interface ScreeningCandidateElsewhere {
+  asset_id: string;
+  source_relative_path: string;
+  match_kind: "danbooru_post" | "content_hash";
+}
+
 export interface ScreeningItem {
   asset_id: string;
   source_relative_path: string;
@@ -140,6 +146,9 @@ export interface ScreeningItem {
   variant_group: string | null;
   duplicate_representative: boolean;
   duplicate_of_asset_id: string | null;
+  source_post_id: string | null;
+  is_candidate: boolean;
+  candidate_elsewhere: ScreeningCandidateElsewhere[];
   score_details: ScreeningScoreDetails | null;
   reason_codes: string[];
   warnings: string[];

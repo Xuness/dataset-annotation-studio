@@ -817,6 +817,18 @@
   font-style: normal;
 }
 
+.screening-card-copy > span i.is-current-candidate {
+  color: color-mix(in srgb, var(--accent) 78%, var(--ink));
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.screening-card-copy > span i.is-candidate-elsewhere {
+  color: color-mix(in srgb, #d8a85b 78%, var(--ink));
+  border: 1px solid color-mix(in srgb, #c69a54 38%, transparent);
+  background: color-mix(in srgb, #c69a54 12%, transparent);
+}
+
 .screening-card-check {
   position: absolute;
   right: 7px;
@@ -965,6 +977,25 @@
   color: var(--muted);
   font-size: var(--text-xs);
   line-height: 1.5;
+}
+
+.screening-candidate-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.screening-candidate-links span {
+  max-width: 100%;
+  padding: 4px 7px;
+  overflow: hidden;
+  color: color-mix(in srgb, #d8a85b 82%, var(--ink));
+  border: 1px solid color-mix(in srgb, #c69a54 38%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, #c69a54 10%, transparent);
+  font-size: var(--text-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .screening-inspector-section.is-warning {

@@ -1,4 +1,4 @@
-import { BarChart3, FileWarning, ShieldCheck } from "lucide-react";
+import { BarChart3, BookmarkCheck, FileWarning, ShieldCheck } from "lucide-react";
 
 import { thumbnailUrl } from "../../../../src/features/assets/api";
 import type {
@@ -47,6 +47,11 @@ function count(operation: ScreeningOperation, pool: ScreeningPool): number {
 
 function filename(item: ScreeningItem): string {
   return item.source_relative_path.split(/[\\/]/u).at(-1) || item.source_relative_path;
+}
+
+function subsetLabel(relativePath: string): string {
+  const parts = relativePath.split(/[\\/]/u).filter(Boolean);
+  return parts.length > 1 ? parts[0] : "项目根目录";
 }
 
 function evidenceConfidence(item: ScreeningItem): number | null {
@@ -233,6 +238,32 @@ export function ScreeningInspectorPanel({
         <p>
           {item.image_width ?? "—"} × {item.image_height ?? "—"}
         </p>
+      </section>
+
+      <section className="screening-inspector-section">
+        <h3>
+          <BookmarkCheck size={14} /> 候选归属
+        </h3>
+        <p>
+          当前子集（{subsetLabel(item.source_relative_path)}）：
+          {item.is_candidate ? "已加入候选" : "尚未加入候选"}
+        </p>
+        {item.source_post_id ? <p>Danbooru ID：{item.source_post_id}</p> : null}
+        {item.candidate_elsewhere.length ? (
+          <>
+            <p>同一来源图片还在以下子集中入选，但不会自动勾选当前素材：</p>
+            <div className="screening-candidate-links">
+              {item.candidate_elsewhere.map((candidate) => (
+                <span key={candidate.asset_id} title={candidate.source_relative_path}>
+                  {subsetLabel(candidate.source_relative_path)} ·
+                  {candidate.match_kind === "danbooru_post" ? " 同一 Danbooru ID" : " 内容相同"}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p>其他子集中没有关联的持久候选。</p>
+        )}
       </section>
 
       <section className="screening-inspector-section">

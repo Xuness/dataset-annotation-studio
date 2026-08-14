@@ -63,6 +63,9 @@ from dataset_studio.modules.workspaces.migrations.v019_screening_task_profiles i
 from dataset_studio.modules.workspaces.migrations.v020_asset_candidates import (
     MIGRATION as V020_ASSET_CANDIDATES,
 )
+from dataset_studio.modules.workspaces.migrations.v021_asset_source_identities import (
+    MIGRATION as V021_ASSET_SOURCE_IDENTITIES,
+)
 
 WORKSPACE_MIGRATIONS: Final[tuple[Migration, ...]] = (
     V001_INITIAL_WORKSPACE_SCHEMA,
@@ -85,5 +88,6 @@ WORKSPACE_MIGRATIONS: Final[tuple[Migration, ...]] = (
     V018_SCREENING_OPERATIONS,
     V019_SCREENING_TASK_PROFILES,
     V020_ASSET_CANDIDATES,
+    V021_ASSET_SOURCE_IDENTITIES,
 )
 WORKSPACE_SCHEMA_VERSION: Final = WORKSPACE_MIGRATIONS[-1].version

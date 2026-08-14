@@ -13,6 +13,7 @@ from dataset_studio.modules.screening.models import (
     SCORE_MODE,
     SCORE_VERSION,
     SELECTION_POLICY_VERSION,
+    ScreeningCandidateElsewhere,
     ScreeningItem,
     ScreeningItemList,
     ScreeningOperation,
@@ -58,6 +59,7 @@ ITEM_SORTS = {
 @dataclass(frozen=True, slots=True)
 class MetadataBatchUpdate:
     item_id: str
+    asset_id: str
     result: MetadataReadResult | None = None
     candidate_pool: str | None = None
     error_code: str | None = None
@@ -237,6 +239,7 @@ class ScreeningRepository:
         now = utc_now_iso()
         normalized_rows: list[tuple[object, ...]] = []
         failed_rows: list[tuple[object, ...]] = []
+        identity_rows: list[tuple[object, ...]] = []
         invalid_count = 0
         for update in updates:
             if update.candidate_pool is not None:
@@ -262,6 +265,16 @@ class ScreeningRepository:
                 continue
             result = update.result
             metadata = result.metadata
+            if metadata.post_id:
+                identity_rows.append(
+                    (
+                        update.asset_id,
+                        "danbooru",
+                        metadata.post_id,
+                        operation_id,
+                        now,
+                    )
+                )
             reasons = (
                 []
                 if update.candidate_pool is None
@@ -331,6 +344,19 @@ class ScreeningRepository:
             if changed != len(updates):
                 raise RuntimeError(
                     f"筛选元数据批次应更新 {len(updates)} 项，实际更新 {changed} 项。"
+                )
+            if identity_rows:
+                connection.executemany(
+                    """
+                    INSERT INTO asset_source_identities (
+                        asset_id, source_kind, source_id, source_operation_id, observed_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(asset_id, source_kind) DO UPDATE SET
+                        source_id = excluded.source_id,
+                        source_operation_id = excluded.source_operation_id,
+                        observed_at = excluded.observed_at
+                    """,
+                    identity_rows,
                 )
             connection.execute(
                 """
@@ -762,7 +788,7 @@ class ScreeningRepository:
                 (*params, limit, offset),
             ).fetchall()
             return ScreeningItemList(
-                items=[self._item(row) for row in rows],
+                items=self._items(connection, rows),
                 total=total,
                 offset=offset,
                 limit=limit,
@@ -777,7 +803,7 @@ class ScreeningRepository:
                 "SELECT * FROM screening_items WHERE operation_id = ? AND asset_id = ?",
                 (operation_id, asset_id),
             ).fetchone()
-            return self._item(row) if row else None
+            return self._items(connection, [row])[0] if row else None
         finally:
             connection.close()
 
@@ -875,8 +901,137 @@ class ScreeningRepository:
             error_message=row["error_message"],
         )
 
+    @classmethod
+    def _items(cls, connection, rows: list[sqlite3.Row]) -> list[ScreeningItem]:
+        context = cls._candidate_context(connection, rows)
+        return [
+            cls._item(
+                row,
+                source_post_id=context[str(row["asset_id"])][0],
+                is_candidate=context[str(row["asset_id"])][1],
+                candidate_elsewhere=context[str(row["asset_id"])][2],
+            )
+            for row in rows
+        ]
+
     @staticmethod
-    def _item(row) -> ScreeningItem:
+    def _candidate_context(
+        connection,
+        rows: list[sqlite3.Row],
+    ) -> dict[str, tuple[str | None, bool, list[ScreeningCandidateElsewhere]]]:
+        asset_ids = list(dict.fromkeys(str(row["asset_id"]) for row in rows))
+        context: dict[str, tuple[str | None, bool, list[ScreeningCandidateElsewhere]]] = {
+            asset_id: (None, False, []) for asset_id in asset_ids
+        }
+        if not asset_ids:
+            return context
+
+        source_ids: dict[str, str] = {}
+        current_candidates: set[str] = set()
+        related: dict[str, dict[str, ScreeningCandidateElsewhere]] = {
+            asset_id: {} for asset_id in asset_ids
+        }
+        row_by_asset_id = {str(row["asset_id"]): row for row in rows}
+
+        for start in range(0, len(asset_ids), 400):
+            batch = asset_ids[start : start + 400]
+            placeholders = ",".join("?" for _ in batch)
+            current_rows = connection.execute(
+                f"""
+                SELECT a.id, identity.source_id,
+                       EXISTS (
+                           SELECT 1 FROM asset_candidates candidate
+                           WHERE candidate.asset_id = a.id
+                       ) AS is_candidate
+                FROM assets a
+                LEFT JOIN asset_source_identities identity
+                  ON identity.asset_id = a.id AND identity.source_kind = 'danbooru'
+                WHERE a.id IN ({placeholders})
+                """,
+                batch,
+            ).fetchall()
+            for current in current_rows:
+                asset_id = str(current["id"])
+                if current["source_id"] is not None:
+                    source_ids[asset_id] = str(current["source_id"])
+                if current["is_candidate"]:
+                    current_candidates.add(asset_id)
+
+            post_matches = connection.execute(
+                f"""
+                SELECT current_identity.asset_id AS current_asset_id,
+                       related.id AS related_asset_id,
+                       related.relative_path AS related_relative_path
+                FROM asset_source_identities current_identity
+                JOIN asset_source_identities related_identity
+                  ON related_identity.source_kind = current_identity.source_kind
+                 AND related_identity.source_id = current_identity.source_id
+                 AND related_identity.asset_id != current_identity.asset_id
+                JOIN asset_candidates candidate
+                  ON candidate.asset_id = related_identity.asset_id
+                JOIN assets related
+                  ON related.id = related_identity.asset_id AND related.is_present = 1
+                WHERE current_identity.source_kind = 'danbooru'
+                  AND current_identity.asset_id IN ({placeholders})
+                ORDER BY current_identity.asset_id, related.relative_path COLLATE NOCASE
+                """,
+                batch,
+            ).fetchall()
+            for match in post_matches:
+                current_asset_id = str(match["current_asset_id"])
+                related_asset_id = str(match["related_asset_id"])
+                related[current_asset_id][related_asset_id] = ScreeningCandidateElsewhere(
+                    asset_id=related_asset_id,
+                    source_relative_path=str(match["related_relative_path"]),
+                    match_kind="danbooru_post",
+                )
+
+            item_ids = [str(row_by_asset_id[asset_id]["id"]) for asset_id in batch]
+            item_placeholders = ",".join("?" for _ in item_ids)
+            hash_matches = connection.execute(
+                f"""
+                SELECT current_item.asset_id AS current_asset_id,
+                       related.id AS related_asset_id,
+                       related.relative_path AS related_relative_path
+                FROM screening_items current_item
+                JOIN assets related
+                  ON related.content_hash = current_item.image_hash
+                 AND related.id != current_item.asset_id
+                 AND related.is_present = 1
+                JOIN asset_candidates candidate ON candidate.asset_id = related.id
+                WHERE current_item.id IN ({item_placeholders})
+                ORDER BY current_item.asset_id, related.relative_path COLLATE NOCASE
+                """,
+                item_ids,
+            ).fetchall()
+            for match in hash_matches:
+                current_asset_id = str(match["current_asset_id"])
+                related_asset_id = str(match["related_asset_id"])
+                related[current_asset_id].setdefault(
+                    related_asset_id,
+                    ScreeningCandidateElsewhere(
+                        asset_id=related_asset_id,
+                        source_relative_path=str(match["related_relative_path"]),
+                        match_kind="content_hash",
+                    ),
+                )
+
+        for asset_id in asset_ids:
+            context[asset_id] = (
+                source_ids.get(asset_id),
+                asset_id in current_candidates,
+                list(related[asset_id].values()),
+            )
+        return context
+
+    @staticmethod
+    def _item(
+        row,
+        *,
+        source_post_id: str | None,
+        is_candidate: bool,
+        candidate_elsewhere: list[ScreeningCandidateElsewhere],
+    ) -> ScreeningItem:
         details = _object(row["score_details"]) if row["score_details"] else None
         return ScreeningItem(
             asset_id=str(row["asset_id"]),
@@ -924,6 +1079,9 @@ class ScreeningRepository:
             variant_group=row["variant_group"],
             duplicate_representative=bool(row["duplicate_representative"]),
             duplicate_of_asset_id=row["duplicate_of_asset_id"],
+            source_post_id=source_post_id,
+            is_candidate=is_candidate,
+            candidate_elsewhere=candidate_elsewhere,
             score_details=details,
             reason_codes=_array(row["reason_codes"]),
             warnings=_array(row["warnings"]),

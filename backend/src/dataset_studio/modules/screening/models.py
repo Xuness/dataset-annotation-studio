@@ -139,6 +139,12 @@ class ScreeningScoreDetails(BaseModel):
     bad_consensus_second: float
 
 
+class ScreeningCandidateElsewhere(BaseModel):
+    asset_id: str
+    source_relative_path: str
+    match_kind: Literal["danbooru_post", "content_hash"]
+
+
 class ScreeningItem(BaseModel):
     asset_id: str
     source_relative_path: str
@@ -177,6 +183,9 @@ class ScreeningItem(BaseModel):
     variant_group: str | None = None
     duplicate_representative: bool = True
     duplicate_of_asset_id: str | None = None
+    source_post_id: str | None = None
+    is_candidate: bool = False
+    candidate_elsewhere: list[ScreeningCandidateElsewhere] = Field(default_factory=list)
     score_details: ScreeningScoreDetails | None = None
     reason_codes: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

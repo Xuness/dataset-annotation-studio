@@ -67,6 +67,15 @@ const item: ScreeningItem = {
   variant_group: null,
   duplicate_representative: true,
   duplicate_of_asset_id: null,
+  source_post_id: "11956520",
+  is_candidate: false,
+  candidate_elsewhere: [
+    {
+      asset_id: "columbina-asset",
+      source_relative_path: "Columbina/rating_g/11956520.png",
+      match_kind: "danbooru_post",
+    },
+  ],
   score_details: {
     popularity_percentile_raw: 0.9,
     popularity_percentile_final: 0.9,
@@ -157,7 +166,12 @@ describe("legacy screening workspace", () => {
 
     expect(screen.getByText("hero.png")).toBeTruthy();
     expect(screen.getByText("任务百分位 99.0% · #1")).toBeTruthy();
+    expect(screen.getByText("Columbina 已候选")).toBeTruthy();
     expect(screen.getByText("240px")).toBeTruthy();
+
+    expect(
+      screen.getByRole("checkbox", { name: "勾选 hero.png" }).getAttribute("aria-checked"),
+    ).toBe("false");
 
     await user.click(screen.getByRole("button", { name: "放大缩略图" }));
     expect(changeThumbnailSize).toHaveBeenCalledWith(280);

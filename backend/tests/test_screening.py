@@ -377,6 +377,116 @@ def test_screening_filters_exact_duplicates_and_danbooru_variants(tmp_path: Path
     assert unmarked.json()["ids"] == [by_name["unique.png"]]
 
 
+def test_screening_reports_candidates_from_other_subsets_without_selecting_current_asset(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "dataset"
+    columbina = project / "Columbina"
+    sandrone = project / "Sandrone"
+    columbina.mkdir(parents=True)
+    sandrone.mkdir()
+    base = {
+        "rating": "g",
+        "created_at": "2026-01-01T00:00:00Z",
+        "metadata_snapshot_at": "2026-01-10T00:00:00Z",
+        "fav_count": 8,
+        "up_score": 6,
+        "down_score": 0,
+    }
+    # Different bytes but the same Danbooru post must still be related.
+    _write_asset(columbina, "11956520", base | {"id": 11956520}, color="red")
+    _write_asset(sandrone, "11956520", base | {"id": 11956520}, color="blue")
+    # Without a source post ID, exact content remains a safe fallback.
+    _write_asset(columbina, "hash-only", base, color="green")
+    _write_asset(sandrone, "hash-only", base, color="green")
+    settings = Settings(app_data_dir=tmp_path / "app-data", host="127.0.0.1", port=0)
+
+    with TestClient(create_app(settings)) as client:
+        project_id = client.post("/api/v1/workspaces/open", json={"path": str(project)}).json()[
+            "workspace"
+        ]["project_id"]
+        assets = client.get(
+            f"/api/v1/workspaces/{project_id}/assets", params={"candidate_scope": "all"}
+        ).json()["items"]
+        by_path = {asset["relative_path"]: asset["id"] for asset in assets}
+        columbina_ids = [
+            by_path["Columbina/11956520.png"],
+            by_path["Columbina/hash-only.png"],
+        ]
+        sandrone_ids = [
+            by_path["Sandrone/11956520.png"],
+            by_path["Sandrone/hash-only.png"],
+        ]
+        first_operation = client.post(
+            f"/api/v1/workspaces/{project_id}/screening/operations",
+            json={"asset_ids": columbina_ids},
+        ).json()["id"]
+        container = client.app.state.container
+        assert ScreeningWorker(container)._claim_next() is not None
+        ScreeningWorker(container)._process_operation(project_id, first_operation)
+        added = client.patch(
+            f"/api/v1/workspaces/{project_id}/assets/candidates",
+            json={
+                "action": "add",
+                "asset_ids": columbina_ids,
+                "source_kind": "screening",
+                "source_operation_id": first_operation,
+            },
+        )
+        assert added.status_code == 200
+
+        second_operation = client.post(
+            f"/api/v1/workspaces/{project_id}/screening/operations",
+            json={"asset_ids": sandrone_ids},
+        ).json()["id"]
+        assert ScreeningWorker(container)._claim_next() is not None
+        ScreeningWorker(container)._process_operation(project_id, second_operation)
+        listed = client.get(
+            f"/api/v1/workspaces/{project_id}/screening/operations/{second_operation}/items",
+            params={"sort": "path"},
+        ).json()["items"]
+        by_filename = {Path(item["source_relative_path"]).name: item for item in listed}
+
+        post_item = by_filename["11956520.png"]
+        hash_item = by_filename["hash-only.png"]
+        assert post_item["source_post_id"] == "11956520"
+        assert post_item["is_candidate"] is False
+        assert post_item["candidate_elsewhere"] == [
+            {
+                "asset_id": by_path["Columbina/11956520.png"],
+                "source_relative_path": "Columbina/11956520.png",
+                "match_kind": "danbooru_post",
+            }
+        ]
+        assert hash_item["source_post_id"] is None
+        assert hash_item["is_candidate"] is False
+        assert hash_item["candidate_elsewhere"] == [
+            {
+                "asset_id": by_path["Columbina/hash-only.png"],
+                "source_relative_path": "Columbina/hash-only.png",
+                "match_kind": "content_hash",
+            }
+        ]
+
+        selected_for_sandrone = client.patch(
+            f"/api/v1/workspaces/{project_id}/assets/candidates",
+            json={
+                "action": "add",
+                "asset_ids": [by_path["Sandrone/11956520.png"]],
+                "source_kind": "screening",
+                "source_operation_id": second_operation,
+            },
+        )
+        assert selected_for_sandrone.status_code == 200
+        refreshed = client.get(
+            f"/api/v1/workspaces/{project_id}/screening/operations/{second_operation}"
+            f"/items/{by_path['Sandrone/11956520.png']}"
+        ).json()
+
+    assert refreshed["is_candidate"] is True
+    assert refreshed["candidate_elsewhere"][0]["source_relative_path"] == ("Columbina/11956520.png")
+
+
 def test_screening_queued_operation_can_stop_resume_and_complete(tmp_path: Path) -> None:
     project = tmp_path / "dataset"
     project.mkdir()

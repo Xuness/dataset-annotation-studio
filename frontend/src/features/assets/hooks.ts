@@ -14,6 +14,7 @@ import {
   type AssetQuery,
 } from "./api";
 import type { CandidateScope, CandidateUpdateRequest } from "../../shared/api/types";
+import { workspaceQueryKeys } from "../../shared/query/workspaceQueries";
 import { annotationTraceKeys, assetKeys, metadataKeys, promptPreviewKeys } from "./queryKeys";
 
 interface AssetQueryOptions {
@@ -97,7 +98,13 @@ export function useCandidateActions(projectId: string) {
   return {
     update: useMutation({
       mutationFn: (request: CandidateUpdateRequest) => updateCandidates(projectId, request),
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) }),
+      onSuccess: () =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: assetKeys.project(projectId) }),
+          queryClient.invalidateQueries({
+            queryKey: workspaceQueryKeys.scope(projectId, "screening"),
+          }),
+        ]),
     }),
   };
 }

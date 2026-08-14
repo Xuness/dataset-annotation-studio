@@ -68,6 +68,32 @@ function filename(item: ScreeningItem): string {
   return item.source_relative_path.split(/[\\/]/u).at(-1) || item.source_relative_path;
 }
 
+function subsetLabel(relativePath: string): string {
+  const parts = relativePath.split(/[\\/]/u).filter(Boolean);
+  return parts.length > 1 ? parts[0] : "项目根目录";
+}
+
+function candidateElsewhereSummary(item: ScreeningItem): string {
+  const subsets = [
+    ...new Set(
+      item.candidate_elsewhere.map((candidate) => subsetLabel(candidate.source_relative_path)),
+    ),
+  ];
+  if (subsets.length <= 2) return `${subsets.join("、")} 已候选`;
+  return `${subsets.slice(0, 2).join("、")} 等 ${subsets.length} 个子集已候选`;
+}
+
+function candidateElsewhereTitle(item: ScreeningItem): string {
+  return item.candidate_elsewhere
+    .map(
+      (candidate) =>
+        `${candidate.source_relative_path}（${
+          candidate.match_kind === "danbooru_post" ? "同一 Danbooru ID" : "内容哈希相同"
+        }）`,
+    )
+    .join("\n");
+}
+
 interface Props {
   projectId: string;
   operationId: string;
@@ -489,6 +515,17 @@ export function ScreeningResultGallery({
                               : ""}
                           </small>
                           <span>
+                            {item.is_candidate ? (
+                              <i className="is-current-candidate">当前已候选</i>
+                            ) : null}
+                            {item.candidate_elsewhere.length ? (
+                              <i
+                                className="is-candidate-elsewhere"
+                                title={candidateElsewhereTitle(item)}
+                              >
+                                {candidateElsewhereSummary(item)}
+                              </i>
+                            ) : null}
                             {item.low_resolution_flag ? <i>低分辨率</i> : null}
                             {item.pixel_duplicate_group ? <i>重复组</i> : null}
                             {item.variant_group ? <i>Danbooru 变体</i> : null}

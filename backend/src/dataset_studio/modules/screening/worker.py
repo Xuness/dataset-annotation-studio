@@ -265,6 +265,7 @@ class ScreeningWorker:
         fallback_snapshot_at: str | None,
     ) -> MetadataBatchUpdate:
         item_id = str(row["id"])
+        asset_id = str(row["asset_id"])
         if (
             row["metadata_relative_path"] is None
             or row["metadata_size"] is None
@@ -272,6 +273,7 @@ class ScreeningWorker:
         ):
             return MetadataBatchUpdate(
                 item_id=item_id,
+                asset_id=asset_id,
                 candidate_pool="invalid",
                 error_code="METADATA_MISSING_AT_CREATE",
                 error_message="任务创建时同名 Danbooru JSON 不可用。",
@@ -287,14 +289,16 @@ class ScreeningWorker:
         except MetadataReadError as error:
             return MetadataBatchUpdate(
                 item_id=item_id,
+                asset_id=asset_id,
                 candidate_pool="invalid",
                 error_code=error.code,
                 error_message=str(error),
             )
         if result.metadata.disposition == "valid":
-            return MetadataBatchUpdate(item_id=item_id, result=result)
+            return MetadataBatchUpdate(item_id=item_id, asset_id=asset_id, result=result)
         return MetadataBatchUpdate(
             item_id=item_id,
+            asset_id=asset_id,
             result=result,
             candidate_pool=result.metadata.disposition,
             error_code="DANBOORU_" + result.metadata.disposition.upper(),

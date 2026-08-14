@@ -5670,6 +5670,33 @@
         "title": "ScreeningAssetIds",
         "type": "object"
       },
+      "ScreeningCandidateElsewhere": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "match_kind": {
+            "enum": [
+              "danbooru_post",
+              "content_hash"
+            ],
+            "title": "Match Kind",
+            "type": "string"
+          },
+          "source_relative_path": {
+            "title": "Source Relative Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "source_relative_path",
+          "match_kind"
+        ],
+        "title": "ScreeningCandidateElsewhere",
+        "type": "object"
+      },
       "ScreeningCandidatePool": {
         "enum": [
           "elite_candidate",
@@ -5803,6 +5830,13 @@
           "asset_id": {
             "title": "Asset Id",
             "type": "string"
+          },
+          "candidate_elsewhere": {
+            "items": {
+              "$ref": "#/components/schemas/ScreeningCandidateElsewhere"
+            },
+            "title": "Candidate Elsewhere",
+            "type": "array"
           },
           "candidate_pool": {
             "anyOf": [
@@ -5973,6 +6007,11 @@
             ],
             "title": "Image Width"
           },
+          "is_candidate": {
+            "default": false,
+            "title": "Is Candidate",
+            "type": "boolean"
+          },
           "keep_score": {
             "anyOf": [
               {
@@ -6114,6 +6153,17 @@
               }
             ],
             "title": "Selection Score"
+          },
+          "source_post_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Post Id"
           },
           "source_relative_path": {
             "title": "Source Relative Path",

@@ -3904,6 +3904,18 @@ export type components = {
             /** Total */
             total: number;
         };
+        /** ScreeningCandidateElsewhere */
+        ScreeningCandidateElsewhere: {
+            /** Asset Id */
+            asset_id: string;
+            /**
+             * Match Kind
+             * @enum {string}
+             */
+            match_kind: "danbooru_post" | "content_hash";
+            /** Source Relative Path */
+            source_relative_path: string;
+        };
         /**
          * ScreeningCandidatePool
          * @enum {string}
@@ -3974,6 +3986,8 @@ export type components = {
             age_hours?: number | null;
             /** Asset Id */
             asset_id: string;
+            /** Candidate Elsewhere */
+            candidate_elsewhere?: components["schemas"]["ScreeningCandidateElsewhere"][];
             candidate_pool?: components["schemas"]["ScreeningCandidatePool"] | null;
             /** Confidence Depth */
             confidence_depth?: number | null;
@@ -4008,6 +4022,11 @@ export type components = {
             image_height?: number | null;
             /** Image Width */
             image_width?: number | null;
+            /**
+             * Is Candidate
+             * @default false
+             */
+            is_candidate: boolean;
             /** Keep Score */
             keep_score?: number | null;
             /**
@@ -4037,6 +4056,8 @@ export type components = {
             selection_rank?: number | null;
             /** Selection Score */
             selection_score?: number | null;
+            /** Source Post Id */
+            source_post_id?: string | null;
             /** Source Relative Path */
             source_relative_path: string;
             /**

@@ -47,6 +47,7 @@ EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS = {
     18: "5a9307e485bbc72f7092bf7bde8902bd6b383495ba2656329b3e7b1c960244ba",
     19: "0a1888b731c2e971b12d5a844a2439d0a9ce925472fade121933ac8f5e6d319e",
     20: "f2475fc69e1472cafd52243bc5b71202cb1d86023f0f1b37a344e251f55a566c",
+    21: "73c6004567ad5d772a8e9cd1be33c5be6017abe53b4e9eb0ba3c9e30ee4bad87",
 }
 
 
@@ -192,6 +193,109 @@ def test_candidate_migration_preserves_assets_and_adds_empty_membership(tmp_path
     assert [(row["table"], row["from"], row["to"], row["on_delete"]) for row in foreign_keys] == [
         ("assets", "asset_id", "id", "CASCADE")
     ]
+
+
+def test_asset_source_identity_migration_backfills_valid_screening_snapshots(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "workspace.sqlite3"
+    migrate_database(database, WORKSPACE_MIGRATIONS[:20])
+    now = "2026-08-14T00:00:00Z"
+    connection = connect(database)
+    try:
+        for asset_id, relative_path in (
+            ("asset-valid", "Columbina/11956520.png"),
+            ("asset-malformed", "Sandrone/broken.png"),
+        ):
+            connection.execute(
+                """
+                INSERT INTO assets (
+                    id, relative_path, filename, stem, suffix, content_hash,
+                    byte_size, modified_ns, width, height, annotation_relative_path,
+                    annotation_status, image_metadata_version, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, '.png', ?, 1, 1, 32, 32, ?, 'missing', 1, ?, ?)
+                """,
+                (
+                    asset_id,
+                    relative_path,
+                    Path(relative_path).name,
+                    Path(relative_path).stem,
+                    f"hash-{asset_id}",
+                    str(Path(relative_path).with_suffix(".txt")).replace("\\", "/"),
+                    now,
+                    now,
+                ),
+            )
+        connection.execute(
+            """
+            INSERT INTO screening_operations (
+                id, status, score_mode, score_version, total_items,
+                processed_items, scored_items, configuration_snapshot,
+                created_at, updated_at, completed_at
+            ) VALUES (
+                'operation', 'completed', 'batch_only_v0_1',
+                'metarank-batch-v0.1', 2, 2, 1, '{}', ?, ?, ?
+            )
+            """,
+            (now, now, now),
+        )
+        for position, (item_id, asset_id, relative_path, snapshot) in enumerate(
+            (
+                (
+                    "item-valid",
+                    "asset-valid",
+                    "Columbina/11956520.png",
+                    '{"post_id":"11956520"}',
+                ),
+                ("item-malformed", "asset-malformed", "Sandrone/broken.png", "{broken"),
+            )
+        ):
+            connection.execute(
+                """
+                INSERT INTO screening_items (
+                    id, operation_id, position, asset_id, source_relative_path,
+                    image_hash, image_size, image_modified_ns, image_width,
+                    image_height, status, normalized_snapshot, created_at, updated_at
+                ) VALUES (?, 'operation', ?, ?, ?, ?, 1, 1, 32, 32, 'scored', ?, ?, ?)
+                """,
+                (
+                    item_id,
+                    position,
+                    asset_id,
+                    relative_path,
+                    f"hash-{asset_id}",
+                    snapshot,
+                    now,
+                    now,
+                ),
+            )
+        connection.commit()
+    finally:
+        connection.close()
+
+    migrate_database(database, WORKSPACE_MIGRATIONS)
+
+    connection = connect(database)
+    try:
+        identities = connection.execute(
+            """
+            SELECT asset_id, source_kind, source_id, source_operation_id
+            FROM asset_source_identities ORDER BY asset_id
+            """
+        ).fetchall()
+        indexes = {
+            str(row["name"])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index'"
+            ).fetchall()
+        }
+    finally:
+        connection.close()
+
+    assert [tuple(row) for row in identities] == [
+        ("asset-valid", "danbooru", "11956520", "operation")
+    ]
+    assert "idx_asset_source_identities_lookup" in indexes
 
 
 @pytest.mark.parametrize(
@@ -984,6 +1088,7 @@ def test_workspace_database_migrates_existing_asset_metadata_version(tmp_path: P
         "job_item_annotation_inputs",
         "legacy_annotation_imports",
         "asset_candidates",
+        "asset_source_identities",
     }.issubset(tables)
     assert preprocess_item_columns["phase"]["notnull"] == 1
     assert preprocess_item_columns["phase"]["dflt_value"] == "'committed'"
