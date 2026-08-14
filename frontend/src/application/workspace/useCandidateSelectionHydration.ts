@@ -6,9 +6,11 @@ import { useWorkspaceSelectionStore } from "../../shared/store/workspaceSelectio
 /**
  * Restore persisted candidate membership into the transient checkbox workspace.
  *
- * Hydration is intentionally a one-time merge for each workspace visit. After
- * that, checkboxes remain an editable draft and candidate membership changes
- * only through the explicit candidate actions.
+ * Hydration is intentionally a one-time merge for the active project. Merely
+ * leaving its workspace routes must not arm another merge: the Zustand draft
+ * survives that navigation and remains the user's current checkbox state.
+ * A real project change clears the draft through setActiveProject and hydrates
+ * the newly active project's candidates.
  */
 export function useCandidateSelectionHydration(projectId: string | null): void {
   const hydratedProjectRef = useRef<string | null>(null);
@@ -17,10 +19,7 @@ export function useCandidateSelectionHydration(projectId: string | null): void {
   const setAssetsChecked = useWorkspaceSelectionStore((state) => state.setAssetsChecked);
 
   useEffect(() => {
-    if (!projectId) {
-      hydratedProjectRef.current = null;
-      return;
-    }
+    if (!projectId) return;
     setActiveProject(projectId);
   }, [projectId, setActiveProject]);
 
