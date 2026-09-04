@@ -323,7 +323,7 @@ export function ExportSettingsPanel({
           {(
             [
               ["flat", "扁平化"],
-              ["preserve", "保留原目录"],
+              ["preserve", "保留原目录（含根目录名）"],
               ["custom", "自定义合并"],
             ] as Array<[ExportDirectoryMode, string]>
           ).map(([mode, label]) => (
@@ -361,7 +361,7 @@ export function ExportSettingsPanel({
           {form.directoryLayout.mode === "flat"
             ? "兼容现有导出；不会保留素材在工作区中的父目录。"
             : form.directoryLayout.mode === "preserve"
-              ? "按照图片相对于工作区根目录的当前路径输出。"
+              ? "保留工作区根目录名，并按照图片相对于工作区根目录的当前路径输出。"
               : "从保留结构开始，将选中的目录内容上提到父级。"}
         </small>
       </section>
