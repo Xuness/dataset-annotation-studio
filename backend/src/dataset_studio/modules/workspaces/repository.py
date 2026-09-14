@@ -41,6 +41,11 @@ class WorkspaceRegistry:
         )
         with transaction(self._database_path) as connection:
             connection.execute(
+                """INSERT OR IGNORE INTO workspace_locations
+                (project_id, root_path, root_path_key) VALUES (?, ?, ?)""",
+                (manifest.project_id, root, root_key),
+            )
+            connection.execute(
                 """
                 UPDATE recent_workspaces
                 SET hidden_at = ?

@@ -1,3 +1,5 @@
+import { useWorkspaceFilesController } from "../../../src/application/workspace/useWorkspaceFilesController";
+import { WorkspaceFilesDialog } from "../workspace/components/WorkspaceFilesDialog";
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -14,6 +16,7 @@ import "./export.css";
 
 export function ExportPage() {
   const { projectId = "" } = useParams();
+  const filesController = useWorkspaceFilesController();
   const navigate = useNavigate();
   const rescan = useLegacyRescanWorkspace(projectId);
   const controller = useExportController({
@@ -75,12 +78,18 @@ export function ExportPage() {
       statusbar={
         <>
           <span>多通道导出 · TXT / JSON · 文件夹 / ZIP</span>
-          <span className="workspace-statusbar__path">
-            任务状态：.annotation-workspace/state.sqlite3
-          </span>
+          <span className="workspace-statusbar__path">任务与备份保存在工具工作区</span>
         </>
       }
     >
+      <button
+        id="workspace-files-open"
+        type="button"
+        onClick={() => void filesController.open(projectId)}
+      >
+        恢复原始文件
+      </button>
+      <WorkspaceFilesDialog controller={filesController} />
       <ExportSettingsPanel
         form={form}
         assetCount={assetCount}

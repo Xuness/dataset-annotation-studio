@@ -98,6 +98,9 @@ function secondaryContent(overrides: Partial<DeliverySpaceContent> = {}): Delive
 function preview(): DeliveryPreviewSummary {
   return {
     token: "preview-token-12345678",
+    createdFileCount: 164,
+    reusedFileCount: 0,
+    replacedFileCount: 0,
     totalItems: 82,
     usableCount: 78,
     reviewedCount: 46,
@@ -149,6 +152,10 @@ function workbenchContent(
     },
     phase: "spec",
     form: {
+      contentMode: "images_and_annotations",
+      destinationKind: "directory",
+      primaryTxtChannelKey: null,
+      conflictPolicy: "block",
       scope: "all",
       destinationPath: "D:\\exports\\portrait-set",
       selections: [{ channel: "tags", language: "", revision: "current" }],

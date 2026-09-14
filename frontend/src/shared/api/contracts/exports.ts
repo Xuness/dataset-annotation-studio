@@ -14,6 +14,10 @@ export type ExportOperationStatus = ApiSchema<"ExportOperationStatus">;
 type GeneratedExportOperation = ApiOutput<"ExportOperation">;
 export type ExportOperation = Omit<GeneratedExportOperation, "configuration_snapshot"> & {
   configuration_snapshot: {
+    content_mode?: "annotations_only" | "images_and_annotations";
+    destination_kind?: "source" | "directory";
+    primary_txt_channel_key?: string | null;
+    conflict_policy?: "block" | "replace_annotations";
     channels?: ExportChannelSelection[];
     formats?: ExportFormat[];
     packaging?: ExportPackaging;

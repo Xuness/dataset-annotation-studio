@@ -4,10 +4,13 @@ from typing import Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
+from dataset_studio.modules.exports.models import ExportRequest
+
 
 class WorkspaceSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    export_preferences: ExportRequest | None = None
     recursive_scan: bool = True
     system_preset_id: str | None = None
     user_prompt: str = ""
@@ -33,6 +36,8 @@ class WorkspaceSummary(BaseModel):
     project_id: str
     name: str
     root_path: str
+    storage_path: str = ""
+    association_state: str = "attached"
     exists: bool = True
     created_at: str
     last_opened_at: str | None = None
@@ -46,11 +51,13 @@ class WorkspaceOpenRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     path: str
+    independent_copy: bool = False
 
 
 class WorkspaceSettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    export_preferences: ExportRequest | None = None
     recursive_scan: bool | None = None
     system_preset_id: str | None = None
     user_prompt: str | None = None

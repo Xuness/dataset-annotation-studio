@@ -149,6 +149,29 @@ export function ProviderModelConfigEditor({
         )}
 
         <label className="form-field">
+          <span>LLM 发送图片大小上限（MB）</span>
+          <input
+            id="inference-image-max-mb"
+            type="number"
+            min="0.000001"
+            step="any"
+            value={
+              value.inference_image_max_bytes == null
+                ? ""
+                : value.inference_image_max_bytes / 1_000_000
+            }
+            onChange={(event) =>
+              setField(
+                "inference_image_max_bytes",
+                event.target.value === ""
+                  ? null
+                  : Math.round(Number(event.target.value) * 1_000_000),
+              )
+            }
+          />
+          <small>留空不限制，超限时仅压缩发送副本，原图与导出不变；不含 Base64 请求体大小。</small>
+        </label>
+        <label className="form-field">
           <span>超时（秒）</span>
           <input
             type="number"

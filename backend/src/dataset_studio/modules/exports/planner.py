@@ -6,6 +6,7 @@ import json
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path, PurePosixPath
 
+from dataset_studio.core.file_targets import fingerprint, safe_target
 from dataset_studio.core.files import file_sha256
 from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationStatus
@@ -45,6 +46,8 @@ class ExportArtifact:
     content_hash: str
     byte_size: int
     source_modified_ns: int | None
+    action: str = "create"
+    before_hash: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +99,7 @@ def build_plan(
     root = workspace_root.resolve()
     destination, global_issues = _validate_destination(
         root,
-        request.destination_path,
+        str(root) if request.destination_kind == "source" else request.destination_path,
         request.packaging,
     )
     rows, selection_issues = _select_assets(database_path, request)
@@ -113,6 +116,8 @@ def build_plan(
         for row in rows
     ]
     items = _mark_target_collisions(items)
+    if request.packaging == ExportPackaging.DIRECTORY:
+        items = [_plan_targets(item, destination, request) for item in items]
     if not items:
         global_issues.append("当前导出范围内没有图片。")
     return ExportPlan(
@@ -165,9 +170,15 @@ def to_preview(request: ExportRequest, plan: ExportPlan) -> ExportPreview:
                 channel_statuses=item.channel_statuses,
                 annotation_status=item.annotation_status,
                 image_bytes=sum(
-                    artifact.byte_size for artifact in item.artifacts if artifact.kind == "image"
+                    artifact.byte_size
+                    for artifact in item.artifacts
+                    if artifact.kind == "image" and artifact.action != "reuse"
                 ),
-                annotation_bytes=item.annotation_size,
+                annotation_bytes=sum(
+                    artifact.byte_size
+                    for artifact in item.artifacts
+                    if artifact.kind != "image" and artifact.action != "reuse"
+                ),
                 warning_code=item.warning_code,
                 warning_message=item.warning_message,
                 blocking_issue=item.blocking_issue,
@@ -180,9 +191,14 @@ def to_preview(request: ExportRequest, plan: ExportPlan) -> ExportPreview:
             artifact.byte_size
             for item in plan.items
             for artifact in item.artifacts
-            if artifact.kind == "image"
+            if artifact.kind == "image" and artifact.action != "reuse"
         ),
-        annotation_bytes=sum(item.annotation_size for item in plan.items),
+        annotation_bytes=sum(
+            a.byte_size
+            for item in plan.items
+            for a in item.artifacts
+            if a.kind != "image" and a.action != "reuse"
+        ),
         usable_count=statuses.count("usable") + statuses.count("reviewed"),
         reviewed_count=statuses.count("reviewed"),
         missing_count=statuses.count("missing"),
@@ -194,6 +210,11 @@ def to_preview(request: ExportRequest, plan: ExportPlan) -> ExportPreview:
         warning_count=sum(item.warning_code is not None for item in plan.items),
         blocking_issue_count=blocking_issue_count,
         blocking_issues=plan.blocking_issues,
+        created_file_count=sum(a.action == "create" for item in plan.items for a in item.artifacts),
+        reused_file_count=sum(a.action == "reuse" for item in plan.items for a in item.artifacts),
+        replaced_file_count=sum(
+            a.action == "replace" for item in plan.items for a in item.artifacts
+        ),
         preview_token=preview_token(request, plan),
     )
 
@@ -209,8 +230,8 @@ def _validate_destination(
     except (OSError, RuntimeError) as error:
         return Path(raw_destination), [f"无法解析导出目录：{error}"]
 
-    if destination == root or destination.is_relative_to(root):
-        issues.append("导出目录不能位于当前项目内部。")
+    if ".annotation-workspace" in destination.parts:
+        issues.append("不能导出到旧工作区备份目录。")
     if not destination.exists():
         issues.append("导出目录不存在，请通过目录选择器选择一个文件夹。")
     elif not destination.is_dir():
@@ -219,8 +240,6 @@ def _validate_destination(
         try:
             if packaging == ExportPackaging.ZIP and archive_output_path(destination).exists():
                 issues.append("目标 ZIP 压缩包已经存在，无法覆盖。")
-            elif packaging == ExportPackaging.DIRECTORY and any(destination.iterdir()):
-                issues.append("导出目录必须为空，以避免覆盖已有文件。")
         except OSError as error:
             issues.append(f"无法读取导出目录：{error}")
     return destination, issues
@@ -474,17 +493,31 @@ def _plan_item(
     if ExportFormat.TXT in request.formats:
         for selection in request.channels:
             selected = annotations[selection.key]
-            directory = _channel_directory(selection) if multiple_txt_channels else ""
+            directory = (
+                _channel_directory(selection)
+                if multiple_txt_channels and request.destination_kind != "source"
+                else ""
+            )
             image_target = _join_target(directory, source_directory, source_name)
-            artifacts.append(_image_artifact(row, image_target))
+            if request.content_mode == "images_and_annotations":
+                artifacts.append(_image_artifact(row, image_target))
             if selected.revision_id is not None:
-                annotation_target = _join_target(directory, source_directory, f"{stem}.txt")
+                suffix = ""
+                if (
+                    request.destination_kind == "source"
+                    and multiple_txt_channels
+                    and selection.key != request.primary_txt_channel_key
+                ):
+                    suffix = f".{_channel_directory(selection)}"
+                annotation_target = _join_target(directory, source_directory, f"{stem}{suffix}.txt")
                 artifacts.append(_annotation_artifact(selected, annotation_target))
-    elif ExportFormat.JSON in request.formats:
+    elif ExportFormat.JSON in request.formats and request.content_mode == "images_and_annotations":
         artifacts.append(_image_artifact(row, _join_target(source_directory, source_name)))
 
     if ExportFormat.JSON in request.formats:
-        directory = "metadata" if multiple_txt_channels else ""
+        directory = (
+            "metadata" if multiple_txt_channels and request.destination_kind != "source" else ""
+        )
         target = _join_target(directory, source_directory, f"{stem}.annotations.json")
         payload = {
             "schema_version": 1,
@@ -534,6 +567,7 @@ def _plan_item(
     if invalid_statuses:
         warnings.append("导出范围包含校验异常的标注。")
 
+    artifacts = list({artifact.target_relative_path: artifact for artifact in artifacts}.values())
     annotation_artifacts = [artifact for artifact in artifacts if artifact.kind != "image"]
     first_image = next(
         (artifact.target_relative_path for artifact in artifacts if artifact.kind == "image"),
@@ -747,3 +781,28 @@ def _mark_target_collisions(items: list[ExportPlanItem]) -> list[ExportPlanItem]
         )
         for index, item in enumerate(items)
     ]
+
+
+def _plan_targets(
+    item: ExportPlanItem, destination: Path, request: ExportRequest
+) -> ExportPlanItem:
+    artifacts: list[ExportArtifact] = []
+    issue = item.blocking_issue
+    for artifact in item.artifacts:
+        try:
+            target = safe_target(destination, artifact.target_relative_path)
+            before = fingerprint(target)
+            action = "create"
+            if before.exists:
+                if before.content_hash == artifact.content_hash:
+                    action = "reuse"
+                elif artifact.kind != "image" and request.conflict_policy == "replace_annotations":
+                    action = "replace"
+                else:
+                    action = "blocked"
+                    issue = f"目标文件已存在且内容不同：{target}"
+            artifacts.append(replace(artifact, action=action, before_hash=before.content_hash))
+        except (OSError, ValueError) as error:
+            issue = str(error)
+            artifacts.append(replace(artifact, action="blocked"))
+    return replace(item, artifacts=tuple(artifacts), blocking_issue=issue)

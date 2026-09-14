@@ -50,7 +50,7 @@ def ensure_database_annotation_store(paths: WorkspacePaths) -> int:
     backup_relative_path: str | None = None
     if legacy_files or history_count:
         backup = _backup_database(paths)
-        backup_relative_path = backup.relative_to(paths.root).as_posix()
+        backup_relative_path = backup.relative_to(paths.internal).as_posix()
 
     repository = AnnotationRepository(paths.database)
     imported_at = utc_now_iso()

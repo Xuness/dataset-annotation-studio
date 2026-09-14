@@ -155,8 +155,8 @@ class PresetRepository:
                 INSERT INTO provider_model_configs (
                     provider_profile_id, model_id, position, temperature,
                     max_output_tokens, timeout_seconds, top_p, seed,
-                    protocol_options_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    protocol_options_json, inference_image_max_bytes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 model_values,
             )
@@ -186,8 +186,8 @@ class PresetRepository:
                 INSERT INTO provider_model_configs (
                     provider_profile_id, model_id, position, temperature,
                     max_output_tokens, timeout_seconds, top_p, seed,
-                    protocol_options_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    protocol_options_json, inference_image_max_bytes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 model_values,
             )

@@ -1,0 +1,83 @@
+.workspace-files-dialog {
+  width: min(900px, 90vw);
+  max-height: 86vh;
+  overflow: auto;
+  padding: 24px;
+  color: #252b30;
+  background: #f4f2ed;
+  border: 1px solid #90928f;
+  box-shadow: 0 18px 70px #17222d40;
+}
+.workspace-files-dialog::backdrop {
+  background: #15222e55;
+}
+.workspace-files-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.workspace-files-dialog h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.workspace-files-dialog fieldset {
+  margin: 18px 0 0;
+  padding: 16px;
+  border: 1px solid #c3c7c7;
+}
+.workspace-files-dialog legend {
+  padding: 0 8px;
+  font-weight: 600;
+}
+.workspace-files-dialog label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 14px 5px 0;
+}
+.workspace-files-dialog button {
+  padding: 8px 12px;
+  margin: 4px 8px 4px 0;
+  border: 1px solid #aab2b5;
+  border-radius: 4px;
+  background: #e8edef;
+  color: inherit;
+  cursor: pointer;
+}
+.workspace-files-dialog button:hover:not(:disabled) {
+  background: #d9e4e9;
+  border-color: #708995;
+}
+.workspace-files-dialog button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.workspace-files-dialog input:not([type="checkbox"]),
+.workspace-files-dialog select {
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid #aab2b5;
+  border-radius: 4px;
+  background: white;
+  color: inherit;
+}
+.workspace-files-dialog input[type="checkbox"] {
+  margin: 0 7px 0 0;
+  accent-color: #3d728b;
+}
+.workspace-files-dialog p {
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.workspace-files-dialog [role="status"] {
+  padding: 10px 12px;
+  background: #e0ebe5;
+}
+.workspace-files-dialog [role="alert"] {
+  color: #9b3232;
+}
+.workspace-files-dialog :focus-visible {
+  outline: 2px solid #407da0;
+  outline-offset: 2px;
+}

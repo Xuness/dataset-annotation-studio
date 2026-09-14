@@ -1,3 +1,6 @@
+import { importIndependentWorkspace } from "../../../src/features/workspaces/api";
+import { useWorkspaceFilesController } from "../../../src/application/workspace/useWorkspaceFilesController";
+import { WorkspaceFilesDialog } from "../workspace/components/WorkspaceFilesDialog";
 import { useState } from "react";
 import { ArrowRight, Cable, RefreshCw, Settings, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -32,6 +35,7 @@ function formatProjectDate(value: string | null): string {
 
 export function HomePage() {
   const navigate = useNavigate();
+  const filesController = useWorkspaceFilesController();
   const recent = useRecentWorkspaces();
   const openMutation = useOpenWorkspace();
   const removeRecentMutation = useRemoveRecentWorkspace();
@@ -69,9 +73,22 @@ export function HomePage() {
     }
   }
 
+  async function importCopy() {
+    setMessage(null);
+    try {
+      const path = await pickWorkspaceFolder();
+      if (!path) return;
+      const result = await importIndependentWorkspace(path);
+      await recent.refetch();
+      navigate(`/workspace/${result.workspace.project_id}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   function enterWorkspace(projectId: string, exists: boolean) {
     if (!exists) {
-      void chooseAndOpenWorkspace();
+      void filesController.open(projectId);
       return;
     }
     setActiveProject(projectId);
@@ -81,7 +98,7 @@ export function HomePage() {
   async function removeFromRecent(projectId: string, name: string) {
     const confirmed = await confirmDialog(
       `只会将“${name}”从最近项目列表中移除。\n\n` +
-        "不会删除数据集、标注、缓存或 .annotation-workspace；" +
+        "不会删除数据集、标注、缓存或工具工作区；" +
         "以后重新打开该文件夹，它会再次出现在最近项目中。",
       {
         title: "从最近项目移除",
@@ -150,6 +167,9 @@ export function HomePage() {
               <span>{openMutation.isPending ? "正在打开" : "打开数据集"}</span>
               {openMutation.isPending ? <Spinner /> : <ArrowRight size={17} aria-hidden="true" />}
             </button>
+            <button id="workspace-import-copy" type="button" onClick={() => void importCopy()}>
+              独立副本导入
+            </button>
             {message ? <p className="home-error">{message}</p> : null}
           </div>
         </section>
@@ -180,7 +200,7 @@ export function HomePage() {
             </div>
           ) : recent.data?.length ? (
             <div className="recent-grid">
-              {recent.data.slice(0, 3).map((workspace) => (
+              {recent.data.map((workspace) => (
                 <article className="recent-card-shell" key={workspace.project_id}>
                   <button
                     type="button"
@@ -223,6 +243,13 @@ export function HomePage() {
                   >
                     <X size={13} aria-hidden="true" />
                   </button>
+                  <button
+                    type="button"
+                    data-testid={`workspace-files-${workspace.project_id}`}
+                    onClick={() => void filesController.open(workspace.project_id)}
+                  >
+                    原始文件与目录关联
+                  </button>
                 </article>
               ))}
             </div>
@@ -233,6 +260,7 @@ export function HomePage() {
           )}
         </section>
       </div>
+      <WorkspaceFilesDialog controller={filesController} />
     </main>
   );
 }

@@ -62,7 +62,7 @@ export function ExportSettingsPanel({
   const [directoryRulesOpen, setDirectoryRulesOpen] = useState(false);
   const validScope = form.scope === "all" || checkedCount > 0;
   const readyToPreview = Boolean(
-    form.destinationPath &&
+    (form.destinationKind === "source" || form.destinationPath) &&
     validScope &&
     form.selections.length &&
     form.selections.every(
@@ -313,10 +313,83 @@ export function ExportSettingsPanel({
           </label>
         </div>
         <small>
-          多通道 TXT 会生成相互独立的训练集目录；JSON 会在一份元数据中保留所有所选通道。
+          {form.destinationKind === "source"
+            ? "多通道 TXT 在原图旁按通道后缀区分；JSON 保留所有所选通道。"
+            : "多通道 TXT 会生成独立训练集目录；JSON 保留所有所选通道。"}
         </small>
       </section>
 
+      <section className="export-option">
+        <label>
+          导出内容
+          <select
+            id="export-content-mode"
+            disabled={activeExport}
+            value={form.contentMode}
+            onChange={(event) =>
+              onChange({ contentMode: event.target.value as typeof form.contentMode })
+            }
+          >
+            <option value="annotations_only">仅标注</option>
+            <option value="images_and_annotations">图片与标注</option>
+          </select>
+        </label>
+        <label>
+          输出位置
+          <select
+            id="export-destination-kind"
+            disabled={activeExport}
+            value={form.destinationKind}
+            onChange={(event) =>
+              onChange({ destinationKind: event.target.value as typeof form.destinationKind })
+            }
+          >
+            <option value="source">每张原图所在文件夹</option>
+            <option value="directory">指定文件夹</option>
+          </select>
+        </label>
+        {form.destinationKind === "source" ? (
+          <p>图片保持原位，仅写入所选标注；不会复制图片。</p>
+        ) : null}
+        {form.destinationKind === "source" &&
+        form.formats.includes("txt") &&
+        form.selections.length > 1 ? (
+          <label>
+            主 TXT 通道
+            <select
+              id="export-primary-txt"
+              disabled={activeExport}
+              value={form.primaryTxtChannelKey ?? ""}
+              onChange={(event) => onChange({ primaryTxtChannelKey: event.target.value || null })}
+            >
+              <option value="">请选择主通道</option>
+              {form.selections.map((selection) => {
+                const key =
+                  selection.channel === "translation"
+                    ? `translation:${selection.translation_source_kind ?? "description"}:${selection.translation_producer_kind ?? "llm"}:${selection.language}`
+                    : selection.channel;
+                return (
+                  <option key={key} value={key}>
+                    {key}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        ) : null}
+        <label>
+          <input
+            id="export-replace-annotations"
+            disabled={activeExport}
+            type="checkbox"
+            checked={form.conflictPolicy === "replace_annotations"}
+            onChange={(event) =>
+              onChange({ conflictPolicy: event.target.checked ? "replace_annotations" : "block" })
+            }
+          />
+          允许备份后覆盖同名标注（本次导出）
+        </label>
+      </section>
       <section className="export-option">
         <span className="export-option__title">目录结构</span>
         <div className="export-directory-mode-selector" role="group" aria-label="目录结构">
@@ -332,7 +405,7 @@ export function ExportSettingsPanel({
               key={mode}
               className={form.directoryLayout.mode === mode ? "is-active" : ""}
               aria-pressed={form.directoryLayout.mode === mode}
-              disabled={activeExport}
+              disabled={activeExport || form.destinationKind === "source"}
               onClick={() => selectDirectoryMode(mode)}
             >
               {label}
@@ -383,7 +456,7 @@ export function ExportSettingsPanel({
             type="button"
             className={form.packaging === "zip" ? "is-active" : ""}
             aria-pressed={form.packaging === "zip"}
-            disabled={activeExport}
+            disabled={activeExport || form.destinationKind === "source"}
             onClick={() => onChange({ packaging: "zip" })}
           >
             <FileArchive size={15} />
@@ -407,13 +480,15 @@ export function ExportSettingsPanel({
         >
           <FolderOpen size={16} />
           <span title={form.destinationPath}>
-            {form.destinationPath || "使用系统目录选择器选择导出文件夹"}
+            {form.destinationKind === "source"
+              ? "当前在每张原图旁输出；点击可改选文件夹"
+              : form.destinationPath || "使用系统目录选择器选择导出文件夹"}
           </span>
         </button>
         <small>
           {form.packaging === "zip"
             ? "压缩包会生成在该目录内；不会覆盖同名压缩包或修改目录中的其他文件。"
-            : "选择的文件夹就是最终输出位置，且必须为空；导出不会修改项目内的旧 TXT。"}
+            : "选择的文件夹就是最终输出位置，允许已有文件；只检查本次目标冲突。"}
         </small>
       </section>
 
@@ -422,7 +497,13 @@ export function ExportSettingsPanel({
         <dl>
           <div>
             <dt>图片</dt>
-            <dd>原始字节复制</dd>
+            <dd>
+              {form.contentMode === "annotations_only"
+                ? "不输出图片"
+                : form.destinationKind === "source"
+                  ? "原位复用，不复制"
+                  : "数据集当前图片原字节"}
+            </dd>
           </div>
           <div>
             <dt>标注</dt>
@@ -434,7 +515,7 @@ export function ExportSettingsPanel({
           </div>
           <div>
             <dt>覆盖文件</dt>
-            <dd>不允许</dd>
+            <dd>标注可确认覆盖，图片不覆盖</dd>
           </div>
           <div>
             <dt>封装</dt>
@@ -455,6 +536,7 @@ export function ExportSettingsPanel({
 
       <div className="export-actions">
         <Button
+          id="export-preview"
           icon={previewPending ? <Spinner /> : <Eye size={14} />}
           disabled={!readyToPreview || previewPending || exportPending}
           onClick={onPreview}
@@ -473,6 +555,7 @@ export function ExportSettingsPanel({
             )
           }
           disabled={!readyToExport || previewPending || exportPending}
+          id="export-execute"
           onClick={onExport}
         >
           开始导出

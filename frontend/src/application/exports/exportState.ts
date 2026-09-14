@@ -12,6 +12,10 @@ import { createScopedViewState } from "../../shared/store/scopedViewState.ts";
 export interface ExportFormState {
   scope: ExportScope;
   destinationPath: string;
+  contentMode: "annotations_only" | "images_and_annotations";
+  destinationKind: "source" | "directory";
+  primaryTxtChannelKey: string | null;
+  conflictPolicy: "block" | "replace_annotations";
   selections: ExportChannelSelection[];
   formats: ExportFormat[];
   packaging: ExportPackaging;
@@ -22,6 +26,10 @@ export function createInitialExportForm(): ExportFormState {
   return {
     scope: "all",
     destinationPath: "",
+    contentMode: "annotations_only",
+    destinationKind: "source",
+    primaryTxtChannelKey: null,
+    conflictPolicy: "block",
     selections: [
       {
         channel: "existing_annotation",
@@ -32,17 +40,19 @@ export function createInitialExportForm(): ExportFormState {
     formats: ["txt"],
     packaging: "directory",
     directoryLayout: {
-      mode: "flat",
+      mode: "preserve",
       merge_into_parent_paths: [],
     },
   };
 }
 
 export interface ExportWorkbenchView {
+  preferencesRestored: boolean;
   form: ExportFormState;
 }
 
 export const exportWorkbenchState = createScopedViewState<ExportWorkbenchView>(() => ({
+  preferencesRestored: false,
   form: createInitialExportForm(),
 }));
 
@@ -59,7 +69,11 @@ export function buildExportRequest(
   return {
     scope: form.scope,
     asset_ids: form.scope === "selected" ? [...checkedAssetIds] : [],
-    destination_path: form.destinationPath,
+    destination_path: form.destinationKind === "source" ? "" : form.destinationPath,
+    content_mode: form.contentMode,
+    destination_kind: form.destinationKind,
+    primary_txt_channel_key: form.primaryTxtChannelKey,
+    conflict_policy: form.conflictPolicy,
     channels: form.selections,
     formats: form.formats,
     packaging: form.packaging,

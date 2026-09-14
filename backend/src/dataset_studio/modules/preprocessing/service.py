@@ -7,14 +7,16 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict
 from pathlib import Path
 
-from dataset_studio.core.files import atomic_copy_file
+from dataset_studio.core.file_targets import hold_file_targets
+from dataset_studio.core.files import atomic_copy_file, verified_move_file
 from dataset_studio.core.languages import LANGUAGE_PATTERN
 from dataset_studio.core.paths import filesystem_path_key
 from dataset_studio.core.sqlite import connect, transaction
+from dataset_studio.modules.assets.companions import registered_suffixes
 from dataset_studio.modules.assets.scanner import IMAGE_METADATA_VERSION, AssetScanner
 from dataset_studio.modules.preprocessing.executor import (
     PreparedItem,
@@ -46,6 +48,7 @@ from dataset_studio.modules.preprocessing.runtime.contracts import RenderIntent
 from dataset_studio.modules.preprocessing.runtime.inspection import inspect_image
 from dataset_studio.modules.preprocessing.runtime.registry import ImageBackendRegistry
 from dataset_studio.modules.preprocessing.runtime.router import build_routing_plan
+from dataset_studio.modules.workspaces.backups import preserve_asset_files
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
@@ -184,7 +187,7 @@ class PreprocessService:
         operation_id = str(uuid.uuid4())
         repository = PreprocessRepository(paths.database)
         completed: list[tuple[PlanItem, Path]] = []
-        with self._track_operation(project_id, operation_id):
+        with self._track_operation(project_id, operation_id), ExitStack() as file_locks:
             self._ensure_no_active_jobs(project_id)
             plan = build_plan(paths.database, paths.root, request)
             current_token = preview_token(request, plan)
@@ -196,6 +199,19 @@ class PreprocessService:
             if not any(item.will_change for item in plan):
                 raise ValueError("当前参数不会修改任何图片，无需执行预处理。")
             changed_items = [item for item in plan if item.will_change]
+            file_locks.enter_context(
+                hold_file_targets(
+                    self._workspaces.settings.app_data_dir,
+                    self._mutation_targets(
+                        paths.root,
+                        paths.database,
+                        [
+                            (item.before_relative_path, item.after_relative_path)
+                            for item in changed_items
+                        ],
+                    ),
+                )
+            )
             repository.start(
                 operation_id,
                 request,
@@ -216,7 +232,7 @@ class PreprocessService:
                     for prepared in preparer:
                         item_id = self._record_item(
                             repository,
-                            paths.root,
+                            paths.internal,
                             operation_id,
                             prepared,
                         )
@@ -273,7 +289,7 @@ class PreprocessService:
     def undo(self, project_id: str, operation_id: str) -> PreprocessOperation:
         paths, manifest = self._workspaces.get(project_id)
         repository = PreprocessRepository(paths.database)
-        with self._track_operation(project_id, f"undo:{operation_id}"):
+        with self._track_operation(project_id, f"undo:{operation_id}"), ExitStack() as file_locks:
             self._ensure_no_active_jobs(project_id)
             operation = repository.get(operation_id)
             if operation is None:
@@ -283,6 +299,19 @@ class PreprocessService:
             if repository.latest_completed_id() != operation_id:
                 raise ValueError("只能从最新的一次预处理开始依次撤销。")
             items = list(repository.items(operation_id))
+            file_locks.enter_context(
+                hold_file_targets(
+                    self._workspaces.settings.app_data_dir,
+                    self._mutation_targets(
+                        paths.root,
+                        paths.database,
+                        [
+                            (str(item["before_relative_path"]), str(item["after_relative_path"]))
+                            for item in items
+                        ],
+                    ),
+                )
+            )
             self._verify_undo(paths.root, paths.database, items)
             backup_root = paths.recovery / operation_id / "undo-backup"
             completed: list[tuple[object, Path]] = []
@@ -320,6 +349,33 @@ class PreprocessService:
             raise RuntimeError("预处理操作记录丢失。")
         return updated
 
+    @classmethod
+    def _mutation_targets(
+        cls, root: Path, database: Path, pairs: list[tuple[str, str]]
+    ) -> list[Path]:
+        targets: list[Path] = []
+        claimed = cls._claimed_annotation_paths(database, root)
+        for before, after in pairs:
+            source, target = root / before, root / after
+            targets.extend((source, target))
+            for before_sidecar, after_sidecar, _ in cls._sidecar_paths(
+                source,
+                target,
+                database.parent / "recovery" / "lock-placeholder",
+                claimed,
+                registered_suffixes(database, root, (source, target)),
+            ):
+                targets.extend((before_sidecar, after_sidecar))
+            targets.extend(
+                (
+                    source.with_suffix(".txt"),
+                    source.with_suffix(".json"),
+                    target.with_suffix(".txt"),
+                    target.with_suffix(".json"),
+                )
+            )
+        return targets
+
     def _commit_prepared_item(self, paths, prepared: PreparedItem) -> None:
         item = prepared.plan
         source = paths.root / item.before_relative_path
@@ -334,11 +390,13 @@ class PreprocessService:
         if paths_differ and target.exists() and not self._same_file(source, target):
             raise ValueError(f"目标文件在执行前已出现，拒绝覆盖：{item.after_relative_path}")
         target_was_source = paths_differ and self._same_file(source, target)
+        preserve_asset_files(paths, item.asset_id, source)
         sidecars = self._sidecar_paths(
             source,
             target,
             prepared.recovery_path,
             self._claimed_annotation_paths(paths.database, paths.root),
+            registered_suffixes(paths.database, paths.root, (source, target)),
         )
         sidecar_states: list[tuple[Path, Path, Path, bool]] = []
         for before_sidecar, after_sidecar, recovery_sidecar in sidecars:
@@ -355,7 +413,7 @@ class PreprocessService:
         try:
             if prepared.staging_path is not None:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(prepared.staging_path, target)
+                verified_move_file(prepared.staging_path, target)
                 if paths_differ and not target_was_source:
                     source.unlink()
             elif paths_differ:
@@ -459,7 +517,7 @@ class PreprocessService:
         for item in items:
             current = root / str(item["after_relative_path"])
             before = root / str(item["before_relative_path"])
-            original = root / str(item["recovery_relative_path"])
+            original = database_path.parent / str(item["recovery_relative_path"])
             paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
             if not current.is_file() or sha256(current) != str(item["after_hash"]):
                 raise ValueError(
@@ -478,6 +536,7 @@ class PreprocessService:
                 current,
                 original,
                 claimed_annotations,
+                registered_suffixes(database_path, root, (before, current)),
             ):
                 if after_sidecar.exists() and not after_sidecar.is_file():
                     raise ValueError(f"当前同名伴随路径不是文件：{after_sidecar.relative_to(root)}")
@@ -498,13 +557,14 @@ class PreprocessService:
     ) -> None:
         current = root / str(item["after_relative_path"])
         before = root / str(item["before_relative_path"])
-        original = root / str(item["recovery_relative_path"])
+        original = database_path.parent / str(item["recovery_relative_path"])
         paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
         sidecars = cls._sidecar_paths(
             before,
             current,
             original,
             cls._claimed_annotation_paths(database_path, root),
+            registered_suffixes(database_path, root, (before, current)),
         )
         atomic_copy_file(current, backup)
         cls._backup_current_sidecars(sidecars, backup)
@@ -543,7 +603,7 @@ class PreprocessService:
     ) -> None:
         after = root / str(item["after_relative_path"])
         before = root / str(item["before_relative_path"])
-        original = root / str(item["recovery_relative_path"])
+        original = database_path.parent / str(item["recovery_relative_path"])
         paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
         if paths_differ and before.is_file() and sha256(before) != str(item["before_hash"]):
             raise RuntimeError(f"撤销补偿时原路径又被修改：{item['before_relative_path']}")
@@ -553,6 +613,7 @@ class PreprocessService:
                 after,
                 original,
                 cls._claimed_annotation_paths(database_path, root),
+                registered_suffixes(database_path, root, (before, after)),
             ),
             backup,
         )
@@ -608,6 +669,18 @@ class PreprocessService:
                     asset_id,
                 ),
             )
+            for companion in connection.execute(
+                "SELECT role FROM companion_files WHERE asset_id=?", (asset_id,)
+            ).fetchall():
+                relative = (
+                    image_path.with_name(image_path.stem + str(companion["role"]))
+                    .relative_to(root)
+                    .as_posix()
+                )
+                connection.execute(
+                    "UPDATE companion_files SET relative_path=? WHERE asset_id=? AND role=?",
+                    (relative, asset_id, companion["role"]),
+                )
             translation_rows = connection.execute(
                 "SELECT language FROM annotation_translations WHERE asset_id = ?",
                 (asset_id,),
@@ -724,6 +797,7 @@ class PreprocessService:
                             after,
                             recovery,
                             claimed_annotations,
+                            registered_suffixes(database_path, root, (before, after)),
                         )
                     )
                 except Exception as sidecar_error:
@@ -771,6 +845,7 @@ class PreprocessService:
         after_image: Path,
         recovery_image: Path,
         claimed_annotations: set[str],
+        registered: tuple[str, ...],
     ) -> list[tuple[Path, Path, Path]]:
         paths: list[tuple[Path, Path, Path]] = [
             (
@@ -797,6 +872,14 @@ class PreprocessService:
                     recovery_image.with_name(f"{recovery_image.stem}.{language}.txt"),
                 )
             )
+        for suffix in registered:
+            triple = (
+                before_image.with_name(before_image.stem + suffix),
+                after_image.with_name(after_image.stem + suffix),
+                recovery_image.with_name(recovery_image.stem + suffix),
+            )
+            if triple not in paths:
+                paths.append(triple)
         return [
             (before, after, recovery)
             for before, after, recovery in paths

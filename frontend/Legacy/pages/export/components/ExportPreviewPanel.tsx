@@ -39,6 +39,9 @@ export function ExportPreviewPanel({ preview }: { preview: ExportPreview | undef
 
       {preview ? (
         <div className="export-status-strip">
+          <span>新建 {preview.created_file_count}</span>
+          <span>复用 {preview.reused_file_count}</span>
+          <span>备份后覆盖 {preview.replaced_file_count}</span>
           <span>当前可用 {preview.usable_count}</span>
           <span>已复核 {preview.reviewed_count}</span>
           <span>尚未复核 {preview.unreviewed_count}</span>
@@ -92,7 +95,7 @@ export function ExportPreviewPanel({ preview }: { preview: ExportPreview | undef
         {!preview ? (
           <div className="export-preview-empty">
             <ScanSearch size={25} />
-            <p>选择范围和导出目录后进行校验；校验不会写入任何导出文件。</p>
+            <p>选择范围和输出位置后进行校验；默认在每张原图旁输出，校验不会写入文件。</p>
           </div>
         ) : preview.blocking_issue_count === 0 && preview.warning_count === 0 ? (
           <div className="export-preview-success">

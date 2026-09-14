@@ -48,6 +48,7 @@ EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS = {
     19: "0a1888b731c2e971b12d5a844a2439d0a9ce925472fade121933ac8f5e6d319e",
     20: "f2475fc69e1472cafd52243bc5b71202cb1d86023f0f1b37a344e251f55a566c",
     21: "73c6004567ad5d772a8e9cd1be33c5be6017abe53b4e9eb0ba3c9e30ee4bad87",
+    22: "757f7cbf741e7683165e656943ba36ff837a63185bc4fd66bd003955e9ac64b9",
 }
 
 
@@ -412,7 +413,7 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     assert "Protocol A: description segment JSON" in translation_prompt["system_prompt"]
     assert "Protocol B: Tags XML envelope" in translation_prompt["system_prompt"]
     assert "application appends" not in translation_prompt["system_prompt"]
-    assert versions == list(range(1, 17))
+    assert versions == list(range(1, 18))
 
 
 def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> None:
@@ -446,7 +447,7 @@ def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> 
 
     assert {"local_tagger_hf_settings", "local_tagger_downloads"}.issubset(tables)
     assert "idx_local_tagger_downloads_active_plan" in indexes
-    assert versions == list(range(1, 17))
+    assert versions == list(range(1, 18))
 
 
 def test_translation_prompt_structure_lock_migration_preserves_custom_default(
@@ -1507,7 +1508,7 @@ def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None
     paths = WorkspacePaths.from_root(root, settings)
     paths.ensure_directories()
     manifest = WorkspaceManifest(
-        project_id="recent-project",
+        project_id="11111111-1111-4111-8111-111111111111",
         name="dataset",
         created_at=utc_now_iso(),
     )
@@ -1534,7 +1535,7 @@ def test_recent_workspace_get_applies_missing_migrations(tmp_path: Path) -> None
         connection.close()
     registry.upsert(manifest, root, utc_now_iso())
 
-    WorkspaceService(settings, registry).get(manifest.project_id)
+    paths, _ = WorkspaceService(settings, registry).get(manifest.project_id)
 
     connection = connect(paths.database)
     try:
@@ -1591,7 +1592,7 @@ def test_recent_workspace_list_applies_missing_migrations_before_summary(
     paths = WorkspacePaths.from_root(root, settings)
     paths.ensure_directories()
     manifest = WorkspaceManifest(
-        project_id="recent-project",
+        project_id="11111111-1111-4111-8111-111111111111",
         name="dataset",
         created_at=utc_now_iso(),
     )
@@ -1599,7 +1600,11 @@ def test_recent_workspace_list_applies_missing_migrations_before_summary(
     migrate_database(paths.database, WORKSPACE_MIGRATIONS[:4])
     registry.upsert(manifest, root, utc_now_iso())
 
-    summaries = WorkspaceService(settings, registry).list_recent()
+    service = WorkspaceService(settings, registry)
+    assert service.list_recent()[0].association_state == "migration_required"
+    service.open(str(root))
+    paths, _ = service.get(manifest.project_id)
+    summaries = service.list_recent()
 
     connection = connect(paths.database)
     try:

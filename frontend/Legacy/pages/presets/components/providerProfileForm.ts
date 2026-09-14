@@ -46,6 +46,7 @@ export function createModelConfig(
       ? Math.min(4096, summary.max_output_tokens)
       : 4096,
     timeout_seconds: 180,
+    inference_image_max_bytes: null,
     top_p: null,
     seed: null,
     protocol_options: createProtocolOptions(providerType),

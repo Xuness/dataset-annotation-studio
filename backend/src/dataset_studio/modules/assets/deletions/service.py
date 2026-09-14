@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import os
 import secrets
 import shutil
 import threading
 import uuid
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path, PurePosixPath
 
-from dataset_studio.core.files import file_sha256
+from dataset_studio.core.file_targets import hold_file_targets
+from dataset_studio.core.files import file_sha256, verified_move_file
 from dataset_studio.modules.assets.companions import AssetBundleFileKind
 from dataset_studio.modules.assets.deletions.models import (
     AssetDeleteOperation,
@@ -21,6 +21,7 @@ from dataset_studio.modules.assets.deletions.repository import (
     AssetDeletionRepository,
     DeleteFileRecord,
 )
+from dataset_studio.modules.workspaces.backups import preserve_asset_files
 from dataset_studio.modules.workspaces.paths import WorkspacePaths
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
@@ -58,7 +59,7 @@ class AssetDeletionService:
     ) -> AssetDeleteOperation:
         paths, _ = self._workspaces.get(project_id)
         operation_id = str(uuid.uuid4())
-        with self._track(project_id, operation_id):
+        with self._track(project_id, operation_id), ExitStack() as file_locks:
             plan = build_plan(paths.database, paths.root, paths.internal, execution.request)
             current_token = preview_token(execution.request, plan)
             if not secrets.compare_digest(current_token, execution.preview_token):
@@ -70,6 +71,14 @@ class AssetDeletionService:
             if plan.count(AssetBundleFileKind.IMAGE) != len(plan.assets):
                 raise ValueError("部分图片已不可用，请重新扫描工作区后重试。")
 
+            file_locks.enter_context(
+                hold_file_targets(
+                    self._workspaces.settings.app_data_dir,
+                    [paths.root / file.source_relative_path for file in plan.files],
+                )
+            )
+            for asset in plan.assets:
+                preserve_asset_files(paths, asset.asset_id, paths.root / asset.relative_path)
             repository = AssetDeletionRepository(paths.database)
             recovery_paths = [
                 (
@@ -79,7 +88,7 @@ class AssetDeletionService:
                     / "files"
                     / Path(PurePosixPath(file.source_relative_path))
                 )
-                .relative_to(paths.root)
+                .relative_to(paths.internal)
                 .as_posix()
                 for file in plan.files
             ]
@@ -91,7 +100,7 @@ class AssetDeletionService:
                     self._validate_source(record, source)
                     recovery.parent.mkdir(parents=True, exist_ok=True)
                     repository.set_file_phase(record.id, "moving")
-                    os.replace(source, recovery)
+                    verified_move_file(source, recovery)
                     moved.append(record)
                     repository.set_file_phase(record.id, "moved")
                 repository.complete(operation_id)
@@ -123,12 +132,18 @@ class AssetDeletionService:
     def undo(self, project_id: str, operation_id: str) -> AssetDeleteOperation:
         paths, _ = self._workspaces.get(project_id)
         repository = AssetDeletionRepository(paths.database)
-        with self._track(project_id, f"undo:{operation_id}"):
+        with self._track(project_id, f"undo:{operation_id}"), ExitStack() as file_locks:
             operation = repository.get(operation_id)
             if operation is None:
                 raise ValueError(f"找不到素材删除记录：{operation_id}")
-            repository.begin_undo(operation_id)
             files = repository.files(operation_id)
+            file_locks.enter_context(
+                hold_file_targets(
+                    self._workspaces.settings.app_data_dir,
+                    [paths.root / file.source_relative_path for file in files],
+                )
+            )
+            repository.begin_undo(operation_id)
             restored: list[DeleteFileRecord] = []
             try:
                 for record in files:
@@ -137,7 +152,7 @@ class AssetDeletionService:
                 for record in files:
                     source, recovery = self._file_paths(paths, operation_id, record)
                     source.parent.mkdir(parents=True, exist_ok=True)
-                    os.replace(recovery, source)
+                    verified_move_file(recovery, source)
                     restored.append(record)
                     repository.set_file_phase(record.id, "restored")
                 repository.complete_undo(operation_id)
@@ -266,7 +281,7 @@ class AssetDeletionService:
         record: DeleteFileRecord,
     ) -> tuple[Path, Path]:
         source = paths.root / Path(PurePosixPath(record.source_relative_path))
-        recovery = paths.root / Path(PurePosixPath(record.recovery_relative_path))
+        recovery = paths.internal / Path(PurePosixPath(record.recovery_relative_path))
         resolved_root = paths.root.resolve()
         resolved_internal = paths.internal.resolve()
         resolved_recovery_root = (paths.recovery / "deletions" / operation_id).resolve()
@@ -316,7 +331,7 @@ class AssetDeletionService:
                     raise ValueError(f"原位置已出现文件：{record.source_relative_path}")
                 if recovery.is_file():
                     source.parent.mkdir(parents=True, exist_ok=True)
-                    os.replace(recovery, source)
+                    verified_move_file(recovery, source)
                 repository.set_file_phase(record.id, "restored")
             except Exception as error:
                 errors.append(str(error) or type(error).__name__)
@@ -336,7 +351,7 @@ class AssetDeletionService:
                 if recovery.exists():
                     raise ValueError(f"恢复区已出现同名文件：{record.recovery_relative_path}")
                 recovery.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(source, recovery)
+                verified_move_file(source, recovery)
                 repository.set_file_phase(record.id, "moved")
             except Exception as error:
                 errors.append(str(error) or type(error).__name__)
@@ -354,7 +369,7 @@ class AssetDeletionService:
                 raise ValueError(f"源文件与恢复文件同时存在：{record.source_relative_path}")
             if recovery.is_file():
                 source.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(recovery, source)
+                verified_move_file(recovery, source)
             elif not source.is_file():
                 raise ValueError(f"源文件与恢复文件均缺失：{record.source_relative_path}")
             repository.set_file_phase(record.id, "restored")
@@ -373,7 +388,7 @@ class AssetDeletionService:
                 raise ValueError(f"源文件与恢复文件同时存在：{record.source_relative_path}")
             if recovery.is_file():
                 source.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(recovery, source)
+                verified_move_file(recovery, source)
             elif not source.is_file():
                 raise ValueError(f"源文件与恢复文件均缺失：{record.source_relative_path}")
             repository.set_file_phase(record.id, "restored")

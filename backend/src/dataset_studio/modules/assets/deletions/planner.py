@@ -9,8 +9,10 @@ from dataset_studio.core.files import file_sha256
 from dataset_studio.core.paths import relative_path_key
 from dataset_studio.modules.assets.companions import (
     AssetBundleFileKind,
+    AssetCompanion,
     discover_asset_companions,
     path_key,
+    registered_suffixes,
 )
 from dataset_studio.modules.assets.deletions.models import AssetDeletionRequest
 from dataset_studio.modules.assets.repository import AssetRepository
@@ -100,6 +102,12 @@ def build_plan(
             continue
         planned_bases.add(base)
         companions = discover_asset_companions(image_path, claimed_annotations)
+        companions.extend(
+            AssetCompanion(
+                image_path.with_name(image_path.stem + suffix), AssetBundleFileKind.ANNOTATION
+            )
+            for suffix in registered_suffixes(database_path, root, (image_path,))
+        )
         existing_companions = [item for item in companions if item.path.is_file()]
         if not owners_by_base.get(base, set()).issubset(selected_ids):
             shared_sidecar_count += len(existing_companions)

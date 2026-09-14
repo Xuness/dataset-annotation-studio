@@ -443,7 +443,7 @@ class LocalTaggerBatchCommitter:
         paths: dict[str, str] = {}
         for item, path, content in staged:
             atomic_write_text(path, content)
-            paths[item.item_id] = path.relative_to(workspace_root).as_posix()
+            paths[item.item_id] = path.relative_to(runs_root.parent).as_posix()
         return paths
 
 

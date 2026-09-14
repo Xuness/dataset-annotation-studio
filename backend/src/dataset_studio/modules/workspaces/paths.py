@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import UUID
 
 from dataset_studio.core.config import Settings
 
@@ -20,7 +21,17 @@ class WorkspacePaths:
 
     @classmethod
     def from_root(cls, root: Path, settings: Settings) -> WorkspacePaths:
+        """Locate an embedded legacy workspace for migration only."""
         internal = root / settings.workspace_dir_name
+        return cls.from_locations(root, internal)
+
+    @classmethod
+    def for_project(cls, root: Path, settings: Settings, project_id: str) -> WorkspacePaths:
+        internal = settings.app_data_dir / "workspaces" / str(UUID(project_id))
+        return cls.from_locations(root, internal)
+
+    @classmethod
+    def from_locations(cls, root: Path, internal: Path) -> WorkspacePaths:
         return cls(
             root=root,
             internal=internal,

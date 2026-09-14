@@ -15,6 +15,19 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def verified_move_file(source: Path, target: Path) -> None:
+    """Move between filesystems only after a verified durable copy exists."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if source.stat().st_dev == target.parent.stat().st_dev:
+        os.replace(source, target)
+        return
+    before = file_sha256(source)
+    copied = atomic_copy_file_with_sha256(source, target)
+    if copied != before or file_sha256(target) != before or file_sha256(source) != before:
+        raise ValueError(f"跨磁盘移动校验失败，源文件已保留：{source} -> {target}")
+    source.unlink()
+
+
 def atomic_write_text(path: Path, content: str, *, encoding: str = "utf-8") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     file_descriptor, temporary_name = tempfile.mkstemp(

@@ -40,7 +40,12 @@ export function SpaceDetails({
           STATE <b>READY</b>
         </span>
       </div>
-      <button className="dial-archive-info__enter" type="button" onClick={onEnter}>
+      <button
+        data-testid="home-enter-space"
+        className="dial-archive-info__enter"
+        type="button"
+        onClick={onEnter}
+      >
         <span>进入空间</span>
         <b aria-hidden="true">→</b>
       </button>

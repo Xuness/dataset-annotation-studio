@@ -42,6 +42,10 @@ export function DeliveryPreflightStage({ content }: DeliveryPreflightStageProps)
         <span>02 / FROZEN MANIFEST</span>
         <h1 id="delivery-preflight-title">冻结与预检</h1>
         <p>当前结果对应这一版方案。修改范围、通道或目的地后需要重新预检。</p>
+        <p>
+          新建 {preview.createdFileCount} · 复用 {preview.reusedFileCount} · 备份后覆盖{" "}
+          {preview.replacedFileCount}
+        </p>
         <div>
           <span>
             <em>OBJECTS //</em>
@@ -123,7 +127,7 @@ export function DeliveryPreflightStage({ content }: DeliveryPreflightStageProps)
                 <span>
                   <b title={item.sourceRelativePath}>{item.sourceRelativePath}</b>
                   <small title={item.targetOutputs.join("\n")}>
-                    {item.targetOutputs.length} OUTPUTS · {item.targetImageName}
+                    {item.targetOutputs.length} OUTPUTS · {item.targetOutputs[0] ?? "无输出"}
                   </small>
                 </span>
                 <span>

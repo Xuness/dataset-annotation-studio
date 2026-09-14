@@ -30,6 +30,12 @@ from dataset_studio.modules.taggers.models import (
 )
 from dataset_studio.modules.translations.models import TranslationStatus
 from dataset_studio.modules.translations.service import TranslationService
+from dataset_studio.modules.workspaces.association import (
+    RelocateExecution,
+    RelocateRequest,
+    preview_relocation,
+    relocate,
+)
 from dataset_studio.modules.workspaces.paths import WorkspacePaths
 from dataset_studio.modules.workspaces.repository import WorkspaceRegistry
 from dataset_studio.modules.workspaces.service import WorkspaceService
@@ -70,6 +76,13 @@ def test_workspace_is_portable_and_scans_recursive_assets(tmp_path: Path) -> Non
     moved = tmp_path / "Style" / "MovedExample"
     moved.parent.mkdir()
     project.rename(moved)
+    relocation = RelocateRequest(path=str(moved))
+    preview = preview_relocation(workspaces, summary.project_id, relocation)
+    relocate(
+        workspaces,
+        summary.project_id,
+        RelocateExecution(request=relocation, preview_token=preview.preview_token),
+    )
     reopened, _ = workspaces.open(str(moved))
 
     assert reopened.project_id == summary.project_id
@@ -83,11 +96,11 @@ def test_remove_recent_api_keeps_workspace_data_and_reopen_restores_entry(
     project = tmp_path / "dataset"
     image = project / "sample.png"
     _write_image(image)
-    paths = WorkspacePaths.from_root(project.resolve(), settings)
 
     with TestClient(create_app(settings)) as client:
         opened = client.post("/api/v1/workspaces/open", json={"path": str(project)})
         project_id = opened.json()["workspace"]["project_id"]
+        paths = WorkspacePaths.for_project(project.resolve(), settings, project_id)
         removed = client.delete(f"/api/v1/workspaces/{project_id}/recent")
 
         assert opened.status_code == 200

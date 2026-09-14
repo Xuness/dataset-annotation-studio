@@ -1,3 +1,4 @@
+import { WorkspaceFilesDialog } from "./WorkspaceFilesDialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ArchiveSpaceContent as ArchiveSpaceContentModel } from "../../../../pages/spaces/spacePageModel";
@@ -128,6 +129,15 @@ export function ArchiveSpaceContent({ content }: ArchiveSpaceContentProps) {
                   <em>DETAIL</em>
                 </button>
               </div>
+              {content.filesController ? (
+                <button
+                  id="workspace-files-open"
+                  type="button"
+                  onClick={() => void content.filesController?.open(focusedProject.id)}
+                >
+                  原始文件与目录关联
+                </button>
+              ) : null}
               <ArchiveProjectDetail
                 project={focusedProject}
                 content={content}
@@ -159,6 +169,18 @@ export function ArchiveSpaceContent({ content }: ArchiveSpaceContentProps) {
           )}
         </div>
       </section>
+      {content.filesController ? (
+        <WorkspaceFilesDialog controller={content.filesController} />
+      ) : null}
+      {content.importIndependentProject ? (
+        <button
+          id="workspace-import-copy"
+          type="button"
+          onClick={() => void content.importIndependentProject?.()}
+        >
+          独立副本导入
+        </button>
+      ) : null}
       <footer className="dial-archive-space-footer dial-archive-space-frame">
         <span>SPACE 01 // PROJECT ARCHIVE — REGISTRY</span>
         <span>

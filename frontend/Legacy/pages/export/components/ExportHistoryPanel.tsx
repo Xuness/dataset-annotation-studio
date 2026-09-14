@@ -77,8 +77,7 @@ export function ExportHistoryPanel({
               <p title={operation.destination_path}>{operation.destination_path}</p>
               <small>
                 {operation.completed_items} / {operation.total_items} 张 ·{" "}
-                {formatBytes(operation.copied_bytes, "KB")} /
-                {formatBytes(operation.total_bytes, "KB")}
+                {formatBytes(operation.copied_bytes)} /{formatBytes(operation.total_bytes)}
               </small>
               <small title={channels}>
                 {packaging} · {directoryLabel} · {formats.toUpperCase()} · {channels}
@@ -102,6 +101,15 @@ export function ExportHistoryPanel({
                 >
                   打开目录
                 </Button>
+                {operation.backup_directory ? (
+                  <Button
+                    disabled={actionPending}
+                    data-testid={`export-backup-${operation.id}`}
+                    onClick={() => onOpenFolder(operation.backup_directory!)}
+                  >
+                    覆盖前备份
+                  </Button>
+                ) : null}
                 {active ? (
                   <Button
                     icon={actionPending ? <Spinner /> : <Pause size={13} />}

@@ -228,7 +228,10 @@ class AssetScanner:
     def _iter_image_paths(paths: WorkspacePaths, recursive: bool):
         iterator = paths.root.rglob("*") if recursive else paths.root.glob("*")
         for candidate in iterator:
-            if paths.internal in candidate.parents:
+            if (
+                paths.internal in candidate.parents
+                or ".annotation-workspace" in candidate.relative_to(paths.root).parts
+            ):
                 continue
             if candidate.is_file() and candidate.suffix.lower() in SUPPORTED_IMAGE_SUFFIXES:
                 yield candidate
