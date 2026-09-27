@@ -753,7 +753,7 @@ def test_force_export_preserves_invalid_legacy_bytes_from_frozen_revision(
     assert (project / "image.txt").read_bytes() == encoded_bytes
 
 
-def test_export_preview_blocks_nonempty_destination_and_flat_name_collisions(
+def test_export_preview_allows_nonempty_destination_but_blocks_flat_name_collisions(
     tmp_path: Path,
 ) -> None:
     workspaces, _, _, exports = _services(tmp_path)
@@ -789,7 +789,8 @@ def test_export_preview_blocks_nonempty_destination_and_flat_name_collisions(
         workspace.project_id,
         ExportRequest(destination_path=str(destination)),
     )
-    assert "导出目录必须为空" in occupied_preview.blocking_issues[0]
+    assert occupied_preview.blocking_issues == []
+    assert occupied_preview.blocking_issue_count == 2
 
     inside_workspace = project / "export"
     inside_workspace.mkdir()
@@ -797,7 +798,7 @@ def test_export_preview_blocks_nonempty_destination_and_flat_name_collisions(
         workspace.project_id,
         ExportRequest(destination_path=str(inside_workspace)),
     )
-    assert "导出目录不能位于当前项目内部" in inside_preview.blocking_issues[0]
+    assert inside_preview.blocking_issues == []
 
 
 def test_export_preview_is_invalidated_by_a_new_revision_even_with_same_content(

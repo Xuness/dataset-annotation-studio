@@ -59,7 +59,7 @@ describe("new frontend routes", () => {
 
   test("hands the selected home space to the stable product route while preserving the theme", async () => {
     renderRoutes("/?theme=dial-archive&s=1");
-    const enter = await screen.findByRole("button", { name: "进入空间" });
+    const enter = await screen.findByTestId("home-enter-space", {}, { timeout: 3000 });
     fireEvent.click(enter);
 
     await waitFor(() => {

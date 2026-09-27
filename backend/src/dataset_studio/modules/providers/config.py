@@ -119,6 +119,7 @@ class ProviderModelConfig(BaseModel):
     timeout_seconds: int = Field(default=180, ge=1, le=3600)
     top_p: float | None = Field(default=None, ge=0, le=1)
     seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
+    inference_image_max_bytes: int | None = Field(default=None, gt=0, strict=True)
     protocol_options: ProviderProtocolOptions
 
     _normalize_model_id = field_validator("model_id")(_require_non_blank)

@@ -7,6 +7,8 @@ describe("archive project model", () => {
   test("projects the generated workspace contract without inventing display data", () => {
     const workspace: WorkspaceSummary = {
       project_id: "project-1",
+      storage_path: "D:/app/workspaces/project-1",
+      association_state: "attached",
       name: "Portraits",
       root_path: "D:\\datasets\\portraits",
       exists: true,
@@ -16,6 +18,7 @@ describe("archive project model", () => {
       created_at: "2026-08-01T10:00:00Z",
       last_opened_at: null,
       settings: {
+        export_preferences: null,
         json_fields: [],
         recursive_scan: true,
         system_preset_id: null,

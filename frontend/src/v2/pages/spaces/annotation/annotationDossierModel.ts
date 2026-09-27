@@ -268,6 +268,16 @@ export function projectDossierProvenance(
         value: parameters.provider_profile_name || "—",
         detail: parameters.provider_type,
       },
+      ...(parameters.sent_image_bytes != null
+        ? [
+            {
+              id: "inference-image",
+              label: "推理图片",
+              value: `${parameters.source_image_bytes?.toLocaleString()} → ${parameters.sent_image_bytes.toLocaleString()} 字节`,
+              detail: `${parameters.inference_image_compressed ? "临时压缩" : "原图"} · ${parameters.sent_image_width} × ${parameters.sent_image_height} · 数据集图片未被推理压缩修改`,
+            },
+          ]
+        : []),
       { id: "started", label: "STARTED", value: trace.started_at },
       { id: "finished", label: "FINISHED", value: trace.finished_at ?? "—" },
       {

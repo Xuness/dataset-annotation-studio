@@ -16,6 +16,7 @@ from dataset_studio.modules.assets.candidates import (
     candidate_scope_clause,
     ensure_assets_in_effective_scope,
 )
+from dataset_studio.modules.assets.companions import registered_suffixes
 from dataset_studio.modules.assets.models import CandidateScope
 from dataset_studio.modules.preprocessing.models import OutputFormat, PreprocessRequest
 
@@ -90,6 +91,7 @@ def build_plan(database_path: Path, root: Path, request: PreprocessRequest) -> l
                 source,
                 target,
                 claimed_annotations,
+                registered_suffixes(database_path, root, (source,)),
             ):
                 if source_sidecar.as_posix() != target_sidecar.as_posix() and (
                     (target_sidecar.exists() and not _same_file(source_sidecar, target_sidecar))
@@ -254,6 +256,7 @@ def _sidecar_pairs(
     source: Path,
     target: Path,
     claimed_annotations: set[str],
+    suffixes: tuple[str, ...],
 ) -> list[tuple[Path, Path]]:
     pairs = [
         (source.with_suffix(".txt"), target.with_suffix(".txt")),
@@ -272,7 +275,11 @@ def _sidecar_pairs(
                         target.with_name(f"{target.stem}.{language}.txt"),
                     )
                 )
-    return pairs
+    pairs.extend(
+        (source.with_name(source.stem + suffix), target.with_name(target.stem + suffix))
+        for suffix in suffixes
+    )
+    return list(dict.fromkeys(pairs))
 
 
 def _claimed_annotation_paths(database_path: Path, root: Path) -> set[str]:

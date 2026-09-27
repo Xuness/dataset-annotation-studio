@@ -94,6 +94,16 @@ export function DeliveryMaterializeStage({ content }: DeliveryMaterializeStagePr
             >
               打开结果
             </button>
+            {operation.backupDirectory ? (
+              <button
+                type="button"
+                disabled={content.exportPending}
+                data-testid={`export-backup-${operation.id}`}
+                onClick={() => void content.openFolder(operation.backupDirectory!)}
+              >
+                覆盖前备份
+              </button>
+            ) : null}
             {operation.canStop ? (
               <button
                 type="button"

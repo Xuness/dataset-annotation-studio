@@ -670,6 +670,24 @@ GLOBAL_MIGRATIONS = (
         SCREENING_WORKER_ACTIVITY_MIGRATION,
         foreign_keys_off=True,
     ),
+    Migration(
+        17,
+        "workspace_locations",
+        """
+        ALTER TABLE provider_model_configs ADD COLUMN inference_image_max_bytes INTEGER;
+        CREATE TABLE workspace_locations (
+            project_id TEXT PRIMARY KEY,
+            root_path TEXT NOT NULL,
+            root_path_key TEXT NOT NULL,
+            directory_identity TEXT,
+            attached INTEGER NOT NULL DEFAULT 1,
+            storage_version INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO workspace_locations (project_id, root_path, root_path_key)
+        SELECT project_id, root_path, COALESCE(root_path_key, root_path) FROM recent_workspaces;
+        CREATE INDEX idx_workspace_locations_root ON workspace_locations(root_path_key);
+        """,
+    ),
 )
 
 

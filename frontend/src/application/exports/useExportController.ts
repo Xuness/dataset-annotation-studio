@@ -29,7 +29,7 @@ interface UseExportControllerOptions {
 export function useExportController({ projectId, confirm, alert }: UseExportControllerOptions) {
   const checkedAssetIds = useWorkspaceSelectionStore((state) => state.checkedAssetIds);
   const setActiveProject = useWorkspaceSelectionStore((state) => state.setActiveProject);
-  const { form } = exportWorkbenchState.useValue(projectId);
+  const { form, preferencesRestored } = exportWorkbenchState.useValue(projectId);
   const workspace = useWorkspace(projectId);
   const assets = useAssets(projectId, { limit: 1 });
   const candidateFolders = useAssetFolders(projectId, form.scope === "all", "auto");
@@ -50,10 +50,42 @@ export function useExportController({ projectId, confirm, alert }: UseExportCont
   const patchForm = useCallback(
     (update: Partial<ExportFormState>) =>
       exportWorkbenchState.patch(projectId, (current) => ({
-        form: { ...current.form, ...update },
+        preferencesRestored: true,
+        form: {
+          ...current.form,
+          ...update,
+          conflictPolicy: update.conflictPolicy ?? "block",
+          ...(update.destinationKind === "source"
+            ? {
+                packaging: "directory" as const,
+                directoryLayout: { mode: "preserve" as const, merge_into_parent_paths: [] },
+              }
+            : {}),
+        },
       })),
     [projectId],
   );
+
+  useEffect(() => {
+    if (!workspace.data || preferencesRestored) return;
+    exportWorkbenchState.patch(projectId, { preferencesRestored: true });
+    const saved = workspace.data.settings.export_preferences;
+    if (saved)
+      patchForm({
+        destinationPath: saved.destination_path ?? "",
+        contentMode: saved.content_mode ?? "images_and_annotations",
+        destinationKind: saved.destination_kind ?? "directory",
+        primaryTxtChannelKey: saved.primary_txt_channel_key ?? null,
+        conflictPolicy: "block",
+        selections: saved.channels ?? [],
+        formats: saved.formats ?? ["txt"],
+        packaging: saved.packaging ?? "directory",
+        directoryLayout: saved.directory_layout ?? {
+          mode: "preserve",
+          merge_into_parent_paths: [],
+        },
+      });
+  }, [projectId, workspace.data, patchForm, preferencesRestored]);
 
   useEffect(() => {
     setActiveProject(projectId);
@@ -101,7 +133,7 @@ export function useExportController({ projectId, confirm, alert }: UseExportCont
     setError(null);
     try {
       const selected = await pickExportFolder();
-      if (selected) patchForm({ destinationPath: selected });
+      if (selected) patchForm({ destinationPath: selected, destinationKind: "directory" });
     } catch (reason) {
       setError(actionError(reason, "无法选择导出目录。"));
     }
@@ -126,6 +158,16 @@ export function useExportController({ projectId, confirm, alert }: UseExportCont
   const startExport = useCallback(async () => {
     const previewData = validPreview;
     if (!previewData || previewData.blocking_issue_count) return;
+    if (
+      previewData.replaced_file_count &&
+      !(await confirm({
+        title: "覆盖已有标注",
+        tone: "danger",
+        confirmLabel: "备份并覆盖",
+        message: `将覆盖 ${previewData.replaced_file_count} 个已有标注文件，旧文件会先保存在项目工作区中。图片不会被覆盖。`,
+      }))
+    )
+      return;
     let allowWarnings = false;
     if (previewData.warning_count) {
       const accepted = await confirm({
@@ -148,7 +190,7 @@ export function useExportController({ projectId, confirm, alert }: UseExportCont
         message:
           form.packaging === "zip"
             ? `将 ${previewData.total_items} 张图片及所选标注通道打包为 ZIP 压缩包？`
-            : `将 ${previewData.total_items} 张图片及所选标注通道物化到导出目录？`,
+            : `导出 ${previewData.total_items} 张素材的所选内容？新增 ${previewData.created_file_count ?? 0} 个文件，复用 ${previewData.reused_file_count ?? 0} 个文件。`,
         title: "开始导出",
         confirmLabel: "开始导出",
       });
@@ -162,12 +204,13 @@ export function useExportController({ projectId, confirm, alert }: UseExportCont
         previewToken: previewData.preview_token,
         allowWarnings,
       });
+      patchForm({ conflictPolicy: "block" });
       actions.preview.reset();
       setPreviewFingerprint(null);
     } catch (reason) {
       setError(actionError(reason, "无法创建导出任务。"));
     }
-  }, [actions.create, actions.preview, confirm, form.packaging, request, validPreview]);
+  }, [actions.create, actions.preview, confirm, form.packaging, request, validPreview, patchForm]);
 
   const stop = useCallback(
     async (operationId: string) => {

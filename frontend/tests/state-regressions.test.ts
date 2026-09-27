@@ -417,7 +417,7 @@ test("export controller freezes selected scope without mutating selection state"
   assert.notEqual(request.asset_ids, checked);
   assert.equal(request.packaging, "zip");
   assert.deepEqual(request.directory_layout, {
-    mode: "flat",
+    mode: "preserve",
     merge_into_parent_paths: [],
   });
   const mergePaths = ["characters/alice"];

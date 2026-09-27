@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dataset_studio.core.languages import LANGUAGE_PATTERN
 from dataset_studio.core.paths import filesystem_path_key
+from dataset_studio.core.sqlite import connect
 
 
 class AssetBundleFileKind(StrEnum):
@@ -47,6 +48,22 @@ def discover_asset_companions(
 
 def path_key(path: Path) -> str:
     return _path_key(path)
+
+
+def registered_suffixes(database: Path, root: Path, images: tuple[Path, ...]) -> tuple[str, ...]:
+    relative_paths = tuple(image.relative_to(root).as_posix() for image in images)
+    connection = connect(database)
+    try:
+        return tuple(
+            str(row["role"])
+            for row in connection.execute(
+                f"SELECT DISTINCT c.role FROM companion_files c JOIN assets a ON a.id=c.asset_id "
+                f"WHERE a.relative_path IN ({','.join('?' for _ in relative_paths)})",
+                relative_paths,
+            )
+        )
+    finally:
+        connection.close()
 
 
 def _path_key(path: Path) -> str:

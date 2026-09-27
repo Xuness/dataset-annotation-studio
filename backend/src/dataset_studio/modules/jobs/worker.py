@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import shutil
 import sqlite3
 from collections.abc import Callable, Sequence
 from contextlib import suppress
 from pathlib import Path
 from typing import Protocol
+
+from filelock import FileLock
 
 from dataset_studio.core.errors import WorkspaceNotFoundError
 from dataset_studio.modules.annotations.service import AnnotationService
@@ -75,6 +78,12 @@ class AnnotationWorker:
         )
 
     async def run(self, stopped: asyncio.Event) -> None:
+        with FileLock(
+            self._container.workspaces.settings.app_data_dir / "annotation-worker.lock", timeout=0
+        ):
+            await self._run(stopped)
+
+    async def _run(self, stopped: asyncio.Event) -> None:
         recovered_preprocessing = self._container.preprocessing.recover_orphaned()
         if recovered_preprocessing:
             LOGGER.info(
@@ -104,6 +113,9 @@ class AnnotationWorker:
                 paths, manifest = self._container.workspaces.get(project_id)
                 repository = JobLifecycleRepository(paths.database)
                 recovered = repository.recover_orphaned()
+                cache = paths.internal / "cache" / "inference"
+                if cache.exists():
+                    shutil.rmtree(cache)
             except (WorkspaceNotFoundError, OSError, ValueError, sqlite3.Error) as error:
                 LOGGER.warning("Skipping unavailable job workspace %s: %s", project_id, error)
                 self._container.workspaces.clear_worker_activity(project_id, "jobs")

@@ -262,6 +262,83 @@ export function DeliverySpecStage({ content }: DeliverySpecStageProps) {
           </div>
         </section>
 
+        <section className="export-option">
+          <label>
+            导出内容
+            <select
+              id="export-content-mode"
+              disabled={content.exportPending}
+              value={form.contentMode}
+              onChange={(event) =>
+                content.updateForm({ contentMode: event.target.value as typeof form.contentMode })
+              }
+            >
+              <option value="annotations_only">仅标注</option>
+              <option value="images_and_annotations">图片与标注</option>
+            </select>
+          </label>
+          <label>
+            输出位置
+            <select
+              id="export-destination-kind"
+              disabled={content.exportPending}
+              value={form.destinationKind}
+              onChange={(event) =>
+                content.updateForm({
+                  destinationKind: event.target.value as typeof form.destinationKind,
+                })
+              }
+            >
+              <option value="source">每张原图所在文件夹</option>
+              <option value="directory">指定文件夹</option>
+            </select>
+          </label>
+          {form.destinationKind === "source" ? (
+            <p>图片保持原位，仅写入所选标注；不会复制图片。</p>
+          ) : null}
+          {form.destinationKind === "source" &&
+          form.formats.includes("txt") &&
+          form.selections.length > 1 ? (
+            <label>
+              主 TXT 通道
+              <select
+                id="export-primary-txt"
+                disabled={content.exportPending}
+                value={form.primaryTxtChannelKey ?? ""}
+                onChange={(event) =>
+                  content.updateForm({ primaryTxtChannelKey: event.target.value || null })
+                }
+              >
+                <option value="">请选择主通道</option>
+                {form.selections.map((selection) => {
+                  const key =
+                    selection.channel === "translation"
+                      ? `translation:${selection.translation_source_kind ?? "description"}:${selection.translation_producer_kind ?? "llm"}:${selection.language}`
+                      : selection.channel;
+                  return (
+                    <option key={key} value={key}>
+                      {key}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+          ) : null}
+          <label>
+            <input
+              id="export-replace-annotations"
+              disabled={content.exportPending}
+              type="checkbox"
+              checked={form.conflictPolicy === "replace_annotations"}
+              onChange={(event) =>
+                content.updateForm({
+                  conflictPolicy: event.target.checked ? "replace_annotations" : "block",
+                })
+              }
+            />
+            允许备份后覆盖同名标注（本次导出）
+          </label>
+        </section>
         <section
           className="dial-archive-delivery-spec__output"
           aria-labelledby="delivery-output-title"
@@ -298,6 +375,7 @@ export function DeliverySpecStage({ content }: DeliverySpecStageProps) {
               type="button"
               className={form.packaging === "zip" ? "is-active" : undefined}
               aria-pressed={form.packaging === "zip"}
+              disabled={form.destinationKind === "source"}
               onClick={() => content.updateForm({ packaging: "zip" })}
             >
               ZIP
@@ -308,12 +386,20 @@ export function DeliverySpecStage({ content }: DeliverySpecStageProps) {
 
       <aside className="dial-archive-delivery-spec__destination">
         <header>
-          <span>DESTINATION // EXTERNAL</span>
+          <span>
+            {form.destinationKind === "source"
+              ? "DESTINATION // SOURCE"
+              : "DESTINATION // DIRECTORY"}
+          </span>
           <h2>出站目的地</h2>
         </header>
         <div className="dial-archive-delivery-spec__destination-path">
           <span>{form.packaging === "zip" ? "ARCHIVE TARGET" : "DIRECTORY TARGET"}</span>
-          <b title={form.destinationPath}>{form.destinationPath || "尚未选择外部目录"}</b>
+          <b title={form.destinationPath}>
+            {form.destinationKind === "source"
+              ? "每张原图所在文件夹"
+              : form.destinationPath || "尚未选择外部目录"}
+          </b>
         </div>
         <button type="button" onClick={() => void content.chooseDestination()}>
           选择目录 <span>BROWSE ↗</span>
@@ -321,7 +407,13 @@ export function DeliverySpecStage({ content }: DeliverySpecStageProps) {
         <dl>
           <div>
             <dt>IMAGE</dt>
-            <dd>复制原始字节</dd>
+            <dd>
+              {form.destinationKind === "source"
+                ? "原位复用"
+                : form.contentMode === "annotations_only"
+                  ? "不复制图片"
+                  : "复制数据集当前图片"}
+            </dd>
           </div>
           <div>
             <dt>REVISION</dt>
@@ -329,7 +421,11 @@ export function DeliverySpecStage({ content }: DeliverySpecStageProps) {
           </div>
           <div>
             <dt>OVERWRITE</dt>
-            <dd>保留现有文件</dd>
+            <dd>
+              {form.conflictPolicy === "replace_annotations"
+                ? "标注备份后覆盖"
+                : "阻止不同内容冲突"}
+            </dd>
           </div>
         </dl>
         {form.scope === "selected" && content.checkedCount === 0 ? (
@@ -337,6 +433,7 @@ export function DeliverySpecStage({ content }: DeliverySpecStageProps) {
         ) : null}
         {content.error ? <p className="is-error">{content.error}</p> : null}
         <button
+          id="export-preview"
           className="dial-archive-delivery-spec__preview"
           type="button"
           disabled={!content.canPreview || content.previewPending || content.exportPending}

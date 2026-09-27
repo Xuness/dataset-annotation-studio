@@ -193,7 +193,7 @@ def test_interrupted_undo_is_finished_on_recovery(tmp_path: Path) -> None:
     repository.begin_undo(operation.id)
     first = repository.files(operation.id)[0]
     source = paths.root / Path(PurePosixPath(first.source_relative_path))
-    recovery = paths.root / Path(PurePosixPath(first.recovery_relative_path))
+    recovery = paths.internal / Path(PurePosixPath(first.recovery_relative_path))
     source.parent.mkdir(parents=True, exist_ok=True)
     os.replace(recovery, source)
     repository.set_file_phase(first.id, "restored")

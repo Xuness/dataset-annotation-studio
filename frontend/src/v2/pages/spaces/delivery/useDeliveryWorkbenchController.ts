@@ -172,7 +172,7 @@ export function useDeliveryWorkbenchController({
     ].join(":"),
   );
   const canPreview = Boolean(
-    controller.form.destinationPath &&
+    (controller.form.destinationKind === "source" || controller.form.destinationPath) &&
     validScope &&
     controller.form.selections.length &&
     controller.form.selections.every(

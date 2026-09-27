@@ -2767,6 +2767,17 @@
             "title": "Allow Warnings",
             "type": "boolean"
           },
+          "backup_directory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Directory"
+          },
           "completed_at": {
             "anyOf": [
               {
@@ -2914,6 +2925,11 @@
             "title": "Blocking Issues",
             "type": "array"
           },
+          "created_file_count": {
+            "default": 0,
+            "title": "Created File Count",
+            "type": "integer"
+          },
           "empty_count": {
             "title": "Empty Count",
             "type": "integer"
@@ -2944,6 +2960,16 @@
           "preview_token": {
             "title": "Preview Token",
             "type": "string"
+          },
+          "replaced_file_count": {
+            "default": 0,
+            "title": "Replaced File Count",
+            "type": "integer"
+          },
+          "reused_file_count": {
+            "default": 0,
+            "title": "Reused File Count",
+            "type": "integer"
           },
           "reviewed_count": {
             "title": "Reviewed Count",
@@ -3104,9 +3130,36 @@
             "title": "Channels",
             "type": "array"
           },
+          "conflict_policy": {
+            "default": "block",
+            "enum": [
+              "block",
+              "replace_annotations"
+            ],
+            "title": "Conflict Policy",
+            "type": "string"
+          },
+          "content_mode": {
+            "default": "images_and_annotations",
+            "enum": [
+              "annotations_only",
+              "images_and_annotations"
+            ],
+            "title": "Content Mode",
+            "type": "string"
+          },
+          "destination_kind": {
+            "default": "directory",
+            "enum": [
+              "source",
+              "directory"
+            ],
+            "title": "Destination Kind",
+            "type": "string"
+          },
           "destination_path": {
+            "default": "",
             "maxLength": 32767,
-            "minLength": 1,
             "title": "Destination Path",
             "type": "string"
           },
@@ -3126,14 +3179,22 @@
             "$ref": "#/components/schemas/ExportPackaging",
             "default": "directory"
           },
+          "primary_txt_channel_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Txt Channel Key"
+          },
           "scope": {
             "$ref": "#/components/schemas/ExportScope",
             "default": "all"
           }
         },
-        "required": [
-          "destination_path"
-        ],
         "title": "ExportRequest",
         "type": "object"
       },
@@ -3152,6 +3213,36 @@
         ],
         "title": "ExportScope",
         "type": "string"
+      },
+      "FileFingerprint": {
+        "properties": {
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "exists",
+          "content_hash",
+          "byte_size"
+        ],
+        "title": "FileFingerprint",
+        "type": "object"
       },
       "FrequencyBucket": {
         "properties": {
@@ -4426,6 +4517,59 @@
         "title": "OpenRouterModelOptions",
         "type": "object"
       },
+      "OriginalFile": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "backup_relative_path": {
+            "title": "Backup Relative Path",
+            "type": "string"
+          },
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "source_relative_path": {
+            "title": "Source Relative Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "asset_id",
+          "role",
+          "source_relative_path",
+          "backup_relative_path",
+          "content_hash",
+          "byte_size",
+          "created_at",
+          "available"
+        ],
+        "title": "OriginalFile",
+        "type": "object"
+      },
       "OutputFormat": {
         "enum": [
           "webp",
@@ -4971,6 +5115,18 @@
         "additionalProperties": false,
         "description": "All request behavior that belongs to one model within a connection.",
         "properties": {
+          "inference_image_max_bytes": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference Image Max Bytes"
+          },
           "max_output_tokens": {
             "default": 4096,
             "maximum": 1000000.0,
@@ -5456,6 +5612,69 @@
         "title": "ReasoningEffort",
         "type": "string"
       },
+      "RelocateExecution": {
+        "properties": {
+          "preview_token": {
+            "title": "Preview Token",
+            "type": "string"
+          },
+          "request": {
+            "$ref": "#/components/schemas/RelocateRequest"
+          }
+        },
+        "required": [
+          "request",
+          "preview_token"
+        ],
+        "title": "RelocateExecution",
+        "type": "object"
+      },
+      "RelocatePreview": {
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "integer"
+          },
+          "matched": {
+            "title": "Matched",
+            "type": "integer"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "preview_token": {
+            "title": "Preview Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "matched",
+          "changed",
+          "missing",
+          "preview_token"
+        ],
+        "title": "RelocatePreview",
+        "type": "object"
+      },
+      "RelocateRequest": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "RelocateRequest",
+        "type": "object"
+      },
       "RenameOptions": {
         "additionalProperties": false,
         "properties": {
@@ -5629,6 +5848,127 @@
           "max_edge"
         ],
         "title": "ResizeOptions",
+        "type": "object"
+      },
+      "RestoreExecution": {
+        "properties": {
+          "preview_token": {
+            "title": "Preview Token",
+            "type": "string"
+          },
+          "request": {
+            "$ref": "#/components/schemas/RestoreRequest"
+          }
+        },
+        "required": [
+          "request",
+          "preview_token"
+        ],
+        "title": "RestoreExecution",
+        "type": "object"
+      },
+      "RestoreItem": {
+        "properties": {
+          "action": {
+            "enum": [
+              "create",
+              "reuse",
+              "replace",
+              "blocked"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "backup": {
+            "$ref": "#/components/schemas/OriginalFile"
+          },
+          "before": {
+            "$ref": "#/components/schemas/FileFingerprint"
+          },
+          "target_path": {
+            "title": "Target Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "backup",
+          "target_path",
+          "before",
+          "action"
+        ],
+        "title": "RestoreItem",
+        "type": "object"
+      },
+      "RestorePreview": {
+        "properties": {
+          "blocking_issues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blocking Issues",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RestoreItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "preview_token": {
+            "title": "Preview Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "blocking_issues",
+          "preview_token"
+        ],
+        "title": "RestorePreview",
+        "type": "object"
+      },
+      "RestoreRequest": {
+        "properties": {
+          "allow_replace": {
+            "title": "Allow Replace",
+            "type": "boolean"
+          },
+          "backup_ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Backup Ids",
+            "type": "array"
+          },
+          "destination_kind": {
+            "enum": [
+              "source",
+              "directory"
+            ],
+            "title": "Destination Kind",
+            "type": "string"
+          },
+          "destination_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Path"
+          }
+        },
+        "required": [
+          "backup_ids",
+          "destination_kind",
+          "destination_path",
+          "allow_replace"
+        ],
+        "title": "RestoreRequest",
         "type": "object"
       },
       "ScanIssue": {
@@ -9426,6 +9766,39 @@
             "title": "Execution Backend",
             "type": "string"
           },
+          "inference_image_compressed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference Image Compressed"
+          },
+          "inference_image_max_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference Image Max Bytes"
+          },
+          "inference_strategy_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference Strategy Version"
+          },
           "installation_id": {
             "anyOf": [
               {
@@ -9526,6 +9899,61 @@
             ],
             "title": "Selection Mode"
           },
+          "sent_image_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Image Bytes"
+          },
+          "sent_image_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Image Hash"
+          },
+          "sent_image_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Image Height"
+          },
+          "sent_image_mime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Image Mime"
+          },
+          "sent_image_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Image Width"
+          },
           "service_tier": {
             "anyOf": [
               {
@@ -9536,6 +9964,50 @@
               }
             ],
             "title": "Service Tier"
+          },
+          "source_image_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Image Bytes"
+          },
+          "source_image_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Image Hash"
+          },
+          "source_image_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Image Height"
+          },
+          "source_image_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Image Width"
           },
           "temperature": {
             "anyOf": [
@@ -10283,6 +10755,11 @@
       "WorkspaceOpenRequest": {
         "additionalProperties": false,
         "properties": {
+          "independent_copy": {
+            "default": false,
+            "title": "Independent Copy",
+            "type": "boolean"
+          },
           "path": {
             "title": "Path",
             "type": "string"
@@ -10313,6 +10790,16 @@
       "WorkspaceSettings": {
         "additionalProperties": false,
         "properties": {
+          "export_preferences": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "json_fields": {
             "items": {
               "type": "string"
@@ -10359,6 +10846,16 @@
       "WorkspaceSettingsUpdate": {
         "additionalProperties": false,
         "properties": {
+          "export_preferences": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "json_fields": {
             "anyOf": [
               {
@@ -10445,6 +10942,11 @@
             "title": "Asset Count",
             "type": "integer"
           },
+          "association_state": {
+            "default": "attached",
+            "title": "Association State",
+            "type": "string"
+          },
           "created_at": {
             "title": "Created At",
             "type": "string"
@@ -10484,6 +10986,11 @@
           },
           "settings": {
             "$ref": "#/components/schemas/WorkspaceSettings"
+          },
+          "storage_path": {
+            "default": "",
+            "title": "Storage Path",
+            "type": "string"
           }
         },
         "required": [
@@ -15133,6 +15640,41 @@
         ]
       }
     },
+    "/api/v1/workspaces/{project_id}/detach": {
+      "post": {
+        "operationId": "detach_workspace_api_v1_workspaces__project_id__detach_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Detach Workspace",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
     "/api/v1/workspaces/{project_id}/exports": {
       "get": {
         "operationId": "list_exports_api_v1_workspaces__project_id__exports_get",
@@ -15918,6 +16460,52 @@
         ]
       }
     },
+    "/api/v1/workspaces/{project_id}/originals": {
+      "get": {
+        "operationId": "original_files_api_v1_workspaces__project_id__originals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OriginalFile"
+                  },
+                  "title": "Response Original Files Api V1 Workspaces  Project Id  Originals Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Original Files",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
     "/api/v1/workspaces/{project_id}/preprocessing/execute": {
       "post": {
         "operationId": "execute_api_v1_workspaces__project_id__preprocessing_execute_post",
@@ -16201,6 +16789,208 @@
           }
         },
         "summary": "Remove Recent Workspace",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/relocate": {
+      "post": {
+        "operationId": "execute_relocate_api_v1_workspaces__project_id__relocate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelocateExecution"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Execute Relocate",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/relocate/preview": {
+      "post": {
+        "operationId": "preview_relocate_api_v1_workspaces__project_id__relocate_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelocateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelocatePreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Relocate",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/restore": {
+      "post": {
+        "operationId": "execute_restore_api_v1_workspaces__project_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreExecution"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Execute Restore Api V1 Workspaces  Project Id  Restore Post",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Execute Restore",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/restore/preview": {
+      "post": {
+        "operationId": "preview_restore_api_v1_workspaces__project_id__restore_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestorePreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Restore",
         "tags": [
           "workspaces"
         ]

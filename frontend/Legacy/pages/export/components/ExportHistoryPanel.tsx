@@ -60,11 +60,13 @@ export function ExportHistoryPanel({
           const packaging = operation.configuration_snapshot.packaging === "zip" ? "ZIP" : "文件夹";
           const directoryLayout = operation.configuration_snapshot.directory_layout;
           const directoryLabel =
-            !directoryLayout || directoryLayout.mode === "flat"
-              ? "扁平化"
-              : directoryLayout.mode === "preserve"
-                ? "保留原目录（含根目录名）"
-                : `自定义合并 ${directoryLayout.merge_into_parent_paths?.length ?? 0} 个目录`;
+            operation.configuration_snapshot.destination_kind === "source"
+              ? "保持原图位置"
+              : !directoryLayout || directoryLayout.mode === "flat"
+                ? "扁平化"
+                : directoryLayout.mode === "preserve"
+                  ? "保留原目录（含根目录名）"
+                  : `自定义合并 ${directoryLayout.merge_into_parent_paths?.length ?? 0} 个目录`;
           return (
             <article key={operation.id} className={active ? "is-active" : ""}>
               <header>
@@ -77,8 +79,7 @@ export function ExportHistoryPanel({
               <p title={operation.destination_path}>{operation.destination_path}</p>
               <small>
                 {operation.completed_items} / {operation.total_items} 张 ·{" "}
-                {formatBytes(operation.copied_bytes, "KB")} /
-                {formatBytes(operation.total_bytes, "KB")}
+                {formatBytes(operation.copied_bytes)} /{formatBytes(operation.total_bytes)}
               </small>
               <small title={channels}>
                 {packaging} · {directoryLabel} · {formats.toUpperCase()} · {channels}
@@ -102,6 +103,15 @@ export function ExportHistoryPanel({
                 >
                   打开目录
                 </Button>
+                {operation.backup_directory ? (
+                  <Button
+                    disabled={actionPending}
+                    data-testid={`export-backup-${operation.id}`}
+                    onClick={() => onOpenFolder(operation.backup_directory!)}
+                  >
+                    覆盖前备份
+                  </Button>
+                ) : null}
                 {active ? (
                   <Button
                     icon={actionPending ? <Spinner /> : <Pause size={13} />}

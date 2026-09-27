@@ -127,6 +127,15 @@ function AnnotationTraceView({ trace }: { trace: AssetAnnotationTrace }) {
         </p>
       ) : null}
 
+      {parameters.sent_image_bytes != null ? (
+        <p data-testid="inference-image-summary">
+          {parameters.inference_image_compressed ? "仅本次推理使用压缩副本" : "本次推理使用原图"}：
+          {parameters.source_image_bytes?.toLocaleString()} →{" "}
+          {parameters.sent_image_bytes.toLocaleString()} 字节，
+          {parameters.sent_image_width} × {parameters.sent_image_height}
+          ；导出图片仍使用数据集中的文件。
+        </p>
+      ) : null}
       <dl className="annotation-trace__parameters">
         <div>
           <dt>{localTagger ? "打标配置" : "API 配置"}</dt>

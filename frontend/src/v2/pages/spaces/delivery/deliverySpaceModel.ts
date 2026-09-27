@@ -104,7 +104,11 @@ export function hasDeliveryDraft(form: Readonly<ExportFormState>): boolean {
     form.formats.length !== 1 ||
     form.formats[0] !== "txt" ||
     form.packaging !== "directory" ||
-    form.directoryLayout.mode !== "flat",
+    form.directoryLayout.mode !== "preserve" ||
+    form.contentMode !== "annotations_only" ||
+    form.destinationKind !== "source" ||
+    form.primaryTxtChannelKey !== null ||
+    form.conflictPolicy !== "block",
   );
 }
 
@@ -128,7 +132,8 @@ export function projectDeliveryManifest(
     packaging: form.packaging,
     packagingLabel: form.packaging === "zip" ? "ZIP 压缩包" : "文件夹",
     destinationPath: form.destinationPath,
-    destinationLabel: destinationName(form.destinationPath),
+    destinationLabel:
+      form.destinationKind === "source" ? "原图所在文件夹" : destinationName(form.destinationPath),
     draft: options.draft ?? hasDeliveryDraft(form),
   };
 }
@@ -137,6 +142,10 @@ function operationManifest(operation: ExportOperation): DeliveryManifestSummary 
   const snapshot = operation.configuration_snapshot;
   const form: ExportFormState = {
     scope: operation.scope,
+    contentMode: snapshot.content_mode ?? "images_and_annotations",
+    destinationKind: snapshot.destination_kind ?? "directory",
+    primaryTxtChannelKey: snapshot.primary_txt_channel_key ?? null,
+    conflictPolicy: "block",
     destinationPath: operation.destination_path,
     selections: snapshot.channels ?? [],
     formats: snapshot.formats ?? ["txt"],
@@ -177,6 +186,7 @@ export function toDeliveryOperation(operation: ExportOperation): DeliveryOperati
     createdAt: operation.created_at,
     completedAt: operation.completed_at ?? null,
     destinationPath: operation.destination_path,
+    backupDirectory: operation.backup_directory ?? null,
     totalItems: operation.total_items,
     completedItems: Math.min(operation.completed_items, operation.total_items),
     progressPercent,
@@ -224,6 +234,9 @@ export function toDeliveryPreview(
 ): DeliveryPreviewSummary | null {
   if (!preview) return null;
   return {
+    createdFileCount: preview.created_file_count,
+    reusedFileCount: preview.reused_file_count,
+    replacedFileCount: preview.replaced_file_count,
     token: preview.preview_token,
     totalItems: preview.total_items,
     usableCount: preview.usable_count,

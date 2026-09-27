@@ -5,12 +5,15 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from dataset_studio.modules.providers.inference_images import PreparedInferenceImage
+
 
 @dataclass(frozen=True, slots=True)
 class MultimodalRequest:
     image_path: Path | None
     system_prompt: str
     user_prompt: str
+    inference_image: PreparedInferenceImage | None = None
 
 
 @dataclass(frozen=True, slots=True)

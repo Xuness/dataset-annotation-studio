@@ -162,7 +162,11 @@ class ExportRequest(BaseModel):
 
     scope: ExportScope = ExportScope.ALL
     asset_ids: list[str] = Field(default_factory=list)
-    destination_path: str = Field(min_length=1, max_length=32_767)
+    destination_path: str = Field(default="", max_length=32_767)
+    content_mode: Literal["annotations_only", "images_and_annotations"] = "images_and_annotations"
+    destination_kind: Literal["source", "directory"] = "directory"
+    primary_txt_channel_key: str | None = None
+    conflict_policy: Literal["block", "replace_annotations"] = "block"
     channels: list[ExportChannelSelection] = Field(
         default_factory=_default_channels,
         min_length=1,
@@ -185,8 +189,6 @@ class ExportRequest(BaseModel):
     @classmethod
     def normalize_destination_path(cls, value: str) -> str:
         normalized = value.strip()
-        if not normalized:
-            raise ValueError("请选择导出目录。")
         return normalized
 
     @field_validator("channels")
@@ -209,6 +211,20 @@ class ExportRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_scope(self) -> ExportRequest:
+        if self.destination_kind == "directory" and not self.destination_path:
+            raise ValueError("请选择导出目录。")
+        if self.destination_kind == "source":
+            if (
+                self.packaging != ExportPackaging.DIRECTORY
+                or self.directory_layout.mode != ExportDirectoryMode.PRESERVE
+            ):
+                raise ValueError("原位导出必须使用文件夹输出并保留原目录结构。")
+            if (
+                ExportFormat.TXT in self.formats
+                and len(self.channels) > 1
+                and self.primary_txt_channel_key not in {item.key for item in self.channels}
+            ):
+                raise ValueError("原位多通道 TXT 导出必须选择一个主通道。")
         if self.scope == ExportScope.SELECTED and not self.asset_ids:
             raise ValueError("请先在素材工作台中选择要导出的图片。")
         if self.scope == ExportScope.ALL and self.asset_ids:
@@ -248,6 +264,9 @@ class ExportPreview(BaseModel):
     warning_count: int
     blocking_issue_count: int
     blocking_issues: list[str] = Field(default_factory=list)
+    created_file_count: int = 0
+    reused_file_count: int = 0
+    replaced_file_count: int = 0
     preview_token: str
 
 
@@ -264,6 +283,7 @@ class ExportOperation(BaseModel):
     status: ExportOperationStatus
     scope: ExportScope
     destination_path: str
+    backup_directory: str | None = None
     total_items: int
     completed_items: int
     total_bytes: int

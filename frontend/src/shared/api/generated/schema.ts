@@ -1379,6 +1379,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/detach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Detach Workspace */
+        post: operations["detach_workspace_api_v1_workspaces__project_id__detach_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/exports": {
         parameters: {
             query?: never;
@@ -1585,6 +1602,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/originals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Original Files */
+        get: operations["original_files_api_v1_workspaces__project_id__originals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/preprocessing/execute": {
         parameters: {
             query?: never;
@@ -1682,6 +1716,74 @@ export type paths = {
         post?: never;
         /** Remove Recent Workspace */
         delete: operations["remove_recent_workspace_api_v1_workspaces__project_id__recent_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/relocate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute Relocate */
+        post: operations["execute_relocate_api_v1_workspaces__project_id__relocate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/relocate/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Relocate */
+        post: operations["preview_relocate_api_v1_workspaces__project_id__relocate_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute Restore */
+        post: operations["execute_restore_api_v1_workspaces__project_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/restore/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Restore */
+        post: operations["preview_restore_api_v1_workspaces__project_id__restore_preview_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2895,6 +2997,8 @@ export type components = {
         ExportOperation: {
             /** Allow Warnings */
             allow_warnings: boolean;
+            /** Backup Directory */
+            backup_directory?: string | null;
             /** Completed At */
             completed_at?: string | null;
             /** Completed Items */
@@ -2946,6 +3050,11 @@ export type components = {
             blocking_issue_count: number;
             /** Blocking Issues */
             blocking_issues?: string[];
+            /**
+             * Created File Count
+             * @default 0
+             */
+            created_file_count: number;
             /** Empty Count */
             empty_count: number;
             /** Encoding Error Count */
@@ -2960,6 +3069,16 @@ export type components = {
             missing_count: number;
             /** Preview Token */
             preview_token: string;
+            /**
+             * Replaced File Count
+             * @default 0
+             */
+            replaced_file_count: number;
+            /**
+             * Reused File Count
+             * @default 0
+             */
+            reused_file_count: number;
             /** Reviewed Count */
             reviewed_count: number;
             /**
@@ -3019,13 +3138,36 @@ export type components = {
             asset_ids?: string[];
             /** Channels */
             channels?: components["schemas"]["ExportChannelSelection"][];
-            /** Destination Path */
+            /**
+             * Conflict Policy
+             * @default block
+             * @enum {string}
+             */
+            conflict_policy: "block" | "replace_annotations";
+            /**
+             * Content Mode
+             * @default images_and_annotations
+             * @enum {string}
+             */
+            content_mode: "annotations_only" | "images_and_annotations";
+            /**
+             * Destination Kind
+             * @default directory
+             * @enum {string}
+             */
+            destination_kind: "source" | "directory";
+            /**
+             * Destination Path
+             * @default
+             */
             destination_path: string;
             directory_layout?: components["schemas"]["ExportDirectoryLayout"];
             /** Formats */
             formats?: components["schemas"]["ExportFormat"][];
             /** @default directory */
             packaging: components["schemas"]["ExportPackaging"];
+            /** Primary Txt Channel Key */
+            primary_txt_channel_key?: string | null;
             /** @default all */
             scope: components["schemas"]["ExportScope"];
         };
@@ -3039,6 +3181,15 @@ export type components = {
          * @enum {string}
          */
         ExportScope: "all" | "selected";
+        /** FileFingerprint */
+        FileFingerprint: {
+            /** Byte Size */
+            byte_size: number;
+            /** Content Hash */
+            content_hash: string | null;
+            /** Exists */
+            exists: boolean;
+        };
         /** FrequencyBucket */
         FrequencyBucket: {
             /** Count */
@@ -3497,6 +3648,27 @@ export type components = {
             reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
             service_tier?: components["schemas"]["ServiceTier"] | null;
         };
+        /** OriginalFile */
+        OriginalFile: {
+            /** Asset Id */
+            asset_id: string;
+            /** Available */
+            available: boolean;
+            /** Backup Relative Path */
+            backup_relative_path: string;
+            /** Byte Size */
+            byte_size: number;
+            /** Content Hash */
+            content_hash: string;
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Role */
+            role: string;
+            /** Source Relative Path */
+            source_relative_path: string;
+        };
         /**
          * OutputFormat
          * @enum {string}
@@ -3690,6 +3862,8 @@ export type components = {
          * @description All request behavior that belongs to one model within a connection.
          */
         ProviderModelConfig: {
+            /** Inference Image Max Bytes */
+            inference_image_max_bytes?: number | null;
             /**
              * Max Output Tokens
              * @default 4096
@@ -3838,6 +4012,30 @@ export type components = {
          * @enum {string}
          */
         ReasoningEffort: "max" | "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
+        /** RelocateExecution */
+        RelocateExecution: {
+            /** Preview Token */
+            preview_token: string;
+            request: components["schemas"]["RelocateRequest"];
+        };
+        /** RelocatePreview */
+        RelocatePreview: {
+            /** Changed */
+            changed: number;
+            /** Matched */
+            matched: number;
+            /** Missing */
+            missing: number;
+            /** Path */
+            path: string;
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** RelocateRequest */
+        RelocateRequest: {
+            /** Path */
+            path: string;
+        };
         /** RenameOptions */
         RenameOptions: {
             /**
@@ -3902,6 +4100,47 @@ export type components = {
             allow_upscale: boolean;
             /** Max Edge */
             max_edge: number;
+        };
+        /** RestoreExecution */
+        RestoreExecution: {
+            /** Preview Token */
+            preview_token: string;
+            request: components["schemas"]["RestoreRequest"];
+        };
+        /** RestoreItem */
+        RestoreItem: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "create" | "reuse" | "replace" | "blocked";
+            backup: components["schemas"]["OriginalFile"];
+            before: components["schemas"]["FileFingerprint"];
+            /** Target Path */
+            target_path: string;
+        };
+        /** RestorePreview */
+        RestorePreview: {
+            /** Blocking Issues */
+            blocking_issues: string[];
+            /** Items */
+            items: components["schemas"]["RestoreItem"][];
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** RestoreRequest */
+        RestoreRequest: {
+            /** Allow Replace */
+            allow_replace: boolean;
+            /** Backup Ids */
+            backup_ids: string[];
+            /**
+             * Destination Kind
+             * @enum {string}
+             */
+            destination_kind: "source" | "directory";
+            /** Destination Path */
+            destination_path: string | null;
         };
         /** ScanIssue */
         ScanIssue: {
@@ -5157,6 +5396,12 @@ export type components = {
              * @default provider
              */
             execution_backend: string;
+            /** Inference Image Compressed */
+            inference_image_compressed?: boolean | null;
+            /** Inference Image Max Bytes */
+            inference_image_max_bytes?: number | null;
+            /** Inference Strategy Version */
+            inference_strategy_version?: number | null;
             /** Installation Id */
             installation_id?: string | null;
             /** Max Output Tokens */
@@ -5179,8 +5424,26 @@ export type components = {
             seed?: number | null;
             /** Selection Mode */
             selection_mode?: string | null;
+            /** Sent Image Bytes */
+            sent_image_bytes?: number | null;
+            /** Sent Image Hash */
+            sent_image_hash?: string | null;
+            /** Sent Image Height */
+            sent_image_height?: number | null;
+            /** Sent Image Mime */
+            sent_image_mime?: string | null;
+            /** Sent Image Width */
+            sent_image_width?: number | null;
             /** Service Tier */
             service_tier?: string | null;
+            /** Source Image Bytes */
+            source_image_bytes?: number | null;
+            /** Source Image Hash */
+            source_image_hash?: string | null;
+            /** Source Image Height */
+            source_image_height?: number | null;
+            /** Source Image Width */
+            source_image_width?: number | null;
             /** Temperature */
             temperature?: number | null;
             /** Threshold */
@@ -5404,6 +5667,11 @@ export type components = {
         };
         /** WorkspaceOpenRequest */
         WorkspaceOpenRequest: {
+            /**
+             * Independent Copy
+             * @default false
+             */
+            independent_copy: boolean;
             /** Path */
             path: string;
         };
@@ -5414,6 +5682,7 @@ export type components = {
         };
         /** WorkspaceSettings */
         WorkspaceSettings: {
+            export_preferences?: components["schemas"]["ExportRequest"] | null;
             /** Json Fields */
             json_fields?: string[];
             /**
@@ -5442,6 +5711,7 @@ export type components = {
         };
         /** WorkspaceSettingsUpdate */
         WorkspaceSettingsUpdate: {
+            export_preferences?: components["schemas"]["ExportRequest"] | null;
             /** Json Fields */
             json_fields?: string[] | null;
             /** Recursive Scan */
@@ -5467,6 +5737,11 @@ export type components = {
              * @default 0
              */
             asset_count: number;
+            /**
+             * Association State
+             * @default attached
+             */
+            association_state: string;
             /** Created At */
             created_at: string;
             /**
@@ -5488,6 +5763,11 @@ export type components = {
             /** Root Path */
             root_path: string;
             settings: components["schemas"]["WorkspaceSettings"];
+            /**
+             * Storage Path
+             * @default
+             */
+            storage_path: string;
         };
     };
     responses: never;
@@ -8534,6 +8814,35 @@ export interface operations {
             };
         };
     };
+    detach_workspace_api_v1_workspaces__project_id__detach_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_exports_api_v1_workspaces__project_id__exports_get: {
         parameters: {
             query?: {
@@ -8999,6 +9308,37 @@ export interface operations {
             };
         };
     };
+    original_files_api_v1_workspaces__project_id__originals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OriginalFile"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     execute_api_v1_workspaces__project_id__preprocessing_execute_post: {
         parameters: {
             query?: never;
@@ -9184,6 +9524,144 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_relocate_api_v1_workspaces__project_id__relocate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelocateExecution"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_relocate_api_v1_workspaces__project_id__relocate_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelocateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelocatePreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_restore_api_v1_workspaces__project_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreExecution"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_restore_api_v1_workspaces__project_id__restore_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestorePreview"];
+                };
             };
             /** @description Validation Error */
             422: {

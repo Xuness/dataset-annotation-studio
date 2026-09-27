@@ -82,7 +82,7 @@ export function PreprocessPage() {
       statusbar={
         <>
           <span>当前仅展示预处理后的有效版本</span>
-          <span className="workspace-statusbar__path">恢复区：.annotation-workspace/recovery</span>
+          <span className="workspace-statusbar__path">恢复区：工具工作区 recovery</span>
         </>
       }
     >

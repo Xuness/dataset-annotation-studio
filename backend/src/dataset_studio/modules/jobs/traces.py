@@ -28,6 +28,18 @@ class TraceRequestParameters(BaseModel):
     temperature: float | None = None
     max_output_tokens: int | None = None
     timeout_seconds: int | None = None
+    inference_strategy_version: int | None = None
+    source_image_hash: str | None = None
+    source_image_width: int | None = None
+    source_image_height: int | None = None
+    sent_image_hash: str | None = None
+    sent_image_mime: str | None = None
+    inference_image_max_bytes: int | None = None
+    inference_image_compressed: bool | None = None
+    source_image_bytes: int | None = None
+    sent_image_bytes: int | None = None
+    sent_image_width: int | None = None
+    sent_image_height: int | None = None
     top_p: float | None = None
     seed: int | None = None
     service_tier: str | None = None
@@ -401,7 +413,7 @@ class AnnotationTraceService:
         candidates: list[Path] = []
         relative_path = _string(row.get("provider_payload_path"))
         if relative_path:
-            candidates.append(paths.root / relative_path)
+            candidates.append(paths.internal / relative_path)
         attempt_number = int(row["attempt_number"])
         attempt_root = paths.runs / str(row["job_id"]) / str(row.get("asset_id", ""))
         candidates.extend(
@@ -410,7 +422,7 @@ class AnnotationTraceService:
                 attempt_root / f"attempt-{attempt_number}-error.json",
             )
         )
-        root = paths.root.resolve()
+        root = paths.internal.resolve()
         for candidate in candidates:
             resolved = candidate.resolve()
             if not resolved.is_relative_to(root) or not resolved.is_file():

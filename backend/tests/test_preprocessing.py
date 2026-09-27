@@ -176,7 +176,7 @@ def test_resize_convert_and_undo_preserves_asset_identity(tmp_path: Path) -> Non
     after = assets.list_assets(summary.project_id).items[0]
     assert after.id == before.id
     assert after.relative_path == "sample.webp"
-    recovery = project / ".annotation-workspace" / "recovery" / operation.id
+    recovery = workspaces.get(summary.project_id)[0].recovery / operation.id
     assert (recovery / "files" / "sample.png").is_file()
 
     undone = preprocessing.undo(summary.project_id, operation.id)

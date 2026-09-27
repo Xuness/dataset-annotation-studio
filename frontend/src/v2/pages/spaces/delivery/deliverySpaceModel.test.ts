@@ -13,6 +13,7 @@ import {
 function operation(overrides: Partial<ExportOperation> = {}): ExportOperation {
   return {
     id: "operation-12345678",
+    backup_directory: null,
     allow_warnings: false,
     completed_at: null,
     completed_items: 4,
@@ -75,9 +76,12 @@ describe("delivery space projections", () => {
 
   test("retains preflight blockers, warnings and concrete target outputs", () => {
     const preview: ExportPreview = {
+      created_file_count: 2,
+      reused_file_count: 0,
+      replaced_file_count: 0,
       annotation_bytes: 200,
       blocking_issue_count: 1,
-      blocking_issues: ["导出目录必须为空。"],
+      blocking_issues: ["同名标注文件内容不同。"],
       empty_count: 0,
       encoding_error_count: 0,
       image_bytes: 800,
@@ -109,7 +113,7 @@ describe("delivery space projections", () => {
       warning_count: 1,
     };
     const projected = toDeliveryPreview(preview);
-    expect(projected?.blockingIssues).toEqual(["导出目录必须为空。"]);
+    expect(projected?.blockingIssues).toEqual(["同名标注文件内容不同。"]);
     expect(projected?.items[0]).toMatchObject({
       targetOutputs: ["tags/001.png", "tags/001.txt"],
       warningCode: "stale",

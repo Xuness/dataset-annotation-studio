@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import shutil
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
 from dataset_studio.core.errors import ResourceConflictError
 from dataset_studio.core.files import atomic_write_text
+from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.annotations.models import AnnotationChannel, AnnotationTag
 from dataset_studio.modules.annotations.service import AnnotationService
 from dataset_studio.modules.annotations.tag_balance import validate_tag_balance
@@ -27,6 +30,11 @@ from dataset_studio.modules.providers.config import (
     OpenRouterModelOptions,
     ProviderExecutionProfile,
     ProviderType,
+)
+from dataset_studio.modules.providers.inference_images import (
+    InferenceImageError,
+    prepare_inference_image,
+    validate_inference_source,
 )
 from dataset_studio.modules.providers.models import (
     MultimodalRequest,
@@ -100,6 +108,65 @@ class ProviderJobExecutor:
         context = self._prepare_context(project_id, job, item, repository)
         if context is None:
             return
+        cache = runs_root.parent / "cache" / "inference" / context.job_id / context.item_id
+        try:
+            if context.request.image_path is not None:
+                connection = connect(runs_root.parent / "state.sqlite3")
+                try:
+                    row = connection.execute(
+                        "SELECT content_hash FROM assets WHERE id=?", (context.asset_id,)
+                    ).fetchone()
+                    if row is None:
+                        raise InferenceImageError("推理源素材记录已不存在。")
+                    expected_hash = str(row["content_hash"])
+                finally:
+                    connection.close()
+                if cache.exists():
+                    shutil.rmtree(cache)
+                preparation = asyncio.create_task(
+                    asyncio.to_thread(
+                        prepare_inference_image,
+                        context.request.image_path,
+                        cache,
+                        context.profile.model.inference_image_max_bytes,
+                        expected_hash,
+                    )
+                )
+                try:
+                    prepared = await asyncio.shield(preparation)
+                except asyncio.CancelledError:
+                    # The thread must finish before its owned files can be removed.
+                    await preparation
+                    raise
+                context = replace(
+                    context,
+                    request=replace(
+                        context.request, image_path=prepared.path, inference_image=prepared
+                    ),
+                )
+            await self._process_context(workspace_root, runs_root, job, item, repository, context)
+        except InferenceImageError as error:
+            repository.finish_item(context.item_id, JobItemStatus.FAILED, error=str(error))
+        finally:
+            if cache.exists():
+                try:
+                    shutil.rmtree(cache)
+                except OSError:
+                    logging.getLogger(__name__).exception(
+                        "Inference image cache cleanup failed",
+                        extra={"cache_path": str(cache), "job_id": context.job_id},
+                    )
+                    raise
+
+    async def _process_context(
+        self,
+        workspace_root: Path,
+        runs_root: Path,
+        job: dict[str, object],
+        item: dict[str, object],
+        repository: JobExecutionRepository,
+        context: ProviderItemContext,
+    ) -> None:
         provider = self._provider_factory(context.profile.provider_type)
         max_attempts = int(job["retry_limit"]) + 1
         previous_attempts = int(item["attempt_count"])
@@ -121,6 +188,8 @@ class ProviderJobExecutor:
             )
             response: ProviderResponse | None = None
             try:
+                if context.request.inference_image is not None:
+                    validate_inference_source(context.request.inference_image)
                 response = await complete_until_stopped(
                     provider,
                     context.profile,
@@ -128,6 +197,8 @@ class ProviderJobExecutor:
                     context.request,
                     lambda: repository.is_stop_requested(context.job_id),
                 )
+                if context.request.inference_image is not None:
+                    validate_inference_source(context.request.inference_image)
                 payload_path = self._save_response_payload(
                     workspace_root,
                     runs_root,
@@ -173,6 +244,15 @@ class ProviderJobExecutor:
                         validation_status=validation_status,
                     )
                     return
+            except InferenceImageError as error:
+                repository.finish_attempt(
+                    attempt_id,
+                    status="source_changed",
+                    error_message=str(error),
+                    provider_payload_path=payload_path,
+                )
+                repository.finish_item(context.item_id, JobItemStatus.FAILED, error=str(error))
+                return
             except TranslationSourceChangedError as error:
                 last_error = str(error)
                 self._finish_response_attempt(
@@ -576,7 +656,7 @@ class ProviderJobExecutor:
             ),
         }
         atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
-        return path.relative_to(workspace_root).as_posix()
+        return path.relative_to(runs_root.parent).as_posix()
 
     @staticmethod
     def _save_response_payload(
@@ -605,7 +685,7 @@ class ProviderJobExecutor:
             "raw": response.raw_payload,
         }
         atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
-        return path.relative_to(workspace_root).as_posix()
+        return path.relative_to(runs_root.parent).as_posix()
 
     @staticmethod
     def _save_error_payload(
@@ -628,7 +708,7 @@ class ProviderJobExecutor:
             "response": error.response_text,
         }
         atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
-        return path.relative_to(workspace_root).as_posix()
+        return path.relative_to(runs_root.parent).as_posix()
 
     @staticmethod
     def _request_snapshot(
@@ -654,7 +734,13 @@ class ProviderJobExecutor:
         return {
             "system_prompt": request.system_prompt,
             "user_prompt": request.user_prompt,
-            "image_filename": request.image_path.name if request.image_path else None,
+            "image_filename": (
+                request.inference_image.source_path.name
+                if request.inference_image
+                else request.image_path.name
+                if request.image_path
+                else None
+            ),
             "parameters": {
                 "provider_type": profile.provider_type.value,
                 "provider_profile_name": profile.name,
@@ -662,6 +748,38 @@ class ProviderJobExecutor:
                 "temperature": model.temperature,
                 "max_output_tokens": model.max_output_tokens,
                 "timeout_seconds": model.timeout_seconds,
+                "inference_strategy_version": 1 if request.inference_image else None,
+                "source_image_hash": request.inference_image.source_hash
+                if request.inference_image
+                else None,
+                "source_image_width": request.inference_image.source_width
+                if request.inference_image
+                else None,
+                "source_image_height": request.inference_image.source_height
+                if request.inference_image
+                else None,
+                "sent_image_hash": request.inference_image.content_hash
+                if request.inference_image
+                else None,
+                "sent_image_mime": request.inference_image.mime_type
+                if request.inference_image
+                else None,
+                "inference_image_max_bytes": model.inference_image_max_bytes,
+                "inference_image_compressed": request.inference_image.compressed
+                if request.inference_image
+                else None,
+                "source_image_bytes": request.inference_image.source_bytes
+                if request.inference_image
+                else None,
+                "sent_image_bytes": request.inference_image.byte_size
+                if request.inference_image
+                else None,
+                "sent_image_width": request.inference_image.width
+                if request.inference_image
+                else None,
+                "sent_image_height": request.inference_image.height
+                if request.inference_image
+                else None,
                 "top_p": model.top_p,
                 "seed": model.seed,
                 "service_tier": (

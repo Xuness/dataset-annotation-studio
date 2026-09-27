@@ -12,15 +12,19 @@ import stat
 import tempfile
 import threading
 import zipfile
-from contextlib import suppress
+from contextlib import ExitStack, suppress
 from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 from dataset_studio.core.errors import WorkspaceNotFoundError
-from dataset_studio.core.files import file_sha256
+from dataset_studio.core.file_targets import fingerprint, hold_file_targets, safe_target
+from dataset_studio.core.files import atomic_copy_file_with_sha256, file_sha256
+from dataset_studio.core.sqlite import transaction
 from dataset_studio.modules.exports.models import ExportOperation, ExportPackaging
 from dataset_studio.modules.exports.paths import archive_output_path
 from dataset_studio.modules.exports.repository import ExportRepository
+from dataset_studio.modules.workspaces.backups import preserve_original
+from dataset_studio.modules.workspaces.paths import WorkspacePaths
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 LOGGER = logging.getLogger("dataset_studio.export_worker")
@@ -124,10 +128,6 @@ class ExportWorker:
                     self._remove_owned_archive(destination, operation.operation_id)
                 else:
                     self._cleanup_operation_temp_files(destination, operation.operation_id)
-                    for target_name in operation.target_names:
-                        target = self._safe_target(destination, target_name)
-                        if target is not None and target.is_file():
-                            target.unlink(missing_ok=True)
                 LOGGER.info(
                     "Marked export %s interrupted in %s.",
                     operation.operation_id,
@@ -146,10 +146,27 @@ class ExportWorker:
             return
         packaging = ExportPackaging.DIRECTORY
         current_item_id: str | None = None
-        current_item = None
+        target_locks = ExitStack()
         try:
             packaging = self._packaging(operation)
             items = repository.operation_items(operation_id)
+            if packaging == ExportPackaging.DIRECTORY:
+                target_locks.enter_context(
+                    hold_file_targets(
+                        self._container.workspaces.settings.app_data_dir,
+                        [
+                            safe_target(
+                                Path(operation.destination_path), str(a["target_relative_path"])
+                            )
+                            for item in items
+                            for a in self._artifacts(item)
+                        ]
+                        + [
+                            safe_target(paths.root, str(item["source_relative_path"]))
+                            for item in items
+                        ],
+                    )
+                )
             self._validate_destination(operation, items)
             if packaging == ExportPackaging.ZIP:
                 self._process_archive(
@@ -159,7 +176,6 @@ class ExportWorker:
                 )
             else:
                 while item := repository.claim_next_item(operation_id):
-                    current_item = item
                     current_item_id = str(item["id"])
                     self._check_stop(repository, operation_id)
                     copied_bytes = self._process_item(
@@ -171,7 +187,6 @@ class ExportWorker:
                     )
                     repository.complete_item(operation_id, current_item_id, copied_bytes)
                     current_item_id = None
-                    current_item = None
 
                 self._check_stop(repository, operation_id)
                 completed_items = repository.operation_items(operation_id)
@@ -198,9 +213,9 @@ class ExportWorker:
                 repository.reset_archive_progress(operation_id)
                 self._cleanup_archive_outputs(operation)
                 current_item_id = None
-            elif current_item is not None:
-                self._cleanup_item_targets(Path(operation.destination_path), current_item)
             repository.fail(operation_id, message, item_id=current_item_id)
+        finally:
+            target_locks.close()
 
     def _process_archive(
         self,
@@ -276,6 +291,7 @@ class ExportWorker:
         archive: zipfile.ZipFile,
     ) -> int:
         root = workspace_root.resolve()
+        self._validate_item_source(root, item)
         copied_bytes = 0
         for artifact in self._artifacts(item):
             self._check_stop(repository, operation_id)
@@ -401,47 +417,122 @@ class ExportWorker:
     ) -> int:
         root = workspace_root.resolve()
         artifacts = self._artifacts(item)
-        published: list[Path] = []
+        paths = WorkspacePaths.from_locations(root, repository.database_path.parent)
+        self._validate_item_source(root, item)
         copied_bytes = 0
-        try:
-            for artifact in artifacts:
-                self._check_stop(repository, operation_id)
-                target = self._required_target(
-                    destination,
-                    str(artifact["target_relative_path"]),
-                )
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if str(artifact["kind"]) == "image":
-                    source_relative = artifact.get("source_relative_path")
-                    if not source_relative:
-                        raise ValueError("导出图片快照缺少源路径。")
-                    source = (root / str(source_relative)).resolve()
-                    if not source.is_relative_to(root):
-                        raise ValueError("图片路径超出当前项目范围。")
-                    copied_bytes += self._copy_verified(
-                        source,
-                        target,
-                        expected_hash=str(artifact["content_hash"]),
-                        expected_size=int(artifact["byte_size"]),
-                        expected_modified_ns=int(artifact["source_modified_ns"]),
-                        operation_id=operation_id,
-                        repository=repository,
-                    )
+        for artifact in artifacts:
+            self._check_stop(repository, operation_id)
+            relative = str(artifact["target_relative_path"])
+            target = safe_target(destination, relative)
+            observed = fingerprint(target)
+            expected = str(artifact["content_hash"])
+            action = str(artifact.get("action", "create"))
+            phase = repository.file_phase(operation_id, relative)
+            if observed.content_hash == expected and (action == "reuse" or phase is not None):
+                repository.record_file(operation_id, relative, "completed", None)
+                copied_bytes += 0 if action == "reuse" else int(artifact["byte_size"])
+                self._register_companion(paths, item, artifact, target)
+                continue
+            if phase == "completed" or observed.content_hash != artifact.get("before_hash"):
+                raise ValueError(f"导出目标已变化，请重新预览：{target}")
+            if action in {"reuse", "blocked"}:
+                raise ValueError(f"无法复用或写入导出目标：{target}")
+            backup_relative = None
+            if action == "replace":
+                if artifact["kind"] == "image":
+                    raise ValueError(f"禁止导出覆盖图片：{target}")
+                backup = paths.recovery / "exports" / operation_id / relative
+                if backup.exists():
+                    if file_sha256(backup) != artifact.get("before_hash"):
+                        raise ValueError(f"导出覆盖备份不一致：{backup}")
                 else:
-                    payload = self._artifact_payload(artifact)
-                    copied_bytes += self._write_payload(
+                    copied = atomic_copy_file_with_sha256(target, backup)
+                    if copied != observed.content_hash or fingerprint(target) != observed:
+                        raise ValueError(f"导出覆盖备份校验失败：{target}")
+                backup_relative = backup.relative_to(paths.internal).as_posix()
+                if target.is_relative_to(root):
+                    suffix = target.name[len(Path(str(item["source_relative_path"])).stem) :]
+                    preserve_original(
+                        paths,
+                        str(item["asset_id"]),
+                        f"companion:{suffix}",
+                        target.relative_to(root).as_posix(),
                         target,
-                        payload,
-                        expected_hash=str(artifact["content_hash"]),
-                        operation_id=operation_id,
-                        repository=repository,
                     )
-                published.append(target)
-            return copied_bytes
-        except BaseException:
-            for target in reversed(published):
-                target.unlink(missing_ok=True)
-            raise
+            repository.record_file(operation_id, relative, "prepared", backup_relative)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if artifact["kind"] == "image":
+                source = safe_target(root, str(artifact["source_relative_path"]))
+                copied_bytes += self._copy_verified(
+                    source,
+                    target,
+                    expected_hash=expected,
+                    expected_size=int(artifact["byte_size"]),
+                    expected_modified_ns=int(artifact["source_modified_ns"]),
+                    operation_id=operation_id,
+                    repository=repository,
+                )
+            elif action == "replace":
+                payload = self._artifact_payload(artifact)
+                copied_bytes += self._replace_payload(
+                    target, payload, str(artifact["before_hash"]), expected, operation_id
+                )
+            else:
+                copied_bytes += self._write_payload(
+                    target,
+                    self._artifact_payload(artifact),
+                    expected_hash=expected,
+                    operation_id=operation_id,
+                    repository=repository,
+                )
+            repository.record_file(operation_id, relative, "completed", backup_relative)
+            self._register_companion(paths, item, artifact, target)
+        return copied_bytes
+
+    @staticmethod
+    def _validate_item_source(root: Path, item) -> None:
+        source = safe_target(root, str(item["source_relative_path"]))
+        if fingerprint(source).content_hash != str(item["image_hash"]):
+            raise ValueError(f"导出源图片已变化，请重新扫描并预览：{source}")
+
+    @staticmethod
+    def _register_companion(paths: WorkspacePaths, item, artifact, target: Path) -> None:
+        if artifact["kind"] == "image" or not target.is_relative_to(paths.root):
+            return
+        source = paths.root / str(item["source_relative_path"])
+        if target.parent != source.parent:
+            return
+        suffix = target.name[len(source.stem) :]
+        if not target.name.startswith(source.stem + "."):
+            return
+        with transaction(paths.database) as connection:
+            connection.execute(
+                """INSERT INTO companion_files VALUES (?, ?, ?)
+                ON CONFLICT(asset_id, role) DO UPDATE SET relative_path=excluded.relative_path""",
+                (str(item["asset_id"]), suffix, target.relative_to(paths.root).as_posix()),
+            )
+
+    @staticmethod
+    def _replace_payload(
+        target: Path, payload: bytes, before_hash: str, expected_hash: str, operation_id: str
+    ) -> int:
+        if hashlib.sha256(payload).hexdigest() != expected_hash:
+            raise ValueError("导出标注快照校验失败。")
+        descriptor, name = tempfile.mkstemp(
+            prefix=f".dataset-studio-export-{operation_id}-", dir=target.parent
+        )
+        temporary = Path(name)
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if fingerprint(target).content_hash != before_hash:
+                raise ValueError(f"覆盖前目标已被修改：{target}")
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return len(payload)
 
     def _copy_verified(
         self,
@@ -586,19 +677,6 @@ class ExportWorker:
                     raise ValueError(f"已导出的文件内容发生了变化：{relative}")
                 allowed_paths.add(PurePosixPath(relative).as_posix().casefold())
 
-        try:
-            files = [entry for entry in destination.rglob("*") if entry.is_file()]
-        except OSError as error:
-            raise ValueError(f"无法读取导出目录：{error}") from error
-        unknown = [
-            entry.relative_to(destination).as_posix()
-            for entry in files
-            if entry.relative_to(destination).as_posix().casefold() not in allowed_paths
-        ]
-        if unknown:
-            examples = "、".join(sorted(unknown, key=str.casefold)[:5])
-            raise ValueError(f"导出目录中出现了任务之外的文件：{examples}")
-
     def _validate_archive_destination(
         self,
         operation: ExportOperation,
@@ -664,7 +742,7 @@ class ExportWorker:
             value = json.loads(str(item["artifact_snapshot"]))
         except (json.JSONDecodeError, TypeError) as error:
             raise ValueError("导出条目的快照无效。") from error
-        if not isinstance(value, list) or not value:
+        if not isinstance(value, list):
             raise ValueError("导出条目没有可执行的文件快照。")
         if not all(isinstance(artifact, dict) for artifact in value):
             raise ValueError("导出条目的文件快照结构无效。")
@@ -815,15 +893,3 @@ class ExportWorker:
         for candidate in destination.rglob("*"):
             if candidate.is_file() and candidate.name.startswith(prefix):
                 candidate.unlink(missing_ok=True)
-
-    @staticmethod
-    def _cleanup_item_targets(destination: Path, item) -> None:
-        with suppress(ValueError):
-            artifacts = ExportWorker._artifacts(item)
-            for artifact in artifacts:
-                target = ExportWorker._safe_target(
-                    destination,
-                    str(artifact["target_relative_path"]),
-                )
-                if target is not None:
-                    target.unlink(missing_ok=True)

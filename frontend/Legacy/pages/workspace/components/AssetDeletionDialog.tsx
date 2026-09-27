@@ -135,7 +135,7 @@ export function AssetDeletionDialog({
             <>
               <p className="asset-deletion-dialog__lead">
                 即将处理 <strong>{preview.asset_count}</strong> 张图片。文件会先移入
-                <code>.annotation-workspace/recovery</code>，可从恢复记录撤销；不会删除空目录。
+                <code>工具工作区 recovery</code>，可从恢复记录撤销；不会删除空目录。
               </p>
               <div className="asset-deletion-summary">
                 <article>

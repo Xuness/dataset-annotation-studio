@@ -1,3 +1,5 @@
+import { importIndependentWorkspace } from "../../../../features/workspaces/api";
+import { useWorkspaceFilesController } from "../../../../application/workspace/useWorkspaceFilesController";
 import { useCallback, useMemo, useState } from "react";
 
 import {
@@ -25,6 +27,7 @@ export function useArchiveSpaceController({
   onActiveProjectChange,
   onOpenProjectWorkbench,
 }: UseArchiveSpaceControllerOptions): ArchiveSpaceContent {
+  const filesController = useWorkspaceFilesController();
   const recent = useRecentWorkspaces();
   const openWorkspace = useOpenWorkspace();
   const removeRecent = useRemoveRecentWorkspace();
@@ -106,6 +109,7 @@ export function useArchiveSpaceController({
 
   return {
     kind: "archive",
+    filesController,
     status: recent.isPending ? "loading" : recent.isError ? "error" : "ready",
     projects,
     activeProjectId,
@@ -113,6 +117,17 @@ export function useArchiveSpaceController({
     registering: openWorkspace.isPending,
     removingProjectId: removeRecent.isPending ? (removeRecent.variables ?? null) : null,
     registerProject,
+    importIndependentProject: async () => {
+      try {
+        const path = await pickWorkspaceFolder();
+        if (!path) return;
+        const result = await importIndependentWorkspace(path);
+        onActiveProjectChange(result.workspace.project_id);
+        await recent.refetch();
+      } catch (reason) {
+        setActionMessage(describeError(reason));
+      }
+    },
     loadProject,
     openProjectWorkbench,
     revealProject,

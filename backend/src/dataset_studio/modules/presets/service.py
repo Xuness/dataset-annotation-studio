@@ -292,6 +292,7 @@ class PresetService:
                     timeout_seconds=int(model_values["timeout_seconds"]),
                     top_p=model_values["top_p"],
                     seed=model_values["seed"],
+                    inference_image_max_bytes=model_values["inference_image_max_bytes"],
                     protocol_options=_PROTOCOL_OPTIONS_ADAPTER.validate_json(
                         str(model_values["protocol_options_json"])
                     ),
@@ -352,6 +353,7 @@ class PresetService:
                 model.top_p,
                 model.seed,
                 model.protocol_options.model_dump_json(exclude_none=True),
+                model.inference_image_max_bytes,
             )
             for position, model in enumerate(profile.models)
         ]

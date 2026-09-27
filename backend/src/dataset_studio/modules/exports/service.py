@@ -13,9 +13,11 @@ from dataset_studio.modules.exports.models import (
     ExportOperationStatus,
     ExportPreview,
     ExportRequest,
+    ExportScope,
 )
-from dataset_studio.modules.exports.planner import build_plan, preview_token, to_preview
+from dataset_studio.modules.exports.planner import ExportPlan, build_plan, preview_token, to_preview
 from dataset_studio.modules.exports.repository import ExportRepository
+from dataset_studio.modules.workspaces.models import WorkspaceSettingsUpdate
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
@@ -50,7 +52,9 @@ class ExportService:
 
     def preview(self, project_id: str, request: ExportRequest) -> ExportPreview:
         paths, _ = self._workspaces.get(project_id)
+        self._validate_storage_target(request)
         plan = build_plan(paths.database, paths.root, request)
+        self._validate_storage_plan(request, plan)
         return to_preview(request, plan)
 
     def create(
@@ -60,7 +64,9 @@ class ExportService:
     ) -> ExportOperation:
         self._ensure_can_start(project_id)
         paths, _ = self._workspaces.get(project_id)
+        self._validate_storage_target(execution.request)
         plan = build_plan(paths.database, paths.root, execution.request)
+        self._validate_storage_plan(execution.request, plan)
         current_token = preview_token(execution.request, plan)
         if not secrets.compare_digest(current_token, execution.preview_token):
             raise ValueError("导出预览已失效；范围、源文件或目标目录发生了变化，请重新校验。")
@@ -88,8 +94,32 @@ class ExportService:
         operation = repository.get(operation_id)
         if operation is None:
             raise RuntimeError("导出任务创建后无法读取。")
+        self._workspaces.update_settings(
+            project_id,
+            WorkspaceSettingsUpdate(
+                export_preferences=execution.request.model_copy(
+                    update={"conflict_policy": "block", "scope": ExportScope.ALL, "asset_ids": []}
+                )
+            ),
+        )
         self._workspaces.mark_worker_activity(project_id, "exports")
         return operation
+
+    def _validate_storage_plan(self, request: ExportRequest, plan: ExportPlan) -> None:
+        if request.packaging == "zip":
+            return
+        app_data = self._workspaces.settings.app_data_dir.resolve()
+        for item in plan.items:
+            for artifact in item.artifacts:
+                target = (Path(plan.destination_path) / artifact.target_relative_path).resolve()
+                if target.is_relative_to(app_data) or ".annotation-workspace" in target.parts:
+                    raise ValueError(f"导出产物不能写入工具数据目录或旧工作区备份：{target}")
+
+    def _validate_storage_target(self, request: ExportRequest) -> None:
+        if request.destination_kind == "directory":
+            target = Path(request.destination_path).expanduser().resolve()
+            if target.is_relative_to(self._workspaces.settings.app_data_dir):
+                raise ValueError("不能导出到工具数据目录。")
 
     def list(self, project_id: str, *, limit: int = 100) -> list[ExportOperation]:
         paths, _ = self._workspaces.get(project_id)

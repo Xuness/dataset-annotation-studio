@@ -89,8 +89,8 @@ ${XDG_DATA_HOME:-$HOME/.local/share}/DatasetAnnotationStudio
 ```
 
 It contains `global.sqlite3`, logs, caches, and the default managed tagger library.
-Dataset-specific state remains inside the selected dataset's
-`.annotation-workspace/` directory.
+Dataset-specific state lives in `workspaces/<project UUID>/` beneath this directory.
+The dataset itself does not contain a new `.annotation-workspace/` directory.
 
 API keys and saved Hugging Face connection secrets require a working Freedesktop
 Secret Service, such as GNOME Keyring or KWallet, in the current desktop/DBus session.
@@ -170,9 +170,10 @@ replaces the DRM vblank wait with a timer-driven frame clock.
 
 ## Filesystem and desktop notes
 
-- The selected dataset directory must be writable. Recovery files and SQLite annotation
-  state live under `.annotation-workspace/`; runtime annotation jobs do not write sidecars
-  beside the images.
+- Read-only datasets support opening, scanning, and annotation. Preprocessing, deletion,
+  source-side export, and restoring into the source need write permission. SQLite and
+  recovery files live in the application data directory; runtime annotation jobs do not
+  write sidecars beside the images.
 - Linux treats names such as `image.png` and `Image.png` as different files. The
   application preserves that identity on Linux, but such projects may not move cleanly
   to case-insensitive filesystems.

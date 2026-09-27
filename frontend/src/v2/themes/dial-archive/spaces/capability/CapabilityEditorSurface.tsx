@@ -166,6 +166,7 @@ function ProviderEditor({
       temperature: draft.providerType === "codex" ? null : 0.2,
       maxOutputTokens: 4096,
       timeoutSeconds: 180,
+      inferenceImageMaxBytes: null,
       topP: null,
       seed: null,
       reasoningEffort: null,
@@ -350,6 +351,33 @@ function ProviderEditor({
                 </Field>
               </>
             ) : null}
+            <label>
+              LLM 发送图片大小上限（MB）
+              <input
+                id="inference-image-max-mb"
+                type="number"
+                min="0.000001"
+                step="any"
+                value={
+                  selectedModel.inferenceImageMaxBytes == null
+                    ? ""
+                    : selectedModel.inferenceImageMaxBytes / 1_000_000
+                }
+                onChange={(event) =>
+                  updateModel({
+                    ...selectedModel,
+                    inferenceImageMaxBytes:
+                      event.target.value === ""
+                        ? null
+                        : Math.round(Number(event.target.value) * 1_000_000),
+                  })
+                }
+              />
+              <small>
+                留空不限制，仅压缩超限图片的发送副本，原图与导出不变，不含 Base64 请求体大小。
+              </small>
+            </label>
+
             <Field label="超时（秒）">
               <input
                 type="number"

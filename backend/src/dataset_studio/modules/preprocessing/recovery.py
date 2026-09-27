@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dataset_studio.core.files import atomic_copy_file
+from dataset_studio.modules.assets.companions import registered_suffixes
 from dataset_studio.modules.assets.scanner import AssetScanner
 from dataset_studio.modules.preprocessing.image_pipeline import sha256
 from dataset_studio.modules.preprocessing.models import PreprocessItemPhase
@@ -20,7 +21,7 @@ class RecoveryFileOperations:
     same_file: Callable[[Path, Path], bool]
     claimed_annotation_paths: Callable[[Path, Path], set[str]]
     sidecar_paths: Callable[
-        [Path, Path, Path, set[str]],
+        [Path, Path, Path, set[str], tuple[str, ...]],
         list[tuple[Path, Path, Path]],
     ]
     update_asset: Callable[[Path, str, Path, Path, str, int, int], None]
@@ -73,7 +74,7 @@ class PreprocessRecoveryCoordinator:
     def _recover_item(self, paths: WorkspacePaths, item: sqlite3.Row) -> None:
         before = paths.root / str(item["before_relative_path"])
         after = paths.root / str(item["after_relative_path"])
-        recovery = paths.root / str(item["recovery_relative_path"])
+        recovery = paths.internal / str(item["recovery_relative_path"])
         before_hash = str(item["before_hash"])
         after_hash = str(item["after_hash"])
         if not recovery.is_file() or sha256(recovery) != before_hash:
@@ -92,7 +93,13 @@ class PreprocessRecoveryCoordinator:
             raise ValueError(f"目标路径出现未知内容，未自动删除：{item['after_relative_path']}")
 
         claimed_annotations = self._files.claimed_annotation_paths(paths.database, paths.root)
-        sidecars = self._files.sidecar_paths(before, after, recovery, claimed_annotations)
+        sidecars = self._files.sidecar_paths(
+            before,
+            after,
+            recovery,
+            claimed_annotations,
+            registered_suffixes(paths.database, paths.root, (before, after)),
+        )
         for before_sidecar, after_sidecar, recovery_sidecar in sidecars:
             self._recover_sidecar(before_sidecar, after_sidecar, recovery_sidecar)
 

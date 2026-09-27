@@ -31,6 +31,7 @@ const provider: ProviderProfile = {
       seed: null,
       temperature: 0.2,
       timeout_seconds: 180,
+      inference_image_max_bytes: null,
       top_p: null,
     },
   ],

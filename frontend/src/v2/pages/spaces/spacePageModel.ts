@@ -1,3 +1,5 @@
+import type { WorkspaceFilesController } from "../../../application/workspace/useWorkspaceFilesController";
+export type { WorkspaceFilesController } from "../../../application/workspace/useWorkspaceFilesController";
 import type { HomeSpace } from "../../navigation/spaceRegistry";
 import type { ExportFormState } from "../../../application/exports/exportState";
 import type { PreprocessFormState } from "../../../application/preprocessing/preprocessState";
@@ -35,6 +37,7 @@ export interface ArchiveProjectRecord {
 }
 
 export interface ArchiveSpaceContent {
+  filesController?: WorkspaceFilesController;
   kind: "archive";
   status: "loading" | "ready" | "error";
   projects: readonly ArchiveProjectRecord[];
@@ -43,6 +46,7 @@ export interface ArchiveSpaceContent {
   registering: boolean;
   removingProjectId: string | null;
   registerProject(): Promise<string | null>;
+  importIndependentProject?(): Promise<void>;
   loadProject(projectId: string): void;
   openProjectWorkbench(projectId: string): void;
   revealProject(projectId: string): Promise<void>;
@@ -1238,6 +1242,7 @@ export interface DeliveryManifestSummary {
 }
 
 export interface DeliveryOperationSummary {
+  backupDirectory?: string | null;
   id: string;
   shortId: string;
   status: string;
@@ -1293,6 +1298,9 @@ export interface DeliveryPreviewItem {
 }
 
 export interface DeliveryPreviewSummary {
+  createdFileCount: number;
+  reusedFileCount: number;
+  replacedFileCount: number;
   token: string;
   totalItems: number;
   usableCount: number;
@@ -1450,6 +1458,7 @@ export interface CapabilityProviderModelDraft {
   temperature: number | null;
   maxOutputTokens: number;
   timeoutSeconds: number;
+  inferenceImageMaxBytes: number | null;
   topP: number | null;
   seed: number | null;
   reasoningEffort: CapabilityReasoningEffort | null;

@@ -543,7 +543,7 @@ async def test_worker_completes_job_and_writes_exact_response(tmp_path: Path) ->
     assert detail.items[0].attempts[0].cache_read_tokens == 80
     assert detail.items[0].attempts[0].cache_write_tokens == 10
     assert detail.items[0].attempts[0].reasoning_tokens == 12
-    payloads = list((project / ".annotation-workspace" / "runs").rglob("attempt-1.json"))
+    payloads = list((workspaces.get(workspace.project_id)[0].runs).rglob("attempt-1.json"))
     assert len(payloads) == 1
     payload = json.loads(payloads[0].read_text(encoding="utf-8"))
     assert payload["kind"] == "response"

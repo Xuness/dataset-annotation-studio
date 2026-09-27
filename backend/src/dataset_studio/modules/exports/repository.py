@@ -43,9 +43,19 @@ class ExportRepository:
     ) -> None:
         now = utc_now_iso()
         warning_count = sum(item.warning_code is not None for item in plan.items)
-        total_bytes = sum(artifact.byte_size for item in plan.items for artifact in item.artifacts)
+        total_bytes = sum(
+            artifact.byte_size
+            for item in plan.items
+            for artifact in item.artifacts
+            if artifact.action != "reuse"
+        )
         configuration_snapshot = json.dumps(
             {
+                "snapshot_version": 2,
+                "content_mode": request.content_mode,
+                "destination_kind": request.destination_kind,
+                "primary_txt_channel_key": request.primary_txt_channel_key,
+                "conflict_policy": request.conflict_policy,
                 "channels": [selection.model_dump(mode="json") for selection in request.channels],
                 "formats": [format_.value for format_ in request.formats],
                 "packaging": request.packaging.value,
@@ -131,6 +141,32 @@ class ExportRepository:
                         now,
                     ),
                 )
+
+    @property
+    def database_path(self) -> Path:
+        return self._database_path
+
+    def file_phase(self, operation_id: str, relative: str) -> str | None:
+        connection = connect(self._database_path)
+        try:
+            row = connection.execute(
+                "SELECT phase FROM export_file_journal "
+                "WHERE operation_id=? AND target_relative_path=?",
+                (operation_id, relative),
+            ).fetchone()
+            return str(row["phase"]) if row else None
+        finally:
+            connection.close()
+
+    def record_file(self, operation_id: str, relative: str, phase: str, backup: str | None) -> None:
+        with transaction(self._database_path) as connection:
+            connection.execute(
+                """INSERT INTO export_file_journal VALUES (?, ?, ?, ?)
+                ON CONFLICT(operation_id, target_relative_path) DO UPDATE SET phase=excluded.phase,
+                backup_relative_path=COALESCE(
+                    excluded.backup_relative_path, export_file_journal.backup_relative_path)""",
+                (operation_id, relative, phase, backup),
+            )
 
     def list(self, *, limit: int = 100) -> list[ExportOperation]:
         connection = connect(self._database_path)
@@ -606,13 +642,14 @@ class ExportRepository:
         finally:
             connection.close()
 
-    @staticmethod
-    def _operation(row) -> ExportOperation:
+    def _operation(self, row) -> ExportOperation:
         try:
             configuration = json.loads(str(row["configuration_snapshot"]))
         except (json.JSONDecodeError, TypeError):
             configuration = {}
+        backup = self.database_path.parent / "recovery" / "exports" / str(row["id"])
         return ExportOperation(
+            backup_directory=str(backup) if backup.is_dir() else None,
             id=str(row["id"]),
             status=ExportOperationStatus(str(row["status"])),
             scope=str(row["scope"]),
