@@ -23,6 +23,11 @@ const WorkspacePage = lazy(() =>
 const JobsPage = lazy(() =>
   import("../pages/jobs/JobsPage").then((module) => ({ default: module.JobsPage })),
 );
+const CharacterAuditPage = lazy(() =>
+  import("../pages/character-audits/CharacterAuditPage").then((module) => ({
+    default: module.CharacterAuditPage,
+  })),
+);
 const PreprocessPage = lazy(() =>
   import("../pages/preprocess/PreprocessPage").then((module) => ({
     default: module.PreprocessPage,
@@ -76,6 +81,7 @@ export function LegacyApp() {
             <Route path="/workspace/:projectId" element={<WorkspacePage />} />
             <Route path="/workspace/:projectId/review" element={<WorkspacePage mode="review" />} />
             <Route path="/workspace/:projectId/jobs" element={<JobsPage />} />
+            <Route path="/workspace/:projectId/characters" element={<CharacterAuditPage />} />
             <Route path="/workspace/:projectId/screening" element={<ScreeningPage />} />
             <Route path="/workspace/:projectId/preprocess" element={<PreprocessPage />} />
             <Route path="/workspace/:projectId/export" element={<ExportPage />} />

@@ -4,6 +4,24 @@
  */
 
 export type paths = {
+    "/api/v1/character-audit-vocabularies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Vocabularies */
+        get: operations["list_vocabularies_api_v1_character_audit_vocabularies_get"];
+        put?: never;
+        /** Import Vocabulary */
+        post: operations["import_vocabulary_api_v1_character_audit_vocabularies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/active": {
         parameters: {
             query?: never;
@@ -1379,6 +1397,194 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/character-audits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Audits */
+        get: operations["list_audits_api_v1_workspaces__project_id__character_audits_get"];
+        put?: never;
+        /** Create Audit */
+        post: operations["create_audit_api_v1_workspaces__project_id__character_audits_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/character-audits/membership-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Membership */
+        post: operations["preview_membership_api_v1_workspaces__project_id__character_audits_membership_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/character-audits/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Audit */
+        get: operations["get_audit_api_v1_workspaces__project_id__character_audits__operation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/character-audits/{operation_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Audit */
+        post: operations["apply_audit_api_v1_workspaces__project_id__character_audits__operation_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/character-audits/{operation_id}/prepare-tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prepare Tags */
+        post: operations["prepare_tags_api_v1_workspaces__project_id__character_audits__operation_id__prepare_tags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/character-audits/{operation_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Audit */
+        post: operations["preview_audit_api_v1_workspaces__project_id__character_audits__operation_id__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/character-audits/{operation_id}/profiles/{profile_index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Review */
+        put: operations["save_review_api_v1_workspaces__project_id__character_audits__operation_id__profiles__profile_index__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/character-audits/{operation_id}/profiles/{profile_index}/redo-visual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Redo Visual */
+        post: operations["redo_visual_api_v1_workspaces__project_id__character_audits__operation_id__profiles__profile_index__redo_visual_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/character-audits/{operation_id}/resolutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Resolutions */
+        put: operations["save_resolutions_api_v1_workspaces__project_id__character_audits__operation_id__resolutions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/character-audits/{operation_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Audit */
+        post: operations["start_audit_api_v1_workspaces__project_id__character_audits__operation_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/character-audits/{operation_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop Audit */
+        post: operations["stop_audit_api_v1_workspaces__project_id__character_audits__operation_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/exports": {
         parameters: {
             query?: never;
@@ -1925,6 +2131,11 @@ export type components = {
              * @default 0
              */
             asset_deletion_count: number;
+            /**
+             * Character Audit Count
+             * @default 0
+             */
+            character_audit_count: number;
             /** Count */
             count: number;
             /**
@@ -2501,6 +2712,23 @@ export type components = {
             /** Expected Modified At */
             expected_modified_at: string | null;
         };
+        /** ApplyPreview */
+        ApplyPreview: {
+            /** Changed Count */
+            changed_count: number;
+            /** Changes */
+            changes: components["schemas"]["AssetChange"][];
+            /** Conflicts */
+            conflicts: components["schemas"]["TagConflict"][];
+            membership: components["schemas"]["MembershipPreview"];
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** ApplyRequest */
+        ApplyRequest: {
+            /** Preview Token */
+            preview_token: string;
+        };
         /** AssetAnnotationTrace */
         AssetAnnotationTrace: {
             /** Annotation Exists */
@@ -2543,6 +2771,17 @@ export type components = {
             translation_producer_kind?: string | null;
             /** Translation Source Kind */
             translation_source_kind?: string | null;
+        };
+        /** AssetChange */
+        AssetChange: {
+            /** After */
+            after: components["schemas"]["AnnotationTag"][];
+            /** Asset Id */
+            asset_id: string;
+            /** Before */
+            before: components["schemas"]["AnnotationTag"][];
+            /** Relative Path */
+            relative_path: string;
         };
         /** AssetDeleteOperation */
         AssetDeleteOperation: {
@@ -2678,6 +2917,23 @@ export type components = {
              */
             result_disposition: "none" | "applied" | "candidate";
         };
+        /** AssetSnapshot */
+        AssetSnapshot: {
+            /** Asset Id */
+            asset_id: string;
+            /** Candidate Count */
+            candidate_count: number;
+            /** Image Hash */
+            image_hash: string;
+            /** Relative Path */
+            relative_path: string;
+            /** Revision Id */
+            revision_id: string | null;
+            /** Tags */
+            tags: components["schemas"]["AnnotationTag"][];
+            /** Usable */
+            usable: boolean;
+        };
         /** AssetSummary */
         AssetSummary: {
             /** Annotation Channels */
@@ -2714,6 +2970,121 @@ export type components = {
             suffix: string;
             /** Width */
             width: number;
+        };
+        /** AuditAttempt */
+        AuditAttempt: {
+            /** Attempt */
+            attempt: number;
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: string;
+            /** Profile Index */
+            profile_index: number;
+            /** Request System */
+            request_system: string;
+            /** Request User */
+            request_user: string;
+            response: components["schemas"]["ProviderResponse"] | null;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "text" | "visual" | "resolution";
+            /** Started At */
+            started_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "succeeded" | "failed" | "interrupted";
+        };
+        /** AuditCreateRequest */
+        AuditCreateRequest: {
+            /** Asset Ids */
+            asset_ids: string[];
+            /** Directory */
+            directory: string | null;
+            /** Minimum Count */
+            minimum_count: number;
+            /** Model Id */
+            model_id: string;
+            /** Profiles */
+            profiles: components["schemas"]["CharacterProfile"][];
+            /** Provider Profile Id */
+            provider_profile_id: string;
+            /** Retry Limit */
+            retry_limit: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "all" | "directory" | "selected";
+            /**
+             * Style
+             * @enum {string}
+             */
+            style: "sparse" | "full";
+            /** Vocabulary Id */
+            vocabulary_id: string;
+        };
+        /** AuditOperation */
+        AuditOperation: {
+            /** Applied Revision Ids */
+            applied_revision_ids: string[];
+            /** Applied Token */
+            applied_token: string | null;
+            /** Attempts */
+            attempts: components["schemas"]["AuditAttempt"][];
+            /** Created At */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /** Id */
+            id: string;
+            /** Prerequisite Job Id */
+            prerequisite_job_id: string | null;
+            provider: components["schemas"]["ProviderExecutionProfile"];
+            /** References */
+            references: components["schemas"]["AssetSnapshot"][];
+            request: components["schemas"]["AuditCreateRequest"];
+            /** Resolutions */
+            resolutions: components["schemas"]["ConflictResolution"][];
+            /** Reviews */
+            reviews: components["schemas"]["ProfileReview"][];
+            /** Source Assets */
+            source_assets: components["schemas"]["AssetSnapshot"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "preparing" | "queued" | "running" | "stopping" | "stopped" | "interrupted" | "failed" | "review" | "applied";
+            /** Updated At */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** AuditSummary */
+        AuditSummary: {
+            /** Created At */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "preparing" | "queued" | "running" | "stopping" | "stopped" | "interrupted" | "failed" | "review" | "applied";
+            /** Triggers */
+            triggers: string[];
+            /** Updated At */
+            updated_at: string;
+            /** Version */
+            version: number;
         };
         /**
          * CandidateScope
@@ -2779,6 +3150,25 @@ export type components = {
              */
             multiple_views: boolean;
         };
+        /** CharacterProfile */
+        CharacterProfile: {
+            /** Directory */
+            directory: string | null;
+            /**
+             * Membership
+             * @enum {string}
+             */
+            membership: "trigger" | "directory";
+            /** Reference Asset Id */
+            reference_asset_id: string;
+            /**
+             * Subject
+             * @enum {string}
+             */
+            subject: "girl" | "boy" | "unknown";
+            /** Trigger */
+            trigger: string;
+        };
         /** CodexAccountStatus */
         CodexAccountStatus: {
             /** Account Type */
@@ -2825,6 +3215,22 @@ export type components = {
              */
             provider_type: "codex";
             reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
+        };
+        /** ConflictResolution */
+        ConflictResolution: {
+            /** Asset Id */
+            asset_id: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "keep" | "replace";
+            /** Reason */
+            reason: string;
+            /** Replacement */
+            replacement: string | null;
+            /** Tag */
+            tag: string;
         };
         /** ConvertOptions */
         ConvertOptions: {
@@ -3163,6 +3569,20 @@ export type components = {
             /** Revision */
             revision: string;
         };
+        /** InventoryTag */
+        InventoryTag: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "identity" | "hair" | "eyes" | "face" | "body" | "clothing" | "footwear" | "legwear" | "accessory" | "action" | "pose" | "expression" | "scene" | "composition" | "quality" | "object" | "other";
+            /** Cluster */
+            cluster: number | null;
+            /** Count */
+            count: number;
+            /** Tag */
+            tag: string;
+        };
         /** JobAttempt */
         JobAttempt: {
             /** Attempt Number */
@@ -3455,6 +3875,21 @@ export type components = {
             /** Expected Translation Revision Id */
             expected_translation_revision_id?: string | null;
         };
+        /** MembershipPreview */
+        MembershipPreview: {
+            /** Candidate Count */
+            candidate_count: number;
+            /** Member Counts */
+            member_counts: number[];
+            /** Missing Tags Count */
+            missing_tags_count: number;
+            /** Shared Count */
+            shared_count: number;
+            /** Total */
+            total: number;
+            /** Unattributed Count */
+            unattributed_count: number;
+        };
         /** MetadataDocument */
         MetadataDocument: {
             /** Error */
@@ -3502,6 +3937,15 @@ export type components = {
          * @enum {string}
          */
         OutputFormat: "webp" | "jpeg" | "png";
+        /** PrepareTagsRequest */
+        PrepareTagsRequest: {
+            /** Overwrite Existing */
+            overwrite_existing: boolean;
+            /** Tagger Profile Id */
+            tagger_profile_id: string;
+            /** Version */
+            version: number;
+        };
         /** PreprocessExecuteRequest */
         PreprocessExecuteRequest: {
             execution?: components["schemas"]["PreprocessExecutionOptions"];
@@ -3679,12 +4123,55 @@ export type components = {
          * @enum {string}
          */
         PreprocessRoute: "cpu" | "accelerated_full" | "accelerated_resize";
+        /** ProfileReview */
+        ProfileReview: {
+            /** Completed Stages */
+            completed_stages: ("text" | "visual" | "resolution")[];
+            /** Confirmed */
+            confirmed: boolean;
+            /** Decisions */
+            decisions: components["schemas"]["TagDecision"][];
+            /** Excluded */
+            excluded: components["schemas"]["InventoryTag"][];
+            /** Initial */
+            initial: components["schemas"]["TagDecision"][];
+            /** Inventory */
+            inventory: components["schemas"]["InventoryTag"][];
+            /** Profile Index */
+            profile_index: number;
+            /** Prompt */
+            prompt: string;
+            /** Suggested */
+            suggested: components["schemas"]["TagDecision"][];
+        };
         /**
          * PromptCacheStrategy
          * @description Placement strategy for an explicit prompt cache breakpoint.
          * @enum {string}
          */
         PromptCacheStrategy: "explicit_system";
+        /**
+         * ProviderExecutionProfile
+         * @description Immutable, single-model provider configuration stored with a job.
+         */
+        ProviderExecutionProfile: {
+            /** Base Url */
+            base_url: string;
+            /** Concurrency */
+            concurrency: number;
+            /** Id */
+            id: string;
+            model: components["schemas"]["ProviderModelConfig"];
+            /** Name */
+            name: string;
+            provider_type: components["schemas"]["ProviderType"];
+            /**
+             * Snapshot Version
+             * @default 2
+             * @constant
+             */
+            snapshot_version: 2;
+        };
         /**
          * ProviderModelConfig
          * @description All request behavior that belongs to one model within a connection.
@@ -3828,6 +4315,29 @@ export type components = {
             name?: string | null;
             provider_type?: components["schemas"]["ProviderType"] | null;
         };
+        /** ProviderResponse */
+        ProviderResponse: {
+            /** Cache Read Tokens */
+            cache_read_tokens?: number | null;
+            /** Cache Write Tokens */
+            cache_write_tokens?: number | null;
+            /** Content */
+            content: string;
+            /** Finish Reason */
+            finish_reason?: string | null;
+            /** Input Tokens */
+            input_tokens?: number | null;
+            /** Output Tokens */
+            output_tokens?: number | null;
+            /** Raw Payload */
+            raw_payload: {
+                [key: string]: unknown;
+            };
+            /** Reasoning Content */
+            reasoning_content?: string | null;
+            /** Reasoning Tokens */
+            reasoning_tokens?: number | null;
+        };
         /**
          * ProviderType
          * @enum {string}
@@ -3902,6 +4412,20 @@ export type components = {
             allow_upscale: boolean;
             /** Max Edge */
             max_edge: number;
+        };
+        /** ResolutionsUpdate */
+        ResolutionsUpdate: {
+            /** Resolutions */
+            resolutions: components["schemas"]["ConflictResolution"][];
+            /** Version */
+            version: number;
+        };
+        /** ReviewUpdate */
+        ReviewUpdate: {
+            /** Decisions */
+            decisions: components["schemas"]["TagDecision"][];
+            /** Version */
+            version: number;
         };
         /** ScanIssue */
         ScanIssue: {
@@ -4324,6 +4848,39 @@ export type components = {
             name?: string | null;
             /** System Prompt */
             system_prompt?: string | null;
+        };
+        /** TagConflict */
+        TagConflict: {
+            /** Asset Id */
+            asset_id: string;
+            /** Proposals */
+            proposals: components["schemas"]["TagDecision"][];
+            resolution: components["schemas"]["ConflictResolution"] | null;
+            /** Tag */
+            tag: string;
+        };
+        /** TagDecision */
+        TagDecision: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "identity" | "hair" | "eyes" | "face" | "body" | "clothing" | "footwear" | "legwear" | "accessory" | "action" | "pose" | "expression" | "scene" | "composition" | "quality" | "object" | "other";
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "keep" | "delete" | "replace" | "uncertain";
+            /** Include In Prompt */
+            include_in_prompt: boolean;
+            /** Prompt Order */
+            prompt_order: number;
+            /** Reason */
+            reason: string;
+            /** Replacement */
+            replacement: string | null;
+            /** Tag */
+            tag: string;
         };
         /** TagDictionaryAdapterSummary */
         TagDictionaryAdapterSummary: {
@@ -5402,6 +5959,54 @@ export type components = {
             /** Valid */
             valid: boolean;
         };
+        /** VersionRequest */
+        VersionRequest: {
+            /** Version */
+            version: number;
+        };
+        /** VocabularyImport */
+        VocabularyImport: {
+            /** Directory */
+            directory: string;
+            /**
+             * License Acknowledged
+             * @constant
+             */
+            license_acknowledged: true;
+            /** Source Version */
+            source_version: string;
+        };
+        /** VocabularyLibrary */
+        VocabularyLibrary: {
+            /** Installations */
+            installations: components["schemas"]["VocabularyManifest"][];
+            /** Issues */
+            issues: string[];
+        };
+        /** VocabularyManifest */
+        VocabularyManifest: {
+            /** Acknowledged At */
+            acknowledged_at: string;
+            /** Character Count */
+            character_count: number;
+            /** Database Sha256 */
+            database_sha256: string;
+            /** General Count */
+            general_count: number;
+            /** Id */
+            id: string;
+            /**
+             * License Status
+             * @constant
+             */
+            license_status: "mixed";
+            /** Relation Count */
+            relation_count: number;
+            /** Source Url */
+            source_url: string;
+            /** Source Version */
+            source_version: string;
+        };
         /** WorkspaceOpenRequest */
         WorkspaceOpenRequest: {
             /** Path */
@@ -5498,6 +6103,59 @@ export type components = {
 };
 export type $defs = Record<string, never>;
 export interface operations {
+    list_vocabularies_api_v1_character_audit_vocabularies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VocabularyLibrary"];
+                };
+            };
+        };
+    };
+    import_vocabulary_api_v1_character_audit_vocabularies_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VocabularyImport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VocabularyManifest"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     active_jobs_api_v1_jobs_active_get: {
         parameters: {
             query?: never;
@@ -8521,6 +9179,421 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TranslationDocument"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_audits_api_v1_workspaces__project_id__character_audits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_audit_api_v1_workspaces__project_id__character_audits_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_membership_api_v1_workspaces__project_id__character_audits_membership_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_audit_api_v1_workspaces__project_id__character_audits__operation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_audit_api_v1_workspaces__project_id__character_audits__operation_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_tags_api_v1_workspaces__project_id__character_audits__operation_id__prepare_tags_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareTagsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_audit_api_v1_workspaces__project_id__character_audits__operation_id__preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_review_api_v1_workspaces__project_id__character_audits__operation_id__profiles__profile_index__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+                profile_index: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    redo_visual_api_v1_workspaces__project_id__character_audits__operation_id__profiles__profile_index__redo_visual_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+                profile_index: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_resolutions_api_v1_workspaces__project_id__character_audits__operation_id__resolutions_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolutionsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_audit_api_v1_workspaces__project_id__character_audits__operation_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_audit_api_v1_workspaces__project_id__character_audits__operation_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOperation"];
                 };
             };
             /** @description Validation Error */

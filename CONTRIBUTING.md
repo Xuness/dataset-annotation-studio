@@ -11,6 +11,13 @@ Thanks for helping improve Dataset Annotation Studio.
 3. Never commit API keys, OAuth material, downloaded model weights, private datasets,
    build output, or local application data.
 
+## Frontend delivery priority
+
+New features and workflow changes must be implemented and validated in the classic (Legacy)
+interface first, unless the user explicitly requests a new-interface-only change. Keep business
+logic in the shared application/features layers and use each interface's own presentation
+components; see [`frontend/Legacy/README.md`](frontend/Legacy/README.md) for the dependency boundary.
+
 ## Source setup
 
 Use the CPU baseline unless the change specifically targets CUDA:

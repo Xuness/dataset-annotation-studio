@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from dataset_studio.api.container import AppContainer
 from dataset_studio.api.dependencies import get_container
+from dataset_studio.modules.character_audits import service as character_audits
 from dataset_studio.modules.jobs.models import (
     ActiveJobsOverview,
     JobCreateRequest,
@@ -19,6 +20,7 @@ Container = Annotated[AppContainer, Depends(get_container)]
 @global_router.get("/active", response_model=ActiveJobsOverview)
 def active_jobs(container: Container):
     jobs = container.jobs.active_overview()
+    character_audit_count = character_audits.active_count(container.workspaces)
     preprocessing_count, _ = container.preprocessing.active_overview()
     export_count, _ = container.exports.active_overview()
     screening_count, _ = container.screening.active_overview()
@@ -31,10 +33,12 @@ def active_jobs(container: Container):
         | container.exports.active_project_ids()
         | container.asset_deletions.active_project_ids()
         | container.screening.active_project_ids()
+        | character_audits.active_project_ids(container.workspaces)
     )
     return ActiveJobsOverview(
         count=(
             jobs.count
+            + character_audit_count
             + preprocessing_count
             + export_count
             + screening_count
@@ -44,6 +48,7 @@ def active_jobs(container: Container):
         ),
         project_count=len(active_projects),
         annotation_job_count=jobs.annotation_job_count,
+        character_audit_count=character_audit_count,
         translation_job_count=jobs.translation_job_count,
         preprocessing_count=preprocessing_count,
         export_count=export_count,
@@ -59,6 +64,7 @@ def stop_all_workspace_jobs(container: Container):
     return {
         "stopped": (
             container.jobs.stop_all_workspaces()
+            + character_audits.stop_all(container)
             + container.exports.stop_all_workspaces()
             + container.screening.stop_all_workspaces()
             + container.tagger_downloads.pause_all()

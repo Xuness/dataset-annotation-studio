@@ -9,6 +9,7 @@ import uvicorn
 from dataset_studio.api.app import create_app
 from dataset_studio.api.container import AppContainer
 from dataset_studio.core.config import settings
+from dataset_studio.modules.character_audits.worker import run_character_audits
 from dataset_studio.modules.exports.worker import ExportWorker
 from dataset_studio.modules.jobs.worker import AnnotationWorker
 from dataset_studio.modules.output_resources import configure_output_resource_owner
@@ -29,6 +30,7 @@ async def run_service() -> None:
     tagger_download_worker = TaggerDownloadWorker(worker_container)
     tag_dictionary_download_worker = TagDictionaryDownloadWorker(worker_container)
     worker_tasks = (
+        asyncio.create_task(run_character_audits(worker_container, stopped)),
         asyncio.create_task(annotation_worker.run(stopped)),
         asyncio.create_task(export_worker.run(stopped)),
         asyncio.create_task(screening_worker.run(stopped)),

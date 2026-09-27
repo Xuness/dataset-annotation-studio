@@ -7,6 +7,7 @@ import {
   type HomeSpace,
   type HomeSpaceId,
 } from "../navigation/spaceRegistry";
+import { useCharacterAuditController } from "../../application/characterAudits/useCharacterAuditController";
 import { useArchiveSpaceController } from "../pages/spaces/archive/useArchiveSpaceController";
 import {
   isAnnotationEditChannelId,
@@ -616,6 +617,45 @@ function AnnotationRoute({ Page, space, themeId, projectId }: AnnotationRoutePro
     <SpaceRouteView
       Page={Page}
       space={space}
+      content={{
+        ...content,
+        openCharacterAudits: () =>
+          navigate(buildFrontendHref("/annotation/characters", { themeId, projectId })),
+      }}
+      themeId={themeId}
+      projectId={projectId}
+    />
+  );
+}
+
+function CharacterAuditRoute() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { projectId } = useProjectRouteContext();
+  const themeId = resolveFrontendThemeId(location.search);
+  const { SpacePage } = getFrontendTheme(themeId);
+  const content = useCharacterAuditController({
+    confirm: async ({ message }) => window.confirm(message),
+    projectId,
+    operationId: readRouteIdentifier(location.search, "operation"),
+    onSelectOperation: (operation) =>
+      navigate(
+        buildFrontendHref("/annotation/characters", { themeId, projectId, query: { operation } }),
+      ),
+    onReturnToAnnotation: () => navigate(buildFrontendHref("/annotation", { themeId, projectId })),
+    onOpenPrerequisite: (operation) =>
+      navigate(
+        buildFrontendHref("/annotation/stage/production", {
+          themeId,
+          projectId,
+          query: { operation, lane: "tags" },
+        }),
+      ),
+  });
+  return (
+    <SpaceRouteView
+      Page={SpacePage}
+      space={getHomeSpace("annotation")}
       content={content}
       themeId={themeId}
       projectId={projectId}
@@ -690,7 +730,11 @@ function LoadedQualityRoute({ Page, space, themeId, projectId, query }: LoadedQu
     <SpaceRouteView
       Page={Page}
       space={space}
-      content={content}
+      content={{
+        ...content,
+        openCharacterAudits: () =>
+          navigate(buildFrontendHref("/annotation/characters", { themeId, projectId })),
+      }}
       themeId={themeId}
       projectId={projectId}
     />
@@ -1341,6 +1385,7 @@ function FallbackRoute() {
 export function FrontendRoutes() {
   return (
     <Routes>
+      <Route path="/annotation/characters" element={<CharacterAuditRoute />} />
       <Route path="/" element={<HomeRoute />} />
       <Route path="/preparation/workbench" element={<PreparationWorkbenchRoute />} />
       <Route path="/annotation/stage" element={<AnnotationStageRoute />} />

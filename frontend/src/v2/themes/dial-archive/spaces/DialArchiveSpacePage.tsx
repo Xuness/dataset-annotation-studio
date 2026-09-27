@@ -19,6 +19,7 @@ import { RouteSweep } from "../components/RouteSweep";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useRouteSweepTransition } from "../hooks/useRouteSweepTransition";
 import "../styles/tokens.css";
+import { CharacterAuditPage } from "./character-audits/CharacterAuditPage";
 import { AnnotationSpaceContent } from "./annotation/AnnotationSpaceContent";
 import { AnnotationStage } from "./annotation/stage/AnnotationStage";
 import { ArchiveSpaceContent } from "./components/ArchiveSpaceContent";
@@ -39,6 +40,7 @@ import { PreparationWorkbench } from "./preparation/PreparationWorkbench";
 import { QualityReviewStage } from "./quality/QualityReviewStage";
 import { QualitySpaceContent } from "./quality/QualitySpaceContent";
 import "./styles/space.css";
+import "./character-audits/character-audits.css";
 import "./styles/archive.css";
 import "./styles/annotation.css";
 import "./annotation/styles/annotation-stage.css";
@@ -224,6 +226,14 @@ function DialArchiveSecondarySpacePage({
 }
 
 export function DialArchiveSpacePage(props: ThemeSpacePageProps) {
+  if (props.content.kind === "character-audit") {
+    return (
+      <main className="dial-archive-space">
+        <SpaceChrome space={props.space} />
+        <CharacterAuditPage content={props.content} />
+      </main>
+    );
+  }
   if (props.content.kind === "capability-download-workbench") {
     return (
       <main

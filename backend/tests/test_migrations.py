@@ -48,6 +48,7 @@ EXPECTED_WORKSPACE_MIGRATION_CHECKSUMS = {
     19: "0a1888b731c2e971b12d5a844a2439d0a9ce925472fade121933ac8f5e6d319e",
     20: "f2475fc69e1472cafd52243bc5b71202cb1d86023f0f1b37a344e251f55a566c",
     21: "73c6004567ad5d772a8e9cd1be33c5be6017abe53b4e9eb0ba3c9e30ee4bad87",
+    22: "070a5d7b6e49c469cee56bd626a9698608954bd432e3ad1c5d4b6b9fd1b52707",
 }
 
 
@@ -412,7 +413,7 @@ def test_global_database_migrates_existing_provider_profiles(tmp_path: Path) -> 
     assert "Protocol A: description segment JSON" in translation_prompt["system_prompt"]
     assert "Protocol B: Tags XML envelope" in translation_prompt["system_prompt"]
     assert "application appends" not in translation_prompt["system_prompt"]
-    assert versions == list(range(1, 17))
+    assert versions == list(range(1, 18))
 
 
 def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> None:
@@ -446,7 +447,7 @@ def test_global_download_migration_adds_durable_tagger_queue(tmp_path: Path) -> 
 
     assert {"local_tagger_hf_settings", "local_tagger_downloads"}.issubset(tables)
     assert "idx_local_tagger_downloads_active_plan" in indexes
-    assert versions == list(range(1, 17))
+    assert versions == list(range(1, 18))
 
 
 def test_translation_prompt_structure_lock_migration_preserves_custom_default(
@@ -721,6 +722,7 @@ def test_recent_workspace_activity_migration_hides_duplicate_roots(
         "jobs_requested_at",
         "exports_requested_at",
         "screening_requested_at",
+        "character_audits_requested_at",
     }
     assert activity_projects == ["newer"]
 
