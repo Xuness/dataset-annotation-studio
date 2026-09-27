@@ -134,6 +134,13 @@ class WorkspaceService:
             exists = root.is_dir() and state == "attached"
             if exists and location and location.directory_identity != directory_identity(root):
                 state, exists = "identity_changed", False
+            legacy = WorkspacePaths.from_root(root, self._settings)
+            can_migrate = (
+                state == "migration_required"
+                and root.is_dir()
+                and legacy.manifest.is_file()
+                and legacy.database.is_file()
+            )
             if paths.manifest.is_file():
                 manifest = self._load_manifest(paths)
                 self._ensure_database(paths.database)
@@ -148,7 +155,7 @@ class WorkspaceService:
                         name=str(row["name"]),
                         root_path=str(root),
                         storage_path=str(paths.internal),
-                        exists=False,
+                        exists=can_migrate,
                         association_state=state,
                         created_at=str(row["created_at"]),
                         last_opened_at=str(row["last_opened_at"]),

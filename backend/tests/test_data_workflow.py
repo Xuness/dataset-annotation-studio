@@ -5,6 +5,7 @@ import base64
 import io
 import json
 import random
+import sys
 import tempfile
 import threading
 import uuid
@@ -93,6 +94,12 @@ def test_source_export_reuses_images_and_preserves_original_annotation(tmp_path:
     )
     original_image = file_sha256(root / "nested" / "image.png")
     preview = exports.preview(summary.project_id, request)
+    assert set(preview.items[0].target_outputs) == {
+        "nested/image.png",
+        "nested/image.txt",
+        "nested/image.description.txt",
+        "nested/image.annotations.json",
+    }
     assert preview.replaced_file_count == 1
     assert preview.image_bytes == 0
     operation = exports.create(
@@ -212,7 +219,12 @@ def test_workspace_identity_overlap_and_legacy_copy(tmp_path: Path) -> None:
     assert legacy.database.read_bytes() == before
     assert workspaces.open(str(root))[0].project_id == manifest.project_id
     alias = tmp_path / "alias"
-    alias.symlink_to(root, target_is_directory=True)
+    if sys.platform == "win32":
+        import _winapi
+
+        _winapi.CreateJunction(str(root), str(alias))
+    else:
+        alias.symlink_to(root, target_is_directory=True)
     assert workspaces.open(str(alias))[0].project_id == manifest.project_id
     workspaces.remove_recent(summary.project_id)
     with pytest.raises(ValueError, match="重叠"):
@@ -498,9 +510,9 @@ def test_inference_orientation_frames_and_source_change(tmp_path: Path) -> None:
 
 def test_export_cannot_target_tool_state_through_an_ancestor(tmp_path: Path) -> None:
     workspaces, _, _, exports = _services(tmp_path)
-    root = tmp_path / "dataset"
-    _write_image(root / "app-data" / "image.png")
-    (root / "app-data" / "image.txt").write_text("caption", encoding="utf-8")
+    root = tmp_path / "datasets" / "app-data"
+    _write_image(root / "image.png")
+    (root / "image.txt").write_text("caption", encoding="utf-8")
     summary, _ = workspaces.open(str(root))
     with pytest.raises(ValueError, match="工具数据目录"):
         exports.preview(
@@ -512,3 +524,31 @@ def test_export_cannot_target_tool_state_through_an_ancestor(tmp_path: Path) -> 
             ),
         )
     assert not (tmp_path / "app-data" / "image.txt").exists()
+
+
+def test_registered_legacy_workspace_can_be_opened_from_recents(tmp_path: Path) -> None:
+    workspaces, _, _, _ = _services(tmp_path)
+    root = tmp_path / "legacy-dataset"
+    _write_image(root / "image.png")
+    legacy = WorkspacePaths.from_root(root, workspaces.settings)
+    legacy.ensure_directories()
+    manifest = WorkspaceManifest(
+        project_id=str(uuid.uuid4()), name="legacy", created_at="2026-01-01T00:00:00Z"
+    )
+    legacy.manifest.write_text(manifest.model_dump_json(), encoding="utf-8")
+    migrate_database(legacy.database, WORKSPACE_MIGRATIONS[:21])
+    WorkspaceRegistry(workspaces.settings.app_data_dir / "global.sqlite3").upsert(
+        manifest, root, manifest.created_at
+    )
+    before = legacy.database.read_bytes()
+
+    recent = workspaces.list_recent()[0]
+    assert recent.association_state == "migration_required"
+    assert recent.exists
+    assert not Path(recent.storage_path).exists()
+
+    paths, migrated = workspaces.get(manifest.project_id)
+    assert migrated.project_id == manifest.project_id
+    assert paths.database.is_file()
+    assert legacy.database.read_bytes() == before
+    assert workspaces.list_recent()[0].association_state == "attached"

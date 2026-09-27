@@ -486,6 +486,7 @@ def _plan_item(
         root,
         source_relative_path,
         request.directory_layout,
+        include_root=request.destination_kind != "source",
     )
     artifacts: list[ExportArtifact] = []
     statuses = {key: _selection_status(selected) for key, selected in annotations.items()}
@@ -699,6 +700,8 @@ def _mapped_source_directory(
     root: Path,
     source_relative_path: str,
     layout: ExportDirectoryLayout,
+    *,
+    include_root: bool = True,
 ) -> str:
     if layout.mode == ExportDirectoryMode.FLAT:
         return ""
@@ -716,6 +719,9 @@ def _mapped_source_directory(
             if original_path.casefold() not in merged:
                 target_parts.append(part)
         mapped = PurePosixPath(*target_parts).as_posix() if target_parts else ""
+
+    if not include_root:
+        return mapped
 
     root_name = root.name
     if (
