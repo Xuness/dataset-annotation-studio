@@ -12,6 +12,7 @@ from dataset_studio.api.routes import (
     annotations,
     asset_deletions,
     assets,
+    character_audits,
     exports,
     jobs,
     preprocessing,
@@ -105,6 +106,8 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(preprocessing.router, prefix=api_prefix)
     app.include_router(exports.router, prefix=api_prefix)
     app.include_router(screening.router, prefix=api_prefix)
+    app.include_router(character_audits.router, prefix=api_prefix)
+    app.include_router(character_audits.library_router, prefix=api_prefix)
     app.include_router(statistics.router, prefix=api_prefix)
     app.include_router(system.router, prefix=api_prefix)
     app.include_router(taggers.router, prefix=api_prefix)

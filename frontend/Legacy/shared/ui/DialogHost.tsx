@@ -84,12 +84,17 @@ export function DialogHost() {
         </p>
         <div className="dialog__actions">
           {isConfirm ? (
-            <Button data-dialog-cancel="" onClick={() => settleCurrent(false)}>
+            <Button
+              data-dialog-cancel=""
+              data-testid="dialog-cancel"
+              onClick={() => settleCurrent(false)}
+            >
               {current.cancelLabel ?? "取消"}
             </Button>
           ) : null}
           <Button
             data-dialog-confirm=""
+            data-testid="dialog-confirm"
             tone={current.tone === "danger" ? "danger" : "primary"}
             onClick={() => settleCurrent(true)}
           >

@@ -1,5 +1,6 @@
 import {
   Bot,
+  UserRoundCheck,
   FolderOutput,
   Images,
   ListFilter,
@@ -15,7 +16,8 @@ import { UpdateAnnouncementIndicator } from "../../legacy/components/UpdateAnnou
 import { useLegacyUnsavedChangesGuard } from "../../legacy/hooks/useLegacyUnsavedChangesGuard";
 import { useSettingsCenter } from "../../shared/settings/settingsCenterStore";
 
-export type WorkspaceSection = "assets" | "screening" | "preprocess" | "jobs" | "review" | "export";
+export type WorkspaceSection =
+  "assets" | "screening" | "preprocess" | "jobs" | "characters" | "review" | "export";
 
 interface NavigationItem {
   id: WorkspaceSection;
@@ -28,6 +30,7 @@ const items: readonly NavigationItem[] = [
   { id: "screening", icon: ListFilter, label: "筛选" },
   { id: "preprocess", icon: SlidersHorizontal, label: "预处理" },
   { id: "jobs", icon: Bot, label: "任务" },
+  { id: "characters", icon: UserRoundCheck, label: "角色" },
   { id: "review", icon: ListChecks, label: "审核" },
   { id: "export", icon: FolderOutput, label: "导出" },
 ];
@@ -37,6 +40,7 @@ const sectionPath: Record<WorkspaceSection, (projectId: string) => string> = {
   screening: (projectId) => `/workspace/${projectId}/screening`,
   preprocess: (projectId) => `/workspace/${projectId}/preprocess`,
   jobs: (projectId) => `/workspace/${projectId}/jobs`,
+  characters: (projectId) => `/workspace/${projectId}/characters`,
   review: (projectId) => `/workspace/${projectId}/review`,
   export: (projectId) => `/workspace/${projectId}/export`,
 };
@@ -68,6 +72,7 @@ export function NavigationRail({
           <button
             type="button"
             key={id}
+            data-testid={`workspace-nav-${id}`}
             className={active === id ? "is-active" : ""}
             title={label}
             aria-current={active === id ? "page" : undefined}
