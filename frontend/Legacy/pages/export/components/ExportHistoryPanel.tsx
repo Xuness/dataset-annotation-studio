@@ -63,7 +63,7 @@ export function ExportHistoryPanel({
             !directoryLayout || directoryLayout.mode === "flat"
               ? "扁平化"
               : directoryLayout.mode === "preserve"
-                ? "保留原目录"
+                ? "保留原目录（含根目录名）"
                 : `自定义合并 ${directoryLayout.merge_into_parent_paths?.length ?? 0} 个目录`;
           return (
             <article key={operation.id} className={active ? "is-active" : ""}>
