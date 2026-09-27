@@ -27,6 +27,7 @@ from dataset_studio.modules.exports.models import (
     ExportPackaging,
     ExportRequest,
     ExportRevisionMode,
+    ExportScope,
 )
 from dataset_studio.modules.exports.repository import ExportRepository
 from dataset_studio.modules.exports.service import ExportService
@@ -147,9 +148,11 @@ def test_export_materializes_multiple_database_channels_as_variants_and_json(
     assert preview.unreviewed_count == 2
     assert preview.warning_count == 0
     assert set(preview.items[0].channel_statuses.values()) == {"usable"}
-    assert any(target.startswith("tags/") for target in preview.items[0].target_outputs)
-    assert any(target.startswith("description/") for target in preview.items[0].target_outputs)
-    assert any(target.startswith("metadata/") for target in preview.items[0].target_outputs)
+    assert any(target.startswith("tags/数据集/") for target in preview.items[0].target_outputs)
+    assert any(
+        target.startswith("description/数据集/") for target in preview.items[0].target_outputs
+    )
+    assert any(target.startswith("metadata/数据集/") for target in preview.items[0].target_outputs)
 
     operation = exports.create(
         workspace.project_id,
@@ -160,17 +163,19 @@ def test_export_materializes_multiple_database_channels_as_variants_and_json(
     completed = exports.get(workspace.project_id, operation.id)
     assert completed.status == ExportOperationStatus.COMPLETED
     assert completed.configuration_snapshot["formats"] == ["txt", "json"]
-    assert (destination / "tags" / "a" / "first.png").read_bytes() == (
+    assert (destination / "tags" / "数据集" / "a" / "first.png").read_bytes() == (
         project / "a" / "first.png"
     ).read_bytes()
-    assert (destination / "tags" / "a" / "first.txt").read_text(encoding="utf-8") == (
-        "character, first"
-    )
-    assert (destination / "description" / "a" / "first.txt").read_text(encoding="utf-8") == (
-        "<caption>first.png</caption>"
-    )
+    assert (destination / "tags" / "数据集" / "a" / "first.txt").read_text(
+        encoding="utf-8"
+    ) == "character, first"
+    assert (destination / "description" / "数据集" / "a" / "first.txt").read_text(
+        encoding="utf-8"
+    ) == "<caption>first.png</caption>"
     metadata = json.loads(
-        (destination / "metadata" / "a" / "first.annotations.json").read_text(encoding="utf-8")
+        (destination / "metadata" / "数据集" / "a" / "first.annotations.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert [tag["name"] for tag in metadata["annotations"]["tags"]["tags"]] == [
         "character",
@@ -197,8 +202,8 @@ def test_export_preserves_workspace_directories_for_directory_and_zip_outputs(
     )
     directory_preview = exports.preview(workspace.project_id, directory_request)
     assert set(directory_preview.items[0].target_outputs) == {
-        "characters/alice/image.png",
-        "characters/alice/image.txt",
+        "preserved-dataset/characters/alice/image.png",
+        "preserved-dataset/characters/alice/image.txt",
     }
     directory_operation = exports.create(
         workspace.project_id,
@@ -208,10 +213,12 @@ def test_export_preserves_workspace_directories_for_directory_and_zip_outputs(
         ),
     )
     _run_export(workspaces, workspace.project_id, directory_operation.id)
-    assert (directory_destination / "characters" / "alice" / "image.png").is_file()
-    assert (directory_destination / "characters" / "alice" / "image.txt").read_text(
-        encoding="utf-8"
-    ) == "ready"
+    assert (
+        directory_destination / "preserved-dataset" / "characters" / "alice" / "image.png"
+    ).is_file()
+    assert (
+        directory_destination / "preserved-dataset" / "characters" / "alice" / "image.txt"
+    ).read_text(encoding="utf-8") == "ready"
 
     zip_destination = tmp_path / "preserved-zip"
     zip_destination.mkdir()
@@ -228,8 +235,8 @@ def test_export_preserves_workspace_directories_for_directory_and_zip_outputs(
     _run_export(workspaces, workspace.project_id, zip_operation.id)
     with zipfile.ZipFile(zip_destination / "preserved-zip.zip") as archive:
         assert set(archive.namelist()) == {
-            "characters/alice/image.png",
-            "characters/alice/image.txt",
+            "preserved-dataset/characters/alice/image.png",
+            "preserved-dataset/characters/alice/image.txt",
         }
 
 
@@ -254,7 +261,10 @@ def test_export_custom_layout_removes_only_selected_original_directory_levels(
 
     preview = exports.preview(workspace.project_id, request)
 
-    assert set(preview.items[0].target_outputs) == {"set-1/image.png", "set-1/image.txt"}
+    assert set(preview.items[0].target_outputs) == {
+        "custom-layout/set-1/image.png",
+        "custom-layout/set-1/image.txt",
+    }
     operation = exports.create(
         workspace.project_id,
         ExportCreateRequest(request=request, preview_token=preview.preview_token),
@@ -264,8 +274,8 @@ def test_export_custom_layout_removes_only_selected_original_directory_levels(
         "merge_into_parent_paths": ["characters", "characters/alice"],
     }
     _run_export(workspaces, workspace.project_id, operation.id)
-    assert (destination / "set-1" / "image.png").is_file()
-    assert (destination / "set-1" / "image.txt").is_file()
+    assert (destination / "custom-layout" / "set-1" / "image.png").is_file()
+    assert (destination / "custom-layout" / "set-1" / "image.txt").is_file()
 
 
 def test_export_custom_layout_blocks_file_and_directory_mapping_collisions(
@@ -809,7 +819,7 @@ def test_export_preview_is_invalidated_by_a_new_revision_even_with_same_content(
     destination = tmp_path / "selected-export"
     destination.mkdir()
     request = ExportRequest(
-        scope="selected",
+        scope=ExportScope.SELECTED,
         asset_ids=[selected.id],
         destination_path=str(destination),
         channels=[

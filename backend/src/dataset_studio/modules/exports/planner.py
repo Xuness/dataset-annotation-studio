@@ -464,6 +464,7 @@ def _plan_item(
     source_name = PurePosixPath(source_relative_path).name
     stem = PurePosixPath(source_name).stem
     source_directory = _mapped_source_directory(
+        root,
         source_relative_path,
         request.directory_layout,
     )
@@ -661,6 +662,7 @@ def _channel_directory(selection: ExportChannelSelection) -> str:
 
 
 def _mapped_source_directory(
+    root: Path,
     source_relative_path: str,
     layout: ExportDirectoryLayout,
 ) -> str:
@@ -668,20 +670,29 @@ def _mapped_source_directory(
         return ""
 
     parent = PurePosixPath(source_relative_path).parent
-    if parent == PurePosixPath("."):
-        return ""
     if layout.mode == ExportDirectoryMode.PRESERVE:
-        return parent.as_posix()
+        mapped = parent.as_posix() if parent != PurePosixPath(".") else ""
+    else:
+        merged = {path.casefold() for path in layout.merge_into_parent_paths}
+        original_parts: list[str] = []
+        target_parts: list[str] = []
+        for part in parent.parts:
+            original_parts.append(part)
+            original_path = PurePosixPath(*original_parts).as_posix()
+            if original_path.casefold() not in merged:
+                target_parts.append(part)
+        mapped = PurePosixPath(*target_parts).as_posix() if target_parts else ""
 
-    merged = {path.casefold() for path in layout.merge_into_parent_paths}
-    original_parts: list[str] = []
-    target_parts: list[str] = []
-    for part in parent.parts:
-        original_parts.append(part)
-        original_path = PurePosixPath(*original_parts).as_posix()
-        if original_path.casefold() not in merged:
-            target_parts.append(part)
-    return PurePosixPath(*target_parts).as_posix() if target_parts else ""
+    root_name = root.name
+    if (
+        not root_name
+        or root_name in {".", ".."}
+        or "/" in root_name
+        or "\\" in root_name
+        or "\x00" in root_name
+    ):
+        return mapped
+    return _join_target(root_name, mapped)
 
 
 def _join_target(*parts: str) -> str:
