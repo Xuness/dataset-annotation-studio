@@ -159,7 +159,7 @@ JSON 可以单独选择，也可以与 TXT 同时选择。逐图 `*.annotations.
 
 例如工作区名为 `MyDataset` 时，`characters/alice/set-1/image.webp` 在保留模式下会输出到
 `MyDataset/characters/alice/set-1/image.webp`；自定义选择 `characters/alice` 后变为
-`MyDataset/set-1/image.webp`。多通道 TXT 会把这一结构放在 `tags/`、`description/` 等通道目录之下，
+`MyDataset/characters/set-1/image.webp`。多通道 TXT 会把这一结构放在 `tags/`、`description/` 等通道目录之下，
 ZIP 内部使用完全相同的目标路径。
 
 输出方式可以选择文件夹或 ZIP。ZIP 模式在所选目录中生成一个与目录同名的 `.zip` 文件，归档内目录结构与
