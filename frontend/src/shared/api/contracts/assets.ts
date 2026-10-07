@@ -19,3 +19,5 @@ export type AnnotationTraceRequestParameters = ApiOutput<"TraceRequestParameters
 export type AnnotationTraceRequest = ApiOutput<"TraceRequest">;
 export type AnnotationTraceResponse = ApiOutput<"TraceResponse">;
 export type AssetAnnotationTrace = ApiOutput<"AssetAnnotationTrace">;
+
+export type AssetLookupRequest = ApiOutput<"AssetLookupRequest">;

@@ -11,7 +11,10 @@ export async function clickControl(testId: string): Promise<void> {
   });
 }
 
-export async function exerciseCharacterAuditReview(info: CharacterAuditServerInfo): Promise<void> {
+export async function exerciseCharacterAuditSteps(
+  info: CharacterAuditServerInfo,
+  navigation: { openTask: (id: string) => Promise<void>; showApply: () => Promise<void> },
+): Promise<void> {
   await screen.findByTestId("character-start", {}, { timeout: 10_000 });
   await clickControl("character-start");
   await waitFor(() =>
@@ -58,7 +61,7 @@ export async function exerciseCharacterAuditReview(info: CharacterAuditServerInf
   await screen.findByTestId("character-membership-result");
   await clickControl("character-create");
   await screen.findByTestId("character-start");
-  await clickControl(`character-open-${info.review_id}`);
+  await navigation.openTask(info.review_id);
   await screen.findByTestId("character-decision-0");
   fireEvent.change(screen.getByTestId("character-reason-0"), {
     target: { value: "Manually checked the source evidence." },
@@ -69,6 +72,7 @@ export async function exerciseCharacterAuditReview(info: CharacterAuditServerInf
   );
   await clickControl("character-review-tab-1");
   await clickControl("character-save-review");
+  await navigation.showApply();
   await waitFor(() =>
     expect(screen.getByTestId<HTMLButtonElement>("character-generate-preview").disabled).toBe(
       false,
@@ -93,4 +97,11 @@ export async function exerciseCharacterAuditReview(info: CharacterAuditServerInf
   await waitFor(() =>
     expect(screen.getByTestId<HTMLButtonElement>("character-apply").disabled).toBe(false),
   );
+}
+
+export function exerciseCharacterAuditReview(info: CharacterAuditServerInfo): Promise<void> {
+  return exerciseCharacterAuditSteps(info, {
+    openTask: (id) => clickControl(`character-open-${id}`),
+    showApply: () => Promise.resolve(),
+  });
 }

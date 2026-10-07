@@ -156,3 +156,10 @@ class MetadataDocument(BaseModel):
     value: object | None = None
     fields: list[str] = Field(default_factory=list)
     error: str | None = None
+
+
+class AssetLookupRequest(BaseModel):
+    search: str
+    status: str | None
+    folder_path: str
+    candidate_scope: CandidateScope

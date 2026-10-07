@@ -1,0 +1,202 @@
+@import "./crop-editor.css";
+
+.preprocess-content {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.preprocess-panels {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 310px minmax(460px, 1fr) 292px;
+}
+.preprocess-workspace-body.crop-workspace-body {
+  grid-template-columns: var(--workspace-rail-width) minmax(0, 1fr);
+}
+.crop-mode-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 97%, transparent);
+}
+.crop-mode-tabs .button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.crop-mode-tabs .button.is-active {
+  color: var(--ink);
+  border-color: var(--line);
+  background: var(--surface-raised);
+  box-shadow: inset 0 -2px var(--accent);
+}
+.crop-mode-note {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.crop-history {
+  min-width: 0;
+  padding: 20px 18px;
+}
+.crop-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  margin-bottom: 16px;
+}
+.crop-panel-heading > svg {
+  color: var(--muted);
+}
+.crop-panel-heading h2 {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.045em;
+}
+.crop-description,
+.crop-canvas-help {
+  margin: 8px 0 16px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+}
+.crop-control-group {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 20px 0;
+  padding: 0;
+  border: 0;
+}
+.crop-control-group legend {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 0 0 9px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 560;
+}
+.crop-ratio-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+.crop-ratio-shortcuts .button {
+  min-height: 30px;
+  padding: 0 3px;
+  font-size: var(--text-xs);
+}
+.crop-ratio-shortcuts .is-active,
+.crop-inspector .button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.crop-ratio-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8px minmax(0, 1fr) 36px;
+  align-items: end;
+  gap: 7px;
+}
+.crop-ratio-fields > .button {
+  height: 36px;
+  padding: 0;
+}
+.crop-ratio-separator {
+  align-self: end;
+  padding-bottom: 9px;
+  color: var(--muted);
+  text-align: center;
+}
+.crop-preset-manager {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.crop-preset-manager summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.crop-preset-manager[open] summary {
+  margin-bottom: 12px;
+}
+.crop-preset-manager .crop-actions {
+  margin-top: 10px;
+}
+.crop-preset-manager .button {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: var(--text-xs);
+}
+.crop-history-empty {
+  padding: 28px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.crop-history-empty p {
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--faint);
+}
+.crop-history-item {
+  display: grid;
+  gap: 10px;
+  padding: 15px 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--text-xs);
+}
+.crop-history-item > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.crop-history-item strong {
+  font-size: var(--text-sm);
+  font-weight: 560;
+}
+.crop-history-item time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.crop-history-item .button {
+  justify-self: start;
+  min-height: 29px;
+  font-size: var(--text-xs);
+}
+.crop-history-item progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.crop-status {
+  color: var(--muted);
+}
+.crop-status--failed,
+.crop-status--recovery_failed {
+  color: var(--danger);
+}
+.crop-status--succeeded {
+  color: var(--accent);
+}
+.crop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 1150px) {
+  .crop-mode-note {
+    display: none;
+  }
+}

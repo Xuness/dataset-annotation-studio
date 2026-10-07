@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
-import { ImageIcon, Maximize2, Minus, Plus } from "lucide-react";
+import { Crop, ImageIcon, Maximize2, Minus, Plus } from "lucide-react";
 
 import { imageUrl } from "../../../../src/features/assets/api";
 import type { AssetSummary } from "../../../../src/shared/api/types";
 
+import { Button } from "../../../shared/ui/Button";
+
 interface ImageStageProps {
   projectId: string;
   asset: AssetSummary | null;
+  onCrop: () => void;
 }
 
 const MIN_ZOOM = 0.25;
 
-export function ImageStage({ projectId, asset }: ImageStageProps) {
+export function ImageStage({ projectId, asset, onCrop }: ImageStageProps) {
   const [zoom, setZoom] = useState(1);
   const [loaded, setLoaded] = useState(false);
   const [panning, setPanning] = useState(false);
@@ -58,7 +61,7 @@ export function ImageStage({ projectId, asset }: ImageStageProps) {
     };
   }, [asset, fitScale, zoom]);
 
-  // 保证任何尺寸的图片都能放大到实际像素
+  // Allow every image size to zoom to actual pixels.
   const maxZoom = useMemo(() => (fitScale ? Math.max(3, 1 / fitScale) : 3), [fitScale]);
 
   const canPan = Boolean(
@@ -151,24 +154,35 @@ export function ImageStage({ projectId, asset }: ImageStageProps) {
             {asset.width} × {asset.height} · {asset.suffix.slice(1).toUpperCase()}
           </span>
         </div>
-        <div className="zoom-controls">
-          <button onClick={() => changeZoom(-0.15)} title="缩小">
-            <Minus size={14} />
-          </button>
-          <span title="相对于实际像素的显示比例">{effectivePercent}%</span>
-          <button onClick={() => changeZoom(0.15)} title="放大">
-            <Plus size={14} />
-          </button>
-          <button
-            className="zoom-controls__actual"
-            onClick={zoomToActual}
-            title="实际像素（双击画布可在适应窗口与实际像素间切换）"
+        <div className="image-stage-tools">
+          <Button
+            className="image-stage-crop-button"
+            icon={<Crop size={14} />}
+            data-testid="image-crop-open"
+            onClick={onCrop}
+            title="单图多框裁剪，原图保持不变"
           >
-            1:1
-          </button>
-          <button onClick={() => setZoom(1)} title="适应窗口（Ctrl + 滚轮缩放）">
-            <Maximize2 size={14} />
-          </button>
+            精细裁剪
+          </Button>
+          <div className="zoom-controls">
+            <button onClick={() => changeZoom(-0.15)} title="缩小">
+              <Minus size={14} />
+            </button>
+            <span title="相对于实际像素的显示比例">{effectivePercent}%</span>
+            <button onClick={() => changeZoom(0.15)} title="放大">
+              <Plus size={14} />
+            </button>
+            <button
+              className="zoom-controls__actual"
+              onClick={zoomToActual}
+              title="实际像素（双击画布可在适应窗口与实际像素间切换）"
+            >
+              1:1
+            </button>
+            <button onClick={() => setZoom(1)} title="适应窗口（Ctrl + 滚轮缩放）">
+              <Maximize2 size={14} />
+            </button>
+          </div>
         </div>
       </header>
       <div

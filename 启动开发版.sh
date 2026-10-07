@@ -22,7 +22,7 @@ Dataset Annotation Studio Linux 开发版启动器
   --cpu                  强制使用 backend/.venv-cpu
   --graphics MODE        cpu-paint（默认）| native | nvidia-sync | dmabuf-off | software
   --check-only           只检查并同步依赖，不启动应用
-  --skip-sync            跳过 pnpm install 与 uv sync
+  --skip-sync            跳过 Rust、pnpm 与 uv 依赖同步（仍验证工具链）
   -h, --help             显示帮助
 
 示例：
@@ -76,7 +76,7 @@ case "$GRAPHICS" in
     ;;
 esac
 
-for command in node pnpm uv cargo rustc; do
+for command in node pnpm uv; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "错误：缺少命令 '$command'，请先安装对应开发工具。" >&2
     exit 1
@@ -167,6 +167,12 @@ fi
 if [[ $CHECK_ONLY -eq 0 ]]; then
   select_dev_ports
 fi
+
+if [[ $SKIP_SYNC -eq 0 ]]; then
+  echo "[Dataset Studio] 同步项目 Rust 工具链……"
+  bash "$ROOT/scripts/setup-rust.sh"
+fi
+node "$ROOT/scripts/run-rust.mjs" rustc -vV
 
 if [[ $SKIP_SYNC -eq 0 ]]; then
   echo "[Dataset Studio] 检查前端依赖……"

@@ -11,6 +11,8 @@ from dataset_studio.modules.assets.models import (
     AssetFolderSelectionRequest,
     AssetIdListResponse,
     AssetListResponse,
+    AssetLookupRequest,
+    AssetSummary,
     CandidateScope,
     CandidateSetSummary,
     CandidateUpdateRequest,
@@ -181,3 +183,10 @@ def list_asset_jobs(
     limit: int = Query(default=100, ge=1, le=500),
 ):
     return container.jobs.list_for_asset(project_id, asset_id, limit=limit)
+
+
+@router.post("/{asset_id}/lookup", response_model=AssetSummary | None)
+def lookup_asset(
+    project_id: str, asset_id: str, query: AssetLookupRequest, container: Container
+) -> AssetSummary | None:
+    return container.assets.lookup(project_id, asset_id, query)

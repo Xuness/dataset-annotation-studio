@@ -2291,6 +2291,40 @@
         "title": "AssetListResponse",
         "type": "object"
       },
+      "AssetLookupRequest": {
+        "properties": {
+          "candidate_scope": {
+            "$ref": "#/components/schemas/CandidateScope"
+          },
+          "folder_path": {
+            "title": "Folder Path",
+            "type": "string"
+          },
+          "search": {
+            "title": "Search",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "search",
+          "status",
+          "folder_path",
+          "candidate_scope"
+        ],
+        "title": "AssetLookupRequest",
+        "type": "object"
+      },
       "AssetRelatedJob": {
         "properties": {
           "attempt_count": {
@@ -2878,6 +2912,41 @@
         "title": "AuditSummary",
         "type": "object"
       },
+      "BatchCropRequest": {
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/CropFilter"
+          },
+          "ratio": {
+            "$ref": "#/components/schemas/Ratio"
+          },
+          "scope": {
+            "enum": [
+              "selected",
+              "filtered",
+              "folder",
+              "all"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "asset_ids",
+          "filters",
+          "ratio"
+        ],
+        "title": "BatchCropRequest",
+        "type": "object"
+      },
       "CandidateScope": {
         "enum": [
           "auto",
@@ -3263,6 +3332,375 @@
           "format"
         ],
         "title": "ConvertOptions",
+        "type": "object"
+      },
+      "CropExecutionRequest": {
+        "properties": {
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "token"
+        ],
+        "title": "CropExecutionRequest",
+        "type": "object"
+      },
+      "CropFilter": {
+        "properties": {
+          "folder_path": {
+            "title": "Folder Path",
+            "type": "string"
+          },
+          "search": {
+            "title": "Search",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "search",
+          "status",
+          "folder_path"
+        ],
+        "title": "CropFilter",
+        "type": "object"
+      },
+      "CropOperation": {
+        "properties": {
+          "completed": {
+            "title": "Completed",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "undoing",
+              "succeeded",
+              "failed",
+              "recovery_failed",
+              "undone"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "total",
+          "completed",
+          "error",
+          "created_at"
+        ],
+        "title": "CropOperation",
+        "type": "object"
+      },
+      "CropPlan": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CropPlanItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "token",
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "CropPlan",
+        "type": "object"
+      },
+      "CropPlanItem": {
+        "properties": {
+          "output_id": {
+            "title": "Output Id",
+            "type": "string"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "rectangle": {
+            "$ref": "#/components/schemas/CropRect"
+          },
+          "source_hash": {
+            "title": "Source Hash",
+            "type": "string"
+          },
+          "source_height": {
+            "title": "Source Height",
+            "type": "integer"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_path": {
+            "title": "Source Path",
+            "type": "string"
+          },
+          "source_width": {
+            "title": "Source Width",
+            "type": "integer"
+          },
+          "whole_image": {
+            "title": "Whole Image",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source_id",
+          "source_path",
+          "source_hash",
+          "source_width",
+          "source_height",
+          "output_id",
+          "output_path",
+          "rectangle",
+          "whole_image"
+        ],
+        "title": "CropPlanItem",
+        "type": "object"
+      },
+      "CropProvenance": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/CropPlanItem"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation_id",
+          "item"
+        ],
+        "title": "CropProvenance",
+        "type": "object"
+      },
+      "CropRect": {
+        "properties": {
+          "height": {
+            "exclusiveMinimum": 0.0,
+            "title": "Height",
+            "type": "integer"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "width": {
+            "exclusiveMinimum": 0.0,
+            "title": "Width",
+            "type": "integer"
+          },
+          "x": {
+            "minimum": 0.0,
+            "title": "X",
+            "type": "integer"
+          },
+          "y": {
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "width",
+          "height",
+          "ratio"
+        ],
+        "title": "CropRect",
+        "type": "object"
+      },
+      "CropScopeRequest": {
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/CropFilter"
+          },
+          "scope": {
+            "enum": [
+              "selected",
+              "filtered",
+              "folder",
+              "all"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "asset_ids",
+          "filters"
+        ],
+        "title": "CropScopeRequest",
+        "type": "object"
+      },
+      "CropSource": {
+        "properties": {
+          "content_version": {
+            "title": "Content Version",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "relative_path",
+          "filename",
+          "width",
+          "height",
+          "content_version"
+        ],
+        "title": "CropSource",
+        "type": "object"
+      },
+      "CropSourceRegions": {
+        "properties": {
+          "asset_id": {
+            "minLength": 1,
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "rectangles": {
+            "items": {
+              "$ref": "#/components/schemas/CropRect"
+            },
+            "minItems": 1,
+            "title": "Rectangles",
+            "type": "array"
+          },
+          "source_version": {
+            "minLength": 1,
+            "title": "Source Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "source_version",
+          "rectangles"
+        ],
+        "title": "CropSourceRegions",
+        "type": "object"
+      },
+      "CropSourceSelection": {
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Asset Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "asset_ids"
+        ],
+        "title": "CropSourceSelection",
         "type": "object"
       },
       "ExecutionBackend": {
@@ -5056,6 +5494,23 @@
         "title": "MetadataDocument",
         "type": "object"
       },
+      "MultiCropRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CropSourceRegions"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MultiCropRequest",
+        "type": "object"
+      },
       "OpenAICompatibleModelOptions": {
         "additionalProperties": false,
         "properties": {
@@ -5153,6 +5608,27 @@
         ],
         "title": "OutputFormat",
         "type": "string"
+      },
+      "PositionedBatchCropRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CropSourceRegions"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "ratio": {
+            "$ref": "#/components/schemas/Ratio"
+          }
+        },
+        "required": [
+          "items",
+          "ratio"
+        ],
+        "title": "PositionedBatchCropRequest",
+        "type": "object"
       },
       "PrepareTagsRequest": {
         "properties": {
@@ -6402,6 +6878,74 @@
         ],
         "title": "ProviderType",
         "type": "string"
+      },
+      "Ratio": {
+        "properties": {
+          "height": {
+            "exclusiveMinimum": 0.0,
+            "title": "Height",
+            "type": "number"
+          },
+          "width": {
+            "exclusiveMinimum": 0.0,
+            "title": "Width",
+            "type": "number"
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ],
+        "title": "Ratio",
+        "type": "object"
+      },
+      "RatioPreset": {
+        "properties": {
+          "builtin": {
+            "title": "Builtin",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "ratio": {
+            "$ref": "#/components/schemas/Ratio"
+          }
+        },
+        "required": [
+          "name",
+          "ratio",
+          "id",
+          "builtin"
+        ],
+        "title": "RatioPreset",
+        "type": "object"
+      },
+      "RatioPresetInput": {
+        "properties": {
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "ratio": {
+            "$ref": "#/components/schemas/Ratio"
+          }
+        },
+        "required": [
+          "name",
+          "ratio"
+        ],
+        "title": "RatioPresetInput",
+        "type": "object"
       },
       "ReasoningEffort": {
         "enum": [
@@ -7744,6 +8288,29 @@
         ],
         "title": "ServiceTier",
         "type": "string"
+      },
+      "SingleCropRequest": {
+        "properties": {
+          "asset_id": {
+            "minLength": 1,
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "rectangles": {
+            "items": {
+              "$ref": "#/components/schemas/CropRect"
+            },
+            "minItems": 1,
+            "title": "Rectangles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "asset_id",
+          "rectangles"
+        ],
+        "title": "SingleCropRequest",
+        "type": "object"
       },
       "SystemDiagnostics": {
         "properties": {
@@ -11795,6 +12362,155 @@
         "summary": "Import Vocabulary",
         "tags": [
           "character-audits"
+        ]
+      }
+    },
+    "/api/v1/crop-ratio-presets": {
+      "get": {
+        "operationId": "list_ratio_presets_api_v1_crop_ratio_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RatioPreset"
+                  },
+                  "title": "Response List Ratio Presets Api V1 Crop Ratio Presets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Ratio Presets",
+        "tags": [
+          "cropping"
+        ]
+      },
+      "post": {
+        "operationId": "create_ratio_preset_api_v1_crop_ratio_presets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RatioPresetInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatioPreset"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Ratio Preset",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/crop-ratio-presets/{preset_id}": {
+      "delete": {
+        "operationId": "delete_ratio_preset_api_v1_crop_ratio_presets__preset_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preset_id",
+            "required": true,
+            "schema": {
+              "title": "Preset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Ratio Preset",
+        "tags": [
+          "cropping"
+        ]
+      },
+      "put": {
+        "operationId": "update_ratio_preset_api_v1_crop_ratio_presets__preset_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preset_id",
+            "required": true,
+            "schema": {
+              "title": "Preset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RatioPresetInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatioPreset"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Ratio Preset",
+        "tags": [
+          "cropping"
         ]
       }
     },
@@ -16061,6 +16777,75 @@
         ]
       }
     },
+    "/api/v1/workspaces/{project_id}/assets/{asset_id}/lookup": {
+      "post": {
+        "operationId": "lookup_asset_api_v1_workspaces__project_id__assets__asset_id__lookup_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetLookupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AssetSummary"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Lookup Asset Api V1 Workspaces  Project Id  Assets  Asset Id  Lookup Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lookup Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
     "/api/v1/workspaces/{project_id}/assets/{asset_id}/metadata": {
       "get": {
         "operationId": "get_metadata_api_v1_workspaces__project_id__assets__asset_id__metadata_get",
@@ -17109,6 +17894,722 @@
         "summary": "Stop Audit",
         "tags": [
           "character-audits"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/batch-preview": {
+      "post": {
+        "operationId": "batch_preview_api_v1_workspaces__project_id__cropping_batch_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchCropRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CropPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Batch Preview",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/execute": {
+      "post": {
+        "operationId": "execute_api_v1_workspaces__project_id__cropping_execute_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CropExecutionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CropOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Execute",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/multi-preview": {
+      "post": {
+        "operationId": "multi_preview_api_v1_workspaces__project_id__cropping_multi_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MultiCropRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CropPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Multi Preview",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/operations": {
+      "get": {
+        "operationId": "operations_api_v1_workspaces__project_id__cropping_operations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CropOperation"
+                  },
+                  "title": "Response Operations Api V1 Workspaces  Project Id  Cropping Operations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Operations",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/operations/{operation_id}/undo": {
+      "post": {
+        "operationId": "undo_api_v1_workspaces__project_id__cropping_operations__operation_id__undo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CropOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Undo",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/plans/{plan_id}": {
+      "get": {
+        "operationId": "plan_page_api_v1_workspaces__project_id__cropping_plans__plan_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "title": "Plan Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": true,
+            "schema": {
+              "maximum": 48,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CropPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Page",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/plans/{plan_id}/items/{index}/result": {
+      "get": {
+        "operationId": "result_image_api_v1_workspaces__project_id__cropping_plans__plan_id__items__index__result_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "title": "Plan Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "title": "Index",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Result Image",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/plans/{plan_id}/items/{index}/source": {
+      "get": {
+        "operationId": "source_image_api_v1_workspaces__project_id__cropping_plans__plan_id__items__index__source_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "title": "Plan Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "title": "Index",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Source Image",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/positioned-preview": {
+      "post": {
+        "operationId": "positioned_preview_api_v1_workspaces__project_id__cropping_positioned_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PositionedBatchCropRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CropPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Positioned Preview",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/single-preview": {
+      "post": {
+        "operationId": "single_preview_api_v1_workspaces__project_id__cropping_single_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SingleCropRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CropPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Single Preview",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/source-scope": {
+      "post": {
+        "operationId": "scoped_sources_api_v1_workspaces__project_id__cropping_source_scope_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CropScopeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CropSource"
+                  },
+                  "title": "Response Scoped Sources Api V1 Workspaces  Project Id  Cropping Source Scope Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scoped Sources",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/source-selection": {
+      "post": {
+        "operationId": "selected_sources_api_v1_workspaces__project_id__cropping_source_selection_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CropSourceSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CropSource"
+                  },
+                  "title": "Response Selected Sources Api V1 Workspaces  Project Id  Cropping Source Selection Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Selected Sources",
+        "tags": [
+          "cropping"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{project_id}/cropping/sources/{output_id}": {
+      "get": {
+        "operationId": "crop_source_api_v1_workspaces__project_id__cropping_sources__output_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "output_id",
+            "required": true,
+            "schema": {
+              "title": "Output Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CropProvenance"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Crop Source Api V1 Workspaces  Project Id  Cropping Sources  Output Id  Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Crop Source",
+        "tags": [
+          "cropping"
         ]
       }
     },

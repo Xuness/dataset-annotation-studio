@@ -18,7 +18,7 @@ export function CharacterConfiguration({ content: c }: Props) {
         <h2>锁定角色与素材范围</h2>
       </header>
       <div className="legacy-character-fields">
-        <label>
+        <label className="form-field">
           素材范围
           <select
             data-testid="character-scope"
@@ -35,7 +35,7 @@ export function CharacterConfiguration({ content: c }: Props) {
           </select>
         </label>
         {c.form.scope === "directory" && (
-          <label>
+          <label className="form-field">
             项目相对目录
             <input
               data-testid="character-directory"
@@ -45,7 +45,7 @@ export function CharacterConfiguration({ content: c }: Props) {
             />
           </label>
         )}
-        <label>
+        <label className="form-field">
           审查风格
           <select
             data-testid="character-style"
@@ -58,7 +58,7 @@ export function CharacterConfiguration({ content: c }: Props) {
             <option value="full">完整角色特征</option>
           </select>
         </label>
-        <label>
+        <label className="form-field">
           最低图片出现次数
           <input
             data-testid="character-minimum-count"
@@ -68,7 +68,7 @@ export function CharacterConfiguration({ content: c }: Props) {
             onChange={(e) => c.setForm({ ...c.form, minimum_count: Number(e.target.value) })}
           />
         </label>
-        <label>
+        <label className="form-field">
           审查模型连接
           <select
             data-testid="character-provider"
@@ -85,7 +85,7 @@ export function CharacterConfiguration({ content: c }: Props) {
             ))}
           </select>
         </label>
-        <label>
+        <label className="form-field">
           视觉模型
           <select
             data-testid="character-model"
@@ -100,22 +100,11 @@ export function CharacterConfiguration({ content: c }: Props) {
             ))}
           </select>
         </label>
-        <label>
-          每阶段额外重试次数
-          <input
-            data-testid="character-retry-limit"
-            type="number"
-            min={0}
-            max={5}
-            value={c.form.retry_limit}
-            onChange={(e) => c.setForm({ ...c.form, retry_limit: Number(e.target.value) })}
-          />
-        </label>
       </div>
       <p>
         这是角色标签汇总审查，不是逐图识别，每个角色使用一张代表性参考图；最多三次常规请求，重试可能另外产生费用。
       </p>
-      <label>
+      <label className="form-field">
         查找项目内参考图
         <input
           data-testid="character-reference-search"
@@ -138,7 +127,7 @@ export function CharacterConfiguration({ content: c }: Props) {
           <fieldset key={index} data-testid={`character-profile-${index}`}>
             <legend>CHARACTER {String(index + 1).padStart(2, "0")}</legend>
             <div className="legacy-character-fields">
-              <label>
+              <label className="form-field">
                 唯一触发词
                 <input
                   data-testid={`character-trigger-${index}`}
@@ -146,7 +135,7 @@ export function CharacterConfiguration({ content: c }: Props) {
                   onChange={(e) => c.updateProfile(index, { ...profile, trigger: e.target.value })}
                 />
               </label>
-              <label>
+              <label className="form-field">
                 参考图
                 <select
                   data-testid={`character-reference-${index}`}
@@ -167,7 +156,7 @@ export function CharacterConfiguration({ content: c }: Props) {
                   ))}
                 </select>
               </label>
-              <label>
+              <label className="form-field">
                 归属依据
                 <select
                   data-testid={`character-membership-${index}`}
@@ -185,7 +174,7 @@ export function CharacterConfiguration({ content: c }: Props) {
                 </select>
               </label>
               {profile.membership === "directory" && (
-                <label>
+                <label className="form-field">
                   角色相对目录
                   <input
                     data-testid={`character-folder-${index}`}
@@ -197,7 +186,7 @@ export function CharacterConfiguration({ content: c }: Props) {
                   />
                 </label>
               )}
-              <label>
+              <label className="form-field">
                 人数标签类别
                 <select
                   data-testid={`character-subject-${index}`}
@@ -240,71 +229,87 @@ export function CharacterConfiguration({ content: c }: Props) {
       >
         添加角色 · {c.form.profiles.length}/4
       </Button>
-      <h3>语义词表</h3>
-      <label>
-        已验证的安装
-        <select
-          data-testid="character-vocabulary"
-          value={c.form.vocabulary_id}
-          onChange={(e) => c.setForm({ ...c.form, vocabulary_id: e.target.value })}
-        >
-          <option value="">请先导入完整三份 CSV</option>
-          {c.vocabularies.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.source_version.slice(0, 12)} · {v.character_count} 角色 / {v.general_count} 标签
-            </option>
-          ))}
-        </select>
-      </label>
-      <details className="legacy-character-import">
-        <summary>导入上游语义词表与查看来源</summary>
-        <p>
-          来源：storyAura/BooruDatasetTagManagerPlus，程序仓库声明 MIT；词条内容还涉及 Danbooru
-          等上游来源，不随本项目改用 Apache-2.0，本工具不自动下载。
-        </p>
-        <p>
-          目录需包含 danbooru_character_tags.csv、danbooru_dataset_general.csv 和
-          danbooru_tag_near_synonyms.csv，关系用于提示同部位候选，不视为可直接替换的同义词。
-        </p>
-        <label>
-          本地 CSV 目录
+      <details className="character-advanced-settings">
+        <summary data-testid="character-advanced-settings">
+          重试与语义词表 · {c.form.vocabulary_id ? "已选择" : "待选择"}
+        </summary>
+        <label className="form-field">
+          每阶段额外重试次数
           <input
-            data-testid="character-vocabulary-directory"
-            value={c.vocabularyDirectory}
-            onChange={(e) => c.setVocabularyDirectory(e.target.value)}
+            data-testid="character-retry-limit"
+            type="number"
+            min={0}
+            max={5}
+            value={c.form.retry_limit}
+            onChange={(e) => c.setForm({ ...c.form, retry_limit: Number(e.target.value) })}
           />
+        </label>{" "}
+        <h3>语义词表</h3>
+        <label className="form-field">
+          已验证的安装
+          <select
+            data-testid="character-vocabulary"
+            value={c.form.vocabulary_id}
+            onChange={(e) => c.setForm({ ...c.form, vocabulary_id: e.target.value })}
+          >
+            <option value="">请先导入完整三份 CSV</option>
+            {c.vocabularies.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.source_version.slice(0, 12)} · {v.character_count} 角色 / {v.general_count} 标签
+              </option>
+            ))}
+          </select>
         </label>
-        <label>
-          来源版本
-          <input
-            data-testid="character-vocabulary-version"
-            value={c.vocabularyVersion}
-            onChange={(e) => c.setVocabularyVersion(e.target.value)}
-          />
-        </label>
-        <label className="legacy-character-check">
-          <input
-            data-testid="character-license"
-            type="checkbox"
-            checked={c.licenseAcknowledged}
-            onChange={(e) => c.setLicenseAcknowledged(e.target.checked)}
-          />
-          我已阅读来源与授权说明，并主动导入这些文件
-        </label>
-        <Button
-          type="button"
-          data-testid="character-import-vocabulary"
-          disabled={c.busy || !c.licenseAcknowledged}
-          onClick={() => void c.importVocabulary()}
-        >
-          校验并安装
-        </Button>
+        <details className="legacy-character-import">
+          <summary>导入上游语义词表与查看来源</summary>
+          <p>
+            来源：storyAura/BooruDatasetTagManagerPlus，程序仓库声明 MIT；词条内容还涉及 Danbooru
+            等上游来源，不随本项目改用 Apache-2.0，本工具不自动下载。
+          </p>
+          <p>
+            目录需包含 danbooru_character_tags.csv、danbooru_dataset_general.csv 和
+            danbooru_tag_near_synonyms.csv，关系用于提示同部位候选，不视为可直接替换的同义词。
+          </p>
+          <label className="form-field">
+            本地 CSV 目录
+            <input
+              data-testid="character-vocabulary-directory"
+              value={c.vocabularyDirectory}
+              onChange={(e) => c.setVocabularyDirectory(e.target.value)}
+            />
+          </label>
+          <label className="form-field">
+            来源版本
+            <input
+              data-testid="character-vocabulary-version"
+              value={c.vocabularyVersion}
+              onChange={(e) => c.setVocabularyVersion(e.target.value)}
+            />
+          </label>
+          <label className="legacy-character-check">
+            <input
+              data-testid="character-license"
+              type="checkbox"
+              checked={c.licenseAcknowledged}
+              onChange={(e) => c.setLicenseAcknowledged(e.target.checked)}
+            />
+            我已阅读来源与授权说明，并主动导入这些文件
+          </label>
+          <Button
+            type="button"
+            data-testid="character-import-vocabulary"
+            disabled={c.busy || !c.licenseAcknowledged}
+            onClick={() => void c.importVocabulary()}
+          >
+            校验并安装
+          </Button>
+        </details>
       </details>
       <div className="legacy-character-actions">
         <Button
           type="button"
           data-testid="character-preview-membership"
-          disabled={c.busy}
+          disabled={c.busy || (c.form.scope === "selected" && !c.checkedCount)}
           onClick={() => void c.previewMembership()}
         >
           预览角色归属
@@ -313,7 +318,9 @@ export function CharacterConfiguration({ content: c }: Props) {
           type="button"
           tone="primary"
           data-testid="character-create"
-          disabled={c.busy || !c.form.vocabulary_id}
+          disabled={
+            c.busy || !c.form.vocabulary_id || (c.form.scope === "selected" && !c.checkedCount)
+          }
           onClick={() => void c.create()}
         >
           保存任务配置

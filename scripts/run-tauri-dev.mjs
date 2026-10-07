@@ -9,6 +9,8 @@ import {
   selectDevPortsFromEnvironment,
 } from "./dev-ports.mjs";
 
+import { projectRustEnvironment, validateRustToolchain } from "./run-rust.mjs";
+
 const require = createRequire(import.meta.url);
 const tauriCliPath = require.resolve("@tauri-apps/cli/tauri.js");
 
@@ -34,6 +36,9 @@ export function buildTauriArguments(configPaths, frontendPort) {
 }
 
 async function run() {
+  await validateRustToolchain(
+    projectRustEnvironment(process.env, process.platform),
+  );
   const selection = await selectDevPortsFromEnvironment();
   applyDevPortEnvironment(selection);
   process.env.DATASET_STUDIO_AUTO_PORTS = "1";
@@ -48,7 +53,7 @@ async function run() {
       ...buildTauriArguments(process.argv.slice(2), selection.frontendPort),
     ],
     {
-      env: process.env,
+      env: projectRustEnvironment(process.env, process.platform),
       stdio: "inherit",
     },
   );

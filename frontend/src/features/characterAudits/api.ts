@@ -1,3 +1,4 @@
+import { validateCharacterAuditRequest } from "./validation";
 import { apiRequest } from "../../shared/api/client";
 import type {
   CharacterAudit,
@@ -27,12 +28,14 @@ export function createCharacterAudit(
   projectId: string,
   request: CharacterAuditRequest,
 ): Promise<CharacterAudit> {
+  validateCharacterAuditRequest(request);
   return apiRequest(base(projectId), { method: "POST", body: JSON.stringify(request) });
 }
 export function previewCharacterMembership(
   projectId: string,
   request: CharacterAuditRequest,
 ): Promise<CharacterAuditMembership> {
+  validateCharacterAuditRequest(request);
   return apiRequest(`${base(projectId)}/membership-preview`, {
     method: "POST",
     body: JSON.stringify(request),

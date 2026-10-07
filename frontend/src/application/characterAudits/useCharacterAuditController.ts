@@ -17,11 +17,9 @@ import type {
   CharacterAuditPreview,
 } from "../../shared/api/contracts/characterAudits";
 import type { CharacterAuditContent } from "./characterAuditModel";
-import {
-  ACTIVE_CHARACTER_AUDIT_STATUSES as ACTIVE,
-  emptyCharacterProfile,
-  initialCharacterForm,
-} from "./characterAuditModel";
+import { emptyCharacterProfile, initialCharacterForm } from "./characterAuditModel";
+
+import { useCharacterAudit, useCharacterAuditHistory } from "./useCharacterAuditQueries";
 
 interface Options {
   projectId: string | null;
@@ -69,19 +67,8 @@ export function useCharacterAuditController({
   const [overwriteExisting, setOverwriteExisting] = useState(false);
   const [referenceSearch, setReferenceSearch] = useState("");
   const checkedAssetIds = useWorkspaceSelectionStore((state) => state.checkedAssetIds);
-  const operations = useQuery({
-    queryKey: ["character-audits", projectId],
-    queryFn: () => api.listCharacterAudits(requireProject()),
-    enabled: Boolean(projectId),
-    refetchInterval: 2000,
-  });
-  const current = useQuery({
-    queryKey: ["character-audit", projectId, operationId],
-    queryFn: () => api.getCharacterAudit(requireProject(), requireOperationId()),
-    enabled: Boolean(projectId && operationId),
-    refetchInterval: (query) =>
-      query.state.data && ACTIVE.has(query.state.data.status) ? 1000 : false,
-  });
+  const operations = useCharacterAuditHistory(projectId);
+  const current = useCharacterAudit(projectId, operationId);
   const providers = useQuery({
     queryKey: ["character-audit-providers"],
     queryFn: listProviderProfiles,

@@ -14,7 +14,8 @@ import { runDesktopExit } from "./desktopExit";
 
 export function useCloseGuard(): void {
   const hasUnsavedChanges = useUnsavedChangesStore(
-    (state) => Object.keys(state.dirtyScopes).length > 0,
+    (state) =>
+      Object.keys(state.dirtyScopes).length > 0 || Object.keys(state.sessionDirtyScopes).length > 0,
   );
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   const exitRequestInFlightRef = useRef(false);

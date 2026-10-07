@@ -22,6 +22,42 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/crop-ratio-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Ratio Presets */
+        get: operations["list_ratio_presets_api_v1_crop_ratio_presets_get"];
+        put?: never;
+        /** Create Ratio Preset */
+        post: operations["create_ratio_preset_api_v1_crop_ratio_presets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/crop-ratio-presets/{preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Ratio Preset */
+        put: operations["update_ratio_preset_api_v1_crop_ratio_presets__preset_id__put"];
+        post?: never;
+        /** Delete Ratio Preset */
+        delete: operations["delete_ratio_preset_api_v1_crop_ratio_presets__preset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/active": {
         parameters: {
             query?: never;
@@ -1295,6 +1331,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{project_id}/assets/{asset_id}/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lookup Asset */
+        post: operations["lookup_asset_api_v1_workspaces__project_id__assets__asset_id__lookup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{project_id}/assets/{asset_id}/metadata": {
         parameters: {
             query?: never;
@@ -1579,6 +1632,227 @@ export type paths = {
         put?: never;
         /** Stop Audit */
         post: operations["stop_audit_api_v1_workspaces__project_id__character_audits__operation_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/batch-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Batch Preview */
+        post: operations["batch_preview_api_v1_workspaces__project_id__cropping_batch_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute */
+        post: operations["execute_api_v1_workspaces__project_id__cropping_execute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/multi-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Multi Preview */
+        post: operations["multi_preview_api_v1_workspaces__project_id__cropping_multi_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Operations */
+        get: operations["operations_api_v1_workspaces__project_id__cropping_operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/operations/{operation_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo */
+        post: operations["undo_api_v1_workspaces__project_id__cropping_operations__operation_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/plans/{plan_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plan Page */
+        get: operations["plan_page_api_v1_workspaces__project_id__cropping_plans__plan_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/plans/{plan_id}/items/{index}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Result Image */
+        get: operations["result_image_api_v1_workspaces__project_id__cropping_plans__plan_id__items__index__result_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/plans/{plan_id}/items/{index}/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Source Image */
+        get: operations["source_image_api_v1_workspaces__project_id__cropping_plans__plan_id__items__index__source_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/positioned-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Positioned Preview */
+        post: operations["positioned_preview_api_v1_workspaces__project_id__cropping_positioned_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/single-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Single Preview */
+        post: operations["single_preview_api_v1_workspaces__project_id__cropping_single_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/source-scope": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scoped Sources */
+        post: operations["scoped_sources_api_v1_workspaces__project_id__cropping_source_scope_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/source-selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Selected Sources */
+        post: operations["selected_sources_api_v1_workspaces__project_id__cropping_source_selection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspaces/{project_id}/cropping/sources/{output_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Crop Source */
+        get: operations["crop_source_api_v1_workspaces__project_id__cropping_sources__output_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2897,6 +3171,16 @@ export type components = {
             /** Total */
             total: number;
         };
+        /** AssetLookupRequest */
+        AssetLookupRequest: {
+            candidate_scope: components["schemas"]["CandidateScope"];
+            /** Folder Path */
+            folder_path: string;
+            /** Search */
+            search: string;
+            /** Status */
+            status: string | null;
+        };
         /** AssetRelatedJob */
         AssetRelatedJob: {
             /**
@@ -3086,6 +3370,18 @@ export type components = {
             /** Version */
             version: number;
         };
+        /** BatchCropRequest */
+        BatchCropRequest: {
+            /** Asset Ids */
+            asset_ids: string[];
+            filters: components["schemas"]["CropFilter"];
+            ratio: components["schemas"]["Ratio"];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "selected" | "filtered" | "folder" | "all";
+        };
         /**
          * CandidateScope
          * @enum {string}
@@ -3245,6 +3541,133 @@ export type components = {
              * @default 90
              */
             quality: number;
+        };
+        /** CropExecutionRequest */
+        CropExecutionRequest: {
+            /** Plan Id */
+            plan_id: string;
+            /** Token */
+            token: string;
+        };
+        /** CropFilter */
+        CropFilter: {
+            /** Folder Path */
+            folder_path: string;
+            /** Search */
+            search: string;
+            /** Status */
+            status: string | null;
+        };
+        /** CropOperation */
+        CropOperation: {
+            /** Completed */
+            completed: number;
+            /** Created At */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "undoing" | "succeeded" | "failed" | "recovery_failed" | "undone";
+            /** Total */
+            total: number;
+        };
+        /** CropPlan */
+        CropPlan: {
+            /** Id */
+            id: string;
+            /** Items */
+            items: components["schemas"]["CropPlanItem"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Token */
+            token: string;
+            /** Total */
+            total: number;
+        };
+        /** CropPlanItem */
+        CropPlanItem: {
+            /** Output Id */
+            output_id: string;
+            /** Output Path */
+            output_path: string;
+            rectangle: components["schemas"]["CropRect"];
+            /** Source Hash */
+            source_hash: string;
+            /** Source Height */
+            source_height: number;
+            /** Source Id */
+            source_id: string;
+            /** Source Path */
+            source_path: string;
+            /** Source Width */
+            source_width: number;
+            /** Whole Image */
+            whole_image: boolean;
+        };
+        /** CropProvenance */
+        CropProvenance: {
+            item: components["schemas"]["CropPlanItem"];
+            /** Operation Id */
+            operation_id: string;
+        };
+        /** CropRect */
+        CropRect: {
+            /** Height */
+            height: number;
+            ratio: components["schemas"]["Ratio"] | null;
+            /** Width */
+            width: number;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+        };
+        /** CropScopeRequest */
+        CropScopeRequest: {
+            /** Asset Ids */
+            asset_ids: string[];
+            filters: components["schemas"]["CropFilter"];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "selected" | "filtered" | "folder" | "all";
+        };
+        /** CropSource */
+        CropSource: {
+            /** Content Version */
+            content_version: string;
+            /** Filename */
+            filename: string;
+            /** Height */
+            height: number;
+            /** Id */
+            id: string;
+            /** Relative Path */
+            relative_path: string;
+            /** Width */
+            width: number;
+        };
+        /** CropSourceRegions */
+        CropSourceRegions: {
+            /** Asset Id */
+            asset_id: string;
+            /** Rectangles */
+            rectangles: components["schemas"]["CropRect"][];
+            /** Source Version */
+            source_version: string;
+        };
+        /** CropSourceSelection */
+        CropSourceSelection: {
+            /** Asset Ids */
+            asset_ids: string[];
         };
         /**
          * ExecutionBackend
@@ -3903,6 +4326,11 @@ export type components = {
             /** Value */
             value?: unknown | null;
         };
+        /** MultiCropRequest */
+        MultiCropRequest: {
+            /** Items */
+            items: components["schemas"]["CropSourceRegions"][];
+        };
         /** OpenAICompatibleModelOptions */
         OpenAICompatibleModelOptions: {
             /**
@@ -3937,6 +4365,12 @@ export type components = {
          * @enum {string}
          */
         OutputFormat: "webp" | "jpeg" | "png";
+        /** PositionedBatchCropRequest */
+        PositionedBatchCropRequest: {
+            /** Items */
+            items: components["schemas"]["CropSourceRegions"][];
+            ratio: components["schemas"]["Ratio"];
+        };
         /** PrepareTagsRequest */
         PrepareTagsRequest: {
             /** Overwrite Existing */
@@ -4343,6 +4777,29 @@ export type components = {
          * @enum {string}
          */
         ProviderType: "openrouter" | "openai_compatible" | "opencode_go" | "gemini" | "codex";
+        /** Ratio */
+        Ratio: {
+            /** Height */
+            height: number;
+            /** Width */
+            width: number;
+        };
+        /** RatioPreset */
+        RatioPreset: {
+            /** Builtin */
+            builtin: boolean;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            ratio: components["schemas"]["Ratio"];
+        };
+        /** RatioPresetInput */
+        RatioPresetInput: {
+            /** Name */
+            name: string;
+            ratio: components["schemas"]["Ratio"];
+        };
         /**
          * ReasoningEffort
          * @enum {string}
@@ -4808,6 +5265,13 @@ export type components = {
          * @enum {string}
          */
         ServiceTier: "flex" | "priority";
+        /** SingleCropRequest */
+        SingleCropRequest: {
+            /** Asset Id */
+            asset_id: string;
+            /** Rectangles */
+            rectangles: components["schemas"]["CropRect"][];
+        };
         /** SystemDiagnostics */
         SystemDiagnostics: {
             /** App Data Dir */
@@ -6144,6 +6608,123 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["VocabularyManifest"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ratio_presets_api_v1_crop_ratio_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RatioPreset"][];
+                };
+            };
+        };
+    };
+    create_ratio_preset_api_v1_crop_ratio_presets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RatioPresetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RatioPreset"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_ratio_preset_api_v1_crop_ratio_presets__preset_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RatioPresetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RatioPreset"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ratio_preset_api_v1_crop_ratio_presets__preset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -8989,6 +9570,42 @@ export interface operations {
             };
         };
     };
+    lookup_asset_api_v1_workspaces__project_id__assets__asset_id__lookup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetLookupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetSummary"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_metadata_api_v1_workspaces__project_id__assets__asset_id__metadata_get: {
         parameters: {
             query?: never;
@@ -9594,6 +10211,447 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_preview_api_v1_workspaces__project_id__cropping_batch_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchCropRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_api_v1_workspaces__project_id__cropping_execute_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CropExecutionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    multi_preview_api_v1_workspaces__project_id__cropping_multi_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MultiCropRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    operations_api_v1_workspaces__project_id__cropping_operations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropOperation"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_api_v1_workspaces__project_id__cropping_operations__operation_id__undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_page_api_v1_workspaces__project_id__cropping_plans__plan_id__get: {
+        parameters: {
+            query: {
+                offset: number;
+                limit: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    result_image_api_v1_workspaces__project_id__cropping_plans__plan_id__items__index__result_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                plan_id: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    source_image_api_v1_workspaces__project_id__cropping_plans__plan_id__items__index__source_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                plan_id: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    positioned_preview_api_v1_workspaces__project_id__cropping_positioned_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PositionedBatchCropRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    single_preview_api_v1_workspaces__project_id__cropping_single_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SingleCropRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scoped_sources_api_v1_workspaces__project_id__cropping_source_scope_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CropScopeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSource"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    selected_sources_api_v1_workspaces__project_id__cropping_source_selection_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CropSourceSelection"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSource"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    crop_source_api_v1_workspaces__project_id__cropping_sources__output_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                output_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropProvenance"] | null;
                 };
             };
             /** @description Validation Error */

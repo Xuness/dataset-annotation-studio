@@ -40,10 +40,10 @@ Before submitting a change, run the relevant non-release checks:
 pnpm --dir frontend check
 uv run --project backend --extra cpu ruff check backend/src backend/tests
 uv run --project backend --extra cpu pytest
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+node scripts/run-rust.mjs cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 ```
 
-Changes to Rust/Tauri behavior should also pass `cargo check` on every claimed platform.
+Changes to Rust/Tauri behavior should also pass `node scripts/run-rust.mjs cargo check` on every claimed platform.
 Do not attach generated installers or downloaded model files to a pull request.
 
 Contributions are submitted under the repository's Apache-2.0 license unless explicitly

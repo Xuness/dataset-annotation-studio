@@ -1,73 +1,18 @@
-.character-audit-workspace-body {
-  grid-template-columns: var(--workspace-rail-width) 238px minmax(0, 1fr);
-}
-.legacy-character-history,
-.legacy-character-workbench {
-  min-width: 0;
-  min-height: 0;
+/* Shared review and parameter controls use the existing Legacy theme tokens. */
+:is(.character-review-pane, .character-settings-pane) {
   color: var(--ink);
-  background: color-mix(in srgb, var(--surface) 97%, transparent);
+  font-size: var(--text-sm);
+  line-height: 1.6;
 }
-.legacy-character-history {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 20px 16px;
-  border-right: 1px solid var(--line);
+:is(.character-review-pane, .character-settings-pane) p {
+  margin: 10px 0;
+  overflow-wrap: anywhere;
 }
-.legacy-character-history > header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.legacy-character-history h2,
 .legacy-character-section h2 {
   margin: 4px 0 12px;
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 400;
-}
-.legacy-character-history-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-.legacy-character-task {
-  display: grid;
-  width: 100%;
-  gap: 8px;
-  padding: 14px 10px;
-  margin-bottom: 8px;
-  border: 1px solid var(--line);
-  border-left: 3px solid transparent;
-  border-radius: var(--radius-sm);
-  background: var(--surface-soft);
-  color: var(--ink-soft);
-  text-align: left;
-  cursor: pointer;
-}
-.legacy-character-task[aria-pressed="true"] {
-  border-left-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--ink);
-}
-.legacy-character-task strong,
-.legacy-character-task small {
-  overflow-wrap: anywhere;
-}
-.legacy-character-history p,
-.legacy-character-workbench p {
-  margin: 10px 0;
-  font-size: var(--text-sm);
-  line-height: 1.7;
-}
-.legacy-character-task small {
-  font-size: var(--text-xs);
-  color: var(--muted);
-}
-.legacy-character-workbench {
-  overflow: auto;
-  padding: 24px clamp(18px, 2.5vw, 40px) 40px;
 }
 .legacy-character-section {
   padding: 0 0 24px;
@@ -81,13 +26,13 @@
   margin: 16px 0;
   align-items: end;
 }
-.legacy-character-workbench label {
+:is(.character-review-pane, .character-settings-pane) label {
   display: grid;
   gap: 7px;
   color: var(--ink-soft);
   font-size: var(--text-sm);
 }
-.legacy-character-workbench :is(input, select, textarea) {
+:is(.character-review-pane, .character-settings-pane) :is(input, select, textarea) {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -100,31 +45,31 @@
   font: inherit;
   font-size: var(--text-sm);
 }
-.legacy-character-workbench textarea {
+:is(.character-review-pane, .character-settings-pane) textarea {
   resize: vertical;
 }
-.legacy-character-workbench :is(input, select, textarea):focus-visible {
+:is(.character-review-pane, .character-settings-pane) :is(input, select, textarea):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.legacy-character-workbench input[type="checkbox"] {
+:is(.character-review-pane, .character-settings-pane) input[type="checkbox"] {
   width: 16px;
   min-height: 16px;
   accent-color: var(--accent);
 }
-.legacy-character-workbench .legacy-character-check {
+:is(.character-review-pane, .character-settings-pane) .legacy-character-check {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.legacy-character-workbench fieldset {
+:is(.character-review-pane, .character-settings-pane) fieldset {
   min-width: 0;
   margin: 18px 0;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
 }
-.legacy-character-workbench legend {
+:is(.character-review-pane, .character-settings-pane) legend {
   padding: 0 8px;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -144,7 +89,7 @@
 .legacy-character-import > label {
   margin: 14px 0;
 }
-.legacy-character-workbench summary {
+:is(.character-review-pane, .character-settings-pane) summary {
   padding: 8px 0;
   font-size: var(--text-sm);
   cursor: pointer;
@@ -156,76 +101,6 @@
   object-fit: contain;
   margin: 12px 0;
 }
-.legacy-character-review-layout {
-  display: grid;
-  grid-template-columns: minmax(150px, 23%) minmax(0, 1fr);
-  gap: 18px;
-}
-.legacy-character-specimen {
-  display: grid;
-  gap: 10px;
-  align-self: start;
-  position: sticky;
-  top: 0;
-  min-width: 0;
-}
-.legacy-character-specimen img {
-  width: 100%;
-  max-height: 40vh;
-  object-fit: contain;
-  background: var(--surface-soft);
-  border: 1px solid var(--line);
-}
-.legacy-character-decisions {
-  min-width: 0;
-}
-.legacy-character-table-wrap {
-  overflow: auto;
-  max-height: 70vh;
-  border: 1px solid var(--line);
-}
-.legacy-character-workbench table {
-  width: 100%;
-  min-width: 720px;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
-}
-.legacy-character-workbench :is(th, td) {
-  padding: 10px;
-  border-bottom: 1px solid var(--line);
-  text-align: left;
-  vertical-align: top;
-}
-.legacy-character-workbench th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--surface-soft);
-  color: var(--ink-soft);
-}
-.legacy-character-workbench td:first-child {
-  min-width: 130px;
-}
-.legacy-character-workbench td:nth-child(3) {
-  min-width: 96px;
-}
-.legacy-character-workbench td:nth-child(4) {
-  min-width: 180px;
-}
-.legacy-character-workbench td small {
-  display: block;
-  margin: 6px 0;
-  color: var(--muted);
-}
-.legacy-character-workbench tr[data-cluster="0"] {
-  background: var(--accent-soft);
-}
-.legacy-character-workbench tr[data-cluster="1"] {
-  background: var(--warning-soft);
-}
-.legacy-character-workbench tr[data-cluster="2"] {
-  background: var(--surface-soft);
-}
 .legacy-character-message {
   padding: 12px 16px;
   border: 1px solid var(--line);
@@ -235,7 +110,7 @@
   overflow-wrap: anywhere;
 }
 .legacy-character-error,
-.legacy-character-workbench [role="alert"] {
+:is(.character-review-pane, .character-settings-pane) [role="alert"] {
   color: var(--warning);
 }
 .legacy-character-conflict {
@@ -244,7 +119,7 @@
 .legacy-character-conflict .button {
   margin: 10px 8px 0 0;
 }
-.legacy-character-workbench pre {
+:is(.character-review-pane, .character-settings-pane) pre {
   max-height: 220px;
   overflow: auto;
   white-space: pre-wrap;
@@ -256,19 +131,4 @@
   max-height: 420px;
   overflow: auto;
   margin: 16px 0;
-}
-@media (max-width: 1400px) {
-  .legacy-character-review-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .legacy-character-specimen {
-    position: static;
-    grid-template-columns: 180px minmax(0, 1fr);
-  }
-  .legacy-character-specimen img {
-    grid-row: span 5;
-  }
-  .legacy-character-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }

@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, type CSSProperties } from "react";
 import { AlertCircle } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { useWorkspaceAssetsController } from "../../../src/application/workspace/useWorkspaceAssetsController";
 import type { WorkspaceBrowserMode } from "../../../src/application/workspace/assetBrowserState";
+import { useLegacyUnsavedChangesGuard } from "../../legacy/hooks/useLegacyUnsavedChangesGuard";
 import { useLegacyRescanWorkspace } from "../../legacy/hooks/useLegacyRescanWorkspace";
 import { legacyAlert, legacyConfirm } from "../../legacy/legacyInteractions";
 import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
@@ -38,6 +39,14 @@ interface WorkspacePageProps {
 export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
   const { projectId = "" } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("tool") === "crop-single")
+      navigate(`/workspace/${projectId}/preprocess?${searchParams.toString()}&browser=${mode}`, {
+        replace: true,
+      });
+  }, [searchParams, projectId, mode, navigate]);
+  const { confirmDiscard } = useLegacyUnsavedChangesGuard();
   const rescan = useLegacyRescanWorkspace(projectId);
   const controller = useWorkspaceAssetsController({
     projectId,
@@ -52,6 +61,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     assetItems,
     assetResult,
     selectedAsset,
+    selectionError,
     selectedAssetId,
     checkedAssetIds,
     search,
@@ -83,6 +93,7 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
     updateRecursiveScan,
     assetDeletion,
   } = controller;
+
   const workspaceBodyRef = useRef<HTMLDivElement>(null);
   const mediaColumnRef = useRef<HTMLDivElement>(null);
   const { layout, setLayout } = useWorkspaceLayout(projectId);
@@ -152,6 +163,12 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
       }
     >
       <AssetBrowser
+        onCropChecked={() =>
+          void (async () => {
+            if (await confirmDiscard())
+              navigate(`/workspace/${projectId}/preprocess?tool=crop&browser=${mode}`);
+          })()
+        }
         mode={mode}
         projectId={projectId}
         assets={assetItems}
@@ -173,7 +190,10 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         loadingMore={assets.isFetchingNextPage}
         selectAllPending={selectAllPending}
         allMatchingSelected={allMatchingSelected}
-        error={!assets.data && assets.error instanceof Error ? assets.error.message : null}
+        error={
+          selectionError ||
+          (!assets.data && assets.error instanceof Error ? assets.error.message : null)
+        }
         bulkActionPending={annotationDialog.open || tagBatchDialog.open}
         onLoadMore={loadMoreAssets}
         recursive={workspace.data.settings.recursive_scan}
@@ -224,7 +244,16 @@ export function WorkspacePage({ mode = "assets" }: WorkspacePageProps) {
         }
       />
       <div className="media-column" ref={mediaColumnRef}>
-        <ImageStage projectId={projectId} asset={selectedAsset} />
+        <ImageStage
+          projectId={projectId}
+          asset={selectedAsset}
+          onCrop={() => {
+            if (selectedAsset)
+              navigate(
+                `/workspace/${projectId}/preprocess?tool=crop-single&asset=${encodeURIComponent(selectedAsset.id)}&browser=${mode}&entry=${crypto.randomUUID()}`,
+              );
+          }}
+        />
         <PaneResizeHandle
           orientation="horizontal"
           label="调整图片与标注区域高度"

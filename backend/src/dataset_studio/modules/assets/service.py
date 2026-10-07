@@ -16,6 +16,8 @@ from dataset_studio.modules.assets.models import (
     AssetFolderSummary,
     AssetIdListResponse,
     AssetListResponse,
+    AssetLookupRequest,
+    AssetSummary,
     CandidateScope,
     CandidateSetSummary,
     CandidateUpdateRequest,
@@ -144,6 +146,16 @@ class AssetService:
             offset=max(offset, 0),
             limit=min(max(limit, 1), 10_000),
             status_counts=status_counts,
+        )
+
+    def lookup(
+        self, project_id: str, asset_id: str, query: AssetLookupRequest
+    ) -> AssetSummary | None:
+        paths, _ = self._workspaces.get(project_id)
+        folder = normalize_folder_path(query.folder_path)
+        return AssetRepository(paths.database).lookup(
+            asset_id,
+            query.model_copy(update={"folder_path": folder}),
         )
 
     def list_asset_ids(

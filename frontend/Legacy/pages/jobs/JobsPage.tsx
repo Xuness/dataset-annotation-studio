@@ -1,6 +1,8 @@
 import { AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { jobCenterViewState } from "../../../src/application/jobs/jobCenterState";
+import { CharacterJobPanels } from "./components/CharacterJobPanels";
 import { useJobCenterController } from "../../../src/application/jobs/useJobCenterController";
 import { useLegacyRescanWorkspace } from "../../legacy/hooks/useLegacyRescanWorkspace";
 import { WorkspaceFrame } from "../../layouts/workspace/WorkspaceFrame";
@@ -15,6 +17,8 @@ import "./job-detail.css";
 export function JobsPage() {
   const { projectId = "" } = useParams();
   const navigate = useNavigate();
+  const center = jobCenterViewState.useValue(projectId);
+  const selectKind = (kind: typeof center.kind) => jobCenterViewState.patch(projectId, { kind });
   const controller = useJobCenterController(projectId);
   const rescan = useLegacyRescanWorkspace(projectId);
   const {
@@ -62,23 +66,31 @@ export function JobsPage() {
         </>
       }
     >
-      <NewJobPanel
-        projectId={projectId}
-        workspace={workspace.data}
-        checkedAssetIds={checkedAssetIds}
-        onCreated={(job) => setSelectedJobId(job.id)}
-      />
-      <JobList
-        jobs={jobItems}
-        selectedId={selectedJobId}
-        hasMore={Boolean(jobs.hasNextPage)}
-        loading={jobs.isLoading}
-        loadingMore={jobs.isFetchingNextPage}
-        error={jobs.error instanceof Error ? jobs.error.message : null}
-        onLoadMore={loadMore}
-        onSelect={setSelectedJobId}
-      />
-      <JobDetailPanel projectId={projectId} jobId={selectedJobId} />
+      {center.kind === "character" ? (
+        <CharacterJobPanels projectId={projectId} onKindChange={selectKind} />
+      ) : (
+        <>
+          <NewJobPanel
+            projectId={projectId}
+            initialKind={center.kind}
+            onKindChange={selectKind}
+            workspace={workspace.data}
+            checkedAssetIds={checkedAssetIds}
+            onCreated={(job) => setSelectedJobId(job.id)}
+          />
+          <JobList
+            jobs={jobItems}
+            selectedId={selectedJobId}
+            hasMore={Boolean(jobs.hasNextPage)}
+            loading={jobs.isLoading}
+            loadingMore={jobs.isFetchingNextPage}
+            error={jobs.error instanceof Error ? jobs.error.message : null}
+            onLoadMore={loadMore}
+            onSelect={setSelectedJobId}
+          />
+          <JobDetailPanel projectId={projectId} jobId={selectedJobId} />
+        </>
+      )}
     </WorkspaceFrame>
   );
 }
