@@ -9,11 +9,12 @@ from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.core.time import utc_now_iso
 from dataset_studio.modules.workspaces.models import WorkspaceManifest
 
-WorkerActivityKind = Literal["jobs", "exports", "screening"]
+WorkerActivityKind = Literal["jobs", "exports", "screening", "character_audits"]
 _ACTIVITY_COLUMNS: dict[WorkerActivityKind, str] = {
     "jobs": "jobs_requested_at",
     "exports": "exports_requested_at",
     "screening": "screening_requested_at",
+    "character_audits": "character_audits_requested_at",
 }
 
 

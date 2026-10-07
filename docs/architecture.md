@@ -50,6 +50,10 @@ checkout 的会话锁并返回 Shell，避免退出日志结束后终端仍回�
 - `modules/workspaces`：项目清单、集中存储登记、身份及目录关联、迁移、原始备份与恢复。
 - `modules/assets`：图片发现、增量索引、目录投影、缩略图、元数据读取，以及素材文件包的可恢复删除。
 - `modules/annotations`：多通道文档、不可变修订、统一状态投影、结构化 Tags、独立复核仓储、旧 TXT 一次性导入和轻量校验。
+- `modules/character_audits`：单至四角色的标签汇总、语义词表索引、分阶段参考图审查、
+  人工决定与共享图片冲突裁决；独立持久化任务不复用逐图 LLM 描述输出通道。
+  前置本地打标任务与关联审查记录同事务创建，最终 Tags 修订与应用记录同事务提交；
+  角色确认不改变整份 Tags 的人工复核状态。
 - `modules/translations`：数据库译文通道、当前可用源修订追踪、结构校验和翻译 Prompt 模板渲染。
 - `modules/prompts`：User Prompt、选定 JSON 字段和可选当前可用 Tags 的纯函数组合。
 - `modules/presets`：全局 System Prompt / 模型连接聚合的持久化；API 密钥通过 `SecretStore` 隔离。
@@ -128,6 +132,8 @@ OpenRouter 目录仍使用其扩展元数据；两个协议各自由适配器映
 - `features/*/api.ts` 是资源级 API，`hooks.ts` 负责 React Query 缓存与失效。
 - `shared/api` 只包含传输和共享 DTO；`shared/desktop` 隔离 Tauri 能力。
 - Zustand 只保存界面选择和本机偏好，不复制后端持久状态。
+
+角色审查由 `src/application/characterAudits` 提供共享控制器，Legacy 的项目内“角色”页与新主题的标注／质检入口使用相同 API 和任务状态，各自持有页面组件、样式及确认交互适配。
 
 新前端（代码目录 `src/v2`）与 Legacy UI 采用独立 HTML/TypeScript/CSS 入口，二者只共享 application、
 feature 与明确的 shared 能力；旧页面、布局、主题、设置和 UI 组件不属于新前端依赖面。工作区查询键、

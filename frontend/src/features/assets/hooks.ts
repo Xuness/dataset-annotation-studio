@@ -9,12 +9,17 @@ import {
   listAssetIds,
   listAssetFolders,
   listAssets,
+  lookupAsset,
   listCandidateIds,
   listSelectedAssetFolders,
   updateCandidates,
   type AssetQuery,
 } from "./api";
-import type { CandidateScope, CandidateUpdateRequest } from "../../shared/api/types";
+import type {
+  AssetLookupRequest,
+  CandidateScope,
+  CandidateUpdateRequest,
+} from "../../shared/api/types";
 import { workspaceQueryKeys } from "../../shared/query/workspaceQueries";
 import { annotationTraceKeys, assetKeys, metadataKeys, promptPreviewKeys } from "./queryKeys";
 
@@ -170,6 +175,19 @@ export function useAssetMetadata(projectId: string, assetId: string | null, enab
   return useQuery({
     queryKey: metadataKeys.detail(projectId, assetId),
     queryFn: () => getMetadata(projectId, assetId!),
+    enabled: Boolean(projectId && assetId && enabled),
+  });
+}
+
+export function useAssetLookup(
+  projectId: string,
+  assetId: string | null,
+  query: AssetLookupRequest,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: [...assetKeys.project(projectId), "lookup", assetId, query],
+    queryFn: () => lookupAsset(projectId, assetId!, query),
     enabled: Boolean(projectId && assetId && enabled),
   });
 }

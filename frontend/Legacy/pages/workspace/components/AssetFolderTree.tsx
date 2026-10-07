@@ -106,6 +106,7 @@ export function AssetFolderTree({
                 </button>
                 <button
                   type="button"
+                  data-testid={`asset-folder-${encodeURIComponent(folder.path)}`}
                   className="asset-folder-tree__select"
                   title={folder.path || folder.name}
                   onClick={() => void onSelect(folder.path)}

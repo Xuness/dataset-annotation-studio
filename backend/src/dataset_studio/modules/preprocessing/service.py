@@ -1,30 +1,28 @@
 from __future__ import annotations
 
-import os
 import secrets
 import shutil
+import sqlite3
 import threading
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict
 from pathlib import Path
 
 from dataset_studio.core.file_targets import hold_file_targets
-from dataset_studio.core.files import atomic_copy_file, verified_move_file
-from dataset_studio.core.languages import LANGUAGE_PATTERN
-from dataset_studio.core.paths import filesystem_path_key
-from dataset_studio.core.sqlite import connect, transaction
+from dataset_studio.core.sqlite import connect
 from dataset_studio.modules.assets.companions import registered_suffixes
-from dataset_studio.modules.assets.scanner import IMAGE_METADATA_VERSION, AssetScanner
+from dataset_studio.modules.assets.scanner import AssetScanner
+from dataset_studio.modules.cropping.execution import recover_orphaned as recover_crops
+from dataset_studio.modules.preprocessing import file_operations
 from dataset_studio.modules.preprocessing.executor import (
     PreparedItem,
     PreprocessItemPreparer,
     requires_render,
     resolve_resize_worker_count,
 )
-from dataset_studio.modules.preprocessing.image_pipeline import sha256
 from dataset_studio.modules.preprocessing.models import (
     ImageProcessingBackend,
     ImageProcessingBackends,
@@ -39,6 +37,7 @@ from dataset_studio.modules.preprocessing.models import (
     PreprocessRequest,
 )
 from dataset_studio.modules.preprocessing.planner import PlanItem, build_plan, preview_token
+from dataset_studio.modules.preprocessing.publication import commit_prepared_item
 from dataset_studio.modules.preprocessing.recovery import (
     PreprocessRecoveryCoordinator,
     RecoveryFileOperations,
@@ -48,11 +47,34 @@ from dataset_studio.modules.preprocessing.runtime.contracts import RenderIntent
 from dataset_studio.modules.preprocessing.runtime.inspection import inspect_image
 from dataset_studio.modules.preprocessing.runtime.registry import ImageBackendRegistry
 from dataset_studio.modules.preprocessing.runtime.router import build_routing_plan
-from dataset_studio.modules.workspaces.backups import preserve_asset_files
 from dataset_studio.modules.workspaces.service import WorkspaceService
 
 
 class PreprocessService:
+    _record_item = staticmethod(file_operations._record_item)
+    _verify_undo = staticmethod(file_operations._verify_undo)
+    _update_asset = staticmethod(file_operations._update_asset)
+    _rollback = staticmethod(file_operations._rollback)
+    _restore_file = staticmethod(file_operations._restore_file)
+    _sidecar_paths = staticmethod(file_operations._sidecar_paths)
+    _translation_languages = staticmethod(file_operations._translation_languages)
+    _claimed_annotation_paths = staticmethod(file_operations._claimed_annotation_paths)
+    _path_key = staticmethod(file_operations._path_key)
+    _same_file = staticmethod(file_operations._same_file)
+    _restore_executed_sidecars = staticmethod(file_operations._restore_executed_sidecars)
+    _restore_original_sidecars = staticmethod(file_operations._restore_original_sidecars)
+    _backup_current_sidecars = staticmethod(file_operations._backup_current_sidecars)
+    _undo_sidecars = staticmethod(file_operations._undo_sidecars)
+    _restore_processed_sidecars = staticmethod(file_operations._restore_processed_sidecars)
+
+    def _undo_item(self, root: Path, database: Path, item: sqlite3.Row, backup: Path) -> None:
+        file_operations._undo_item(root, database, item, backup, self._update_asset)
+
+    def _restore_processed_item(
+        self, root: Path, database: Path, item: sqlite3.Row, backup: Path
+    ) -> None:
+        file_operations._restore_processed_item(root, database, item, backup, self._update_asset)
+
     def __init__(
         self,
         workspaces: WorkspaceService,
@@ -278,10 +300,16 @@ class PreprocessService:
 
     def list_operations(self, project_id: str) -> list[PreprocessOperation]:
         paths, _ = self._workspaces.get(project_id)
-        return PreprocessRepository(paths.database).list()
+        with connect(paths.database) as connection:
+            crop_ids = {str(r[0]) for r in connection.execute("SELECT id FROM crop_operations")}
+        return [
+            operation
+            for operation in PreprocessRepository(paths.database).list()
+            if operation.id not in crop_ids
+        ]
 
     def recover_orphaned(self) -> int:
-        return self._recovery.recover_orphaned()
+        return recover_crops(self._workspaces) + self._recovery.recover_orphaned()
 
     def close(self) -> None:
         self._backend_registry.close()
@@ -291,13 +319,20 @@ class PreprocessService:
         repository = PreprocessRepository(paths.database)
         with self._track_operation(project_id, f"undo:{operation_id}"), ExitStack() as file_locks:
             self._ensure_no_active_jobs(project_id)
+            with connect(paths.database) as connection:
+                if connection.execute(
+                    "SELECT 1 FROM crop_operations WHERE id=?", (operation_id,)
+                ).fetchone():
+                    raise ValueError("此操作属于非破坏性裁剪，请从裁剪历史撤销。")
             operation = repository.get(operation_id)
             if operation is None:
                 raise ValueError("找不到预处理操作。")
             if operation.status != "completed":
                 raise ValueError("只有已完成且尚未撤销的操作可以恢复。")
             if repository.latest_completed_id() != operation_id:
-                raise ValueError("只能从最新的一次预处理开始依次撤销。")
+                raise ValueError(
+                    "只能从最新的一次图片操作开始依次撤销；较新的裁剪请从裁剪历史撤销。"
+                )
             items = list(repository.items(operation_id))
             file_locks.enter_context(
                 hold_file_targets(
@@ -377,325 +412,7 @@ class PreprocessService:
         return targets
 
     def _commit_prepared_item(self, paths, prepared: PreparedItem) -> None:
-        item = prepared.plan
-        source = paths.root / item.before_relative_path
-        target = paths.root / item.after_relative_path
-        paths_differ = item.before_relative_path != item.after_relative_path
-        source_stat = source.stat()
-        if (
-            source_stat.st_size != prepared.source_size
-            or source_stat.st_mtime_ns != prepared.source_modified_ns
-        ):
-            raise ValueError(f"源文件在并发准备后发生了变化：{item.before_relative_path}")
-        if paths_differ and target.exists() and not self._same_file(source, target):
-            raise ValueError(f"目标文件在执行前已出现，拒绝覆盖：{item.after_relative_path}")
-        target_was_source = paths_differ and self._same_file(source, target)
-        preserve_asset_files(paths, item.asset_id, source)
-        sidecars = self._sidecar_paths(
-            source,
-            target,
-            prepared.recovery_path,
-            self._claimed_annotation_paths(paths.database, paths.root),
-            registered_suffixes(paths.database, paths.root, (source, target)),
-        )
-        sidecar_states: list[tuple[Path, Path, Path, bool]] = []
-        for before_sidecar, after_sidecar, recovery_sidecar in sidecars:
-            if after_sidecar.exists() and not self._same_file(before_sidecar, after_sidecar):
-                raise ValueError(
-                    f"目标同名伴随文件在执行前已出现，拒绝覆盖："
-                    f"{after_sidecar.relative_to(paths.root)}"
-                )
-            existed = before_sidecar.is_file()
-            if existed:
-                atomic_copy_file(before_sidecar, recovery_sidecar)
-            sidecar_states.append((before_sidecar, after_sidecar, recovery_sidecar, existed))
-        moved_sidecars: list[tuple[Path, Path, Path]] = []
-        try:
-            if prepared.staging_path is not None:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                verified_move_file(prepared.staging_path, target)
-                if paths_differ and not target_was_source:
-                    source.unlink()
-            elif paths_differ:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(source, target)
-            for before_sidecar, after_sidecar, recovery_sidecar, existed in sidecar_states:
-                if existed:
-                    if not before_sidecar.is_file():
-                        raise ValueError(
-                            f"同名伴随文件在执行期间发生了变化："
-                            f"{before_sidecar.relative_to(paths.root)}"
-                        )
-                    if after_sidecar.exists() and not self._same_file(
-                        before_sidecar, after_sidecar
-                    ):
-                        raise ValueError(
-                            f"目标同名伴随文件在执行前已出现，拒绝覆盖："
-                            f"{after_sidecar.relative_to(paths.root)}"
-                        )
-                    after_sidecar.parent.mkdir(parents=True, exist_ok=True)
-                    os.replace(before_sidecar, after_sidecar)
-                    moved_sidecars.append((before_sidecar, after_sidecar, recovery_sidecar))
-                elif before_sidecar.exists():
-                    raise ValueError(
-                        f"同名伴随文件在执行期间发生了变化："
-                        f"{before_sidecar.relative_to(paths.root)}"
-                    )
-            self._update_asset(
-                paths.database,
-                item.asset_id,
-                target,
-                paths.root,
-                prepared.after_hash,
-                item.after_width,
-                item.after_height,
-            )
-        except BaseException as error:
-            compensation_errors: list[str] = []
-            try:
-                self._restore_executed_sidecars(moved_sidecars)
-            except Exception as sidecar_error:
-                compensation_errors.append(f"伴随文件恢复失败：{sidecar_error}")
-            try:
-                self._restore_file(
-                    source,
-                    target,
-                    prepared.recovery_path,
-                    paths_differ=paths_differ,
-                )
-            except Exception as image_error:
-                compensation_errors.append(f"图片恢复失败：{image_error}")
-            if compensation_errors:
-                raise RuntimeError("；".join(compensation_errors)) from error
-            raise
-
-    @staticmethod
-    def _record_item(
-        repository,
-        root: Path,
-        operation_id: str,
-        prepared: PreparedItem,
-    ) -> str:
-        item = prepared.plan
-        observation = prepared.observation
-        item_id = str(uuid.uuid4())
-        repository.add_item(
-            operation_id,
-            (
-                item_id,
-                operation_id,
-                item.asset_id,
-                item.before_relative_path,
-                item.after_relative_path,
-                item.before_hash,
-                prepared.after_hash,
-                item.before_width,
-                item.before_height,
-                item.after_width,
-                item.after_height,
-                prepared.recovery_path.relative_to(root).as_posix(),
-                PreprocessItemPhase.PREPARED.value,
-                observation.planned_route.value if observation else None,
-                observation.actual_route.value if observation else None,
-                observation.backend_id if observation else None,
-                observation.decode_location if observation else None,
-                observation.resize_location if observation else None,
-                observation.encode_location if observation else None,
-                observation.route_reason_code if observation else None,
-                observation.fallback_code if observation else None,
-                observation.duration_ms if observation else None,
-            ),
-        )
-        return item_id
-
-    @staticmethod
-    def _verify_undo(root: Path, database_path: Path, items) -> None:
-        claimed_annotations = PreprocessService._claimed_annotation_paths(
-            database_path,
-            root,
-        )
-        for item in items:
-            current = root / str(item["after_relative_path"])
-            before = root / str(item["before_relative_path"])
-            original = database_path.parent / str(item["recovery_relative_path"])
-            paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
-            if not current.is_file() or sha256(current) != str(item["after_hash"]):
-                raise ValueError(
-                    f"当前文件已在预处理后被修改，无法安全撤销：{item['after_relative_path']}"
-                )
-            if not original.is_file():
-                raise ValueError(f"恢复文件缺失：{item['recovery_relative_path']}")
-            if (
-                paths_differ
-                and before.exists()
-                and not PreprocessService._same_file(before, current)
-            ):
-                raise ValueError(f"原路径已出现新文件，拒绝覆盖：{item['before_relative_path']}")
-            for before_sidecar, after_sidecar, _ in PreprocessService._sidecar_paths(
-                before,
-                current,
-                original,
-                claimed_annotations,
-                registered_suffixes(database_path, root, (before, current)),
-            ):
-                if after_sidecar.exists() and not after_sidecar.is_file():
-                    raise ValueError(f"当前同名伴随路径不是文件：{after_sidecar.relative_to(root)}")
-                if before_sidecar.exists() and not PreprocessService._same_file(
-                    before_sidecar, after_sidecar
-                ):
-                    raise ValueError(
-                        f"原同名伴随路径已出现新文件，拒绝覆盖：{before_sidecar.relative_to(root)}"
-                    )
-
-    @classmethod
-    def _undo_item(
-        cls,
-        root: Path,
-        database_path: Path,
-        item,
-        backup: Path,
-    ) -> None:
-        current = root / str(item["after_relative_path"])
-        before = root / str(item["before_relative_path"])
-        original = database_path.parent / str(item["recovery_relative_path"])
-        paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
-        sidecars = cls._sidecar_paths(
-            before,
-            current,
-            original,
-            cls._claimed_annotation_paths(database_path, root),
-            registered_suffixes(database_path, root, (before, current)),
-        )
-        atomic_copy_file(current, backup)
-        cls._backup_current_sidecars(sidecars, backup)
-        before_written = False
-        try:
-            if paths_differ and before.exists() and not cls._same_file(before, current):
-                raise ValueError(f"原路径已出现新文件，拒绝覆盖：{item['before_relative_path']}")
-            if paths_differ:
-                current.unlink()
-            atomic_copy_file(original, before)
-            before_written = True
-            cls._undo_sidecars(sidecars)
-            cls._update_asset(
-                database_path,
-                str(item["asset_id"]),
-                before,
-                root,
-                str(item["before_hash"]),
-                int(item["before_width"]),
-                int(item["before_height"]),
-            )
-        except BaseException:
-            cls._restore_processed_sidecars(sidecars, backup)
-            if before_written and paths_differ:
-                before.unlink(missing_ok=True)
-            atomic_copy_file(backup, current)
-            raise
-
-    @classmethod
-    def _restore_processed_item(
-        cls,
-        root: Path,
-        database_path: Path,
-        item,
-        backup: Path,
-    ) -> None:
-        after = root / str(item["after_relative_path"])
-        before = root / str(item["before_relative_path"])
-        original = database_path.parent / str(item["recovery_relative_path"])
-        paths_differ = str(item["before_relative_path"]) != str(item["after_relative_path"])
-        if paths_differ and before.is_file() and sha256(before) != str(item["before_hash"]):
-            raise RuntimeError(f"撤销补偿时原路径又被修改：{item['before_relative_path']}")
-        cls._restore_processed_sidecars(
-            cls._sidecar_paths(
-                before,
-                after,
-                original,
-                cls._claimed_annotation_paths(database_path, root),
-                registered_suffixes(database_path, root, (before, after)),
-            ),
-            backup,
-        )
-        if paths_differ:
-            before.unlink(missing_ok=True)
-        atomic_copy_file(backup, after)
-        cls._update_asset(
-            database_path,
-            str(item["asset_id"]),
-            after,
-            root,
-            str(item["after_hash"]),
-            int(item["after_width"]),
-            int(item["after_height"]),
-        )
-
-    @staticmethod
-    def _update_asset(
-        database_path: Path,
-        asset_id: str,
-        image_path: Path,
-        root: Path,
-        content_hash: str,
-        width: int,
-        height: int,
-    ) -> None:
-        stat = image_path.stat()
-        annotation = image_path.with_suffix(".txt")
-        metadata = image_path.with_suffix(".json")
-        with transaction(database_path) as connection:
-            connection.execute(
-                """
-                UPDATE assets
-                SET relative_path = ?, filename = ?, stem = ?, suffix = ?,
-                    content_hash = ?, byte_size = ?, modified_ns = ?, width = ?, height = ?,
-                    annotation_relative_path = ?, metadata_relative_path = ?,
-                    image_metadata_version = ?, is_present = 1
-                WHERE id = ?
-                """,
-                (
-                    image_path.relative_to(root).as_posix(),
-                    image_path.name,
-                    image_path.stem,
-                    image_path.suffix.lower(),
-                    content_hash,
-                    stat.st_size,
-                    stat.st_mtime_ns,
-                    width,
-                    height,
-                    annotation.relative_to(root).as_posix(),
-                    metadata.relative_to(root).as_posix() if metadata.is_file() else None,
-                    IMAGE_METADATA_VERSION,
-                    asset_id,
-                ),
-            )
-            for companion in connection.execute(
-                "SELECT role FROM companion_files WHERE asset_id=?", (asset_id,)
-            ).fetchall():
-                relative = (
-                    image_path.with_name(image_path.stem + str(companion["role"]))
-                    .relative_to(root)
-                    .as_posix()
-                )
-                connection.execute(
-                    "UPDATE companion_files SET relative_path=? WHERE asset_id=? AND role=?",
-                    (relative, asset_id, companion["role"]),
-                )
-            translation_rows = connection.execute(
-                "SELECT language FROM annotation_translations WHERE asset_id = ?",
-                (asset_id,),
-            ).fetchall()
-            for row in translation_rows:
-                language = str(row["language"])
-                translation = annotation.with_name(f"{annotation.stem}.{language}.txt")
-                connection.execute(
-                    """
-                    UPDATE annotation_translations
-                    SET translation_relative_path = ?
-                    WHERE asset_id = ? AND language = ?
-                    """,
-                    (translation.relative_to(root).as_posix(), asset_id, language),
-                )
+        commit_prepared_item(self, paths, prepared)
 
     def active_overview(self) -> tuple[int, int]:
         with self._active_lock:
@@ -737,6 +454,17 @@ class PreprocessService:
     @classmethod
     def ensure_database_inactive(cls, database_path: Path) -> None:
         if cls.has_active_database(database_path):
+            with connect(database_path) as connection:
+                crop = connection.execute(
+                    "SELECT id,error FROM crop_operations "
+                    "WHERE status='recovery_failed' OR (status='undoing' AND error IS NOT NULL) "
+                    "ORDER BY created_at DESC LIMIT 1"
+                ).fetchone()
+            if crop:
+                raise ValueError(
+                    f"当前项目的裁剪恢复尚未完成：operation={crop['id']}；{crop['error']}。"
+                    "请查看预处理页的裁剪记录，修复文件问题后重新启动应用以重试恢复。"
+                )
             raise ValueError("当前工作区存在尚未结束或尚未恢复的图片预处理，请稍后重试。")
 
     def _ensure_no_active_jobs(self, project_id: str) -> None:
@@ -752,6 +480,11 @@ class PreprocessService:
     @contextmanager
     def guard_workspace(self, project_id: str, operation_id: str):
         with self._track_operation(project_id, operation_id, is_preprocessing=False):
+            yield
+
+    @contextmanager
+    def guard_image_operation(self, project_id: str, operation_id: str) -> Iterator[None]:
+        with self._track_operation(project_id, operation_id, is_preprocessing=True):
             yield
 
     @contextmanager
@@ -775,207 +508,3 @@ class PreprocessService:
         finally:
             with self._active_lock:
                 self._active_operations.pop(key, None)
-
-    @classmethod
-    def _rollback(
-        cls,
-        root: Path,
-        database_path: Path,
-        completed: list[tuple[PlanItem, Path]],
-    ) -> None:
-        errors: list[str] = []
-        claimed_annotations = cls._claimed_annotation_paths(database_path, root)
-        for item, recovery in reversed(completed):
-            try:
-                after = root / item.after_relative_path
-                before = root / item.before_relative_path
-                bundle_errors: list[str] = []
-                try:
-                    cls._restore_original_sidecars(
-                        cls._sidecar_paths(
-                            before,
-                            after,
-                            recovery,
-                            claimed_annotations,
-                            registered_suffixes(database_path, root, (before, after)),
-                        )
-                    )
-                except Exception as sidecar_error:
-                    bundle_errors.append(f"伴随文件恢复失败：{sidecar_error}")
-                try:
-                    cls._restore_file(
-                        before,
-                        after,
-                        recovery,
-                        paths_differ=item.before_relative_path != item.after_relative_path,
-                    )
-                except Exception as image_error:
-                    bundle_errors.append(f"图片恢复失败：{image_error}")
-                if bundle_errors:
-                    raise RuntimeError("；".join(bundle_errors))
-                cls._update_asset(
-                    database_path,
-                    item.asset_id,
-                    before,
-                    root,
-                    item.before_hash,
-                    item.before_width,
-                    item.before_height,
-                )
-            except Exception as error:
-                errors.append(f"{item.before_relative_path}：{error}")
-        if errors:
-            raise RuntimeError("；".join(errors))
-
-    @staticmethod
-    def _restore_file(
-        before: Path,
-        after: Path,
-        recovery: Path,
-        *,
-        paths_differ: bool,
-    ) -> None:
-        if paths_differ:
-            after.unlink(missing_ok=True)
-        atomic_copy_file(recovery, before)
-
-    @staticmethod
-    def _sidecar_paths(
-        before_image: Path,
-        after_image: Path,
-        recovery_image: Path,
-        claimed_annotations: set[str],
-        registered: tuple[str, ...],
-    ) -> list[tuple[Path, Path, Path]]:
-        paths: list[tuple[Path, Path, Path]] = [
-            (
-                before_image.with_suffix(".txt"),
-                after_image.with_suffix(".txt"),
-                recovery_image.with_suffix(".txt"),
-            ),
-            (
-                before_image.with_suffix(".json"),
-                after_image.with_suffix(".json"),
-                recovery_image.with_suffix(".json"),
-            ),
-        ]
-        languages = (
-            PreprocessService._translation_languages(before_image, claimed_annotations)
-            | PreprocessService._translation_languages(after_image, claimed_annotations)
-            | PreprocessService._translation_languages(recovery_image, set())
-        )
-        for language in sorted(languages):
-            paths.append(
-                (
-                    before_image.with_name(f"{before_image.stem}.{language}.txt"),
-                    after_image.with_name(f"{after_image.stem}.{language}.txt"),
-                    recovery_image.with_name(f"{recovery_image.stem}.{language}.txt"),
-                )
-            )
-        for suffix in registered:
-            triple = (
-                before_image.with_name(before_image.stem + suffix),
-                after_image.with_name(after_image.stem + suffix),
-                recovery_image.with_name(recovery_image.stem + suffix),
-            )
-            if triple not in paths:
-                paths.append(triple)
-        return [
-            (before, after, recovery)
-            for before, after, recovery in paths
-            if before.as_posix() != after.as_posix()
-        ]
-
-    @staticmethod
-    def _translation_languages(
-        image_path: Path,
-        claimed_annotations: set[str],
-    ) -> set[str]:
-        if not image_path.parent.is_dir():
-            return set()
-        prefix = f"{image_path.stem}."
-        languages: set[str] = set()
-        for candidate in image_path.parent.glob(f"{image_path.stem}.*.txt"):
-            if PreprocessService._path_key(candidate) in claimed_annotations:
-                continue
-            language = candidate.name[len(prefix) : -len(".txt")]
-            if LANGUAGE_PATTERN.fullmatch(language):
-                languages.add(language)
-        return languages
-
-    @staticmethod
-    def _claimed_annotation_paths(database_path: Path, root: Path) -> set[str]:
-        connection = connect(database_path)
-        try:
-            return {
-                PreprocessService._path_key(root / str(row["annotation_relative_path"]))
-                for row in connection.execute(
-                    """
-                    SELECT annotation_relative_path
-                    FROM assets
-                    WHERE is_present = 1
-                    """
-                )
-            }
-        finally:
-            connection.close()
-
-    @staticmethod
-    def _path_key(path: Path) -> str:
-        return filesystem_path_key(path)
-
-    @staticmethod
-    def _same_file(first: Path, second: Path) -> bool:
-        if not first.exists() or not second.exists():
-            return False
-        try:
-            return first.samefile(second)
-        except OSError:
-            return False
-
-    @staticmethod
-    def _restore_executed_sidecars(sidecars: list[tuple[Path, Path, Path]]) -> None:
-        for before, after, recovery in reversed(sidecars):
-            after.unlink(missing_ok=True)
-            atomic_copy_file(recovery, before)
-
-    @staticmethod
-    def _restore_original_sidecars(sidecars: list[tuple[Path, Path, Path]]) -> None:
-        for before, after, recovery in sidecars:
-            if recovery.is_file():
-                after.unlink(missing_ok=True)
-                atomic_copy_file(recovery, before)
-
-    @staticmethod
-    def _backup_current_sidecars(
-        sidecars: list[tuple[Path, Path, Path]],
-        backup_image: Path,
-    ) -> None:
-        for _, after, _ in sidecars:
-            backup = backup_image.parent / after.name
-            if after.is_file():
-                atomic_copy_file(after, backup)
-            else:
-                backup.unlink(missing_ok=True)
-
-    @staticmethod
-    def _undo_sidecars(sidecars: list[tuple[Path, Path, Path]]) -> None:
-        for before, after, recovery in sidecars:
-            if after.is_file():
-                before.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(after, before)
-            elif recovery.is_file():
-                atomic_copy_file(recovery, before)
-
-    @staticmethod
-    def _restore_processed_sidecars(
-        sidecars: list[tuple[Path, Path, Path]],
-        backup_image: Path,
-    ) -> None:
-        for before, after, recovery in sidecars:
-            backup = backup_image.parent / after.name
-            if not backup.is_file() and not recovery.is_file():
-                continue
-            before.unlink(missing_ok=True)
-            if backup.is_file():
-                atomic_copy_file(backup, after)

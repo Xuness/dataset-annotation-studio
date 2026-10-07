@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useAssetFolders,
   useAssetIds,
+  useAssetLookup,
   useCandidateSummary,
   useInfiniteAssets,
 } from "../../features/assets/hooks";
@@ -116,6 +117,22 @@ export function useWorkspaceAssetsController({
     () => assets.data?.pages.flatMap((page) => page.items) ?? [],
     [assets.data?.pages],
   );
+  const lookupEnabled = Boolean(
+    selectedAssetId &&
+    !assets.isLoading &&
+    !assetItems.some((asset) => asset.id === selectedAssetId),
+  );
+  const selectedLookup = useAssetLookup(
+    projectId,
+    selectedAssetId,
+    {
+      search,
+      status: statusFilter,
+      folder_path: folderPath,
+      candidate_scope: candidateScope,
+    },
+    lookupEnabled,
+  );
   const assetResult = assets.data?.pages[0];
   const knownMatchingAssetIds = useMemo(
     () =>
@@ -166,17 +183,34 @@ export function useWorkspaceAssetsController({
   }, [editorDirty, folderPath, folders.data, setFolderPath]);
 
   useEffect(() => {
-    if (editorDirty || assets.isLoading) return;
-    if (!assetItems.length) {
-      if (selectedAssetId) selectAsset(null);
+    if (
+      editorDirty ||
+      assets.isLoading ||
+      (lookupEnabled && (selectedLookup.isFetching || selectedLookup.isError))
+    )
       return;
-    }
-    if (!selectedAssetId || !assetItems.some((asset) => asset.id === selectedAssetId)) {
-      selectAsset(assetItems[0].id);
-    }
-  }, [assetItems, assets.isLoading, editorDirty, selectAsset, selectedAssetId]);
+    if (
+      selectedAssetId &&
+      (assetItems.some((asset) => asset.id === selectedAssetId) || selectedLookup.data)
+    )
+      return;
+    selectAsset(assetItems[0]?.id ?? null);
+  }, [
+    assetItems,
+    assets.isLoading,
+    editorDirty,
+    lookupEnabled,
+    selectedLookup.data,
+    selectedLookup.isError,
+    selectedLookup.isFetching,
+    selectAsset,
+    selectedAssetId,
+  ]);
 
-  const selectedAsset = assetItems.find((asset) => asset.id === selectedAssetId) ?? null;
+  const selectedAsset =
+    assetItems.find((asset) => asset.id === selectedAssetId) ?? selectedLookup.data ?? null;
+  const selectionError =
+    lookupEnabled && selectedLookup.error instanceof Error ? selectedLookup.error.message : null;
 
   const requestSelectAsset = useCallback(
     async (assetId: string): Promise<boolean> => {
@@ -311,6 +345,7 @@ export function useWorkspaceAssetsController({
     assetItems,
     assetResult,
     selectedAsset,
+    selectionError,
     selectedAssetId,
     checkedAssetIds,
     search,

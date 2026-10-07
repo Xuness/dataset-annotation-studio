@@ -1,0 +1,278 @@
+.character-audit-workspace-body {
+  grid-template-columns:
+    var(--workspace-rail-width) minmax(190px, var(--character-assets))
+    5px minmax(0, 1fr) 5px minmax(250px, var(--character-settings));
+}
+.character-center {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--surface) 97%, transparent);
+}
+.character-workbench-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.character-workbench-toolbar h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 400;
+}
+.character-center-split {
+  display: grid;
+  grid-template-columns: minmax(0, var(--character-preview)) 5px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.character-image-pane,
+.character-review-pane,
+.character-settings-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 20px 16px;
+}
+.character-image-pane {
+  display: flex;
+  flex-direction: column;
+}
+.character-image-pane > header h2 {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.character-image-pane > header p,
+.character-membership-note {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.character-image-pane .character-image-viewport {
+  flex: 1;
+  min-height: 280px;
+  height: auto;
+}
+.character-image-empty,
+.character-review-empty {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-height: 280px;
+  padding: 18px;
+  gap: 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.character-review-pane {
+  border-left: 1px solid var(--line);
+}
+.character-settings-pane {
+  border-left: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 97%, transparent);
+}
+.character-settings-pane > header h2 {
+  font-size: 18px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  margin: 5px 0 22px;
+}
+.character-settings-pane .legacy-character-fields {
+  grid-template-columns: minmax(0, 1fr);
+}
+.character-settings-pane .legacy-character-section {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.character-settings-pane .legacy-character-section h2 {
+  font-size: var(--text-sm);
+}
+.character-settings-pane .legacy-character-profiles {
+  display: grid;
+  gap: 12px;
+}
+.character-settings-pane fieldset {
+  margin: 0;
+  min-width: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+}
+.character-settings-pane .legacy-character-actions {
+  margin-top: 14px;
+}
+.character-settings-pane pre,
+.character-settings-pane p {
+  overflow-wrap: anywhere;
+}
+.character-settings-pane pre {
+  white-space: pre-wrap;
+  font-size: var(--text-xs);
+}
+.character-snapshot {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.character-snapshot dl {
+  display: grid;
+  gap: 6px;
+}
+.character-snapshot dd {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.character-snapshot dt {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.character-snapshot h3 {
+  font-size: var(--text-sm);
+}
+.character-review-pane .legacy-character-section {
+  border: 0;
+  background: transparent;
+  padding: 12px 0;
+}
+.character-review-summary {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-xs);
+}
+.character-review-summary small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+.character-review-content,
+.character-decision-list {
+  display: grid;
+  gap: 12px;
+}
+.character-decision-row {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  padding: 14px 0;
+}
+.character-decision-field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  font-size: var(--text-xs);
+}
+.character-decision-field small {
+  color: var(--muted);
+}
+.character-decision-field strong {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.character-decision-field select,
+.character-decision-field input,
+.character-decision-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+}
+.character-decision-field input[type="checkbox"] {
+  width: auto;
+}
+.character-decision-field textarea {
+  resize: vertical;
+}
+.character-decision-evidence summary,
+.character-snapshot summary {
+  cursor: pointer;
+  color: var(--muted);
+  padding: 5px 0;
+}
+.character-review-pane > .legacy-character-tabs {
+  position: sticky;
+  top: -20px;
+  z-index: 2;
+  background: var(--surface);
+  padding: 10px 0;
+}
+.character-review-pane .legacy-character-actions {
+  position: sticky;
+  bottom: -20px;
+  background: var(--surface);
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 1400px) {
+  .character-audit-workspace-body {
+    grid-template-columns:
+      var(--workspace-rail-width) minmax(180px, min(var(--character-assets), 210px))
+      5px minmax(0, 1fr) 5px minmax(235px, min(var(--character-settings), 260px));
+  }
+  .character-workbench-toolbar {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  .character-image-pane,
+  .character-review-pane,
+  .character-settings-pane {
+    padding: 14px 10px;
+  }
+  .character-review-pane > .legacy-character-tabs {
+    top: -14px;
+  }
+}
+
+.character-settings-pane .legacy-character-actions {
+  position: sticky;
+  bottom: -20px;
+  padding: 12px 0;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  z-index: 1;
+}
+.character-advanced-settings {
+  margin-top: 18px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.character-decision-row {
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 0.7fr);
+}
+.character-decision-row > :nth-child(n + 3) {
+  grid-column: 1 / -1;
+}
+.character-decision-row > :last-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.character-decision-row input[type="number"] {
+  width: 74px;
+}
+@media (max-width: 1400px) {
+  .character-decision-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .character-settings-pane .legacy-character-actions {
+    bottom: -14px;
+  }
+}
+
+:is(.character-settings-pane, .character-review-pane) .legacy-character-actions:empty {
+  display: none;
+}

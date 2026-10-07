@@ -1,4 +1,7 @@
 import { BookOpenText, Bot, Languages, Play, Settings2, Tags } from "lucide-react";
+import { taggerThresholdSummary } from "./taggerThresholdSummary";
+import { JobKindSelector } from "./JobKindSelector";
+import type { JobCenterKind } from "../../../../src/application/jobs/jobCenterState";
 import { useNavigate } from "react-router-dom";
 
 import { useNewJobController } from "../../../../src/application/jobs/useNewJobController";
@@ -10,7 +13,6 @@ import {
 import type {
   ExistingTranslationPolicy,
   JobDetail,
-  TaggerProfile,
   TranslationSourceKind,
   WorkspaceSummary,
 } from "../../../../src/shared/api/types";
@@ -19,37 +21,18 @@ import { Button } from "../../../shared/ui/Button";
 import { Spinner } from "../../../shared/ui/Spinner";
 
 interface NewJobPanelProps {
+  initialKind: "annotation" | "translation";
+  onKindChange: (kind: JobCenterKind) => void;
   projectId: string;
   workspace: WorkspaceSummary;
   checkedAssetIds: string[];
   onCreated: (job: JobDetail) => void;
 }
 
-function taggerThresholdSummary(profile: TaggerProfile): {
-  label: string;
-  value: string;
-} {
-  const { selection } = profile;
-  if (selection.mode === "global") {
-    return {
-      label: "统一阈值",
-      value: `${selection.global_threshold.toFixed(2)}（全部输出类别）`,
-    };
-  }
-
-  return {
-    label: selection.mode === "category" ? "有效分类阈值" : "分类回退阈值",
-    value: profile.categories
-      .map((category) => {
-        const threshold = selection.category_thresholds[category] ?? selection.global_threshold;
-        return `${taggerCategoryLabel(category)} ${threshold.toFixed(2)}`;
-      })
-      .join(" · "),
-  };
-}
-
 export function NewJobPanel({
   projectId,
+  initialKind,
+  onKindChange,
   workspace,
   checkedAssetIds,
   onCreated,
@@ -61,6 +44,7 @@ export function NewJobPanel({
     workspace,
     checkedAssetIds,
     onCreated,
+    initialKind,
   });
   const {
     systemPresets,
@@ -130,20 +114,13 @@ export function NewJobPanel({
         </div>
       </header>
 
-      <div className="job-kind-switch" aria-label="任务类型">
-        <button
-          className={kind === "annotation" ? "is-active" : ""}
-          onClick={() => setKind("annotation")}
-        >
-          <Bot size={14} /> 标注
-        </button>
-        <button
-          className={kind === "translation" ? "is-active" : ""}
-          onClick={() => setKind("translation")}
-        >
-          <Languages size={14} /> 翻译
-        </button>
-      </div>
+      <JobKindSelector
+        kind={kind}
+        onChange={(value) => {
+          if (value !== "character") setKind(value);
+          onKindChange(value);
+        }}
+      />
 
       {kind === "annotation" ? (
         <div className="job-kind-switch job-executor-switch" aria-label="标注执行方式">

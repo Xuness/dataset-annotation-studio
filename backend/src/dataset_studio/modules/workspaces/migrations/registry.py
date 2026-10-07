@@ -69,6 +69,12 @@ from dataset_studio.modules.workspaces.migrations.v021_asset_source_identities i
 from dataset_studio.modules.workspaces.migrations.v022_external_workspace import (
     MIGRATION as V022_EXTERNAL_WORKSPACE,
 )
+from dataset_studio.modules.workspaces.migrations.v023_character_audits import (
+    MIGRATION as V023_CHARACTER_AUDITS,
+)
+from dataset_studio.modules.workspaces.migrations.v024_image_cropping import (
+    MIGRATION as V024_IMAGE_CROPPING,
+)
 
 WORKSPACE_MIGRATIONS: Final[tuple[Migration, ...]] = (
     V001_INITIAL_WORKSPACE_SCHEMA,
@@ -93,5 +99,7 @@ WORKSPACE_MIGRATIONS: Final[tuple[Migration, ...]] = (
     V020_ASSET_CANDIDATES,
     V021_ASSET_SOURCE_IDENTITIES,
     V022_EXTERNAL_WORKSPACE,
+    V023_CHARACTER_AUDITS,
+    V024_IMAGE_CROPPING,
 )
 WORKSPACE_SCHEMA_VERSION: Final = WORKSPACE_MIGRATIONS[-1].version

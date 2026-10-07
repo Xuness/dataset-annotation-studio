@@ -11,6 +11,13 @@ Thanks for helping improve Dataset Annotation Studio.
 3. Never commit API keys, OAuth material, downloaded model weights, private datasets,
    build output, or local application data.
 
+## Frontend delivery priority
+
+New features and workflow changes must be implemented and validated in the classic (Legacy)
+interface first, unless the user explicitly requests a new-interface-only change. Keep business
+logic in the shared application/features layers and use each interface's own presentation
+components; see [`frontend/Legacy/README.md`](frontend/Legacy/README.md) for the dependency boundary.
+
 ## Source setup
 
 Use the CPU baseline unless the change specifically targets CUDA:
@@ -33,10 +40,10 @@ Before submitting a change, run the relevant non-release checks:
 pnpm --dir frontend check
 uv run --project backend --extra cpu ruff check backend/src backend/tests
 uv run --project backend --extra cpu pytest
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+node scripts/run-rust.mjs cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 ```
 
-Changes to Rust/Tauri behavior should also pass `cargo check` on every claimed platform.
+Changes to Rust/Tauri behavior should also pass `node scripts/run-rust.mjs cargo check` on every claimed platform.
 Do not attach generated installers or downloaded model files to a pull request.
 
 Contributions are submitted under the repository's Apache-2.0 license unless explicitly

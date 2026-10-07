@@ -34,7 +34,7 @@ from dataset_studio.modules.jobs.models import (
 )
 from dataset_studio.modules.jobs.provider_snapshot import load_provider_snapshot
 from dataset_studio.modules.jobs.query_repository import JobQueryRepository
-from dataset_studio.modules.jobs.repository import JobCreationRepository
+from dataset_studio.modules.jobs.repository import JobCreation, JobCreationRepository
 from dataset_studio.modules.presets.models import TranslationPromptPreset
 from dataset_studio.modules.presets.service import PresetService
 from dataset_studio.modules.tag_dictionaries.service import TagDictionaryService
@@ -100,6 +100,15 @@ class JobService:
         *,
         include_items: bool,
     ) -> JobDetail:
+        creation = self.prepare_creation(project_id, request)
+        JobCreationRepository(self._workspaces.get(project_id)[0].database).insert_prepared_job(
+            creation
+        )
+        self._workspaces.mark_worker_activity(project_id, "jobs")
+        return self.get(project_id, creation.job_id, include_items=include_items)
+
+    def prepare_creation(self, project_id: str, request: JobCreateRequest) -> JobCreation:
+        """Freeze job inputs; local tagger callers must hold the catalog guard."""
         paths, manifest = self._workspaces.get(project_id)
         use_tags_as_context = False
         if request.execution_backend == ExecutionBackend.LOCAL_TAGGER:
@@ -290,8 +299,7 @@ class JobService:
                 overwrite_existing = request.overwrite_existing
 
         job_id = str(uuid.uuid4())
-        repository = JobCreationRepository(paths.database)
-        repository.insert_job(
+        return JobCreation(
             job_id=job_id,
             kind=request.kind.value,
             configuration_snapshot=json.dumps(configuration, ensure_ascii=False),
@@ -314,8 +322,6 @@ class JobService:
             retry_limit=retry_limit,
             asset_ids=asset_ids,
         )
-        self._workspaces.mark_worker_activity(project_id, "jobs")
-        return self.get(project_id, job_id, include_items=include_items)
 
     def _resolve_translation_prompt(
         self,

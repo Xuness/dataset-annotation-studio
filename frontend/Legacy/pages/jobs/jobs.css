@@ -353,3 +353,27 @@
     grid-template-columns: var(--workspace-rail-width) 280px 285px minmax(360px, 1fr);
   }
 }
+.job-kind-switch--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.job-kind-switch--three button {
+  padding: 8px 2px;
+  font-size: var(--text-xs);
+}
+.character-job-detail {
+  overflow: auto;
+  padding: 22px;
+}
+.character-job-detail dl {
+  display: grid;
+  grid-template-columns: 95px minmax(0, 1fr);
+  gap: 10px;
+}
+.character-job-detail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.character-job-detail section {
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+}

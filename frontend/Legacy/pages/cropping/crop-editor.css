@@ -1,0 +1,153 @@
+.image-stage-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.image-stage-tools .image-stage-crop-button {
+  min-height: 28px;
+  padding: 0 9px;
+  font-size: var(--text-xs);
+}
+.crop-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+}
+.crop-inspector {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 18px;
+  border-left: 1px solid var(--line);
+}
+.crop-inspector-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 16px;
+}
+.crop-inspector-heading h3 span {
+  color: var(--accent);
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+}
+.crop-inspector .crop-control-group {
+  margin: 6px 0;
+}
+.crop-inspector .button {
+  font-size: var(--text-xs);
+}
+.crop-frame-list {
+  display: grid;
+  gap: 6px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.crop-frame-list .button {
+  justify-content: flex-start;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+.crop-coordinate-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.crop-canvas-section {
+  min-width: 0;
+}
+.crop-canvas-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.crop-canvas-tools .button {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: var(--text-xs);
+}
+.crop-canvas-tools .button[aria-pressed="true"] {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.crop-zoom-level {
+  min-width: 42px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.crop-canvas-viewport {
+  height: min(52vh, 680px);
+  overflow: hidden;
+  position: relative;
+  container-type: size;
+  touch-action: none;
+  overscroll-behavior: contain;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+}
+.crop-canvas-image {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}
+.crop-canvas-image > img {
+  display: block;
+  width: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+.crop-canvas-image svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.crop-frame {
+  fill: color-mix(in srgb, var(--accent) 8%, transparent);
+  stroke: color-mix(in srgb, var(--accent) 60%, white);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  cursor: move;
+}
+.crop-frame.is-selected {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+.crop-canvas-image text {
+  fill: white;
+  paint-order: stroke;
+  stroke: #151515;
+  stroke-width: 2;
+}
+.crop-handle {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 1;
+  cursor: nwse-resize;
+}
+@media (max-width: 1150px) {
+  .crop-editor {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+}
+
+.crop-canvas-viewport.is-space-held,
+.crop-canvas-viewport.is-space-held * {
+  cursor: grab;
+}
+.crop-canvas-viewport.is-panning,
+.crop-canvas-viewport.is-panning * {
+  cursor: grabbing;
+}

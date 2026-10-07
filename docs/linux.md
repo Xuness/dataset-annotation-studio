@@ -32,7 +32,7 @@ Then install:
 - Node.js LTS with Corepack/pnpm
 - Python 3.11 or newer
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- Rust stable through [rustup](https://rustup.rs/)
+- Rust as pinned in `rust-toolchain.toml`, installed inside the checkout by the launcher
 
 The upstream package list for other distributions is maintained in the
 [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
@@ -44,6 +44,15 @@ corepack enable
 chmod +x ./启动开发版.sh
 ./启动开发版.sh
 ```
+
+The launcher installs the official Rust toolchain from `rust-toolchain.toml` under
+`.rust/`, verifies the downloaded rustup installer checksum, and leaves system Rust
+and shell profiles unchanged. Tauri, `--check-only`, and `pnpm check` use this same
+project toolchain rather than mixing distribution Rust with system LLVM. For manual
+setup, run `pnpm rust:setup`; for direct Cargo commands, use
+`node scripts/run-rust.mjs cargo ...`. `--skip-sync` skips installation but still
+checks that the configured compiler runs and reports a valid host before Tauri starts.
+A missing or broken compiler produces its command, exit status, and original output.
 
 The launcher uses `backend/.venv-cuda` when `nvidia-smi` reports a CUDA device and
 `backend/.venv-cpu` otherwise. The environments remain independent, so starting on a

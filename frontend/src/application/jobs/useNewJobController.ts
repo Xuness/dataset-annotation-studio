@@ -30,6 +30,7 @@ interface UseNewJobControllerOptions {
   checkedAssetIds: readonly string[];
   onCreated: (job: JobDetail) => void;
   enabled?: boolean;
+  initialKind?: JobKind;
 }
 
 type NewJobScope = "all" | "selected" | "folder";
@@ -40,6 +41,7 @@ export function useNewJobController({
   checkedAssetIds,
   onCreated,
   enabled = true,
+  initialKind,
 }: UseNewJobControllerOptions) {
   const systemPresets = useSystemPresets(enabled);
   const translationPromptPresets = useTranslationPromptPresets(enabled);
@@ -48,7 +50,7 @@ export function useNewJobController({
   const tagDictionaryLibrary = useTagDictionaryLibrary(enabled);
   const candidateSummary = useCandidateSummary(projectId);
   const actions = useJobActions(projectId);
-  const [kind, setKind] = useState<JobKind>("annotation");
+  const [kind, setKind] = useState<JobKind>(initialKind ?? "annotation");
   const [annotationBackend, setAnnotationBackend] = useState<ExecutionBackend>("provider");
   const [translationBackend, setTranslationBackend] = useState<"provider" | "local_dictionary">(
     "provider",

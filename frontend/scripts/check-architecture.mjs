@@ -16,6 +16,7 @@ const controllerBoundPresentation = new Set([
   "Legacy/pages/workspace/components/TagBatchPreviewDetails.tsx",
   "Legacy/pages/workspace/components/AssetDeletionDialog.tsx",
   "Legacy/pages/jobs/JobsPage.tsx",
+  "Legacy/pages/character-audits/CharacterAuditPage.tsx",
   "Legacy/pages/jobs/components/NewJobPanel.tsx",
   "Legacy/pages/jobs/components/JobDetailPanel.tsx",
   "Legacy/pages/preprocess/PreprocessPage.tsx",

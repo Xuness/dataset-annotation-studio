@@ -73,6 +73,10 @@ class PreprocessRepository:
                 """
                 SELECT id FROM preprocess_operations
                 WHERE status IN ('running', 'recovering')
+                AND NOT EXISTS (
+                    SELECT 1 FROM crop_operations
+                    WHERE crop_operations.id = preprocess_operations.id
+                )
                 ORDER BY created_at
                 """
             ).fetchall()

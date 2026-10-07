@@ -1,0 +1,134 @@
+/* Shared review and parameter controls use the existing Legacy theme tokens. */
+:is(.character-review-pane, .character-settings-pane) {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+:is(.character-review-pane, .character-settings-pane) p {
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.legacy-character-section h2 {
+  margin: 4px 0 12px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 400;
+}
+.legacy-character-section {
+  padding: 0 0 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.legacy-character-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+  align-items: end;
+}
+:is(.character-review-pane, .character-settings-pane) label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+:is(.character-review-pane, .character-settings-pane) :is(input, select, textarea) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+:is(.character-review-pane, .character-settings-pane) textarea {
+  resize: vertical;
+}
+:is(.character-review-pane, .character-settings-pane) :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+:is(.character-review-pane, .character-settings-pane) input[type="checkbox"] {
+  width: 16px;
+  min-height: 16px;
+  accent-color: var(--accent);
+}
+:is(.character-review-pane, .character-settings-pane) .legacy-character-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+:is(.character-review-pane, .character-settings-pane) fieldset {
+  min-width: 0;
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+:is(.character-review-pane, .character-settings-pane) legend {
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.legacy-character-actions,
+.legacy-character-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.legacy-character-tabs .button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  box-shadow: inset 0 -2px var(--accent);
+}
+.legacy-character-import > label {
+  margin: 14px 0;
+}
+:is(.character-review-pane, .character-settings-pane) summary {
+  padding: 8px 0;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.legacy-character-reference-thumb {
+  display: block;
+  max-width: 160px;
+  max-height: 160px;
+  object-fit: contain;
+  margin: 12px 0;
+}
+.legacy-character-message {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  overflow-wrap: anywhere;
+}
+.legacy-character-error,
+:is(.character-review-pane, .character-settings-pane) [role="alert"] {
+  color: var(--warning);
+}
+.legacy-character-conflict {
+  border-left: 3px solid var(--warning) !important;
+}
+.legacy-character-conflict .button {
+  margin: 10px 8px 0 0;
+}
+:is(.character-review-pane, .character-settings-pane) pre {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.legacy-character-diffs {
+  max-height: 420px;
+  overflow: auto;
+  margin: 16px 0;
+}

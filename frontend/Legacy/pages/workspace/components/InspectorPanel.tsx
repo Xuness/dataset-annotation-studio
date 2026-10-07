@@ -7,6 +7,7 @@ import { useUnsavedChangesStore } from "../../../../src/shared/store/unsavedChan
 import { confirmDialog } from "../../../shared/ui/dialogs";
 import { inspectorViewState, type InspectorTab } from "../workspaceViewState";
 import { MetadataSettingsPanel } from "./MetadataSettingsPanel";
+import { CropSourceInfo } from "../../cropping/CropSourceInfo";
 import { OverviewPanel } from "./OverviewPanel";
 import { PromptSettingsPanel } from "./PromptSettingsPanel";
 
@@ -74,6 +75,9 @@ export function InspectorPanel({
         ))}
       </div>
       <div className="inspector-panel__content">
+        {activeTab === "overview" && asset && (
+          <CropSourceInfo projectId={projectId} assetId={asset.id} />
+        )}
         {activeTab === "overview" ? (
           <OverviewPanel
             projectId={projectId}

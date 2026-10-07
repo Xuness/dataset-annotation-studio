@@ -1,5 +1,20 @@
 import type { WorkspaceFilesController } from "../../../application/workspace/useWorkspaceFilesController";
 export type { WorkspaceFilesController } from "../../../application/workspace/useWorkspaceFilesController";
+import type { CharacterAuditContent } from "../../../application/characterAudits/characterAuditModel";
+export type {
+  CharacterAuditContent,
+  CharacterAuditDecision,
+  CharacterAuditProfile,
+  CharacterAuditResolution,
+  CharacterTagConflict,
+} from "../../../application/characterAudits/characterAuditModel";
+export {
+  CHARACTER_AUDIT_STATUS,
+  ACTIVE_CHARACTER_AUDIT_STATUSES,
+  CHARACTER_APPEARANCE_CATEGORIES,
+  CHARACTER_DECISIONS,
+  CHARACTER_DECISION_LABELS,
+} from "../../../application/characterAudits/characterAuditModel";
 import type { HomeSpace } from "../../navigation/spaceRegistry";
 import type { ExportFormState } from "../../../application/exports/exportState";
 import type { PreprocessFormState } from "../../../application/preprocessing/preprocessState";
@@ -153,6 +168,7 @@ export interface AnnotationOperationSummary {
 }
 
 export interface AnnotationSpaceContent {
+  openCharacterAudits?(): void;
   kind: "annotation";
   status: "no-context" | "loading" | "ready" | "error";
   project: AnnotationProjectContext | null;
@@ -965,6 +981,7 @@ export interface QualityQueueSummary extends QualityQueuePresentation {
 }
 
 export interface QualitySpaceContent {
+  openCharacterAudits?(): void;
   kind: "quality";
   status: "no-context" | "loading" | "ready" | "error";
   project: AnnotationProjectContext | null;
@@ -1626,6 +1643,7 @@ export interface CapabilitySpaceContent {
 }
 
 export type SpacePageContent =
+  | CharacterAuditContent
   | ArchiveSpaceContent
   | AnnotationSpaceContent
   | AnnotationStageContent

@@ -4,7 +4,7 @@
 
 - Node.js LTS and pnpm through Corepack
 - Python 3.11+ and uv
-- Rust stable
+- Rust pinned by `rust-toolchain.toml` (Linux checkout setup: `pnpm rust:setup`)
 - Tauri system prerequisites for the host platform
 - PowerShell 7 only for the Windows convenience launcher and maintenance scripts
 
@@ -76,12 +76,12 @@ pnpm check
 The individual gates remain:
 
 ```text
-node --test scripts/dev-ports.test.mjs
+node --test scripts/dev-ports.test.mjs scripts/rust-toolchain.test.mjs
 pnpm --dir frontend check
 uv run --project backend --no-sync ruff check backend/src backend/tests
 uv run --project backend --no-sync pytest
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-cargo check --manifest-path src-tauri/Cargo.toml
+node scripts/run-rust.mjs cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+node scripts/run-rust.mjs cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
 After selecting and syncing the CUDA extra on a machine with a real NVIDIA device, the
@@ -92,7 +92,7 @@ alpha resize:
 DATASET_STUDIO_RUN_CUDA_TESTS=1 uv run --project backend --no-sync pytest backend/tests/test_cuda_image_runtime_integration.py -q
 ```
 
-The aggregate `pnpm check` runs all of the above. `cargo check` compiles Rust metadata
+The aggregate `pnpm check` runs all of the above. `node scripts/run-rust.mjs cargo check` compiles Rust metadata
 and dependencies; it is intentionally separate when only non-compiling validation is
 desired.
 

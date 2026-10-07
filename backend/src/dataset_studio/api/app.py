@@ -12,6 +12,8 @@ from dataset_studio.api.routes import (
     annotations,
     asset_deletions,
     assets,
+    character_audits,
+    cropping,
     exports,
     jobs,
     preprocessing,
@@ -32,6 +34,8 @@ from dataset_studio.core.errors import (
     SecretStoreUnavailableError,
     StudioError,
 )
+from dataset_studio.modules.cropping.errors import CropExecutionError
+from dataset_studio.modules.cropping.execution import recover_orphaned as recover_crops
 from dataset_studio.modules.providers.models import ProviderRequestError
 
 
@@ -41,6 +45,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         container = AppContainer.create(app_settings)
         app.state.container = container
         try:
+            recover_crops(container.workspaces)
             yield
         finally:
             await container.aclose()
@@ -74,6 +79,10 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     ):
         return JSONResponse(status_code=503, content={"detail": str(error)})
 
+    @app.exception_handler(CropExecutionError)
+    async def crop_execution_error_handler(_request: Request, error: CropExecutionError):
+        return JSONResponse(status_code=500, content={"detail": str(error)})
+
     @app.exception_handler(ValueError)
     async def value_error_handler(_request: Request, error: ValueError):
         return JSONResponse(status_code=400, content={"detail": str(error)})
@@ -103,8 +112,11 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     app.include_router(jobs.router, prefix=api_prefix)
     app.include_router(jobs.global_router, prefix=api_prefix)
     app.include_router(preprocessing.router, prefix=api_prefix)
+    app.include_router(cropping.router, prefix=api_prefix)
     app.include_router(exports.router, prefix=api_prefix)
     app.include_router(screening.router, prefix=api_prefix)
+    app.include_router(character_audits.router, prefix=api_prefix)
+    app.include_router(character_audits.library_router, prefix=api_prefix)
     app.include_router(statistics.router, prefix=api_prefix)
     app.include_router(system.router, prefix=api_prefix)
     app.include_router(taggers.router, prefix=api_prefix)

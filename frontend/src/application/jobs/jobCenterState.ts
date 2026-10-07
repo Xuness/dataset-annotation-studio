@@ -1,6 +1,10 @@
 import { createScopedViewState } from "../../shared/store/scopedViewState";
 
+export type JobCenterKind = "annotation" | "translation" | "character";
+
 export interface JobCenterView {
+  kind: JobCenterKind;
+  selectedCharacterId: string | null;
   selectedJobId: string | null;
 }
 
@@ -17,4 +21,6 @@ export function reconcileSelectedJobId(
 
 export const jobCenterViewState = createScopedViewState<JobCenterView>(() => ({
   selectedJobId: null,
+  kind: "annotation",
+  selectedCharacterId: null,
 }));

@@ -5,6 +5,8 @@ import type {
   AssetFolderSelectionRequest,
   AssetIdListResponse,
   AssetListResponse,
+  AssetLookupRequest,
+  AssetSummary,
   CandidateScope,
   CandidateSetSummary,
   CandidateUpdateRequest,
@@ -127,4 +129,15 @@ export function thumbnailUrl(
 ): string {
   const parameters = new URLSearchParams({ size: String(size), v: contentVersion });
   return apiAssetUrl(`/api/v1/workspaces/${projectId}/assets/${assetId}/thumbnail?${parameters}`);
+}
+
+export function lookupAsset(
+  projectId: string,
+  assetId: string,
+  query: AssetLookupRequest,
+): Promise<AssetSummary | null> {
+  return apiRequest(`/api/v1/workspaces/${projectId}/assets/${assetId}/lookup`, {
+    method: "POST",
+    body: JSON.stringify(query),
+  });
 }

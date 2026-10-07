@@ -6,183 +6,24 @@ from pathlib import Path
 
 from dataset_studio.core.sqlite import connect, transaction
 from dataset_studio.modules.annotations.projection import (
-    INVALID_VALIDATION_VALUES,
     document_state_projection_sql,
     resolve_document_row_state,
-    translation_dependency_stale_sql,
 )
 from dataset_studio.modules.assets.candidates import candidate_scope_clause
-from dataset_studio.modules.assets.models import AssetRecord, AssetSummary, CandidateScope
-
-
-def _latest_unresolved_generation_failure_sql(column: str) -> str:
-    if column not in {"id", "last_error"}:
-        raise ValueError("不支持的任务失败字段。")
-    return f"""
-    (
-        SELECT failed.{column}
-        FROM job_items failed
-        JOIN jobs failed_job ON failed_job.id = failed.job_id
-        WHERE failed.asset_id = assets.id
-          AND failed.status = 'failed'
-          AND NOT EXISTS (
-              SELECT 1
-              FROM job_items newer
-              JOIN jobs newer_job ON newer_job.id = newer.job_id
-              WHERE newer.asset_id = failed.asset_id
-                AND newer_job.output_channel = failed_job.output_channel
-                AND (
-                    failed_job.output_channel != 'translation'
-                    OR (
-                        LOWER(
-                            CASE
-                                WHEN json_valid(newer_job.configuration_snapshot)
-                                THEN COALESCE(
-                                    json_extract(
-                                        newer_job.configuration_snapshot,
-                                        '$.target_language'
-                                    ),
-                                    ''
-                                )
-                                ELSE ''
-                            END
-                        )
-                        =
-                        LOWER(
-                            CASE
-                                WHEN json_valid(failed_job.configuration_snapshot)
-                                THEN COALESCE(
-                                    json_extract(
-                                        failed_job.configuration_snapshot,
-                                        '$.target_language'
-                                    ),
-                                    ''
-                                )
-                                ELSE ''
-                            END
-                        )
-                        AND COALESCE(
-                            CASE
-                                WHEN json_valid(newer_job.configuration_snapshot)
-                                THEN json_extract(
-                                    newer_job.configuration_snapshot,
-                                    '$.translation_source_kind'
-                                )
-                            END,
-                            'description'
-                        )
-                        =
-                        COALESCE(
-                            CASE
-                                WHEN json_valid(failed_job.configuration_snapshot)
-                                THEN json_extract(
-                                    failed_job.configuration_snapshot,
-                                    '$.translation_source_kind'
-                                )
-                            END,
-                            'description'
-                        )
-                        AND COALESCE(
-                            CASE
-                                WHEN json_valid(newer_job.configuration_snapshot)
-                                THEN json_extract(
-                                    newer_job.configuration_snapshot,
-                                    '$.translation_producer_kind'
-                                )
-                            END,
-                            'llm'
-                        )
-                        =
-                        COALESCE(
-                            CASE
-                                WHEN json_valid(failed_job.configuration_snapshot)
-                                THEN json_extract(
-                                    failed_job.configuration_snapshot,
-                                    '$.translation_producer_kind'
-                                )
-                            END,
-                            'llm'
-                        )
-                    )
-                )
-                AND (
-                    newer.updated_at > failed.updated_at
-                    OR (
-                        newer.updated_at = failed.updated_at
-                        AND newer.rowid > failed.rowid
-                    )
-                )
-          )
-        ORDER BY failed.updated_at DESC, failed.rowid DESC
-        LIMIT 1
-    )
-    """
-
-
-LATEST_JOB_ERROR_SQL = _latest_unresolved_generation_failure_sql("last_error")
-UNRESOLVED_GENERATION_FAILURE_SQL = (
-    f"({_latest_unresolved_generation_failure_sql('id')} IS NOT NULL)"
+from dataset_studio.modules.assets.models import (
+    AssetLookupRequest,
+    AssetRecord,
+    AssetSummary,
+    CandidateScope,
 )
-
-REVIEW_VALIDATION_STATUSES = INVALID_VALIDATION_VALUES
-REVIEW_VALIDATION_SQL = ", ".join(f"'{status}'" for status in REVIEW_VALIDATION_STATUSES)
-
-TRANSLATION_DEPENDENCY_STALE_SQL = translation_dependency_stale_sql(
-    document_alias="d",
-    revision_alias="r",
-    asset_alias="assets",
+from dataset_studio.modules.assets.projections import (
+    ACTIVE_UNREVIEWED_DOCUMENT_SQL,
+    ASSET_SUMMARY_SELECT,
+    NEEDS_REVIEW_SQL,
+    REVIEW_VALIDATION_STATUSES,
+    STALE_DOCUMENT_SQL,
+    UNRESOLVED_GENERATION_FAILURE_SQL,
 )
-
-ACTIVE_UNREVIEWED_DOCUMENT_SQL = f"""
-EXISTS (
-    SELECT 1
-    FROM annotation_documents d
-    JOIN annotation_document_revisions r ON r.id = d.head_revision_id
-    WHERE d.asset_id = assets.id
-      AND r.is_tombstone = 0
-      AND r.image_content_hash = assets.content_hash
-      AND NOT ({TRANSLATION_DEPENDENCY_STALE_SQL})
-      AND r.validation_status NOT IN ({REVIEW_VALIDATION_SQL})
-      AND (
-          d.reviewed_revision_id IS NULL
-          OR d.reviewed_revision_id != d.head_revision_id
-      )
-)
-"""
-
-STALE_DOCUMENT_SQL = f"""
-EXISTS (
-    SELECT 1
-    FROM annotation_documents d
-    JOIN annotation_document_revisions r ON r.id = d.head_revision_id
-    WHERE d.asset_id = assets.id
-      AND r.is_tombstone = 0
-      AND (
-          r.image_content_hash != assets.content_hash
-          OR {TRANSLATION_DEPENDENCY_STALE_SQL}
-      )
-)
-"""
-
-INVALID_DOCUMENT_SQL = """
-EXISTS (
-    SELECT 1
-    FROM annotation_documents d
-    JOIN annotation_document_revisions r ON r.id = d.head_revision_id
-    WHERE d.asset_id = assets.id
-      AND r.is_tombstone = 0
-      AND r.validation_status IN ('invalid', 'encoding_error', 'empty', 'unchecked')
-)
-"""
-
-NEEDS_REVIEW_SQL = f"""
-(
-    {ACTIVE_UNREVIEWED_DOCUMENT_SQL}
-    OR {STALE_DOCUMENT_SQL}
-    OR {INVALID_DOCUMENT_SQL}
-    OR {UNRESOLVED_GENERATION_FAILURE_SQL}
-)
-"""
 
 
 class AssetRepository:
@@ -321,22 +162,7 @@ class AssetRepository:
             )
             rows = connection.execute(
                 f"""
-                SELECT id, relative_path, filename, suffix,
-                       content_hash AS content_version, byte_size, width, height,
-                       annotation_relative_path, annotation_status, metadata_relative_path,
-                       EXISTS (
-                           SELECT 1 FROM asset_candidates c WHERE c.asset_id = assets.id
-                       ) AS is_candidate,
-                       CASE
-                           WHEN {UNRESOLVED_GENERATION_FAILURE_SQL} THEN 'failed'
-                           ELSE NULL
-                       END AS generation_status,
-                       CASE
-                           WHEN {UNRESOLVED_GENERATION_FAILURE_SQL}
-                           THEN {LATEST_JOB_ERROR_SQL}
-                           ELSE NULL
-                       END AS generation_error
-                FROM assets
+                {ASSET_SUMMARY_SELECT}
                 WHERE {where}
                 ORDER BY relative_path COLLATE NOCASE
                 LIMIT ? OFFSET ?
@@ -380,6 +206,26 @@ class AssetRepository:
                 values["annotation_channels"] = channels_by_asset.get(str(row["id"]), {})
                 items.append(AssetSummary.model_validate(values))
             return items, total, status_counts
+        finally:
+            connection.close()
+
+    def lookup(self, asset_id: str, query: AssetLookupRequest) -> AssetSummary | None:
+        where, parameters = self._asset_filter(
+            query.search,
+            query.status,
+            (query.folder_path,),
+            query.candidate_scope,
+        )
+        connection = connect(self._database_path)
+        try:
+            row = connection.execute(
+                f"{ASSET_SUMMARY_SELECT} WHERE {where} AND assets.id=?",
+                [*parameters, asset_id],
+            ).fetchone()
+            if row is None:
+                return None
+            channels = self._channel_statuses(connection, [row])[asset_id]
+            return AssetSummary.model_validate({**dict(row), "annotation_channels": channels})
         finally:
             connection.close()
 
